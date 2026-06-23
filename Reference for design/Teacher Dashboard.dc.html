@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',sans-serif;background:#150729;color:#fff;overflow-x:hidden}
+  h1,h2,h3,h4{font-family:'Cairo',sans-serif}
+  .card{background:#241342;border:1px solid rgba(150,120,220,.14);border-radius:20px}
+  .lift{transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s}
+  .lift:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.4);border-color:rgba(180,150,250,.34)}
+  .navi{display:flex;align-items:center;gap:13px;padding:13px 16px;border-radius:14px;color:#b1a0d6;font-weight:600;font-size:15.5px;cursor:pointer;transition:background .22s,color .22s;text-decoration:none}
+  .navi:hover{background:rgba(255,255,255,.05);color:#fff}
+  .navi.on{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 12px 26px rgba(124,58,237,.42)}
+  .rail{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;cursor:pointer;color:#9c8cc0;transition:background .22s,color .22s}
+  .rail:hover{background:rgba(255,255,255,.06);color:#fff}
+  .rail.on{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;box-shadow:0 10px 22px rgba(124,58,237,.45)}
+  .lnk{color:#a78bf0;font-weight:700;font-size:13.5px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;transition:color .2s}
+  .lnk:hover{color:#c4b1fb}
+  .pill{font-size:12px;font-weight:700;padding:6px 14px;border-radius:30px;white-space:nowrap}
+  .ftbtn{width:100%;text-align:center;background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.3);border-radius:13px;padding:13px;color:#b69bf5;font-family:'Tajawal';font-weight:700;font-size:14.5px;cursor:pointer;transition:background .22s}
+  .ftbtn:hover{background:rgba(124,58,237,.24)}
+  .sbtn{cursor:pointer;border:1px solid rgba(150,120,220,.22);background:rgba(255,255,255,.04);border-radius:11px;padding:11px 16px;color:#cdbef0;font-family:'Tajawal';font-weight:700;font-size:13.5px;white-space:nowrap;transition:background .2s,border-color .2s}
+  .sbtn:hover{background:rgba(255,255,255,.08);border-color:rgba(180,150,250,.4)}
+  .ic{cursor:pointer;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.05);border:1px solid rgba(150,120,220,.18);transition:background .2s}
+  .ic:hover{background:rgba(255,255,255,.1)}
+  .ava{border-radius:50%;object-fit:cover;object-position:top;border:2px solid #2c1a4e}
+  .hamb,.botnav{display:none}
+  @media(max-width:1240px){.row5{flex-wrap:wrap}.stat{flex:1 1 30%!important;min-width:180px!important}}
+  @media(max-width:1080px){.row3>*{flex:1 1 100%!important}.col3>*{flex:1 1 100%!important}}
+  @media(max-width:1024px){
+    .iconrail{display:none!important}
+    .sidebar{position:fixed;inset-block:0;right:0;left:auto;z-index:95}
+    .hamb{display:grid!important}
+  }
+  @media(max-width:760px){
+    .main{padding:16px 14px 92px!important}
+    .botnav{display:flex!important}
+    .stat{flex:1 1 100%!important}
+    .hdr-card{display:none!important}
+  }
+</style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:linear-gradient(165deg,#1d0c3a 0%,#150729 60%,#10061f 100%);direction:rtl">
+
+  <!-- ===== RIGHT LABELED SIDEBAR ===== -->
+  <aside class="sidebar {{ drawerCls }}" style="flex:none;width:262px;background:linear-gradient(195deg,#22103f,#180a32);border-inline-start:1px solid rgba(150,120,220,.1);display:flex;flex-direction:column;padding:26px 18px;transform:{{ sidebarTf }}">
+    <h2 style="font-weight:800;font-size:21px;color:#fff;text-align:right;padding:2px 8px 22px">لوحة تحكم المعلم</h2>
+    <nav style="display:flex;flex-direction:column;gap:4px;flex:1">
+      <a class="navi on" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الرئيسية</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الطلاب</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الحصص والجداول</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18M8 3v4M16 3v4M8 15l2.5 2.5L16 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الحضور والغياب</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16l-7-3-7 3V4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 10l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>التقييمات والملاحظات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 4h8l3 3v13H5V4h3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الواجبات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>التقارير والإحصائيات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 17H7a4 4 0 0 1 0-8h2M15 7h2a4 4 0 0 1 0 8h-2M8 13h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>روابط الحصص</a>
+      <a class="navi" href="#" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:13px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الإشعارات</span><span style="background:#7c3aed;color:#fff;font-size:12px;font-weight:800;min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;padding:0 6px">5</span></a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8M4.6 9a1.6 1.6 0 0 0-.3-1.8m0 9.6A1.6 1.6 0 0 0 4.6 15m14.8-6a1.6 1.6 0 0 0 .3-1.8M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>الإعدادات</a>
+    </nav>
+    <button class="navi" style="border:1px solid rgba(150,120,220,.18);background:rgba(255,255,255,.03);justify-content:flex-start;margin-top:12px;font-family:'Tajawal'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M9 16l-4-4 4-4M5 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>تسجيل الخروج</button>
+  </aside>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;z-index:90;background:rgba(8,3,20,.6);backdrop-filter:blur(2px)"></div>
+  </sc-if>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main" style="flex:1;min-width:0;padding:24px clamp(16px,2.2vw,30px)">
+
+    <!-- header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px">
+      <div class="hdr-card card" style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:18px">
+        <img class="ava" src="images/teacher2.png" alt="أ. محمد حسن" style="width:54px;height:54px">
+        <div style="text-align:right"><div style="display:flex;align-items:center;gap:7px;font-weight:700;font-size:16px;color:#fff">أ. محمد حسن <svg width="17" height="17" viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2 9.5 4.6 6 4.2 5.4 7.7 2.3 9.4 3.9 12.5 2.3 15.6l3.1 1.7.6 3.5 3.5-.4L12 23l2.5-2.6 3.5.4.6-3.5 3.1-1.7-1.6-3.1 1.6-3.1-3.1-1.7-.6-3.5-3.5.4Z"/><path d="m8.5 12 2.3 2.3L15.5 9.5" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div style="color:#a394c4;font-size:13.5px;margin-top:2px">معلم قرآن كريم</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="text-align:left">
+          <h1 style="font-weight:800;font-size:clamp(26px,2.8vw,34px);color:#fff">مرحباً بك، <span style="color:#E8C76A">أ. محمد</span></h1>
+          <p style="color:#a394c4;font-size:15px;margin-top:5px">استمر في العطاء، فكل طالب يتعلم به صدقة جارية</p>
+        </div>
+        <button class="hamb" onClick="{{ openDrawer }}" aria-label="القائمة" style="cursor:pointer;width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.05);border:1px solid rgba(150,120,220,.2);place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#c4b1fb" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+
+    <!-- ===== ROW 1 stats ===== -->
+    <div class="row5" style="display:flex;gap:16px;margin-bottom:18px">
+      <div class="stat card lift" style="flex:1;min-width:175px;padding:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي الطلاب</span><span style="width:44px;height:44px;border-radius:13px;background:rgba(124,58,237,.18);display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#a855f7" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="#a855f7" stroke-width="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:38px;color:#fff;margin-top:10px;line-height:1">{{ nStudents }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">طالب</div>
+        <div style="border-top:1px solid rgba(150,120,220,.13);margin-top:14px;padding-top:12px"><a class="lnk" href="#">عرض التفاصيل ›</a></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:175px;padding:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">الحصص اليوم</span><span style="width:44px;height:44px;border-radius:13px;background:rgba(34,197,94,.16);display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="#34d399" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="#34d399" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:38px;color:#fff;margin-top:10px;line-height:1">{{ nSessions }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">حصص</div>
+        <div style="border-top:1px solid rgba(150,120,220,.13);margin-top:14px;padding-top:12px"><a class="lnk" href="#">عرض التفاصيل ›</a></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:175px;padding:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">متوسط التقييم</span><span style="width:44px;height:44px;border-radius:13px;background:rgba(232,199,106,.18);display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:38px;color:#fff;margin-top:10px;line-height:1">{{ nRating }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">من 5</div>
+        <div style="border-top:1px solid rgba(150,120,220,.13);margin-top:14px;padding-top:12px"><a class="lnk" href="#">عرض التفاصيل ›</a></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:175px;padding:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><span style="color:#a394c4;font-size:14px">نسبة الحضور</span><div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:10px;line-height:1">{{ nAttend }}</div><div style="color:#a394c4;font-size:13px;margin-top:4px">هذا الأسبوع</div></div>
+          <div style="position:relative;width:60px;height:60px;flex:none"><svg width="60" height="60" viewBox="0 0 60 60" style="transform:rotate(-90deg)"><circle cx="30" cy="30" r="25" fill="none" stroke="rgba(150,120,220,.16)" stroke-width="7"/><circle cx="30" cy="30" r="25" fill="none" stroke="#a855f7" stroke-width="7" stroke-linecap="round" stroke-dasharray="157.08" stroke-dashoffset="{{ attendOffset }}" style="transition:stroke-dashoffset .2s"/></svg></div>
+        </div>
+        <div style="border-top:1px solid rgba(150,120,220,.13);margin-top:14px;padding-top:12px"><a class="lnk" href="#">عرض التفاصيل ›</a></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:175px;padding:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">ساعات التدريس</span><span style="width:44px;height:44px;border-radius:13px;background:rgba(232,199,106,.16);display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#E8C76A" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="#E8C76A" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:38px;color:#fff;margin-top:10px;line-height:1">{{ nHours }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">ساعة هذا الشهر</div>
+        <div style="border-top:1px solid rgba(150,120,220,.13);margin-top:14px;padding-top:12px"><a class="lnk" href="#">عرض التفاصيل ›</a></div>
+      </div>
+    </div>
+
+    <!-- ===== ROW 2 ===== -->
+    <div class="row3" style="display:flex;gap:16px;margin-bottom:18px;align-items:stretch">
+
+      <!-- today sessions table -->
+      <div class="card lift" style="flex:1.7;min-width:330px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between"><a class="lnk" href="#">‹ عرض الجدول الكامل</a><h3 style="font-weight:800;font-size:18px;color:#fff">جدول الحصص اليوم</h3></div>
+        <div style="display:flex;flex-direction:column;gap:11px;margin-top:16px;flex:1">
+
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:12px 14px">
+            <button class="sbtn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);border:none;color:#fff">الدخول إلى الحصة</button>
+            <span class="pill" style="background:rgba(34,197,94,.18);color:#4ade80">جارية الآن</span>
+            <div style="display:flex;align-items:center;gap:8px"><div style="display:flex" dir="ltr"><img class="ava" src="images/teacher1.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher3.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher4.png" style="width:28px;height:28px;margin-inline-start:-8px"></div><span style="color:#a394c4;font-size:12.5px;white-space:nowrap">12 طالب</span></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15.5px;color:#fff">علوم القرآن</div><div style="color:#a394c4;font-size:12.5px">المستوى المتقدم</div></div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:12px 14px">
+            <button class="sbtn">تجهيز الحصة</button>
+            <span class="pill" style="background:rgba(59,130,246,.18);color:#60a5fa">قادمة</span>
+            <div style="display:flex;align-items:center;gap:8px"><div style="display:flex" dir="ltr"><img class="ava" src="images/teacher2.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher4.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher1.png" style="width:28px;height:28px;margin-inline-start:-8px"></div><span style="color:#a394c4;font-size:12.5px;white-space:nowrap">8 طالب</span></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15.5px;color:#fff">حفظ ومراجعة</div><div style="color:#a394c4;font-size:12.5px">المستوى المتوسط</div></div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:12px 14px">
+            <button class="sbtn">تجهيز الحصة</button>
+            <span class="pill" style="background:rgba(59,130,246,.18);color:#60a5fa">قادمة</span>
+            <div style="display:flex;align-items:center;gap:8px"><div style="display:flex" dir="ltr"><img class="ava" src="images/teacher3.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher2.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher1.png" style="width:28px;height:28px;margin-inline-start:-8px"></div><span style="color:#a394c4;font-size:12.5px;white-space:nowrap">10 طالب</span></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15.5px;color:#fff">تجويد</div><div style="color:#a394c4;font-size:12.5px">المستوى الأساسي</div></div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:12px 14px">
+            <button class="sbtn">عرض التفاصيل</button>
+            <span class="pill" style="background:rgba(232,199,106,.18);color:#E8C76A">لاحقاً</span>
+            <div style="display:flex;align-items:center;gap:8px"><div style="display:flex" dir="ltr"><img class="ava" src="images/teacher4.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher3.png" style="width:28px;height:28px;margin-inline-start:-8px"><img class="ava" src="images/teacher2.png" style="width:28px;height:28px;margin-inline-start:-8px"></div><span style="color:#a394c4;font-size:12.5px;white-space:nowrap">6 طالب</span></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15.5px;color:#fff">مراجعة الحفظ</div><div style="color:#a394c4;font-size:12.5px">المستوى المتقدم</div></div>
+          </div>
+        </div>
+        <button class="ftbtn" style="margin-top:14px">عرض جميع الحصص</button>
+      </div>
+
+      <!-- students -->
+      <div class="card lift" style="flex:1.5;min-width:300px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between"><a class="lnk" href="#">‹ عرض جميع الطلاب</a><h3 style="font-weight:800;font-size:18px;color:#fff">الطلاب</h3></div>
+        <div style="display:flex;gap:14px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
+          <div style="text-align:center"><img class="ava" src="images/teacher1.png" style="width:54px;height:54px"><div style="color:#c9bce4;font-size:12.5px;margin-top:6px">سارة أحمد</div></div>
+          <div style="text-align:center"><img class="ava" src="images/teacher1.png" style="width:54px;height:54px"><div style="color:#c9bce4;font-size:12.5px;margin-top:6px">فاطمة خالد</div></div>
+          <div style="text-align:center"><img class="ava" src="images/teacher3.png" style="width:54px;height:54px"><div style="color:#c9bce4;font-size:12.5px;margin-top:6px">محمد علي</div></div>
+          <div style="text-align:center"><img class="ava" src="images/teacher2.png" style="width:54px;height:54px"><div style="color:#c9bce4;font-size:12.5px;margin-top:6px">يوسف حسن</div></div>
+          <div style="text-align:center"><div style="width:54px;height:54px;border-radius:50%;border:2px dashed rgba(150,120,220,.4);display:grid;place-items:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#a78bf0" stroke-width="2" stroke-linecap="round"/></svg></div><div style="color:#a78bf0;font-size:12.5px;margin-top:6px">إضافة طالب</div></div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:16px;padding:16px;margin-top:18px;flex:1">
+          <div style="font-weight:700;font-size:15px;color:#fff;text-align:right;margin-bottom:14px">تقدم الطلاب</div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#4ade80;font-weight:700;font-size:14px;width:38px;text-align:left">90%</span>
+              <div style="flex:1;height:8px;border-radius:6px;background:rgba(150,120,220,.16);overflow:hidden"><div style="width:90%;height:100%;border-radius:6px;background:linear-gradient(90deg,#22c55e,#4ade80)"></div></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:130px"><div style="text-align:right;flex:1"><div style="font-weight:600;font-size:13.5px;color:#fff">يوسف حسن</div><div style="color:#9384b8;font-size:11.5px">المستوى المتقدم</div></div><img class="ava" src="images/teacher2.png" style="width:30px;height:30px"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#4ade80;font-weight:700;font-size:14px;width:38px;text-align:left">75%</span>
+              <div style="flex:1;height:8px;border-radius:6px;background:rgba(150,120,220,.16);overflow:hidden"><div style="width:75%;height:100%;border-radius:6px;background:linear-gradient(90deg,#22c55e,#4ade80)"></div></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:130px"><div style="text-align:right;flex:1"><div style="font-weight:600;font-size:13.5px;color:#fff">فاطمة خالد</div><div style="color:#9384b8;font-size:11.5px">المستوى المتوسط</div></div><img class="ava" src="images/teacher1.png" style="width:30px;height:30px"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#E8C76A;font-weight:700;font-size:14px;width:38px;text-align:left">60%</span>
+              <div style="flex:1;height:8px;border-radius:6px;background:rgba(150,120,220,.16);overflow:hidden"><div style="width:60%;height:100%;border-radius:6px;background:linear-gradient(90deg,#D4AF37,#E8C76A)"></div></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:130px"><div style="text-align:right;flex:1"><div style="font-weight:600;font-size:13.5px;color:#fff">محمد علي</div><div style="color:#9384b8;font-size:11.5px">المستوى الأساسي</div></div><img class="ava" src="images/teacher3.png" style="width:30px;height:30px"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#E8C76A;font-weight:700;font-size:14px;width:38px;text-align:left">45%</span>
+              <div style="flex:1;height:8px;border-radius:6px;background:rgba(150,120,220,.16);overflow:hidden"><div style="width:45%;height:100%;border-radius:6px;background:linear-gradient(90deg,#D4AF37,#E8C76A)"></div></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:130px"><div style="text-align:right;flex:1"><div style="font-weight:600;font-size:13.5px;color:#fff">سارة أحمد</div><div style="color:#9384b8;font-size:11.5px">المستوى الأساسي</div></div><img class="ava" src="images/teacher1.png" style="width:30px;height:30px"></div>
+            </div>
+          </div>
+        </div>
+        <button class="ftbtn" style="margin-top:14px">عرض تقرير تفصيلي</button>
+      </div>
+
+      <!-- assignments -->
+      <div class="card lift" style="flex:1.15;min-width:270px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between"><a class="lnk" href="#">عرض الكل</a><h3 style="font-weight:800;font-size:18px;color:#fff">أحدث الواجبات</h3></div>
+        <div style="display:flex;flex-direction:column;gap:11px;margin-top:16px;flex:1">
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:13px">
+            <div style="position:relative;width:54px;height:54px;flex:none"><svg width="54" height="54" viewBox="0 0 54 54" style="transform:rotate(-90deg)"><circle cx="27" cy="27" r="22" fill="none" stroke="rgba(150,120,220,.16)" stroke-width="6"/><circle cx="27" cy="27" r="22" fill="none" stroke="#34d399" stroke-width="6" stroke-linecap="round" stroke-dasharray="138.23" stroke-dashoffset="23"/></svg><div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;font-weight:800;color:#fff">10/12</div></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:14.5px;color:#fff">حفظ سورة الملك</div><div style="color:#a394c4;font-size:12px;margin-top:2px">المستوى المتقدم</div><div style="color:#8a7bb0;font-size:11.5px;margin-top:5px">تاريخ التسليم 10/24</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:13px">
+            <div style="position:relative;width:54px;height:54px;flex:none"><svg width="54" height="54" viewBox="0 0 54 54" style="transform:rotate(-90deg)"><circle cx="27" cy="27" r="22" fill="none" stroke="rgba(150,120,220,.16)" stroke-width="6"/><circle cx="27" cy="27" r="22" fill="none" stroke="#a855f7" stroke-width="6" stroke-linecap="round" stroke-dasharray="138.23" stroke-dashoffset="46"/></svg><div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;font-weight:800;color:#fff">8/12</div></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:14.5px;color:#fff">تفسير الآيات 1 - 10</div><div style="color:#a394c4;font-size:12px;margin-top:2px">المستوى المتوسط</div><div style="color:#8a7bb0;font-size:11.5px;margin-top:5px">تاريخ التسليم 10/24</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:13px">
+            <div style="position:relative;width:54px;height:54px;flex:none"><svg width="54" height="54" viewBox="0 0 54 54" style="transform:rotate(-90deg)"><circle cx="27" cy="27" r="22" fill="none" stroke="rgba(150,120,220,.16)" stroke-width="6"/><circle cx="27" cy="27" r="22" fill="none" stroke="#E8C76A" stroke-width="6" stroke-linecap="round" stroke-dasharray="138.23" stroke-dashoffset="34.5"/></svg><div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;font-weight:800;color:#fff">9/12</div></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:14.5px;color:#fff">أحكام النون الساكنة</div><div style="color:#a394c4;font-size:12px;margin-top:2px">المستوى الأساسي</div><div style="color:#8a7bb0;font-size:11.5px;margin-top:5px">تاريخ التسليم 10/24</div></div>
+          </div>
+        </div>
+        <button class="ftbtn" style="margin-top:14px">عرض جميع الواجبات</button>
+      </div>
+    </div>
+
+    <!-- ===== ROW 3 ===== -->
+    <div class="col3" style="display:flex;gap:16px;align-items:stretch">
+
+      <!-- performance chart -->
+      <div class="card lift" style="flex:1.9;min-width:320px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:18px">
+            <button style="cursor:pointer;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(150,120,220,.2);border-radius:11px;padding:8px 14px;font-family:'Tajawal';font-size:13px;color:#cdbef0;font-weight:600">أخر 7 أيام <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="#cdbef0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="display:flex;align-items:center;gap:6px;color:#a394c4;font-size:12.5px"><span style="width:14px;height:3px;border-radius:2px;background:#E8C76A"></span>عدد الحصص</span>
+              <span style="display:flex;align-items:center;gap:6px;color:#a394c4;font-size:12.5px"><span style="width:14px;height:3px;border-radius:2px;background:#a855f7"></span>ساعات التدريس</span>
+            </div>
+          </div>
+          <h3 style="font-weight:800;font-size:18px;color:#fff">إحصائيات الأداء</h3>
+        </div>
+        <div style="flex:1;margin-top:16px;min-height:230px">
+          <svg viewBox="0 0 620 240" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible">
+            <line x1="60" y1="20" x2="600" y2="20" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="60" y1="65" x2="600" y2="65" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="60" y1="110" x2="600" y2="110" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="60" y1="155" x2="600" y2="155" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="60" y1="200" x2="600" y2="200" stroke="rgba(150,120,220,.18)" stroke-width="1.2"/>
+            <text x="50" y="204" text-anchor="end" font-size="12" fill="#8a7bb0" font-family="Tajawal">0</text>
+            <text x="50" y="159" text-anchor="end" font-size="12" fill="#8a7bb0" font-family="Tajawal">10</text>
+            <text x="50" y="114" text-anchor="end" font-size="12" fill="#8a7bb0" font-family="Tajawal">20</text>
+            <text x="50" y="69" text-anchor="end" font-size="12" fill="#8a7bb0" font-family="Tajawal">30</text>
+            <text x="50" y="24" text-anchor="end" font-size="12" fill="#8a7bb0" font-family="Tajawal">40</text>
+            <polyline points="60,159.5 150,119 240,132.5 330,78.5 420,110 510,87.5 600,29" fill="none" stroke="#a855f7" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="60,168.5 150,150.5 240,114.5 330,128 420,33.5 510,123.5 600,56" fill="none" stroke="#E8C76A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <g fill="#a855f7"><circle cx="60" cy="159.5" r="3.5"/><circle cx="150" cy="119" r="3.5"/><circle cx="240" cy="132.5" r="3.5"/><circle cx="330" cy="78.5" r="3.5"/><circle cx="420" cy="110" r="3.5"/><circle cx="510" cy="87.5" r="3.5"/><circle cx="600" cy="29" r="3.5"/></g>
+            <g fill="#E8C76A"><circle cx="60" cy="168.5" r="3.5"/><circle cx="150" cy="150.5" r="3.5"/><circle cx="240" cy="114.5" r="3.5"/><circle cx="330" cy="128" r="3.5"/><circle cx="420" cy="33.5" r="3.5"/><circle cx="510" cy="123.5" r="3.5"/><circle cx="600" cy="56" r="3.5"/></g>
+            <text x="60" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">السبت</text>
+            <text x="150" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الأحد</text>
+            <text x="240" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الإثنين</text>
+            <text x="330" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الثلاثاء</text>
+            <text x="420" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الأربعاء</text>
+            <text x="510" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الخميس</text>
+            <text x="600" y="224" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الجمعة</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- quick reports -->
+      <div class="card lift" style="flex:1.05;min-width:230px;padding:20px">
+        <h3 style="font-weight:800;font-size:18px;color:#fff;text-align:right">التقارير السريعة</h3>
+        <div style="display:flex;gap:12px;margin-top:18px">
+          <div class="lift" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.12);border-radius:16px;padding:20px 10px;text-align:center;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="margin:0 auto 12px"><circle cx="9" cy="8" r="3" stroke="#a855f7" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="#a855f7" stroke-width="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/></svg><div style="font-size:13.5px;font-weight:700;color:#cfc3ea">تقرير الحضور</div></div>
+          <div class="lift" style="flex:1;background:linear-gradient(160deg,rgba(124,58,237,.22),rgba(124,58,237,.08));border:1px solid rgba(168,85,247,.4);border-radius:16px;padding:20px 10px;text-align:center;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="#E8C76A" style="margin:0 auto 12px"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><div style="font-size:13.5px;font-weight:700;color:#fff">تقرير التقييمات</div></div>
+          <div class="lift" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.12);border-radius:16px;padding:20px 10px;text-align:center;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="margin:0 auto 12px"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="#60a5fa" stroke-width="1.9" stroke-linecap="round"/></svg><div style="font-size:13.5px;font-weight:700;color:#cfc3ea">تقرير الواجبات</div></div>
+        </div>
+      </div>
+
+      <!-- session links -->
+      <div class="card lift" style="flex:1.3;min-width:270px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:10px"><button class="ic" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#a78bf0" stroke-width="2" stroke-linecap="round"/></svg></button><a class="lnk" href="#">‹ إدارة الروابط</a></div>
+          <h3 style="font-weight:800;font-size:18px;color:#fff">روابط الحصص</h3>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:13px">
+            <div style="display:flex;gap:8px"><button class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 13v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4" stroke="#cdbef0" stroke-width="1.7" stroke-linecap="round"/><rect x="11" y="3" width="9" height="9" rx="2" stroke="#cdbef0" stroke-width="1.7"/></svg></button><button class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4Z" stroke="#cdbef0" stroke-width="1.7" stroke-linejoin="round"/></svg></button></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15px;color:#fff">Zoom</div><div style="color:#a394c4;font-size:12.5px;direction:rtl">جلسة رقم 123 456 7890</div></div>
+            <div style="flex:none;width:42px;height:42px;border-radius:12px;background:#2563eb;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="12" height="10" rx="2.5" fill="#fff"/><path d="m16 10 5-3v10l-5-3v-4Z" fill="#fff"/></svg></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(150,120,220,.1);border-radius:14px;padding:13px">
+            <div style="display:flex;gap:8px"><button class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 13v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4" stroke="#cdbef0" stroke-width="1.7" stroke-linecap="round"/><rect x="11" y="3" width="9" height="9" rx="2" stroke="#cdbef0" stroke-width="1.7"/></svg></button><button class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4Z" stroke="#cdbef0" stroke-width="1.7" stroke-linejoin="round"/></svg></button></div>
+            <div style="flex:1;text-align:right;min-width:0"><div style="font-weight:700;font-size:15px;color:#fff">Google Meet</div><div style="color:#a394c4;font-size:12px;overflow:hidden;text-overflow:ellipsis;direction:ltr;text-align:right">meet.google.com/abc-defg-hij</div></div>
+            <div style="flex:none;width:42px;height:42px;border-radius:12px;background:#fff;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="11" height="10" rx="2.5" fill="#00ac47"/><path d="m14 11 3-2v6l-3-2" fill="#ffba00"/><path d="m17 9 4-2v10l-4-2V9Z" fill="#2684fc"/><path d="M14 11v2l3 2v-2l-3-2Z" fill="#ea4335"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== LEFT ICON RAIL ===== -->
+  <aside class="iconrail" style="flex:none;width:80px;background:linear-gradient(195deg,#1d0c3a,#150729);border-inline-end:1px solid rgba(150,120,220,.1);display:flex;flex-direction:column;align-items:center;padding:22px 0;gap:8px">
+    <div style="width:52px;height:52px;border-radius:15px;border:1.5px solid rgba(212,175,55,.55);display:grid;place-items:center;margin-bottom:14px">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none"><circle cx="24.5" cy="6" r="2.2" stroke="#E8C76A" stroke-width="1.4"/><path d="M16 6.5c2.6 0 4.2 2 4.2 4.2H11.8C11.8 8.5 13.4 6.5 16 6.5Z" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 8.7v2.2" stroke="#E8C76A" stroke-width="1.4"/><path d="M8 27V15.5c0-1 .6-1.9 1.5-2.3L16 10l6.5 3.2c.9.4 1.5 1.3 1.5 2.3V27" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M13.2 27v-4.4c0-1.5 1.2-2.7 2.8-2.7s2.8 1.2 2.8 2.7V27" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 27h21" stroke="#E8C76A" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+    <div class="rail on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.8"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="currentColor" stroke-width="1.8"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 6c-1.6-1.1-3.7-1.7-6-1.7v14c2.3 0 4.4.6 6 1.7 1.6-1.1 3.7-1.7 6-1.7v-14c-2.3 0-4.4.6-6 1.7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6v14" stroke="currentColor" stroke-width="1.6"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 4h8l3 3v13H5V4h3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16l-7-3-7 3V4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L4 21l1.1-3.9A8.4 8.4 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div style="flex:1"></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+    <div class="rail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5M12 17h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+      <div style="position:relative"><img class="ava" src="images/teacher2.png" style="width:46px;height:46px;border:2px solid rgba(212,175,55,.6)"><span style="position:absolute;bottom:0;inset-inline-end:0;width:11px;height:11px;border-radius:50%;background:#22c55e;border:2px solid #150729"></span></div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="#8a7bb0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </aside>
+
+  <!-- bottom nav (mobile) -->
+  <nav class="botnav" style="position:fixed;bottom:0;inset-inline:0;z-index:80;background:#1d0c3a;border-top:1px solid rgba(150,120,220,.12);padding:8px 10px;align-items:center;justify-content:space-around;box-shadow:0 -8px 24px rgba(0,0,0,.4)">
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#a855f7;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الرئيسية</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الطلاب</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الحصص</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16l-7-3-7 3V4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>الواجبات</a>
+    <a href="#" onClick="{{ openDrawer }}" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>المزيد</a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { p: 0, drawer: false, isMobile: false };
+
+  componentDidMount() {
+    this._mq = window.matchMedia('(max-width:1024px)');
+    this._onMq = () => this.setState({ isMobile: this._mq.matches, drawer: false });
+    this.setState({ isMobile: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+    const start = performance.now(), dur = 1400;
+    this._timer = setInterval(() => {
+      const t = Math.min(1, (performance.now() - start) / dur);
+      this.setState({ p: 1 - Math.pow(1 - t, 3) });
+      if (t >= 1) { clearInterval(this._timer); this._timer = null; }
+    }, 33);
+  }
+  componentWillUnmount() {
+    if (this._timer) clearInterval(this._timer);
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+
+  openDrawer() { this.setState({ drawer: true }); }
+  closeDrawer() { this.setState({ drawer: false }); }
+
+  renderVals() {
+    const circ = 157.08;
+    const p = this.state.p;
+    const attend = 95 * p;
+    return {
+      nStudents: Math.round(128 * p),
+      nSessions: Math.round(4 * p),
+      nRating: (4.9 * p).toFixed(1),
+      nAttend: Math.round(attend) + '%',
+      nHours: Math.round(32 * p),
+      attendOffset: circ * (1 - attend / 100),
+      drawerOpen: this.state.drawer && this.state.isMobile,
+      drawerCls: this.state.drawer ? 'open' : '',
+      sidebarTf: (this.state.isMobile && !this.state.drawer) ? 'translateX(100%)' : 'translateX(0)',
+      openDrawer: () => this.openDrawer(),
+      closeDrawer: () => this.closeDrawer(),
+    };
+  }
+}
+</script>
+</body>
+</html>

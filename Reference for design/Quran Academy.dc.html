@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:'Tajawal',sans-serif;background:#0f0226;color:#111827;direction:rtl;overflow-x:hidden}
+  h1,h2,h3,h4{font-family:'Cairo',sans-serif}
+  @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-18px) rotate(-6deg)}}
+  @keyframes glowpulse{0%,100%{opacity:.55}50%{opacity:1}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes spinslow{to{transform:rotate(360deg)}}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  .reveal{animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) both}
+  .navlink{position:relative;color:#E7E0F5;text-decoration:none;transition:color .25s;white-space:nowrap}
+  .navlink:hover{color:#E8C76A}
+  .gbtn{transition:transform .25s, box-shadow .25s, filter .25s}
+  .gbtn:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(212,175,55,.45)}
+  .obtn{transition:transform .25s, border-color .25s, background .25s}
+  .obtn:hover{transform:translateY(-2px);border-color:#E8C76A;background:rgba(232,199,106,.08)}
+  .lift{transition:transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s}
+  .lift:hover{transform:translateY(-8px)}
+  @media(min-width:981px){.mobile-menu{display:none!important}}
+  @media(max-width:980px){
+    .nav-mid{display:none!important}
+    .nav-login{display:none!important}
+    .hamburger{display:grid!important}
+  }
+  @media(max-width:860px){
+    .lead{order:-1!important}
+    #community .comm-stats{order:3!important}
+  }
+  @media(max-width:760px){
+    .listen-widget{display:none!important}
+    .hero-stats{flex-wrap:wrap;gap:18px 26px!important}
+    .stat-div{display:none!important}
+  }
+  @media(max-width:600px){
+    .nav-cta{display:none!important}
+  }
+  @media(max-width:560px){
+    .hero-cta{flex-direction:column;align-items:stretch}
+    .hero-cta button{width:100%;justify-content:center}
+    .hero-stats{display:grid!important;grid-template-columns:1fr 1fr;gap:22px 12px!important;justify-items:center}
+    .stat-div{display:none!important}
+  }
+</style>
+</helmet>
+
+<div style="background:#0f0226;width:100%;overflow:hidden">
+
+<header style="position:fixed;top:0;inset-inline:0;z-index:80;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:13px clamp(18px,4.5vw,68px);background:{{ navBg }};box-shadow:{{ navShadow }};backdrop-filter:blur(12px);transition:background .35s,box-shadow .35s">
+  <div style="display:flex;align-items:center;gap:11px;flex:none">
+    <img src="images/logo.jpg" alt="ترتيلة أونلاين" style="width:50px;height:50px;border-radius:13px;object-fit:cover;border:1px solid rgba(212,175,55,.45);box-shadow:0 6px 18px rgba(0,0,0,.4)">
+    <div style="line-height:1.18"><div style="color:#F3E6C0;font-family:'Cairo';font-weight:800;font-size:17px;letter-spacing:.3px">ترتيلة</div><div style="color:#9b7fd6;font-size:10px;letter-spacing:3px;font-weight:600">ONLINE</div></div>
+  </div>
+  <nav class="nav-mid" style="display:flex;align-items:center;gap:clamp(16px,2.3vw,32px);font-weight:500;font-size:16px">
+    <a class="navlink" href="#contact">تواصل معنا</a>
+    <a class="navlink" href="#community">من نحن</a>
+    <a class="navlink" href="#pricing">الأسعار</a>
+    <a class="navlink" href="#teachers">المعلمون</a>
+    <a class="navlink" href="#journey">مسارات التعلم</a>
+    <a class="navlink" href="#top" style="color:#E8C76A;font-weight:700">الرئيسية<span style="position:absolute;inset-inline:0;bottom:-9px;height:3px;border-radius:3px;background:linear-gradient(90deg,#D4AF37,#E8C76A)"></span></a>
+  </nav>
+  <div style="display:flex;align-items:center;gap:13px;flex:none">
+    <button class="obtn nav-login" style="cursor:pointer;font-family:'Tajawal';font-weight:600;font-size:15px;color:#Eadfff;background:transparent;border:1.5px solid rgba(232,199,106,.45);border-radius:30px;padding:11px 24px">تسجيل الدخول</button>
+    <button class="gbtn nav-cta" style="cursor:pointer;font-family:'Tajawal';font-weight:700;font-size:15px;color:#2a1500;background:linear-gradient(135deg,#E8C76A,#D4AF37);border:none;border-radius:30px;padding:12px 26px;box-shadow:0 10px 26px rgba(212,175,55,.4)">ابدأ رحلتك الآن</button>
+    <button class="hamburger" onClick="{{ toggleMenu }}" aria-label="القائمة" style="cursor:pointer;display:none;width:46px;height:46px;border-radius:12px;border:1px solid rgba(232,199,106,.4);background:rgba(255,255,255,.05);place-items:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#E8C76A" stroke-width="1.9" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="mobile-menu" style="position:fixed;top:76px;inset-inline:0;z-index:75;background:rgba(15,3,38,.98);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.08);padding:14px clamp(20px,5vw,68px) 24px;display:flex;flex-direction:column;box-shadow:0 24px 44px rgba(0,0,0,.55)">
+    <a class="navlink" onClick="{{ closeMenu }}" href="#top" style="padding:14px 4px;font-size:17px;color:#E8C76A;font-weight:700;border-bottom:1px solid rgba(255,255,255,.06)">الرئيسية</a>
+    <a class="navlink" onClick="{{ closeMenu }}" href="#journey" style="padding:14px 4px;font-size:17px;border-bottom:1px solid rgba(255,255,255,.06)">مسارات التعلم</a>
+    <a class="navlink" onClick="{{ closeMenu }}" href="#teachers" style="padding:14px 4px;font-size:17px;border-bottom:1px solid rgba(255,255,255,.06)">المعلمون</a>
+    <a class="navlink" onClick="{{ closeMenu }}" href="#pricing" style="padding:14px 4px;font-size:17px;border-bottom:1px solid rgba(255,255,255,.06)">الأسعار</a>
+    <a class="navlink" onClick="{{ closeMenu }}" href="#community" style="padding:14px 4px;font-size:17px;border-bottom:1px solid rgba(255,255,255,.06)">من نحن</a>
+    <a class="navlink" onClick="{{ closeMenu }}" href="#contact" style="padding:14px 4px;font-size:17px">تواصل معنا</a>
+    <div style="display:flex;gap:12px;margin-top:18px">
+      <button class="obtn" style="cursor:pointer;flex:1;font-family:'Tajawal';font-weight:600;font-size:15px;color:#Eadfff;background:transparent;border:1.5px solid rgba(232,199,106,.45);border-radius:30px;padding:13px">تسجيل الدخول</button>
+      <button class="gbtn" style="cursor:pointer;flex:1;font-family:'Tajawal';font-weight:700;font-size:15px;color:#2a1500;background:linear-gradient(135deg,#E8C76A,#D4AF37);border:none;border-radius:30px;padding:13px">ابدأ رحلتك الآن</button>
+    </div>
+  </div>
+</sc-if>
+
+<section id="top" style="position:relative;min-height:780px;padding:120px clamp(20px,5vw,68px) 36px;background:#150232 url('images/hero_bg.png') center/cover no-repeat;display:flex;flex-direction:column;justify-content:center;overflow:hidden">
+  <div style="position:absolute;inset:0;background:linear-gradient(270deg,rgba(15,2,38,.72) 0%,rgba(15,2,38,.32) 38%,rgba(15,2,38,0) 60%)"></div>
+
+  <div style="position:absolute;inset-inline-end:clamp(18px,5vw,70px);top:42%;z-index:3;display:flex;align-items:center;gap:14px" class="reveal listen-widget">
+    <button class="gbtn" style="cursor:pointer;width:62px;height:62px;border-radius:50%;border:2px solid rgba(232,199,106,.7);background:rgba(20,4,46,.35);display:grid;place-items:center;backdrop-filter:blur(4px)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#E8C76A"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <div style="line-height:1.5"><div style="color:#cdbfe8;font-size:14px;font-weight:500">استمع لتلاوة</div><div style="color:#fff;font-size:17px;font-weight:700;font-family:'Cairo'">سورة الرحمن</div></div>
+  </div>
+
+  <div style="position:relative;z-index:4;max-width:1340px;margin:0 auto;width:100%;display:flex;justify-content:flex-start">
+    <div style="width:min(620px,100%);text-align:right">
+      <h1 class="reveal" style="font-weight:900;line-height:1.12;font-size:clamp(40px,5.8vw,82px);color:#fff;letter-spacing:-1px">
+        تعلم <span style="background:linear-gradient(120deg,#E8C76A,#D4AF37);-webkit-background-clip:text;background-clip:text;color:transparent">القرآن</span><br>كما لم تتخيل من قبل
+      </h1>
+      <p class="reveal" style="margin-top:22px;font-size:clamp(17px,1.5vw,21px);line-height:1.85;color:#cfc3e8;font-weight:400;max-width:540px;margin-inline-end:auto">
+        منصة تربوية أونلاين تجمع بين <span style="color:#E8C76A">أصالة العلم</span> وقوة التقنية لتمنحك <span style="color:#E8C76A">تجربة تعلم فريدة</span> وملهمة.
+      </p>
+      <div class="reveal hero-cta" style="margin-top:32px;display:flex;gap:16px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="obtn" style="cursor:pointer;display:flex;align-items:center;gap:12px;font-family:'Tajawal';font-weight:700;font-size:17px;color:#fff;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.22);border-radius:38px;padding:16px 32px">استكشف المسارات <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="gbtn" style="cursor:pointer;display:flex;align-items:center;gap:12px;font-family:'Tajawal';font-weight:800;font-size:17px;color:#2a1500;background:linear-gradient(135deg,#E8C76A,#D4AF37);border:none;border-radius:38px;padding:16px 36px;box-shadow:0 14px 34px rgba(212,175,55,.42)">ابدأ رحلتك الآن <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+
+      <div class="hero-stats reveal" style="margin-top:48px;display:flex;align-items:center;justify-content:flex-end;gap:clamp(18px,2.6vw,40px)">
+        <div style="text-align:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="margin:0 auto 8px"><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0" stroke="#E8C76A" stroke-width="1.7" stroke-linecap="round"/></svg><div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:clamp(22px,2.2vw,28px)">{{ statStudents }}</div><div style="color:#b3a4d0;font-size:14px;margin-top:2px">طالب وطالبة</div></div>
+        <div class="stat-div" style="width:1px;height:52px;background:rgba(255,255,255,.16)"></div>
+        <div style="text-align:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="margin:0 auto 8px"><path d="m12 4 10 5-10 5L2 9l10-5Z" stroke="#E8C76A" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 11v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" stroke="#E8C76A" stroke-width="1.7" stroke-linecap="round"/></svg><div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:clamp(22px,2.2vw,28px)">{{ statTeachers }}</div><div style="color:#b3a4d0;font-size:14px;margin-top:2px">معلم متخصص</div></div>
+        <div class="stat-div" style="width:1px;height:52px;background:rgba(255,255,255,.16)"></div>
+        <div style="text-align:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="margin:0 auto 8px"><circle cx="12" cy="12" r="9" stroke="#E8C76A" stroke-width="1.7"/><path d="M12 7v5l3 3" stroke="#E8C76A" stroke-width="1.7" stroke-linecap="round"/></svg><div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:clamp(22px,2.2vw,28px)">{{ statHours }}</div><div style="color:#b3a4d0;font-size:14px;margin-top:2px">ساعة تعليمية</div></div>
+        <div class="stat-div" style="width:1px;height:52px;background:rgba(255,255,255,.16)"></div>
+        <div style="text-align:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="#E8C76A" style="margin:0 auto 8px"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:clamp(22px,2.2vw,28px)">{{ statRating }}</div><div style="color:#b3a4d0;font-size:14px;margin-top:2px">تقييم الطلاب</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;bottom:18px;inset-inline-start:50%;transform:translateX(-50%);z-index:4">
+    <div style="width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(232,199,106,.5);display:grid;place-items:center;animation:floaty 2.4s ease-in-out infinite">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6M6 4l6 6 6-6" stroke="#E8C76A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </div>
+</section>
+
+<section id="journey" style="background:#F6F4FB;padding:clamp(64px,8vw,110px) clamp(20px,5vw,68px)">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;gap:clamp(32px,5vw,72px);flex-wrap:wrap">
+
+    <div style="flex:1 1 600px;min-width:0;display:flex;align-items:stretch;gap:14px;justify-content:flex-start;overflow-x:auto;padding-bottom:8px" dir="ltr">
+      <div style="display:flex;align-items:flex-end;gap:0;flex:1">
+        <!-- step 1 -->
+        <div class="lift" style="flex:1;min-width:138px;background:#fff;border-radius:20px;padding:26px 16px;text-align:center;box-shadow:0 14px 36px rgba(36,12,82,.07);border:1px solid #eee6f7;align-self:center">
+          <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#F1ECFb;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#6D34D6" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#6D34D6" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#6D34D6" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#6D34D6" stroke-width="1.7"/></svg></div>
+          <div style="margin-top:14px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">1</div>
+          <div dir="rtl" style="margin-top:8px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">تقييم المستوى</div>
+          <div dir="rtl" style="margin-top:8px;color:#6B7280;font-size:14px;line-height:1.7">اختبار تحديد المستوى لتحديد نقاط القوة لديك بدقة</div>
+        </div>
+        <div style="align-self:center;flex:none;width:34px;height:30px"><svg width="34" height="30" viewBox="0 0 34 30" fill="none"><path d="M2 22C10 22 9 8 17 8s7 14 15 14" stroke="#b9a4ec" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="0.1 7"/><circle cx="32" cy="22" r="2.4" fill="#b9a4ec"/></svg></div>
+        <!-- step 2 -->
+        <div class="lift" style="flex:1;min-width:138px;background:#fff;border-radius:20px;padding:26px 16px;text-align:center;box-shadow:0 14px 36px rgba(36,12,82,.07);border:1px solid #eee6f7;align-self:center">
+          <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#F1ECFb;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 6c-1.6-1-3.6-1.5-6-1.5v13c2.4 0 4.4.5 6 1.5 1.6-1 3.6-1.5 6-1.5v-13c-2.4 0-4.4.5-6 1.5Z" stroke="#6D34D6" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6v13" stroke="#6D34D6" stroke-width="1.6"/></svg></div>
+          <div style="margin-top:14px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">2</div>
+          <div dir="rtl" style="margin-top:8px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">خطة مخصصة</div>
+          <div dir="rtl" style="margin-top:8px;color:#6B7280;font-size:14px;line-height:1.7">خطة تعلم خاصة تناسب أهدافك ووقتك</div>
+        </div>
+        <div style="align-self:center;flex:none;width:34px;height:30px"><svg width="34" height="30" viewBox="0 0 34 30" fill="none"><path d="M2 22C10 22 9 8 17 8s7 14 15 14" stroke="#E8A23C" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="0.1 7"/><circle cx="32" cy="22" r="2.4" fill="#E8A23C"/></svg></div>
+        <!-- step 3 active -->
+        <div class="lift" style="flex:1.05;min-width:148px;background:#fff;border-radius:22px;padding:32px 16px;text-align:center;box-shadow:0 22px 50px rgba(212,150,40,.22);border:2px solid #E8B24A;align-self:stretch;display:flex;flex-direction:column;justify-content:center">
+          <div style="width:56px;height:56px;margin:0 auto;border-radius:50%;background:#fff;border:2px solid #E8B24A;display:grid;place-items:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#E29A2E" stroke-width="1.7"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#E29A2E" stroke-width="1.7" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="#E29A2E" stroke-width="1.7"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#E29A2E" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+          <div style="margin-top:14px;font-family:'Cairo';font-weight:800;color:#E29A2E;font-size:18px">3</div>
+          <div dir="rtl" style="margin-top:8px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">تعلم وتطوير</div>
+          <div dir="rtl" style="margin-top:8px;color:#6B7280;font-size:14px;line-height:1.7">تعلم مع معلمين متخصصين ومتابعة مستمرة</div>
+        </div>
+        <div style="align-self:center;flex:none;width:34px;height:30px"><svg width="34" height="30" viewBox="0 0 34 30" fill="none"><path d="M2 22C10 22 9 8 17 8s7 14 15 14" stroke="#E8A23C" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="0.1 7"/><circle cx="2" cy="22" r="2.4" fill="#E8A23C"/></svg></div>
+        <!-- step 4 -->
+        <div class="lift" style="flex:1;min-width:138px;background:#fff;border-radius:20px;padding:26px 16px;text-align:center;box-shadow:0 14px 36px rgba(36,12,82,.07);border:1px solid #eee6f7;align-self:center">
+          <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#F1ECFb;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16l3-4 3 3 4-6" stroke="#6D34D6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="margin-top:14px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">4</div>
+          <div dir="rtl" style="margin-top:8px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">ممارسة وتطبيق</div>
+          <div dir="rtl" style="margin-top:8px;color:#6B7280;font-size:14px;line-height:1.7">تطبيق ما تعلمته من خلال أنشطة تفاعلية</div>
+        </div>
+        <div style="align-self:center;flex:none;width:34px;height:30px"><svg width="34" height="30" viewBox="0 0 34 30" fill="none"><path d="M2 22C10 22 9 8 17 8s7 14 15 14" stroke="#b9a4ec" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="0.1 7"/><circle cx="32" cy="22" r="2.4" fill="#b9a4ec"/></svg></div>
+        <!-- step 5 -->
+        <div class="lift" style="flex:1;min-width:138px;background:#fff;border-radius:20px;padding:26px 16px;text-align:center;box-shadow:0 14px 36px rgba(36,12,82,.07);border:1px solid #eee6f7;align-self:center">
+          <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#F1ECFb;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" stroke="#6D34D6" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 5h2.5a2.5 2.5 0 0 1-2.5 4M7 5H4.5A2.5 2.5 0 0 0 7 9M10 14h4M9 20h6M12 14v6" stroke="#6D34D6" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+          <div style="margin-top:14px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">5</div>
+          <div dir="rtl" style="margin-top:8px;font-family:'Cairo';font-weight:800;color:#1A0447;font-size:18px">إتقان وتحقيق</div>
+          <div dir="rtl" style="margin-top:8px;color:#6B7280;font-size:14px;line-height:1.7">تقييم التقدم والاحتفال بالإنجاز بإتقان</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lead" style="flex:0 1 360px;min-width:280px;text-align:right">
+      <h2 style="font-weight:800;font-size:clamp(34px,4vw,52px);line-height:1.2">
+        <span style="background:linear-gradient(120deg,#7C3AED,#9b5cf0);-webkit-background-clip:text;background-clip:text;color:transparent">ابدأ رحلتك</span><br>
+        <span style="color:#1A0447">مع القرآن</span>
+      </h2>
+      <p style="margin-top:20px;color:#6B7280;font-size:17px;line-height:1.9;max-width:380px;margin-inline-end:0;margin-inline-start:auto">اختر المسار الذي يناسبك، وسنرشدك خطوة بخطوة حتى تحقق هدفك في تعلم كتاب الله</p>
+      <button class="gbtn" style="cursor:pointer;margin-top:28px;display:inline-flex;align-items:center;gap:12px;font-family:'Tajawal';font-weight:700;font-size:17px;color:#fff;background:linear-gradient(135deg,#6D34D6,#4B1Fb0);border:none;border-radius:14px;padding:16px 30px;box-shadow:0 16px 34px rgba(75,31,176,.32)">اختر مسارك الآن <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+
+  </div>
+</section>
+
+<section id="teachers" style="position:relative;background:radial-gradient(120% 90% at 100% 0%,#3a1273 0%,#1c0942 45%,#140530 100%);padding:clamp(64px,8vw,108px) clamp(20px,5vw,68px);overflow:hidden">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;gap:clamp(30px,4vw,64px);flex-wrap:wrap">
+
+    <div style="flex:1 1 720px;min-width:300px;order:1">
+      <div style="display:flex;gap:clamp(16px,1.8vw,26px);overflow-x:auto;padding-bottom:6px">
+        <div class="lift" style="flex:1 0 215px;background:#1d0c40;border:1px solid rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
+          <img src="images/teacher1.png" alt="أ. فاطمة محمد" style="width:100%;height:268px;object-fit:cover;display:block">
+          <div style="padding:16px 18px 18px">
+            <div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:18px">أ. فاطمة محمد</div>
+            <div style="color:#b6a6d8;font-size:14px;margin-top:5px">إجازة في حفص عن عاصم</div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:6px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><span style="color:#fff;font-weight:700;font-size:15px">4.9</span></div>
+          </div>
+        </div>
+        <div class="lift" style="flex:1 0 215px;background:#1d0c40;border:1px solid rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
+          <img src="images/teacher2.png" alt="أ. أحمد حسن" style="width:100%;height:268px;object-fit:cover;display:block">
+          <div style="padding:16px 18px 18px">
+            <div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:18px">أ. أحمد حسن</div>
+            <div style="color:#b6a6d8;font-size:14px;margin-top:5px">إجازة في حفص عن عاصم</div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:6px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><span style="color:#fff;font-weight:700;font-size:15px">5.0</span></div>
+          </div>
+        </div>
+        <div class="lift" style="flex:1 0 215px;background:#1d0c40;border:1px solid rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
+          <img src="images/teacher3.png" alt="أ. محمد الغامدي" style="width:100%;height:268px;object-fit:cover;display:block">
+          <div style="padding:16px 18px 18px">
+            <div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:18px">أ. محمد الغامدي</div>
+            <div style="color:#b6a6d8;font-size:14px;margin-top:5px">إجازة في شعبة عن عاصم</div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:6px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><span style="color:#fff;font-weight:700;font-size:15px">4.9</span></div>
+          </div>
+        </div>
+        <div class="lift" style="flex:1 0 215px;background:#1d0c40;border:1px solid rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
+          <img src="images/teacher4.png" alt="أ. سيف عبدالله" style="width:100%;height:268px;object-fit:cover;display:block">
+          <div style="padding:16px 18px 18px">
+            <div style="color:#fff;font-family:'Cairo';font-weight:800;font-size:18px">أ. سيف عبدالله</div>
+            <div style="color:#b6a6d8;font-size:14px;margin-top:5px">إجازة في ورش عن نافع</div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:6px"><svg width="17" height="17" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg><span style="color:#fff;font-weight:700;font-size:15px">4.8</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:22px">
+        <button class="obtn" style="cursor:pointer;width:46px;height:46px;border-radius:50%;border:1px solid rgba(232,199,106,.4);background:transparent;display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#E8C76A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="obtn" style="cursor:pointer;width:46px;height:46px;border-radius:50%;border:1px solid rgba(232,199,106,.4);background:transparent;display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#E8C76A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
+
+    <div class="lead" style="flex:0 1 330px;min-width:280px;text-align:right;order:2">
+      <div style="color:#9b6cf0;font-weight:700;font-size:16px;margin-bottom:14px">معلمون متخصصون</div>
+      <h2 style="font-weight:800;font-size:clamp(34px,4vw,52px);line-height:1.2;color:#fff">تعلم على يد<br>أهل القرآن</h2>
+      <p style="margin-top:20px;color:#c4b6e0;font-size:17px;line-height:1.9;max-width:360px;margin-inline-start:auto">نخبة من المعلمين المتخصصين في القراءات والتجويد وعلوم القرآن لمساعدتك على الإتقان خطوة بخطوة</p>
+      <button class="obtn" style="cursor:pointer;margin-top:28px;font-family:'Tajawal';font-weight:700;font-size:17px;color:#fff;background:transparent;border:1.5px solid rgba(232,199,106,.55);border-radius:34px;padding:15px 34px">عرض جميع المعلمين</button>
+    </div>
+
+  </div>
+</section>
+
+<section id="platform" style="background:#F8F7FC;padding:clamp(64px,8vw,108px) clamp(20px,5vw,68px)">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;gap:clamp(34px,5vw,70px);flex-wrap:wrap">
+
+    <div class="lead" style="flex:0 1 360px;min-width:280px;text-align:right;order:2">
+      <h2 style="font-weight:800;font-size:clamp(32px,3.6vw,50px);line-height:1.25">
+        <span style="background:linear-gradient(120deg,#7C3AED,#9b5cf0);-webkit-background-clip:text;background-clip:text;color:transparent">منصة ذكية</span><br>
+        <span style="color:#1A0447">لتجربة تعلم متكاملة</span>
+      </h2>
+      <div style="margin-top:28px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;gap:12px;justify-content:flex-start;flex-direction:row-reverse"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#E6F4EC;display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#1F9D57" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="color:#374151;font-size:16.5px">لوحة تحكم ذكية لمتابعتك خطوة بخطوة</span></div>
+        <div style="display:flex;align-items:center;gap:12px;justify-content:flex-start;flex-direction:row-reverse"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#E6F4EC;display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#1F9D57" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="color:#374151;font-size:16.5px">دورة الحفظ بسهولة مع أفضل المعلمين</span></div>
+        <div style="display:flex;align-items:center;gap:12px;justify-content:flex-start;flex-direction:row-reverse"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#E6F4EC;display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#1F9D57" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="color:#374151;font-size:16.5px">التقارير اليومية وتحليلات التطور الأسبوعية</span></div>
+        <div style="display:flex;align-items:center;gap:12px;justify-content:flex-start;flex-direction:row-reverse"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#E6F4EC;display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#1F9D57" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="color:#374151;font-size:16.5px">محتوى تفاعلي واختبارات ذكية</span></div>
+      </div>
+      <button class="gbtn" style="cursor:pointer;margin-top:30px;display:inline-flex;align-items:center;gap:12px;font-family:'Tajawal';font-weight:700;font-size:17px;color:#fff;background:linear-gradient(135deg,#6D34D6,#4B1Fb0);border:none;border-radius:14px;padding:16px 30px;box-shadow:0 16px 34px rgba(75,31,176,.28)">استكشف المنصة <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <div style="flex:1 1 600px;min-width:300px;order:1">
+      <img src="images/dashboard.png" alt="لوحة التحكم الذكية" style="width:100%;height:auto;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(36,12,82,.16))">
+    </div>
+
+  </div>
+</section>
+
+<section id="stories" style="position:relative;background:radial-gradient(110% 120% at 0% 0%,#34106a 0%,#1c0942 46%,#160734 100%);padding:clamp(60px,7vw,96px) clamp(20px,5vw,68px);overflow:hidden">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;gap:clamp(30px,4vw,60px);flex-wrap:wrap">
+
+    <div style="flex:1 1 660px;min-width:300px;order:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:clamp(16px,1.6vw,24px)">
+      <div class="lift" style="border-radius:18px;overflow:hidden;cursor:pointer;box-shadow:0 20px 44px rgba(0,0,0,.32)"><img src="images/story1.png" alt="من القراءة المقطعة إلى ختم القرآن — محمد 13 سنة" style="width:100%;height:auto;display:block"></div>
+      <div class="lift" style="border-radius:18px;overflow:hidden;cursor:pointer;box-shadow:0 20px 44px rgba(0,0,0,.32)"><img src="images/story2.png" alt="رحلتي مع التجويد غيرت تلاوتي — سارة 22 سنة" style="width:100%;height:auto;display:block"></div>
+      <div class="lift" style="border-radius:18px;overflow:hidden;cursor:pointer;box-shadow:0 20px 44px rgba(0,0,0,.32)"><img src="images/story3.png" alt="حفظت القرآن في 8 أشهر — علي 19 سنة" style="width:100%;height:auto;display:block"></div>
+    </div>
+
+    <div class="lead" style="flex:0 1 300px;min-width:260px;text-align:right;order:2">
+      <h2 style="font-weight:800;font-size:clamp(32px,3.6vw,48px);line-height:1.25;color:#fff">قصص نجاح<br>من واقع تجربتهم</h2>
+      <p style="margin-top:18px;color:#c4b6e0;font-size:16.5px;line-height:1.9;max-width:320px;margin-inline-start:auto">آلاف الطلاب حول العالم حققوا أهدافهم في تعلم وحفظ القرآن مع ترتيلة أونلاين</p>
+      <button class="obtn" style="cursor:pointer;margin-top:26px;font-family:'Tajawal';font-weight:700;font-size:16px;color:#fff;background:transparent;border:1.5px solid rgba(232,199,106,.5);border-radius:34px;padding:14px 30px">شاهد المزيد من القصص</button>
+    </div>
+
+  </div>
+</section>
+
+<section id="community" style="background:#F8F7FC;padding:clamp(60px,7vw,100px) clamp(20px,5vw,68px)">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;gap:clamp(24px,3vw,48px);flex-wrap:wrap;justify-content:center">
+
+    <div class="comm-stats" style="order:1;flex:0 0 auto;display:flex;flex-direction:column;gap:26px">
+      <div style="display:flex;align-items:center;gap:14px"><span style="flex:none;width:50px;height:50px;border-radius:14px;background:#FBF3DF;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10Z" stroke="#D4AF37" stroke-width="1.7"/><circle cx="12" cy="12" r="10" stroke="#D4AF37" stroke-width="1.7"/></svg></span><div><div style="font-family:'Cairo';font-weight:800;font-size:24px;color:#1A0447">+100</div><div style="color:#6B7280;font-size:14px">دولة</div></div></div>
+      <div style="display:flex;align-items:center;gap:14px"><span style="flex:none;width:50px;height:50px;border-radius:14px;background:#FBF3DF;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#D4AF37" stroke-width="1.7"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#D4AF37" stroke-width="1.7" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="#D4AF37" stroke-width="1.7"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#D4AF37" stroke-width="1.7" stroke-linecap="round"/></svg></span><div><div style="font-family:'Cairo';font-weight:800;font-size:24px;color:#1A0447">+200K</div><div style="color:#6B7280;font-size:14px">طالب وطالبة</div></div></div>
+      <div style="display:flex;align-items:center;gap:14px"><span style="flex:none;width:50px;height:50px;border-radius:14px;background:#FBF3DF;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 5h9M8.5 5v2c0 4-2 7-5 8M6 9c0 2.5 2.5 4.5 6 5.5" stroke="#D4AF37" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 20l4-9 4 9M14.5 17h5" stroke="#D4AF37" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div style="font-family:'Cairo';font-weight:800;font-size:24px;color:#1A0447">+50</div><div style="color:#6B7280;font-size:14px">لغات مختلفة</div></div></div>
+      <div style="display:flex;align-items:center;gap:14px"><span style="flex:none;width:50px;height:50px;border-radius:14px;background:#FBF3DF;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 13v-1a7 7 0 0 1 14 0v1M5 13h2v5H5a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Zm14 0h-2v5h2a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2Z" stroke="#D4AF37" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 18a4 4 0 0 1-4 3" stroke="#D4AF37" stroke-width="1.7" stroke-linecap="round"/></svg></span><div><div style="font-family:'Cairo';font-weight:800;font-size:24px;color:#1A0447">24/7</div><div style="color:#6B7280;font-size:14px">دعم ومتابعة</div></div></div>
+    </div>
+
+    <div style="order:2;flex:1 1 460px;min-width:300px;text-align:center"><img src="images/worldmap.png" alt="مجتمع عالمي" style="width:100%;max-width:640px;height:auto;display:block;margin:0 auto"></div>
+
+    <div style="order:3;flex:0 1 300px;min-width:260px;text-align:right">
+      <h2 style="font-weight:800;font-size:clamp(32px,3.6vw,48px);line-height:1.25">
+        <span style="background:linear-gradient(120deg,#7C3AED,#9b5cf0);-webkit-background-clip:text;background-clip:text;color:transparent">مجتمع عالمي</span><br>
+        <span style="color:#1A0447">يجمع القرآن</span>
+      </h2>
+      <p style="margin-top:18px;color:#6B7280;font-size:16.5px;line-height:1.9;max-width:320px;margin-inline-start:auto">طلاب من أكثر من 100 دولة يتعلمون ويتواصلون في بيئة آمنة ومحفزة</p>
+      <button class="gbtn" style="cursor:pointer;margin-top:26px;font-family:'Tajawal';font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,#6D34D6,#4B1Fb0);border:none;border-radius:12px;padding:14px 30px;box-shadow:0 14px 30px rgba(75,31,176,.26)">انضم إلى مجتمعنا</button>
+    </div>
+
+  </div>
+</section>
+
+<section id="pricing" style="background:#FBFAFE;padding:clamp(60px,7vw,100px) clamp(20px,5vw,68px)">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:stretch;gap:clamp(28px,4vw,56px);flex-wrap:wrap">
+
+    <div style="flex:1 1 700px;min-width:300px;order:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;align-items:start">
+      <!-- أساسي -->
+      <div class="lift" style="background:#fff;border:1px solid #ece6f6;border-radius:20px;padding:30px 24px;box-shadow:0 14px 36px rgba(36,12,82,.06);text-align:right">
+        <div style="font-family:'Cairo';font-weight:800;font-size:22px;color:#1A0447">أساسي</div>
+        <div style="color:#9aa0ab;font-size:14px;margin-top:4px">لبداية رحلتك</div>
+        <div style="margin-top:18px;display:flex;align-items:baseline;gap:6px;justify-content:flex-start;flex-direction:row-reverse"><span style="font-family:'Cairo';font-weight:800;font-size:36px;color:#1A0447">{{ planBasic }}</span><span style="color:#9aa0ab;font-size:14px">/الشهر</span></div>
+        <div style="height:1px;background:#eee6f6;margin:20px 0"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:15px;color:#4b5563">
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>حصة أسبوعية</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>محتوى مقسّم</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>تقارير تقدم أساسية</span></div>
+        </div>
+        <button class="gbtn" style="cursor:pointer;width:100%;margin-top:24px;font-family:'Tajawal';font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,#5b2bc4,#3d1894);border:none;border-radius:11px;padding:13px">ابدأ الآن</button>
+      </div>
+      <!-- متقدم featured -->
+      <div class="lift" style="position:relative;background:#fff;border:2px solid #E8B24A;border-radius:20px;padding:34px 24px 30px;box-shadow:0 24px 50px rgba(212,160,50,.2);text-align:right">
+        <div style="position:absolute;top:-15px;inset-inline-start:50%;transform:translateX(-50%);background:linear-gradient(135deg,#E8C76A,#D4AF37);color:#3a2200;font-family:'Cairo';font-weight:800;font-size:13px;padding:6px 18px;border-radius:30px;white-space:nowrap;box-shadow:0 8px 18px rgba(212,175,55,.4)">الأكثر اختياراً</div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:22px;color:#1A0447">متقدم</div>
+        <div style="color:#9aa0ab;font-size:14px;margin-top:4px">لتعلم مستمر</div>
+        <div style="margin-top:18px;display:flex;align-items:baseline;gap:6px;justify-content:flex-start;flex-direction:row-reverse"><span style="font-family:'Cairo';font-weight:800;font-size:36px;color:#1A0447">{{ planPro }}</span><span style="color:#9aa0ab;font-size:14px">/الشهر</span></div>
+        <div style="height:1px;background:#f1e6cf;margin:20px 0"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:15px;color:#4b5563">
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#D4AF37" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>4 حصص أسبوعياً</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#D4AF37" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>معلم مخصص</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#D4AF37" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>تقارير تقدم متقدمة</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#D4AF37" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>محتوى تفاعلي</span></div>
+        </div>
+        <button class="gbtn" style="cursor:pointer;width:100%;margin-top:24px;font-family:'Tajawal';font-weight:800;font-size:15px;color:#3a2200;background:linear-gradient(135deg,#E8C76A,#D4AF37);border:none;border-radius:11px;padding:13px;box-shadow:0 12px 26px rgba(212,175,55,.36)">ابدأ الآن</button>
+      </div>
+      <!-- مميز -->
+      <div class="lift" style="background:#fff;border:1px solid #ece6f6;border-radius:20px;padding:30px 24px;box-shadow:0 14px 36px rgba(36,12,82,.06);text-align:right">
+        <div style="font-family:'Cairo';font-weight:800;font-size:22px;color:#1A0447">مميز</div>
+        <div style="color:#9aa0ab;font-size:14px;margin-top:4px">لتقدم أسرع</div>
+        <div style="margin-top:18px;display:flex;align-items:baseline;gap:6px;justify-content:flex-start;flex-direction:row-reverse"><span style="font-family:'Cairo';font-weight:800;font-size:36px;color:#1A0447">{{ planPrem }}</span><span style="color:#9aa0ab;font-size:14px">/الشهر</span></div>
+        <div style="height:1px;background:#eee6f6;margin:20px 0"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:15px;color:#4b5563">
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>حصص يومية</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>معلم مخصص</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>تقارير تفصيلية</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>جلسات مراجعة</span></div>
+        </div>
+        <button class="gbtn" style="cursor:pointer;width:100%;margin-top:24px;font-family:'Tajawal';font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,#5b2bc4,#3d1894);border:none;border-radius:11px;padding:13px">ابدأ الآن</button>
+      </div>
+      <!-- عائلي -->
+      <div class="lift" style="background:#fff;border:1px solid #ece6f6;border-radius:20px;padding:30px 24px;box-shadow:0 14px 36px rgba(36,12,82,.06);text-align:right">
+        <div style="font-family:'Cairo';font-weight:800;font-size:22px;color:#1A0447">عائلي</div>
+        <div style="color:#9aa0ab;font-size:14px;margin-top:4px">لجميع أفراد العائلة</div>
+        <div style="margin-top:18px;display:flex;align-items:baseline;gap:6px;justify-content:flex-start;flex-direction:row-reverse"><span style="font-family:'Cairo';font-weight:800;font-size:36px;color:#1A0447">{{ planFam }}</span><span style="color:#9aa0ab;font-size:14px">/الشهر</span></div>
+        <div style="height:1px;background:#eee6f6;margin:20px 0"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:15px;color:#4b5563">
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>حتى 5 أفراد</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>معلم لكل فرد</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>تقارير عائلية</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-direction:row-reverse;justify-content:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-11" stroke="#6D34D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>دعم خاص</span></div>
+        </div>
+        <button class="gbtn" style="cursor:pointer;width:100%;margin-top:24px;font-family:'Tajawal';font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,#5b2bc4,#3d1894);border:none;border-radius:11px;padding:13px">ابدأ الآن</button>
+      </div>
+    </div>
+
+    <div class="lead" style="flex:0 1 300px;min-width:260px;order:2;text-align:right;align-self:center">
+      <h2 style="font-weight:800;font-size:clamp(32px,3.6vw,50px);line-height:1.25">
+        <span style="background:linear-gradient(120deg,#7C3AED,#9b5cf0);-webkit-background-clip:text;background-clip:text;color:transparent">اختر الخطة</span><br>
+        <span style="color:#1A0447">المناسبة لك</span>
+      </h2>
+      <p style="margin-top:18px;color:#6B7280;font-size:16.5px;line-height:1.9;max-width:300px;margin-inline-start:auto">خطط مرنة تناسب جميع احتياجاتك وأهدافك في تعلم القرآن</p>
+      <div style="margin-top:26px;display:inline-flex;background:#efeaf8;border-radius:40px;padding:5px;gap:4px">
+        <button onClick="{{ setMonthly }}" style="cursor:pointer;font-family:'Tajawal';font-weight:600;font-size:14px;border:none;border-radius:34px;padding:10px 20px;background:{{ pillMBg }};color:{{ pillMCol }};box-shadow:{{ pillMSh }};transition:all .25s">شهري</button>
+        <button onClick="{{ setQuarter }}" style="cursor:pointer;font-family:'Tajawal';font-weight:600;font-size:14px;border:none;border-radius:34px;padding:10px 20px;background:{{ pillQBg }};color:{{ pillQCol }};box-shadow:{{ pillQSh }};transition:all .25s">فصلي</button>
+        <button onClick="{{ setYearly }}" style="cursor:pointer;font-family:'Tajawal';font-weight:600;font-size:14px;border:none;border-radius:34px;padding:10px 20px;background:{{ pillYBg }};color:{{ pillYCol }};box-shadow:{{ pillYSh }};transition:all .25s">سنوي</button>
+      </div>
+      <div style="margin-top:14px"><span style="display:inline-block;background:#efeaf8;color:#7c5fc0;font-size:13px;font-weight:600;padding:7px 16px;border-radius:24px">خصم 20% —</span></div>
+    </div>
+
+  </div>
+</section>
+
+<section id="contact" style="position:relative;background:#160734 url('images/footer_bg.png') center/cover no-repeat;min-height:clamp(380px,42vw,520px);display:flex;align-items:center;padding:clamp(40px,6vw,72px) clamp(20px,5vw,68px);overflow:hidden">
+  <div style="position:absolute;inset:0;background:linear-gradient(270deg,rgba(22,7,52,.78) 0%,rgba(22,7,52,.4) 42%,rgba(22,7,52,0) 64%)"></div>
+  <div style="position:relative;z-index:2;max-width:1340px;margin:0 auto;width:100%;display:flex;justify-content:flex-start">
+    <div style="width:min(560px,100%);text-align:right">
+      <h2 style="font-weight:800;font-size:clamp(32px,4.4vw,56px);line-height:1.2;color:#fff">
+        <span style="background:linear-gradient(120deg,#E8C76A,#D4AF37);-webkit-background-clip:text;background-clip:text;color:transparent">ابدأ رحلتك</span> مع كتاب الله
+      </h2>
+      <div style="margin-top:14px;font-family:'Cairo';font-weight:700;font-size:clamp(18px,2vw,24px);color:#E8C76A">اليوم هو أفضل يوم لتبدأ!</div>
+      <p style="margin-top:14px;color:#cabfe4;font-size:clamp(15px,1.4vw,18px);line-height:1.85;max-width:430px;margin-inline-start:auto">انضم إلى آلاف الطلاب وابدأ رحلتك التعليمية في ترتيلة أونلاين</p>
+      <div style="margin-top:28px;display:flex;gap:14px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="obtn" style="cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Tajawal';font-weight:700;font-size:16px;color:#fff;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.28);border-radius:36px;padding:15px 30px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.4A8 8 0 1 1 21 12Z" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/></svg>تواصل معنا</button>
+        <button class="gbtn" style="cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Tajawal';font-weight:800;font-size:16px;color:#2a1500;background:linear-gradient(135deg,#E8C76A,#D4AF37);border:none;border-radius:36px;padding:15px 34px;box-shadow:0 14px 32px rgba(212,175,55,.4)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ابدأ رحلتك الآن</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="background:#100327;padding:clamp(36px,4vw,52px) clamp(20px,5vw,68px) 30px;border-top:1px solid rgba(255,255,255,.06)">
+  <div style="max-width:1340px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:11px">
+      <img src="images/logo.jpg" alt="ترتيلة أونلاين" style="width:46px;height:46px;border-radius:13px;object-fit:cover;border:1px solid rgba(212,175,55,.4)">
+      <div style="line-height:1.18"><div style="color:#F3E6C0;font-family:'Cairo';font-weight:800;font-size:16px">ترتيلة</div><div style="color:#9b7fd6;font-size:10px;letter-spacing:3px;font-weight:600">ONLINE</div></div>
+    </div>
+    <nav style="display:flex;gap:clamp(16px,2.4vw,30px);flex-wrap:wrap;font-size:15px">
+      <a class="navlink" href="#top">الرئيسية</a>
+      <a class="navlink" href="#journey">مسارات التعلم</a>
+      <a class="navlink" href="#teachers">المعلمون</a>
+      <a class="navlink" href="#pricing">الأسعار</a>
+      <a class="navlink" href="#community">من نحن</a>
+      <a class="navlink" href="#contact">تواصل معنا</a>
+    </nav>
+  </div>
+  <div style="max-width:1340px;margin:26px auto 0;padding-top:22px;border-top:1px solid rgba(255,255,255,.06);text-align:center;color:#8576a8;font-size:14px">© 2026 ترتيلة أونلاين — جميع الحقوق محفوظة</div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    period: 'سنوي',
+    journeyActive: 3,
+    counts: { students: 0, teachers: 0, hours: 0, rating: 0 },
+    scrolled: false,
+    menuOpen: false,
+  };
+
+  componentDidMount() {
+    this._raf = null;
+    this.animateCounts();
+    this._onScroll = () => {
+      const s = window.scrollY > 36;
+      if (s !== this.state.scrolled) this.setState({ scrolled: s });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll);
+    if (this._raf) cancelAnimationFrame(this._raf);
+  }
+
+  animateCounts() {
+    const targets = { students: 20, teachers: 120, hours: 10, rating: 4.9 };
+    const dur = 1700, start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      this.setState({ counts: {
+        students: Math.round(targets.students * e),
+        teachers: Math.round(targets.teachers * e),
+        hours: Math.round(targets.hours * e),
+        rating: targets.rating * e,
+      }});
+      if (t < 1) this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  toggleMenu() { this.setState(s => ({ menuOpen: !s.menuOpen })); }
+  closeMenu() { this.setState({ menuOpen: false }); }
+  setPeriod(p) { this.setState({ period: p }); }
+  setJourney(i) { this.setState({ journeyActive: i }); }
+
+  renderVals() {
+    const c = this.state.counts;
+    const mult = { 'سنوي': 1, 'فصلي': 1.12, 'شهري': 1.3 }[this.state.period] || 1;
+    const r = (n) => Math.round(n * mult);
+    const plans = {
+      basic: '$' + r(19), pro: '$' + r(39), prem: '$' + r(69), fam: '$' + r(99),
+    };
+    return {
+      menuOpen: this.state.menuOpen,
+      toggleMenu: () => this.toggleMenu(),
+      closeMenu: () => this.closeMenu(),
+      navBg: (this.state.scrolled || this.state.menuOpen) ? 'rgba(15,3,38,.97)' : 'transparent',
+      navShadow: this.state.scrolled ? '0 10px 30px rgba(0,0,0,.35)' : 'none',
+      statStudents: '+' + c.students + 'K',
+      statTeachers: '+' + c.teachers,
+      statHours: '+' + c.hours + 'K',
+      statRating: c.rating.toFixed(1) + '/5',
+      period: this.state.period,
+      setPeriod: (p) => this.setPeriod(p),
+      isYearly: this.state.period === 'سنوي',
+      isQuarter: this.state.period === 'فصلي',
+      isMonthly: this.state.period === 'شهري',
+      planBasic: plans.basic, planPro: plans.pro, planPrem: plans.prem, planFam: plans.fam,
+      setYearly: () => this.setPeriod('سنوي'),
+      setQuarter: () => this.setPeriod('فصلي'),
+      setMonthly: () => this.setPeriod('شهري'),
+      pillYBg: this.state.period === 'سنوي' ? '#ffffff' : 'transparent',
+      pillYCol: this.state.period === 'سنوي' ? '#1A0447' : '#8b7fb0',
+      pillYSh: this.state.period === 'سنوي' ? '0 4px 12px rgba(36,12,82,.14)' : 'none',
+      pillQBg: this.state.period === 'فصلي' ? '#ffffff' : 'transparent',
+      pillQCol: this.state.period === 'فصلي' ? '#1A0447' : '#8b7fb0',
+      pillQSh: this.state.period === 'فصلي' ? '0 4px 12px rgba(36,12,82,.14)' : 'none',
+      pillMBg: this.state.period === 'شهري' ? '#ffffff' : 'transparent',
+      pillMCol: this.state.period === 'شهري' ? '#1A0447' : '#8b7fb0',
+      pillMSh: this.state.period === 'شهري' ? '0 4px 12px rgba(36,12,82,.14)' : 'none',
+      journeyActive: this.state.journeyActive,
+      setJourney: (i) => this.setJourney(i),
+      j1: this.state.journeyActive === 1, j2: this.state.journeyActive === 2,
+      j3: this.state.journeyActive === 3, j4: this.state.journeyActive === 4,
+      j5: this.state.journeyActive === 5,
+    };
+  }
+}
+</script>
+</body>
+</html>

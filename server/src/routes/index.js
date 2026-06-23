@@ -1,0 +1,22 @@
+const router = require('express').Router()
+
+router.use('/auth', require('./auth.routes'))
+router.use('/users', require('./user.routes'))
+router.use('/students', require('./student.routes'))
+router.use('/teachers', require('./teacher.routes'))
+router.use('/sessions', require('./session.routes'))
+router.use('/attendance', require('./attendance.routes'))
+router.use('/evaluations', require('./evaluation.routes'))
+router.use('/homework', require('./homework.routes'))
+router.use('/memorization', require('./memorization.routes'))
+router.use('/revision', require('./revision.routes'))
+router.use('/subscriptions', require('./subscription.routes'))
+router.use('/notifications', require('./notification.routes'))
+router.use('/courses', require('./course.routes'))
+router.use('/packages', require('./package.routes'))
+router.use('/admin', require('./admin.routes'))
+router.use('/website', require('./website.routes'))
+router.use('/ai', require('./ai.routes'))
+router.use('/enrollments', require('./enrollment.routes'))
+
+module.exports = router

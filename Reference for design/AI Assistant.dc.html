@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',sans-serif;background:#ece9f9;color:#1f1147;overflow-x:hidden}
+  h1,h2,h3,h4{font-family:'Cairo',sans-serif}
+  @keyframes floatP{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(-22px);opacity:1}}
+  @keyframes msgIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes blink{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+  .msg{animation:msgIn .4s cubic-bezier(.2,.7,.2,1) both}
+  .scard{transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s;cursor:pointer}
+  .scard:hover{transform:translateY(-4px);box-shadow:0 18px 38px rgba(76,40,140,.16);border-color:#c9b6f3}
+  .chip{cursor:pointer;background:#fff;border:1px solid #e2daf3;border-radius:30px;padding:10px 18px;color:#5b3aa8;font-family:'Tajawal';font-weight:600;font-size:13.5px;white-space:nowrap;transition:background .2s,border-color .2s,transform .2s}
+  .chip:hover{background:#f3eefc;border-color:#c9b6f3;transform:translateY(-2px)}
+  .gbtn{transition:transform .25s,box-shadow .25s}
+  .gbtn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(124,58,237,.4)}
+  .chat-scroll{scrollbar-width:thin;scrollbar-color:#cdbef0 transparent}
+  .chat-scroll::-webkit-scrollbar{width:6px}
+  .chat-scroll::-webkit-scrollbar-thumb{background:#cdbef0;border-radius:6px}
+  @media(max-width:980px){
+    .layout{flex-direction:column!important;padding:18px!important;gap:18px!important}
+    .welcome{flex:none!important;width:100%!important}
+    .chatcol{flex:none!important;width:100%!important;height:78vh!important}
+    .arch{display:none!important}
+  }
+  @media(max-width:760px){
+    .layout{padding:0!important;gap:0!important;height:100vh}
+    .welcome{display:none!important}
+    .chatcol{width:100%!important;height:100vh!important;border-radius:0!important}
+    .particles{display:none!important}
+  }
+</style>
+</helmet>
+
+<div style="position:relative;min-height:100vh;background:radial-gradient(120% 80% at 15% 20%,#f3effc 0%,#e7e2f7 50%,#ddd6f2 100%);direction:rtl;overflow:hidden">
+
+  <!-- floating particles -->
+  <div class="particles" style="position:absolute;inset:0;pointer-events:none">
+    <div style="position:absolute;top:8%;left:5%;width:14px;height:14px;border-radius:50%;background:rgba(168,130,240,.4);animation:floatP 6s ease-in-out infinite"></div>
+    <div style="position:absolute;top:22%;left:38%;width:8px;height:8px;border-radius:50%;background:rgba(168,130,240,.45);animation:floatP 7s ease-in-out .8s infinite"></div>
+    <div style="position:absolute;top:42%;left:3%;width:7px;height:7px;border-radius:50%;background:rgba(212,175,55,.5);animation:floatP 5.5s ease-in-out .3s infinite"></div>
+    <div style="position:absolute;top:14%;left:44%;width:6px;height:6px;border-radius:50%;background:rgba(168,130,240,.4);animation:floatP 8s ease-in-out 1.2s infinite"></div>
+    <div style="position:absolute;top:55%;left:30%;width:9px;height:9px;border-radius:50%;background:rgba(168,130,240,.35);animation:floatP 6.5s ease-in-out .5s infinite"></div>
+    <div style="position:absolute;top:5%;left:25%;width:6px;height:6px;border-radius:50%;background:rgba(212,175,55,.45);animation:floatP 7.5s ease-in-out 1.6s infinite"></div>
+  </div>
+
+  <!-- glowing mosque arch bottom-left -->
+  <div class="arch" style="position:absolute;bottom:0;left:0;width:560px;height:340px;pointer-events:none;opacity:.9">
+    <svg viewBox="0 0 560 340" width="100%" height="100%" fill="none" preserveAspectRatio="xMinYMax meet">
+      <defs><radialGradient id="ag" cx="35%" cy="80%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+      <path d="M0 340 C70 270 90 200 150 200 Q190 130 230 200 C290 200 300 280 360 340 Z" fill="url(#ag)"/>
+      <path d="M150 340 V215 Q190 150 230 215 V340" stroke="#fff" stroke-width="2" opacity=".75"/>
+      <path d="M120 340 V235 Q190 120 260 235 V340" stroke="#cdbef0" stroke-width="1.5" opacity=".5"/>
+    </svg>
+  </div>
+
+  <div class="layout" style="position:relative;z-index:2;display:flex;align-items:stretch;gap:clamp(24px,4vw,60px);padding:clamp(28px,4vw,56px);max-width:1560px;margin:0 auto;min-height:100vh">
+
+    <!-- ===== RIGHT: CHAT (DOM first => right in RTL) ===== -->
+    <div class="chatcol" style="flex:1.05;min-width:0;display:flex;flex-direction:column;background:#fdfcff;border:1px solid rgba(150,120,220,.14);border-radius:28px;box-shadow:0 30px 70px rgba(76,40,140,.16);overflow:hidden;max-height:92vh">
+
+      <!-- header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;border-bottom:1px solid #f0ecf8">
+        <div style="display:flex;align-items:center;gap:13px">
+          <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(145deg,#8b5cf6,#6d28d9);display:grid;place-items:center;box-shadow:0 8px 20px rgba(124,58,237,.4)"><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z"/><path d="m18 14 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z" opacity=".9"/></svg></div>
+          <div style="text-align:right"><div style="font-family:'Cairo';font-weight:800;font-size:18px;color:#1f1147">مساعد ترتيلة</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span><span style="color:#7c7191;font-size:13px">متصل الآن</span></div></div>
+        </div>
+        <button aria-label="إغلاق" style="cursor:pointer;width:40px;height:40px;border-radius:12px;border:none;background:transparent;display:grid;place-items:center;transition:background .2s" style-hover="background:#f3eefc"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="#8a7bb0" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+      </div>
+
+      <!-- conversation -->
+      <div ref="{{ scrollRef }}" class="chat-scroll" style="flex:1;overflow-y:auto;padding:22px clamp(16px,2vw,26px);display:flex;flex-direction:column;gap:18px">
+
+        <sc-for list="{{ messages }}" as="m" hint-placeholder-count="3">
+          <div class="msg" style="display:flex;flex-direction:column;align-items:{{ m.align }}">
+            <sc-if value="{{ m.isUserGray }}" hint-placeholder-val="{{ false }}">
+              <div style="max-width:78%;background:#f4f2fa;border:1px solid #ece7f6;border-radius:18px 18px 18px 6px;padding:12px 16px">
+                <div style="display:flex;align-items:center;gap:8px;justify-content:flex-start;margin-bottom:5px"><span style="width:22px;height:22px;border-radius:50%;background:#e3dcf3;display:grid;place-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="#8a7bb0" stroke-width="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="#8a7bb0" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="color:#9a8fb3;font-size:12px">{{ m.time }}</span><span style="color:#6b6086;font-size:12.5px;font-weight:700">أنت</span></div>
+                <div style="color:#2a2147;font-size:15px;line-height:1.7;text-align:right">{{ m.text }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ m.isUserPurple }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="max-width:78%;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-radius:18px 18px 6px 18px;padding:13px 17px;box-shadow:0 10px 24px rgba(124,58,237,.28)"><div style="color:#fff;font-size:15px;line-height:1.6;font-weight:600;text-align:right">{{ m.text }}</div></div>
+                <span style="color:#a99bcb;font-size:11.5px;white-space:nowrap">{{ m.time }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ m.isBotText }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:10px;max-width:88%">
+                <div style="flex:none;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#8b5cf6,#6d28d9);display:grid;place-items:center;margin-top:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="m12 4 1.4 3.8L17 9l-3.6 1.2L12 14l-1.4-3.8L7 9l3.6-1.2L12 4Z"/></svg></div>
+                <div style="background:#f6f3fc;border:1px solid #ece7f6;border-radius:6px 18px 18px 18px;padding:13px 17px"><div style="color:#2a2147;font-size:15px;line-height:1.75;text-align:right">{{ m.text }}</div><div style="color:#b0a6c6;font-size:11.5px;margin-top:8px;text-align:left">{{ m.time }}</div></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ m.isPricing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:10px;max-width:92%">
+                <div style="flex:none;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#8b5cf6,#6d28d9);display:grid;place-items:center;margin-top:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="m12 4 1.4 3.8L17 9l-3.6 1.2L12 14l-1.4-3.8L7 9l3.6-1.2L12 4Z"/></svg></div>
+                <div style="flex:1;background:#f6f3fc;border:1px solid #e9e2f6;border-radius:6px 18px 18px 18px;padding:18px 20px">
+                  <div style="font-family:'Cairo';font-weight:800;font-size:16px;color:#1f1147;text-align:right;margin-bottom:14px">لدينا ٤ باقات مميزة تناسب احتياجاتك:</div>
+                  <div style="display:flex;flex-direction:column;gap:11px">
+                    <div style="display:flex;align-items:center;gap:11px;justify-content:flex-start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="1.7"/><path d="M12 7v10M9 9.5h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5" stroke="#a855f7" stroke-width="1.6" stroke-linecap="round"/></svg><span style="color:#3a2960;font-size:14.5px;font-weight:700">الباقة الأساسية – 199 ريال / شهر</span></div>
+                    <div style="display:flex;align-items:center;gap:11px;justify-content:flex-start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.5 10h-13L4 8Z" stroke="#a855f7" stroke-width="1.6" stroke-linejoin="round"/></svg><span style="color:#3a2960;font-size:14.5px;font-weight:700">الباقة المتقدمة – 399 ريال / شهر</span></div>
+                    <div style="display:flex;align-items:center;gap:11px;justify-content:flex-start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="m6 9 6-5 6 5-6 11L6 9Z" stroke="#a855f7" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 9h18" stroke="#a855f7" stroke-width="1.6"/></svg><span style="color:#3a2960;font-size:14.5px;font-weight:700">الباقة الشاملة – 599 ريال / شهر</span></div>
+                    <div style="display:flex;align-items:center;gap:11px;justify-content:flex-start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6V4Z" stroke="#a855f7" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="#a855f7" stroke-width="1.6" stroke-linecap="round"/></svg><span style="color:#3a2960;font-size:14.5px;font-weight:700">باقة الحفظ المكثف – 899 ريال / شهر</span></div>
+                  </div>
+                  <div style="color:#5a4f76;font-size:14px;text-align:right;margin-top:15px;font-weight:600">يمكنك الاطلاع على تفاصيل كل باقة من صفحة الباقات.</div>
+                  <button class="gbtn" onClick="{{ onShowPlans }}" style="cursor:pointer;width:100%;margin-top:15px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Tajawal';font-weight:800;font-size:15px;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border:none;border-radius:13px;padding:14px;box-shadow:0 12px 26px rgba(124,58,237,.32)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m14 7-5 5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>عرض جميع الباقات</button>
+                  <div style="color:#b0a6c6;font-size:11.5px;margin-top:10px;text-align:left">{{ m.time }}</div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+          <div class="msg" style="display:flex;align-items:center;gap:10px">
+            <div style="flex:none;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#8b5cf6,#6d28d9);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="m12 4 1.4 3.8L17 9l-3.6 1.2L12 14l-1.4-3.8L7 9l3.6-1.2L12 4Z"/></svg></div>
+            <div style="background:#f6f3fc;border:1px solid #ece7f6;border-radius:6px 18px 18px 18px;padding:15px 18px;display:flex;gap:5px">
+              <span style="width:8px;height:8px;border-radius:50%;background:#a855f7;animation:blink 1.2s infinite"></span>
+              <span style="width:8px;height:8px;border-radius:50%;background:#a855f7;animation:blink 1.2s .2s infinite"></span>
+              <span style="width:8px;height:8px;border-radius:50%;background:#a855f7;animation:blink 1.2s .4s infinite"></span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- chips -->
+      <div style="display:flex;gap:10px;padding:14px clamp(16px,2vw,22px) 6px;overflow-x:auto;flex-wrap:nowrap">
+        <button class="chip" onClick="{{ chipTrial }}">احجز حصة تجريبية</button>
+        <button class="chip" onClick="{{ chipEdit }}">تعديل الحجز</button>
+        <button class="chip" onClick="{{ chipTajweed }}">أريد تعلم التجويد</button>
+        <button class="chip" onClick="{{ chipSupport }}">الدعم الفني</button>
+      </div>
+
+      <!-- input -->
+      <div style="padding:12px clamp(16px,2vw,22px) 10px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:none;width:50px;height:50px;border-radius:15px;background:linear-gradient(145deg,#8b5cf6,#6d28d9);display:grid;place-items:center;box-shadow:0 8px 20px rgba(124,58,237,.35)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="8" width="14" height="10" rx="3" stroke="#fff" stroke-width="1.8"/><path d="M12 5v3M9 13h.01M15 13h.01M9.5 16h5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="4" r="1.4" fill="#fff"/></svg></div>
+          <div style="flex:1;display:flex;align-items:center;gap:10px;background:#f4f2fa;border:1px solid #e7e1f4;border-radius:16px;padding:6px 8px 6px 16px">
+            <input ref="{{ inputRef }}" onKeyDown="{{ onKey }}" placeholder="اكتب رسالتك هنا..." style="flex:1;background:transparent;border:none;outline:none;font-family:'Tajawal';font-size:15px;color:#2a2147;padding:10px 4px;text-align:right">
+            <button aria-label="إرفاق" style="cursor:pointer;width:38px;height:38px;border-radius:11px;border:none;background:transparent;display:grid;place-items:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8 9.5 16.5a3 3 0 0 1-4.2-4.2L13 4.6a5 5 0 0 1 7 7l-8 8" stroke="#a99bcb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <button class="gbtn" onClick="{{ onSend }}" aria-label="إرسال" style="cursor:pointer;flex:none;width:50px;height:50px;border-radius:15px;border:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:grid;place-items:center;box-shadow:0 10px 24px rgba(124,58,237,.4)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 4 3 11l7 2 2 7 9-16Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" fill="none"/><path d="m10 13 4-4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        </div>
+        <div style="text-align:center;color:#a99bcb;font-size:12px;margin-top:10px">المساعد الذكي قد يجيب بشكل غير دقيق أحياناً، يرجى مراجعة المعلومات المهمة.</div>
+      </div>
+    </div>
+
+    <!-- ===== LEFT: WELCOME ===== -->
+    <div class="welcome" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:10px clamp(8px,2vw,30px)">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="92" height="92" viewBox="0 0 32 32" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E8C76A"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><circle cx="24.5" cy="6" r="2.4" stroke="url(#lg)" stroke-width="1.5"/><path d="M16 6.3c2.7 0 4.4 2.1 4.4 4.4H11.6C11.6 8.4 13.3 6.3 16 6.3Z" stroke="url(#lg)" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 8.6v2.1" stroke="url(#lg)" stroke-width="1.5"/><path d="M7.5 27V15.2c0-1.1.6-2 1.6-2.5L16 9.4l6.9 3.3c1 .5 1.6 1.4 1.6 2.5V27" stroke="url(#lg)" stroke-width="1.5" stroke-linejoin="round"/><path d="M12.8 27v-4.6c0-1.6 1.3-2.9 3.2-2.9s3.2 1.3 3.2 2.9V27" stroke="url(#lg)" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 27h22" stroke="url(#lg)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <div style="line-height:1.18"><div style="font-family:'Cairo';font-weight:800;font-size:30px;color:#2a1760">ترتيلة</div><div style="font-size:13px;letter-spacing:1.5px;color:#8a7bb0;font-weight:600;margin-top:2px">Tartelah Online</div></div>
+      </div>
+      <h1 style="font-weight:800;font-size:clamp(30px,3.6vw,46px);line-height:1.35;margin-top:30px;background:linear-gradient(120deg,#6d28d9,#a855f7);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:560px">مرحباً بك في مساعد ترتيلة الذكي</h1>
+      <p style="color:#5a4f76;font-size:clamp(16px,1.5vw,19px);line-height:1.9;margin-top:18px;max-width:480px">أنا هنا لمساعدتك في رحلتك إلى مع القرآن. اسألني عن الدورات، المستويات، الحصص، الاشتراكات وأي استفسار آخر.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:34px;width:100%;max-width:560px">
+        <div class="scard" onClick="{{ cardPlans }}" style="background:#fdfcff;border:1px solid #ece7f6;border-radius:18px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 10px 28px rgba(76,40,140,.07)"><span style="color:#2a2147;font-weight:700;font-size:16px">ما هي الباقات المتاحة؟</span><span style="flex:none;width:42px;height:42px;border-radius:12px;background:#f1ebfc;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="#7c3aed" stroke-width="1.7"/><path d="M2 10h20" stroke="#7c3aed" stroke-width="1.7"/></svg></span></div>
+        <div class="scard" onClick="{{ cardTrial }}" style="background:#fdfcff;border:1px solid #ece7f6;border-radius:18px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 10px 28px rgba(76,40,140,.07)"><span style="color:#2a2147;font-weight:700;font-size:16px">كيف أحجز حصة تجريبية؟</span><span style="flex:none;width:42px;height:42px;border-radius:12px;background:#f1ebfc;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="#7c3aed" stroke-width="1.7"/><path d="M3 9h18M8 3v4M16 3v4" stroke="#7c3aed" stroke-width="1.7" stroke-linecap="round"/></svg></span></div>
+        <div class="scard" onClick="{{ cardTajweed }}" style="background:#fdfcff;border:1px solid #ece7f6;border-radius:18px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 10px 28px rgba(76,40,140,.07)"><span style="color:#2a2147;font-weight:700;font-size:16px">أريد تعلم التجويد</span><span style="flex:none;width:42px;height:42px;border-radius:12px;background:#f1ebfc;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 6c-1.6-1.1-3.7-1.7-6-1.7v14c2.3 0 4.4.6 6 1.7 1.6-1.1 3.7-1.7 6-1.7v-14c-2.3 0-4.4.6-6 1.7Z" stroke="#7c3aed" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6v14" stroke="#7c3aed" stroke-width="1.6"/></svg></span></div>
+        <div class="scard" onClick="{{ cardLevel }}" style="background:#fdfcff;border:1px solid #ece7f6;border-radius:18px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 10px 28px rgba(76,40,140,.07)"><span style="color:#2a2147;font-weight:700;font-size:16px">ما هو مستواي؟</span><span style="flex:none;width:42px;height:42px;border-radius:12px;background:#f1ebfc;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 19v-5M10 19V8M15 19v-7M20 19V5" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    messages: [
+      { type: 'userGray', text: 'كيف يمكنني استعادة كلمة المرور؟', time: 'قبل 30 ث' },
+      { type: 'userPurple', text: 'ما هي الباقات المتاحة؟', time: '10:30 AM' },
+      { type: 'pricing', time: '10:31 AM' },
+    ],
+    typing: false,
+  };
+
+  componentDidMount() { this.scrollDown(); }
+
+  now() {
+    const d = new Date();
+    let h = d.getHours(), m = d.getMinutes();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + String(m).padStart(2, '0') + ' ' + ap;
+  }
+
+  scrollDown() {
+    requestAnimationFrame(() => {
+      const el = this._scroll;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  reply(userText) {
+    if (!userText || !userText.trim()) return;
+    const t = this.now();
+    this.setState(s => ({
+      messages: [...s.messages, { type: 'userPurple', text: userText.trim(), time: t }],
+    }), () => this.scrollDown());
+
+    this.setState({ typing: true }, () => this.scrollDown());
+    clearTimeout(this._rt);
+    this._rt = setTimeout(() => {
+      const reply = this.cannedReply(userText);
+      this.setState(s => ({
+        typing: false,
+        messages: [...s.messages, reply],
+      }), () => this.scrollDown());
+    }, 1300);
+  }
+
+  cannedReply(q) {
+    const t = this.now();
+    if (/باقات|الباقة|سعر|أسعار|اشتراك/.test(q)) return { type: 'pricing', time: t };
+    if (/تجريبي|احجز|حجز/.test(q)) return { type: 'botText', time: t, text: 'بكل سرور! لحجز حصة تجريبية مجانية، اختر المستوى والوقت المناسب لك ومعلمك المفضل، وسنؤكد الموعد فوراً. هل تود أن أبدأ الحجز الآن؟' };
+    if (/تجويد/.test(q)) return { type: 'botText', time: t, text: 'رائع! لدينا مسار متكامل لتعلم التجويد من الأساس: أحكام النون الساكنة والتنوين، المدود، والمخارج، مع معلمين مجازين. هل تبدأ من المستوى الأساسي؟' };
+    if (/مستوى|مستواي/.test(q)) return { type: 'botText', time: t, text: 'لتحديد مستواك بدقة، سنجري اختبار تحديد مستوى قصير (5 دقائق) في التلاوة والتجويد، ثم نضع لك خطة مخصصة. هل تود بدء الاختبار؟' };
+    if (/دعم|مشكلة|فني/.test(q)) return { type: 'botText', time: t, text: 'فريق الدعم الفني متاح على مدار الساعة. صف لي المشكلة التي تواجهها وسأساعدك في حلها فوراً أو أحوّلك للمختص المناسب.' };
+    if (/تعديل|إلغاء|الحجز/.test(q)) return { type: 'botText', time: t, text: 'يمكنك تعديل أو إلغاء أي حجز قبل موعده بـ 3 ساعات دون رسوم. أخبرني برقم الحجز أو موعده وسأقوم بالتعديل.' };
+    return { type: 'botText', time: t, text: 'شكراً لتواصلك! يسعدني مساعدتك في الدورات، المستويات، الحصص، والاشتراكات. هل يمكنك توضيح استفسارك أكثر؟' };
+  }
+
+  send() {
+    const el = this._input;
+    if (!el) return;
+    const v = el.value;
+    if (!v.trim()) return;
+    el.value = '';
+    this.reply(v);
+  }
+
+  renderVals() {
+    const messages = this.state.messages.map(m => ({
+      ...m,
+      align: m.type === 'userPurple' ? 'flex-start' : (m.type === 'userGray' ? 'flex-start' : 'flex-start'),
+      isUserGray: m.type === 'userGray',
+      isUserPurple: m.type === 'userPurple',
+      isBotText: m.type === 'botText',
+      isPricing: m.type === 'pricing',
+    }));
+    return {
+      messages,
+      typing: this.state.typing,
+      scrollRef: (el) => { this._scroll = el; },
+      inputRef: (el) => { this._input = el; },
+      onSend: () => this.send(),
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.send(); } },
+      onShowPlans: () => this.reply('أريد عرض جميع الباقات بالتفصيل'),
+      chipTrial: () => this.reply('احجز حصة تجريبية'),
+      chipEdit: () => this.reply('تعديل الحجز'),
+      chipTajweed: () => this.reply('أريد تعلم التجويد'),
+      chipSupport: () => this.reply('الدعم الفني'),
+      cardPlans: () => this.reply('ما هي الباقات المتاحة؟'),
+      cardTrial: () => this.reply('كيف أحجز حصة تجريبية؟'),
+      cardTajweed: () => this.reply('أريد تعلم التجويد'),
+      cardLevel: () => this.reply('ما هو مستواي؟'),
+    };
+  }
+}
+</script>
+</body>
+</html>

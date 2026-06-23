@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',sans-serif;background:#120526;color:#fff;overflow-x:hidden}
+  h1,h2,h3,h4{font-family:'Cairo',sans-serif}
+  .card{background:#1d0e3a;border:1px solid rgba(150,120,220,.13);border-radius:20px}
+  .lift{transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s}
+  .lift:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.45);border-color:rgba(180,150,250,.34)}
+  .navi{display:flex;align-items:center;gap:13px;padding:13px 16px;border-radius:14px;color:#a99bd0;font-weight:600;font-size:15.5px;cursor:pointer;transition:background .22s,color .22s;text-decoration:none}
+  .navi:hover{background:rgba(255,255,255,.05);color:#fff}
+  .navi.on{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 12px 26px rgba(124,58,237,.42)}
+  .lnk{color:#a78bf0;font-weight:700;font-size:13.5px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;transition:color .2s}
+  .lnk:hover{color:#c4b1fb}
+  .badge{font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:30px;white-space:nowrap}
+  .qa{flex:1;min-width:120px;background:#1d0e3a;border:1px solid rgba(150,120,220,.13);border-radius:18px;padding:24px 12px;display:flex;flex-direction:column;align-items:center;gap:14px;cursor:pointer;transition:transform .3s,border-color .3s,background .3s}
+  .qa:hover{transform:translateY(-5px);border-color:rgba(180,150,250,.4);background:#251248}
+  .ava{border-radius:50%;object-fit:cover;object-position:top;border:2px solid #2c1a4e}
+  .hamb,.botnav{display:none}
+  @media(max-width:1280px){.row5{flex-wrap:wrap}.stat{flex:1 1 30%!important;min-width:200px!important}}
+  @media(max-width:1080px){.row3>*{flex:1 1 100%!important}}
+  @media(max-width:1024px){
+    .sidebar{position:fixed;inset-block:0;left:0;right:auto;z-index:95}
+    .hamb{display:grid!important}
+  }
+  @media(max-width:760px){
+    .main{padding:16px 14px 92px!important}
+    .botnav{display:flex!important}
+    .stat{flex:1 1 100%!important}
+    .qa{flex:1 1 40%!important}
+    .datew{display:none!important}
+  }
+</style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:linear-gradient(160deg,#1a0a36 0%,#120526 55%,#0c0419 100%);direction:ltr">
+
+  <!-- ===== SIDEBAR (left) ===== -->
+  <aside class="sidebar" style="flex:none;width:248px;background:linear-gradient(190deg,#1c0d39,#140628);border-inline-end:1px solid rgba(150,120,220,.1);display:flex;flex-direction:column;padding:24px 16px;transform:{{ sidebarTf }}">
+    <div style="display:flex;align-items:center;gap:12px;padding:2px 6px 22px;direction:rtl">
+      <div style="flex:none;width:54px;height:54px;border-radius:15px;border:1.5px solid rgba(212,175,55,.6);display:grid;place-items:center;background:rgba(20,5,46,.5)">
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><circle cx="24.5" cy="6" r="2.2" stroke="#E8C76A" stroke-width="1.4"/><path d="M16 6.5c2.6 0 4.2 2 4.2 4.2H11.8C11.8 8.5 13.4 6.5 16 6.5Z" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 8.7v2.2" stroke="#E8C76A" stroke-width="1.4"/><path d="M8 27V15.5c0-1 .6-1.9 1.5-2.3L16 10l6.5 3.2c.9.4 1.5 1.3 1.5 2.3V27" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M13.2 27v-4.4c0-1.5 1.2-2.7 2.8-2.7s2.8 1.2 2.8 2.7V27" stroke="#E8C76A" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 27h21" stroke="#E8C76A" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </div>
+      <div style="line-height:1.12"><div style="font-family:'Cairo';font-weight:800;font-size:24px;color:#fff">ترتيلة</div><div style="font-size:11px;letter-spacing:.6px;color:#a78fd6;font-weight:600">Tartelah Online</div></div>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:3px;flex:1;direction:rtl;overflow-y:auto">
+      <a class="navi on" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الرئيسية</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الطلاب</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>المعلمون</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="8" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="8" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="13" width="8" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="8" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>الدورات والمستويات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الحصص والجداول</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18M8 3v4M16 3v4M8 15l2.5 2.5L16 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الحضور والغياب</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 4h8l3 3v13H5V4h3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الواجبات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16l-7-3-7 3V4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 10l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>التقييمات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M2 10h20" stroke="currentColor" stroke-width="1.8"/></svg>الاشتراكات والباقات</a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>التقارير والإحصائيات</a>
+      <a class="navi" href="#" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:13px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الإشعارات</span><span style="background:#7c3aed;color:#fff;font-size:12px;font-weight:800;min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;padding:0 6px">5</span></a>
+      <a class="navi" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8M4.6 9a1.6 1.6 0 0 0-.3-1.8m0 9.6A1.6 1.6 0 0 0 4.6 15m14.8-6a1.6 1.6 0 0 0 .3-1.8M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>الإعدادات</a>
+    </nav>
+    <div style="margin-top:12px;direction:rtl;background:rgba(255,255,255,.04);border:1px solid rgba(150,120,220,.12);border-radius:16px;padding:12px;display:flex;align-items:center;gap:11px;cursor:pointer">
+      <img class="ava" src="images/teacher2.png" alt="م. أحمد الحسين" style="width:44px;height:44px;border:2px solid rgba(212,175,55,.6)">
+      <div style="flex:1;line-height:1.3"><div style="color:#fff;font-weight:700;font-size:14.5px">م. أحمد الحسين</div><div style="color:#a78fd6;font-size:12.5px">مدير المنصة</div></div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="#a78fd6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </aside>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;z-index:90;background:rgba(8,3,20,.6);backdrop-filter:blur(2px)"></div>
+  </sc-if>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main" style="flex:1;min-width:0;padding:24px clamp(16px,2.2vw,32px);direction:rtl">
+
+    <!-- header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px;flex-wrap:wrap">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <button class="hamb" onClick="{{ openDrawer }}" aria-label="القائمة" style="cursor:pointer;width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.05);border:1px solid rgba(150,120,220,.2);place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#c4b1fb" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+        <div>
+          <h1 style="font-weight:800;font-size:clamp(26px,2.8vw,34px);color:#fff">لوحة التحكم</h1>
+          <p style="color:#a394c4;font-size:15px;margin-top:5px">مرحباً بك في لوحة إدارة المنصة 👋</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="datew card" style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:16px">
+          <div style="text-align:right;line-height:1.35"><div style="color:#a394c4;font-size:12.5px">اليوم</div><div style="color:#fff;font-weight:700;font-size:14.5px">20 مايو 2024</div></div>
+          <span style="width:42px;height:42px;border-radius:12px;background:rgba(124,58,237,.18);display:grid;place-items:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="#a855f7" stroke-width="1.7"/><path d="M3 9h18M8 3v4M16 3v4" stroke="#a855f7" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+        </div>
+        <button class="card lift" style="cursor:pointer;width:60px;height:66px;border-radius:16px;display:grid;place-items:center;padding:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#c4b1fb" stroke-width="1.9"/><path d="m20 20-3.5-3.5" stroke="#c4b1fb" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+
+    <!-- ===== ROW 1 stats ===== -->
+    <div class="row5" style="display:flex;gap:16px;margin-bottom:18px">
+      <div class="stat card lift" style="flex:1;min-width:200px;padding:20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي الطلاب</span><span style="width:46px;height:46px;border-radius:13px;background:rgba(124,58,237,.18);display:grid;place-items:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#a855f7" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.3" stroke="#a855f7" stroke-width="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:12px;line-height:1">{{ nStudents }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">طالب</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:12px;color:#4ade80;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11l6-6 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>12% <span style="color:#8a7bb0;font-weight:400">عن الشهر الماضي</span></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:200px;padding:20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي المعلمين</span><span style="width:46px;height:46px;border-radius:13px;background:rgba(59,130,246,.18);display:grid;place-items:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="#60a5fa" stroke-width="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:12px;line-height:1">{{ nTeachers }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">معلم</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:12px;color:#4ade80;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11l6-6 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>15% <span style="color:#8a7bb0;font-weight:400">عن الشهر الماضي</span></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:200px;padding:20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي الحصص</span><span style="width:46px;height:46px;border-radius:13px;background:rgba(59,130,246,.18);display:grid;place-items:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="#60a5fa" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:12px;line-height:1">{{ nSessions }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">حصة</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:12px;color:#4ade80;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11l6-6 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>15% <span style="color:#8a7bb0;font-weight:400">عن الشهر الماضي</span></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:200px;padding:20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي الاشتراكات</span><span style="width:46px;height:46px;border-radius:13px;background:rgba(232,199,106,.16);display:grid;place-items:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="#E8C76A" stroke-width="1.7"/><path d="M2 10h20" stroke="#E8C76A" stroke-width="1.7"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:12px;line-height:1">{{ nRevenue }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">إجمالي الإيرادات</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:12px;color:#4ade80;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11l6-6 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>18% <span style="color:#8a7bb0;font-weight:400">عن الشهر الماضي</span></div>
+      </div>
+      <div class="stat card lift" style="flex:1;min-width:200px;padding:20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><span style="color:#a394c4;font-size:14px">إجمالي الأرباح</span><span style="width:46px;height:46px;border-radius:13px;background:rgba(34,197,94,.16);display:grid;place-items:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M16 7.5c0-1.7-1.8-2.5-4-2.5s-4 .8-4 2.5S9.8 10 12 10s4 .8 4 2.8-1.8 2.7-4 2.7-4-.9-4-2.7" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round"/></svg></span></div>
+        <div style="font-family:'Cairo';font-weight:800;font-size:34px;color:#fff;margin-top:12px;line-height:1">{{ nProfit }}</div>
+        <div style="color:#a394c4;font-size:13px;margin-top:4px">صافي الربح</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:12px;color:#4ade80;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11l6-6 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>20% <span style="color:#8a7bb0;font-weight:400">عن الشهر الماضي</span></div>
+      </div>
+    </div>
+
+    <!-- ===== ROW 2 ===== -->
+    <div class="row3" style="display:flex;gap:16px;margin-bottom:18px;align-items:stretch">
+
+      <!-- platform analytics chart -->
+      <div class="card lift" style="flex:1.9;min-width:330px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <button style="cursor:pointer;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(150,120,220,.2);border-radius:11px;padding:8px 14px;font-family:'Tajawal';font-size:13px;color:#cdbef0;font-weight:600">آخر 7 أيام <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="#cdbef0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <h3 style="font-weight:800;font-size:18px;color:#fff">إحصائيات المنصة</h3>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:14px;justify-content:flex-end">
+          <span style="display:flex;align-items:center;gap:6px;color:#a394c4;font-size:12.5px"><span style="width:14px;height:3px;border-radius:2px;background:#E8C76A"></span>عدد الحصص</span>
+          <span style="display:flex;align-items:center;gap:6px;color:#a394c4;font-size:12.5px"><span style="width:14px;height:3px;border-radius:2px;background:#a855f7"></span>عدد الطلاب</span>
+        </div>
+        <div style="flex:1;margin-top:10px;min-height:250px">
+          <svg viewBox="0 0 640 290" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible">
+            <line x1="70" y1="30" x2="610" y2="30" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="70" y1="74" x2="610" y2="74" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="70" y1="118" x2="610" y2="118" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="70" y1="162" x2="610" y2="162" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="70" y1="206" x2="610" y2="206" stroke="rgba(150,120,220,.1)" stroke-width="1"/>
+            <line x1="70" y1="250" x2="610" y2="250" stroke="rgba(150,120,220,.18)" stroke-width="1.2"/>
+            <text x="60" y="254" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">0</text>
+            <text x="60" y="210" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">700</text>
+            <text x="60" y="166" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">1,400</text>
+            <text x="60" y="122" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">2,100</text>
+            <text x="60" y="78" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">2,800</text>
+            <text x="60" y="34" text-anchor="end" font-size="11.5" fill="#8a7bb0" font-family="Tajawal">3,500</text>
+            <defs><linearGradient id="pa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".26"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></linearGradient></defs>
+            <path d="M70,204.7 160,157 250,167 340,116.8 430,157 520,62.7 610,75.3 L610,250 L70,250 Z" fill="url(#pa)"/>
+            <polyline points="70,204.7 160,157 250,167 340,116.8 430,157 520,62.7 610,75.3" fill="none" stroke="#a855f7" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="70,240 160,223 250,227.4 340,198.5 430,220.5 520,169.5 610,155.7" fill="none" stroke="#E8C76A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <g fill="#a855f7"><circle cx="70" cy="204.7" r="4"/><circle cx="160" cy="157" r="4"/><circle cx="250" cy="167" r="4"/><circle cx="340" cy="116.8" r="4"/><circle cx="430" cy="157" r="4"/><circle cx="520" cy="62.7" r="4"/><circle cx="610" cy="75.3" r="4"/></g>
+            <g fill="#E8C76A"><circle cx="70" cy="240" r="4"/><circle cx="160" cy="223" r="4"/><circle cx="250" cy="227.4" r="4"/><circle cx="340" cy="198.5" r="4"/><circle cx="430" cy="220.5" r="4"/><circle cx="520" cy="169.5" r="4"/><circle cx="610" cy="155.7" r="4"/></g>
+            <text x="70" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">السبت</text>
+            <text x="160" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الأحد</text>
+            <text x="250" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الإثنين</text>
+            <text x="340" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الثلاثاء</text>
+            <text x="430" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الأربعاء</text>
+            <text x="520" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الخميس</text>
+            <text x="610" y="272" text-anchor="middle" font-size="12" fill="#8a7bb0" font-family="Tajawal">الجمعة</text>
+          </svg>
+        </div>
+        <button class="lnk" style="align-self:center;margin-top:8px;background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.3);border-radius:12px;padding:11px 22px;color:#b69bf5;font-family:'Tajawal';font-weight:700;font-size:14px">عرض التقرير الكامل ↗</button>
+      </div>
+
+      <!-- recent registrations -->
+      <div class="card lift" style="flex:1.15;min-width:280px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between"><a class="lnk" href="#">عرض الكل</a><h3 style="font-weight:800;font-size:18px;color:#fff">أحدث التسجيلات</h3></div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:12px;flex:1">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(150,120,220,.08)"><span style="color:#8a7bb0;font-size:12.5px;white-space:nowrap">منذ 10 دقائق</span><span class="badge" style="background:rgba(124,58,237,.2);color:#c4a6f7">طالبة</span><div style="flex:1;font-weight:700;font-size:15px;color:#fff;text-align:right">سارة أحمد</div><img class="ava" src="images/teacher1.png" style="width:40px;height:40px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(150,120,220,.08)"><span style="color:#8a7bb0;font-size:12.5px;white-space:nowrap">منذ 25 دقيقة</span><span class="badge" style="background:rgba(34,197,94,.18);color:#4ade80">معلم</span><div style="flex:1;font-weight:700;font-size:15px;color:#fff;text-align:right">محمد علي</div><img class="ava" src="images/teacher3.png" style="width:40px;height:40px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(150,120,220,.08)"><span style="color:#8a7bb0;font-size:12.5px;white-space:nowrap">منذ 45 دقيقة</span><span class="badge" style="background:rgba(124,58,237,.2);color:#c4a6f7">طالبة</span><div style="flex:1;font-weight:700;font-size:15px;color:#fff;text-align:right">فاطمة خالد</div><img class="ava" src="images/teacher1.png" style="width:40px;height:40px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(150,120,220,.08)"><span style="color:#8a7bb0;font-size:12.5px;white-space:nowrap">منذ ساعة</span><span class="badge" style="background:rgba(34,197,94,.18);color:#4ade80">طالب</span><div style="flex:1;font-weight:700;font-size:15px;color:#fff;text-align:right">يوسف حسن</div><img class="ava" src="images/teacher2.png" style="width:40px;height:40px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 4px"><span style="color:#8a7bb0;font-size:12.5px;white-space:nowrap">منذ ساعتين</span><span class="badge" style="background:rgba(124,58,237,.2);color:#c4a6f7">طالبة</span><div style="flex:1;font-weight:700;font-size:15px;color:#fff;text-align:right">أسماء عبدالرحمن</div><img class="ava" src="images/teacher1.png" style="width:40px;height:40px"></div>
+        </div>
+      </div>
+
+      <!-- system notifications -->
+      <div class="card lift" style="flex:1.15;min-width:280px;padding:20px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between"><a class="lnk" href="#">عرض الكل</a><h3 style="font-weight:800;font-size:18px;color:#fff">تنبيهات النظام</h3></div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;flex:1">
+          <div style="display:flex;align-items:center;gap:11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:13px;padding:11px 12px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(239,68,68,.18);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 4 2 20h20L12 4Z" stroke="#f87171" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="#f87171" stroke-width="1.9" stroke-linecap="round"/></svg></span><span class="badge" style="background:rgba(239,68,68,.22);color:#f87171">مهم</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">انتهاء اشتراك 15 طالب</div></div></div>
+          <div style="display:flex;align-items:center;gap:11px;padding:7px 4px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(59,130,246,.16);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="#60a5fa" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="color:#8a7bb0;font-size:12px;white-space:nowrap">منذ ساعتين</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">حصص اليوم: 32 حصة</div></div></div>
+          <div style="display:flex;align-items:center;gap:11px;padding:7px 4px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(232,199,106,.16);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M8 4h8l3 3v13H5V4h3Z" stroke="#E8C76A" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span style="color:#8a7bb0;font-size:12px;white-space:nowrap">منذ 3 ساعات</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">واجبات لم تُصحح: 24</div></div></div>
+          <div style="display:flex;align-items:center;gap:11px;padding:7px 4px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(34,197,94,.16);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#4ade80" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M18 6v6M21 9h-6" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="color:#8a7bb0;font-size:12px;white-space:nowrap">منذ 5 ساعات</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">طلب معلم جديد</div></div></div>
+          <div style="display:flex;align-items:center;gap:11px;padding:7px 4px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(232,199,106,.16);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="#E8C76A"><path d="m12 4 2 4.2 4.6.6-3.3 3.2.8 4.5L12 14.4 7.9 16.5l.8-4.5-3.3-3.2 4.6-.6L12 4Z"/></svg></span><span style="color:#8a7bb0;font-size:12px;white-space:nowrap">منذ 6 ساعات</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">تقييمات جديدة: 18</div></div></div>
+          <div style="display:flex;align-items:center;gap:11px;padding:7px 4px"><span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(239,68,68,.14);display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0" stroke="#f87171" stroke-width="1.7" stroke-linecap="round"/><path d="m4 4 16 16" stroke="#f87171" stroke-width="1.7" stroke-linecap="round"/></svg></span><span style="color:#8a7bb0;font-size:12px;white-space:nowrap">منذ 12 ساعة</span><div style="flex:1;text-align:right"><div style="font-weight:600;font-size:14px;color:#fff">مشاكل في الاتصال: 2</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ROW 3 quick actions ===== -->
+    <div class="card" style="padding:24px;border-radius:22px">
+      <h3 style="font-weight:800;font-size:18px;color:#fff;text-align:right;margin-bottom:20px">إجراءات سريعة</h3>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(124,58,237,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="#a855f7" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M18 7v6M21 10h-6" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">إضافة طالب</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(59,130,246,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="#60a5fa" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M18 7v6M21 10h-6" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">إضافة معلم</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(34,197,94,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="#4ade80" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4M12 13v4M10 15h4" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">إضافة حصة</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(232,199,106,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 6c-1.6-1.1-3.7-1.7-6-1.7v14c2.3 0 4.4.6 6 1.7 1.6-1.1 3.7-1.7 6-1.7v-14c-2.3 0-4.4.6-6 1.7Z" stroke="#E8C76A" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 6v14" stroke="#E8C76A" stroke-width="1.7"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">إضافة دورة</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(168,85,247,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="m21 4-9 16-2.5-6.5L3 11l18-7Z" stroke="#c084fc" stroke-width="1.7" stroke-linejoin="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">إرسال إشعار</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(59,130,246,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 3h7l4 4v14H7V3Z" stroke="#60a5fa" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12h6M9 16h6" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">تقرير جديد</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(34,197,94,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 9.5a3.5 3.5 0 0 1 0 8.5H7Z" stroke="#4ade80" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 11v5M9.5 13.5 12 11l2.5 2.5" stroke="#4ade80" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">نسخة احتياطية</span></div>
+        <div class="qa"><span style="width:54px;height:54px;border-radius:15px;background:rgba(150,120,220,.16);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#b1a0d6" stroke-width="1.8"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8M4.6 9a1.6 1.6 0 0 0-.3-1.8m0 9.6A1.6 1.6 0 0 0 4.6 15m14.8-6a1.6 1.6 0 0 0 .3-1.8M12 2v3m0 14v3M2 12h3m14 0h3" stroke="#b1a0d6" stroke-width="1.6" stroke-linecap="round"/></svg></span><span style="font-size:14px;font-weight:700;color:#e8e0f5">الإعدادات العامة</span></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- bottom nav (mobile) -->
+  <nav class="botnav" style="position:fixed;bottom:0;inset-inline:0;z-index:80;background:#1a0a36;border-top:1px solid rgba(150,120,220,.12);padding:8px 10px;align-items:center;justify-content:space-around;box-shadow:0 -8px 24px rgba(0,0,0,.4)">
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#a855f7;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>الرئيسية</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>الطلاب</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>التقارير</a>
+    <a href="#" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M2 10h20" stroke="currentColor" stroke-width="1.8"/></svg>الاشتراكات</a>
+    <a href="#" onClick="{{ openDrawer }}" style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8a7bb0;text-decoration:none;font-size:11px;font-weight:600;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>المزيد</a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { p: 0, drawer: false, isMobile: false };
+
+  componentDidMount() {
+    this._mq = window.matchMedia('(max-width:1024px)');
+    this._onMq = () => this.setState({ isMobile: this._mq.matches, drawer: false });
+    this.setState({ isMobile: this._mq.matches });
+    this._mq.addEventListener('change', this._onMq);
+    const start = performance.now(), dur = 1400;
+    this._timer = setInterval(() => {
+      const t = Math.min(1, (performance.now() - start) / dur);
+      this.setState({ p: 1 - Math.pow(1 - t, 3) });
+      if (t >= 1) { clearInterval(this._timer); this._timer = null; }
+    }, 33);
+  }
+  componentWillUnmount() {
+    if (this._timer) clearInterval(this._timer);
+    if (this._mq) this._mq.removeEventListener('change', this._onMq);
+  }
+
+  openDrawer() { this.setState({ drawer: true }); }
+  closeDrawer() { this.setState({ drawer: false }); }
+
+  renderVals() {
+    const p = this.state.p;
+    const n = (v) => Math.round(v * p).toLocaleString('en-US');
+    return {
+      nStudents: n(2543),
+      nTeachers: n(156),
+      nSessions: n(1234),
+      nRevenue: '$' + n(45231),
+      nProfit: '$' + n(12452),
+      drawerOpen: this.state.drawer && this.state.isMobile,
+      sidebarTf: (this.state.isMobile && !this.state.drawer) ? 'translateX(-100%)' : 'translateX(0)',
+      openDrawer: () => this.openDrawer(),
+      closeDrawer: () => this.closeDrawer(),
+    };
+  }
+}
+</script>
+</body>
+</html>
