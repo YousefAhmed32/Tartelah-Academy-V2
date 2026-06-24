@@ -158,6 +158,17 @@
     background: #cdbef0;
     border-radius: 6px;
   }
+  .custom-scroll-light {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+  .custom-scroll-light::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scroll-light::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+  }
 
   /* ===== SKELETON LOADING ===== */
   .skeleton {

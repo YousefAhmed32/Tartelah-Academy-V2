@@ -10,6 +10,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
   pending: { label: 'قيد الانتظار', variant: 'warning' },
@@ -202,7 +203,7 @@ export default function AdminEnrollmentsPage() {
         footer={<Button variant="ghost" onClick={() => { setShowProof(false); setSelectedRequest(null) }}>إغلاق</Button>}
       >
         <div className="text-center">
-          <img src={selectedRequest?.paymentProofUrl} alt="إثبات الدفع" className="max-w-full max-h-[70vh] object-contain rounded-xl mx-auto border border-[#e8e0f5]" />
+          <img src={getFileUrl(selectedRequest?.paymentProofUrl)} alt="إثبات الدفع" className="max-w-full max-h-[70vh] object-contain rounded-xl mx-auto border border-[#e8e0f5]" />
           <div className="mt-3 text-sm text-[#9b7fd6]">
             رُفع بواسطة: {selectedRequest?.studentId?.firstNameAr} — {formatDateAr(selectedRequest?.updatedAt)}
           </div>

@@ -110,8 +110,8 @@ export default function LoginPage() {
         >
           {/* Logo */}
           <div className="flex items-center gap-[13px]">
-            <div className="flex-none w-[60px] h-[60px] rounded-[16px] flex items-center justify-center" style={{ border: '1.5px solid rgba(212,175,55,0.6)', background: 'rgba(20,5,46,0.4)' }}>
-              <LogoIcon size={34} />
+            <div className="flex-none w-[60px] h-[60px] rounded-[16px] overflow-hidden flex items-center justify-center" style={{ border: '1.5px solid rgba(212,175,55,0.6)', background: 'rgba(20,5,46,0.4)' }}>
+              <img src="/logo-png.png" alt="ترتيلة" className="w-full h-full object-contain p-1.5" />
             </div>
             <div style={{ lineHeight: 1.15 }}>
               <div className="font-heading font-extrabold text-[26px] text-white">ترتيلة</div>
@@ -292,15 +292,3 @@ export default function LoginPage() {
   )
 }
 
-function LogoIcon({ size = 34 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="24.5" cy="6" r="2.4" stroke="#E8C76A" strokeWidth="1.4"/>
-      <path d="M16 6.5c2.6 0 4.2 2 4.2 4.2H11.8C11.8 8.5 13.4 6.5 16 6.5Z" stroke="#E8C76A" strokeWidth="1.4" strokeLinejoin="round"/>
-      <path d="M16 8.7v2.2" stroke="#E8C76A" strokeWidth="1.4"/>
-      <path d="M8 27V15.5c0-1 .6-1.9 1.5-2.3L16 10l6.5 3.2c.9.4 1.5 1.3 1.5 2.3V27" stroke="#E8C76A" strokeWidth="1.4" strokeLinejoin="round"/>
-      <path d="M13.2 27v-4.4c0-1.5 1.2-2.7 2.8-2.7s2.8 1.2 2.8 2.7V27" stroke="#E8C76A" strokeWidth="1.4" strokeLinejoin="round"/>
-      <path d="M5.5 27h21" stroke="#E8C76A" strokeWidth="1.4" strokeLinecap="round"/>
-    </svg>
-  )
-}

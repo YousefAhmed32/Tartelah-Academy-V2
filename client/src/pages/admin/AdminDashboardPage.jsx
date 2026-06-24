@@ -1,110 +1,390 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import api from '../../utils/api.js'
-import StatCard from '../../components/shared/StatCard.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
-import Badge from '../../components/ui/Badge.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatNumber, formatCurrency } from '../../utils/format.js'
 import { ROUTES } from '../../config/constants.js'
+import { useAuthStore } from '../../store/authStore.js'
+
+function getArabicDate() {
+  return new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function KPICard({ label, value, sub, icon, color = '#7c3aed', trend, to }) {
+  const navigate = useNavigate()
+  return (
+    <motion.div
+      whileHover={{ y: -1 }}
+      onClick={() => to && navigate(to)}
+      className={`bg-white rounded-2xl p-5 border border-gray-100 shadow-sm ${to ? 'cursor-pointer' : ''}`}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}12`, color }}>
+          {icon}
+        </div>
+        {trend !== undefined && (
+          <span className={`text-xs font-bold px-2 py-1 rounded-full ${trend >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            {trend >= 0 ? '+' : ''}{trend}%
+          </span>
+        )}
+      </div>
+      <div className="font-heading font-extrabold text-2xl text-gray-900">{value}</div>
+      <div className="text-sm font-semibold text-gray-700 mt-0.5">{label}</div>
+      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+    </motion.div>
+  )
+}
+
+function AlertBanner({ count, to }) {
+  const navigate = useNavigate()
+  if (!count) return null
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={() => navigate(to)}
+      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
+    >
+      <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center flex-none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" fill="white"/>
+          <path d="M12 9v4M12 17h.01" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div className="flex-1">
+        <span className="font-bold text-amber-800 text-sm">
+          {count} {count === 1 ? 'طلب تسجيل جديد' : 'طلبات تسجيل جديدة'} تنتظر مراجعتك
+        </span>
+        <span className="text-amber-600 text-xs mr-2">انقر للمراجعة</span>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-amber-500">
+        <path d="m9 18-6-6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </motion.div>
+  )
+}
+
+function SessionRow({ session, index }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+    >
+      <Avatar src={session.studentId?.avatar} name={session.studentId?.firstNameAr || '؟'} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-gray-800 truncate">
+          {session.studentId?.firstNameAr} — {session.teacherId?.firstNameAr}
+        </div>
+        <div className="text-xs text-gray-400 mt-0.5">{formatTimeAr(session.scheduledAt)} • {session.durationMinutes} دقيقة</div>
+      </div>
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">
+        {session.meetingProvider}
+      </span>
+    </motion.div>
+  )
+}
+
+function RegistrationRow({ user: u, index }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <Avatar src={u.avatar} name={`${u.firstNameAr} ${u.lastNameAr}`} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-gray-800 truncate">{u.firstNameAr} {u.lastNameAr}</div>
+        <div className="text-xs text-gray-400">{formatDateAr(u.createdAt)}</div>
+      </div>
+      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${u.role === 'teacher' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'}`}>
+        {u.role === 'teacher' ? 'معلم' : 'طالب'}
+      </span>
+    </div>
+  )
+}
+
+function QuickActionBtn({ icon, label, to, color = '#7c3aed', badge }) {
+  return (
+    <Link
+      to={to}
+      className="relative flex flex-col items-center gap-2 px-5 py-4 rounded-2xl border transition-all hover:-translate-y-0.5 hover:shadow-sm text-center"
+      style={{ borderColor: `${color}20`, background: `${color}08` }}
+    >
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15`, color }}>
+        {icon}
+      </div>
+      <span className="text-xs font-semibold" style={{ color }}>{label}</span>
+      {badge > 0 && (
+        <span className="absolute -top-1.5 -start-1.5 w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 export default function AdminDashboardPage() {
+  const { user } = useAuthStore()
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin', 'dashboard'],
     queryFn: () => api.get('/admin/stats').then(r => r.data.data),
+    refetchInterval: 60000,
     placeholderData: {
       totalStudents: 0, totalTeachers: 0, totalSessions: 0, totalRevenue: 0,
-      activeSubscriptions: 0, sessionsToday: 0,
-      recentRegistrations: [], upcomingSessions: [], revenueByMonth: [],
+      activeSubscriptions: 0, sessionsToday: 0, pendingEnrollments: 0,
+      recentRegistrations: [], upcomingSessions: [],
     },
   })
 
-  const cards = [
-    { label: 'إجمالي الطلاب', value: formatNumber(stats?.totalStudents), color: '#7c3aed', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.7"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
-    { label: 'المعلمون', value: formatNumber(stats?.totalTeachers), color: '#E8C76A', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M20 19c0-3.3-3.6-6-8-6s-8 2.7-8 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
-    { label: 'الاشتراكات النشطة', value: formatNumber(stats?.activeSubscriptions), color: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M16 6V4a2 2 0 0 0-4 0v2M3 10h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
-    { label: 'الإيرادات (ريال)', value: formatCurrency(stats?.totalRevenue), color: '#3b82f6', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
-  ]
-  const pendingEnrollments = stats?.pendingEnrollments || 0
+  const pending = stats?.pendingEnrollments || 0
+
+  if (isLoading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Spinner color="border-violet-600" />
+    </div>
+  )
 
   return (
-    <div dir="rtl">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="font-heading font-extrabold text-2xl text-brand-textBody">لوحة الإدارة</h1>
-        <p className="text-[#9b7fd6] mt-1">نظرة عامة على المنصة</p>
+    <div dir="rtl" className="space-y-6 max-w-[1400px]">
+
+      {/* Page header */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <p className="text-xs font-semibold text-gray-400 mb-1">{getArabicDate()}</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="font-heading font-extrabold text-2xl text-gray-900">
+              مرحباً، {user?.firstNameAr || 'المدير'} 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {pending > 0
+                ? `لديك ${pending} ${pending === 1 ? 'طلب يحتاج' : 'طلبات تحتاج'} مراجعتك اليوم`
+                : 'المنصة تعمل بشكل طبيعي — لا توجد إجراءات عاجلة'}
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2">
+            <Link to={ROUTES.ADMIN_REPORTS} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 bg-white hover:bg-gray-50 transition-colors">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              التقارير
+            </Link>
+            <Link to={ROUTES.ADMIN_ENROLLMENTS} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors" style={{ background: '#7c3aed' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              طلبات التسجيل
+            </Link>
+          </div>
+        </div>
       </motion.div>
 
-      {/* Pending enrollment alert */}
-      {pendingEnrollments > 0 && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
-          <Link to={ROUTES.ADMIN_ENROLLMENTS} className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-amber-400/40 hover:bg-amber-500/5 transition-colors" style={{ background: 'rgba(245,158,11,0.06)' }}>
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-none" />
-            <span className="font-semibold text-amber-600">{pendingEnrollments} طلب تسجيل جديد يحتاج مراجعة</span>
-            <svg className="mr-auto" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#d97706" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </Link>
+      {/* Alert banners */}
+      <AlertBanner count={pending} to={ROUTES.ADMIN_ENROLLMENTS} />
+
+      {/* Unscheduled students alert */}
+      {stats?.unscheduledStudents > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-50 border border-purple-200"
+        >
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center flex-none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="5" width="18" height="16" rx="2.5" fill="white"/>
+              <path d="M3 9h18M8 3v4M16 3v4" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <span className="font-bold text-violet-800 text-sm">
+              {stats.unscheduledStudents} {stats.unscheduledStudents === 1 ? 'طالب مشترك' : 'طلاب مشتركون'} بدون جدول دوري
+            </span>
+            <span className="text-violet-600 text-xs mr-2">— يحتاجون تعيين جدول من المعلم</span>
+          </div>
         </motion.div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map((s, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-            <StatCard {...s} />
-          </motion.div>
-        ))}
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          label="إجمالي الطلاب"
+          value={formatNumber(stats?.totalStudents)}
+          sub="طالب مسجل في المنصة"
+          icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="17" cy="9" r="2.3" stroke="currentColor" strokeWidth="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+          color="#7c3aed"
+          to={ROUTES.ADMIN_STUDENTS}
+        />
+        <KPICard
+          label="المعلمون"
+          value={formatNumber(stats?.totalTeachers)}
+          sub="معلم نشط"
+          icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+          color="#E8C76A"
+          to={ROUTES.ADMIN_TEACHERS}
+        />
+        <KPICard
+          label="اشتراكات نشطة"
+          value={formatNumber(stats?.activeSubscriptions)}
+          sub="اشتراك فعّال حالياً"
+          icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/></svg>}
+          color="#10b981"
+          to={ROUTES.ADMIN_PACKAGES}
+        />
+        <KPICard
+          label="إجمالي الإيرادات"
+          value={formatCurrency(stats?.totalRevenue, 'SAR')}
+          sub="الإيرادات الكلية للمنصة"
+          icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM12 7v2.5l2 1M3 19a9 9 0 0 1 18 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>}
+          color="#3b82f6"
+          to={ROUTES.ADMIN_REPORTS}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's sessions */}
-        <div className="lg:col-span-2 card-light p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-heading font-bold text-brand-textBody text-lg">حصص اليوم</h2>
-            <Badge variant="purple" dot>{stats?.sessionsToday || 0} حصة</Badge>
+      {/* Quick Actions */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <h2 className="font-heading font-bold text-gray-900 mb-4 text-base">إجراءات سريعة</h2>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+          <QuickActionBtn
+            icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 13l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            label="مراجعة الطلبات"
+            to={ROUTES.ADMIN_ENROLLMENTS}
+            color="#f59e0b"
+            badge={pending}
+          />
+          <QuickActionBtn
+            icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+            label="إدارة الطلاب"
+            to={ROUTES.ADMIN_STUDENTS}
+            color="#7c3aed"
+          />
+          <QuickActionBtn
+            icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+            label="إدارة المعلمين"
+            to={ROUTES.ADMIN_TEACHERS}
+            color="#E8C76A"
+          />
+          <QuickActionBtn
+            icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+            label="التقارير"
+            to={ROUTES.ADMIN_REPORTS}
+            color="#10b981"
+          />
+          <QuickActionBtn
+            icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.8"/></svg>}
+            label="الإشعارات"
+            to={ROUTES.ADMIN_NOTIFICATIONS}
+            color="#ec4899"
+          />
+        </div>
+      </div>
+
+      {/* Main Operations Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Today's Sessions */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-heading font-bold text-gray-900 text-base">حصص اليوم</h2>
+              <p className="text-xs text-gray-400 mt-0.5">الحصص المجدولة اليوم</p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${stats?.sessionsToday > 0 ? 'bg-violet-50 text-violet-700' : 'bg-gray-100 text-gray-500'}`}>
+                {stats?.sessionsToday || 0} حصة
+              </span>
+              <Link to={ROUTES.ADMIN_SESSIONS} className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+                عرض الكل
+              </Link>
+            </div>
           </div>
-          {isLoading ? (
-            <div className="flex justify-center py-8"><Spinner color="border-brand-purple" /></div>
-          ) : !stats?.upcomingSessions?.length ? (
-            <div className="text-center py-8 text-[#9b7fd6] text-sm">لا توجد حصص لهذا اليوم</div>
+
+          {!stats?.upcomingSessions?.length ? (
+            <div className="flex flex-col items-center justify-center py-12 rounded-2xl bg-gray-50">
+              <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="text-gray-400"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-500">لا توجد حصص مجدولة اليوم</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {stats.upcomingSessions.slice(0, 5).map((s, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[#f8f5ff]">
-                  <Avatar src={s.studentId?.avatar} name={`${s.studentId?.firstNameAr}`} size="xs" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-semibold text-brand-textBody">{s.studentId?.firstNameAr} - {s.teacherId?.firstNameAr}</span>
-                    <div className="text-xs text-[#9b7fd6]">{formatTimeAr(s.scheduledAt)} • {s.durationMinutes} د</div>
-                  </div>
-                  <Badge variant="purple">{s.meetingProvider}</Badge>
-                </div>
+            <div className="space-y-1">
+              {stats.upcomingSessions.slice(0, 6).map((s, i) => (
+                <SessionRow key={i} session={s} index={i} />
               ))}
             </div>
           )}
         </div>
 
-        {/* Recent registrations */}
-        <div className="card-light p-6">
-          <h2 className="font-heading font-bold text-brand-textBody text-lg mb-5">آخر التسجيلات</h2>
+        {/* Recent Registrations */}
+        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-heading font-bold text-gray-900 text-base">آخر التسجيلات</h2>
+              <p className="text-xs text-gray-400 mt-0.5">أحدث المستخدمين المسجلين</p>
+            </div>
+            <Link to={ROUTES.ADMIN_STUDENTS} className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+              عرض الكل
+            </Link>
+          </div>
+
           {!stats?.recentRegistrations?.length ? (
-            <div className="text-center py-6 text-[#9b7fd6] text-sm">لا توجد تسجيلات حديثة</div>
+            <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mb-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              </div>
+              <p className="text-sm">لا توجد تسجيلات حديثة</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {stats.recentRegistrations.slice(0, 5).map((u, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <Avatar src={u.avatar} name={`${u.firstNameAr} ${u.lastNameAr}`} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-brand-textBody truncate">{u.firstNameAr} {u.lastNameAr}</div>
-                    <div className="text-xs text-[#9b7fd6]">{formatDateAr(u.createdAt)}</div>
-                  </div>
-                  <Badge variant={u.role === 'teacher' ? 'gold' : 'purple'}>
-                    {u.role === 'teacher' ? 'معلم' : 'طالب'}
-                  </Badge>
-                </div>
+            <div className="divide-y divide-gray-50">
+              {stats.recentRegistrations.slice(0, 7).map((u, i) => (
+                <RegistrationRow key={i} user={u} index={i} />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Platform Stats Row */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <h2 className="font-heading font-bold text-gray-900 mb-4 text-base">صحة المنصة</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            {
+              label: 'إجمالي الحصص',
+              value: formatNumber(stats?.totalSessions),
+              icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+              color: '#7c3aed',
+            },
+            {
+              label: 'حصص اليوم',
+              value: formatNumber(stats?.sessionsToday),
+              icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+              color: '#10b981',
+            },
+            {
+              label: 'طلبات قيد المراجعة',
+              value: formatNumber(pending),
+              icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>,
+              color: '#f59e0b',
+            },
+            {
+              label: 'متوسط الطلاب/معلم',
+              value: stats?.totalTeachers > 0
+                ? (stats.totalStudents / stats.totalTeachers).toFixed(1)
+                : '0',
+              icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+              color: '#3b82f6',
+            },
+          ].map((m, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-none" style={{ background: `${m.color}12`, color: m.color }}>
+                {m.icon}
+              </div>
+              <div>
+                <div className="font-heading font-extrabold text-lg text-gray-900">{m.value}</div>
+                <div className="text-xs text-gray-500">{m.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   )
 }

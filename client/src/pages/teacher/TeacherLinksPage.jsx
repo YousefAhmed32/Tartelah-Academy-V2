@@ -80,26 +80,53 @@ export default function TeacherLinksPage() {
         </div>
       )}
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="إضافة رابط اجتماع" size="sm"
-        footer={<>
-          <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
-          <Button variant="gold" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending} disabled={!form.link}>حفظ</Button>
-        </>}
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="إضافة رابط اجتماع"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
+            <Button variant="gold" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending} disabled={!form.link}>
+              حفظ الرابط
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4" dir="rtl">
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">المنصة</label>
-            <select name="provider" value={form.provider} onChange={e => setForm(p => ({ ...p, provider: e.target.value }))} className="field w-full">
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">المنصة</label>
+            <select
+              name="provider"
+              value={form.provider}
+              onChange={e => setForm(p => ({ ...p, provider: e.target.value }))}
+              className="field-light w-full"
+            >
               {providers.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">التسمية (اختياري)</label>
-            <input type="text" name="label" value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))} className="field w-full" placeholder="مثال: غرفتي الدائمة" />
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">التسمية (اختياري)</label>
+            <input
+              type="text"
+              name="label"
+              value={form.label}
+              onChange={e => setForm(p => ({ ...p, label: e.target.value }))}
+              className="field-light w-full"
+              placeholder="مثال: غرفتي الدائمة"
+            />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">الرابط</label>
-            <input type="url" name="link" value={form.link} onChange={e => setForm(p => ({ ...p, link: e.target.value }))} className="field w-full" placeholder="https://..." />
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">الرابط <span className="text-red-500">*</span></label>
+            <input
+              type="url"
+              name="link"
+              value={form.link}
+              onChange={e => setForm(p => ({ ...p, link: e.target.value }))}
+              className="field-light w-full"
+              placeholder="https://..."
+            />
           </div>
         </div>
       </Modal>

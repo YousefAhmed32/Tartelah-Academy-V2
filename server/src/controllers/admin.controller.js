@@ -3,6 +3,7 @@ const Session = require('../models/Session')
 const Subscription = require('../models/Subscription')
 const Evaluation = require('../models/Evaluation')
 const EnrollmentRequest = require('../models/EnrollmentRequest')
+const ScheduleRule = require('../models/ScheduleRule')
 const { sendSuccess, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 
@@ -31,11 +32,19 @@ exports.getDashboardStats = async (req, res, next) => {
       { $group: { _id: null, total: { $sum: '$amountPaid' }, thisMonth: { $sum: { $cond: [{ $gte: ['$createdAt', monthStart] }, '$amountPaid', 0] } } } }
     ])
 
+    // Students with active subscriptions but no schedule rule (not yet scheduled)
+    const activeSubStudentIds = await Subscription.distinct('studentId', { status: 'active' })
+    const scheduledStudentIds = await ScheduleRule.distinct('studentId', { status: 'active' })
+    const unscheduledCount = activeSubStudentIds.filter(
+      id => !scheduledStudentIds.some(s => s.toString() === id.toString())
+    ).length
+
     sendSuccess(res, {
       totalStudents,
       totalTeachers,
       activeSubscriptions,
       pendingEnrollments,
+      unscheduledStudents: unscheduledCount,
       totalRevenue: revenue[0]?.total || 0,
       totalSessions: sessionStats[0]?.total || 0,
       sessionsToday: sessionStats[0]?.todayCount || 0,

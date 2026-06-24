@@ -1,190 +1,188 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
-2026-06-22
+2026-06-24
 
 ## Status
-**PRODUCTION READY — Complete Enrollment Workflow Implemented**
+**EDUCATIONAL OPERATING SYSTEM — Full Scheduling Engine + Session Lifecycle**
 
-All 197 tracked tasks completed. Full student-to-admin-to-teacher enrollment pipeline live.  
-Build: ✅ 4.05s, zero errors.
+Frontend: ✅ Zero errors, 4.87s build  
+Backend: ✅ All server files pass syntax check  
+Engine: ✅ ScheduleRule model + schedule.service.js + full CRUD
 
 ---
 
-## This Session — Enrollment Workflow Architecture (2026-06-22)
+## This Session — Educational Operating System Overhaul
 
-### Problem Analysis
-The project was marked 100% complete but the core business flow had critical gaps:
-1. Students could register but had no path to enrollment
-2. No payment proof upload system existed
-3. Admin had no enrollment review queue
-4. Teacher assignment produced no notifications
-5. Subscription model lacked `pending` status
+### Philosophy
+Previous sessions built a working dashboard. This session transformed it into a real educational operating system where:
+- Sessions are **generated from rules**, not entered manually
+- Attendance is **session-linked and inline**, not a separate page
+- Evaluations and homework are **reachable from every session card**
+- Teachers get **smart alerts** about unscheduled students
+- Admin gets **operational intelligence** about platform health
 
-### What Was Built
+---
 
-#### New Files Created
-| File | Purpose |
-|------|---------|
-| `server/src/models/EnrollmentRequest.js` | Full enrollment lifecycle model |
-| `server/src/controllers/enrollment.controller.js` | Submit, upload, review, approve/reject |
-| `server/src/routes/enrollment.routes.js` | 6 protected routes (student + admin) |
-| `client/src/pages/student/StudentEnrollmentPage.jsx` | 3-step enrollment flow with proof upload |
-| `client/src/pages/admin/AdminEnrollmentsPage.jsx` | Review queue with modal approve/reject |
+## What Was Built
 
-#### Modified Files
+### New Backend Files
+
+| File | Type | Purpose |
+|------|------|---------|
+| `server/src/models/ScheduleRule.js` | NEW | Recurring schedule rule entity |
+| `server/src/services/schedule.service.js` | NEW | Session generation engine |
+| `server/src/controllers/scheduleRule.controller.js` | NEW | CRUD + preview + generate |
+| `server/src/routes/scheduleRule.routes.js` | NEW | Routes at `/schedule-rules` |
+
+### Modified Backend Files
+
 | File | Change |
 |------|--------|
-| `server/src/models/Subscription.js` | Added `pending` to status enum |
-| `server/src/models/Notification.js` | Added `enrollment` type + `relatedId` field |
-| `server/src/middleware/upload.middleware.js` | Added `uploadPaymentProof` handler |
-| `server/src/routes/index.js` | Registered `/enrollments` |
-| `server/src/controllers/admin.controller.js` | `pendingEnrollments` in dashboard stats |
-| `server/server.js` | `uploads/payment-proofs` dir on startup |
-| `client/src/layouts/AdminLayout.jsx` | "طلبات التسجيل" nav + amber live badge |
-| `client/src/layouts/StudentLayout.jsx` | "التسجيل في برنامج" nav item |
-| `client/src/pages/admin/AdminDashboardPage.jsx` | Pending enrollment alert banner |
-| `client/src/pages/student/StudentSubscriptionPage.jsx` | Empty state → enrollment CTA |
-| `client/src/App.jsx` | Routes for both new pages |
-| `client/src/config/constants.js` | STUDENT_ENROLLMENT + ADMIN_ENROLLMENTS |
+| `server/src/models/Session.js` | Added: seriesId, isException, isMakeup, rescheduledFrom; statuses: rescheduled, missed |
+| `server/src/controllers/session.controller.js` | Added: getSession, getTeacherSessionsByMonth, rescheduleSession; fixed completeSession attendance |
+| `server/src/routes/session.routes.js` | Added: GET /:id, GET /teacher-month, PATCH /:id/reschedule |
+| `server/src/controllers/attendance.controller.js` | Added: getSessionAttendance, saveSessionAttendance |
+| `server/src/routes/attendance.routes.js` | Added: GET/POST /session/:sessionId |
+| `server/src/controllers/admin.controller.js` | Added: ScheduleRule import, unscheduledStudents count in stats |
+| `server/src/routes/index.js` | Added: /schedule-rules route |
+
+### Modified Frontend Files
+
+| File | Change |
+|------|--------|
+| `client/src/pages/teacher/TeacherSessionsPage.jsx` | **FULL REDESIGN** — Schedule wizard + month view + expandable cards |
+| `client/src/pages/teacher/TeacherDashboardPage.jsx` | Added: schedule rules query, unscheduled alert, action queue item |
+| `client/src/pages/admin/AdminDashboardPage.jsx` | Added: unscheduled students alert banner |
+| `client/src/config/constants.js` | Added: SESSION_STATUS (expanded), SCHEDULE_FREQUENCY, DAYS_OF_WEEK |
 
 ---
 
-## Complete Business Flow (Now Live)
+## Key API Endpoints
 
-### Student Journey
+### Schedule Rules (NEW)
 ```
-Register → Login → Dashboard
-  → Sidebar: "التسجيل في برنامج"
-  → Browse packages (card grid, features, price)
-  → Step 1: Select package
-  → Step 2: Payment details (method, reference, notes)
-  → Step 3: Submit → status: pending → admins notified
-  → Upload payment proof image → status: under_review
-  → Track status with badge + description
-  → On approval: subscription activated, teacher assigned, notified
+POST   /api/v1/schedule-rules/preview         → preview dates (no DB)
+POST   /api/v1/schedule-rules                 → create rule + generate sessions
+GET    /api/v1/schedule-rules/my              → teacher's rules with stats
+GET    /api/v1/schedule-rules/:id             → single rule + sessions
+PATCH  /api/v1/schedule-rules/:id             → update meeting link / pause
+POST   /api/v1/schedule-rules/:id/generate-more → extend + generate more
 ```
 
-### Admin Journey
+### Sessions (UPDATED)
 ```
-Login → Dashboard
-  → Amber alert banner: "X طلب تسجيل جديد يحتاج مراجعة" (clickable)
-  → Sidebar: "طلبات التسجيل" with amber badge count
-  → Filter by status (pending/under_review/approved/rejected)
-  → Click "مراجعة" on any request
-  → Modal: student info + package + amount + payment method
-  → View payment proof image in dedicated modal
-  → Choose: Approve / Reject
-  → Approve: assign teacher (required) + level + group + start date
-  → Click "موافقة وتفعيل الاشتراك"
-  → Subscription created automatically
-  → Student notified ✅ Teacher notified ✅
+GET    /api/v1/sessions/teacher-month?year=&month=  → monthly view
+GET    /api/v1/sessions/:id                          → single session + attendance
+PATCH  /api/v1/sessions/:id/reschedule              → reschedule with notification
 ```
 
-### Teacher Journey
+### Attendance (UPDATED)
 ```
-Receives notification: "تم تعيين طالب جديد — [student name]"
-  → Student appears in TeacherStudentsPage
-  → Can schedule sessions immediately
+GET    /api/v1/attendance/session/:sessionId  → get session's attendance
+POST   /api/v1/attendance/session/:sessionId  → save (upsert) attendance
 ```
 
 ---
 
-## API Endpoints Added
+## Teacher Sessions Page — Architecture
+
 ```
-POST   /api/v1/enrollments                    student → submit request
-GET    /api/v1/enrollments/me                 student → my requests + status
-POST   /api/v1/enrollments/:id/payment-proof  student → upload image (multipart)
-GET    /api/v1/enrollments                    admin → all requests (?status=pending)
-GET    /api/v1/enrollments/pending-count      admin → badge count
-GET    /api/v1/enrollments/:id                admin → single request details
-PATCH  /api/v1/enrollments/:id/review         admin → approve/reject + create subscription
+TeacherSessionsPage
+├── [Header] + [إنشاء جدول دوري] + [+ حصة واحدة]
+├── [Tabs: الشهر الحالي | الجداول الدورية | السجل]
+│
+├── Tab: month
+│   ├── [Month nav: < شهر >]
+│   └── Sessions grouped by date
+│       └── SessionCard (expandable)
+│           ├── [Attendance: حاضر/غائب/متأخر/معذور + notes + save]
+│           ├── [Meeting link button]
+│           └── [Actions: اكتملت | إعادة جدولة | إلغاء | تقييم | واجب]
+│
+├── Tab: rules
+│   └── ScheduleRulesView — per-student rule cards with stats
+│
+├── Tab: history
+│   └── Past sessions list
+│
+├── ScheduleWizard (Modal, 4 steps)
+│   ├── Step 1: Student select
+│   ├── Step 2: Frequency + days + time
+│   ├── Step 3: Sessions count + meeting
+│   └── Step 4: Preview dates → Confirm
+│
+├── QuickEvalModal — session-linked evaluation
+├── QuickHomeworkModal — student pre-filled homework
+└── RescheduleModal — new datetime + notification
 ```
 
 ---
 
-## Architecture Updates
+## Schedule Generation Algorithm
 
-### EnrollmentRequest Model
 ```
-studentId, packageId, status (pending/under_review/approved/rejected)
-paymentMethod (bank_transfer/cash/card/other), paymentReference
-paymentProofUrl (uploaded file path)
-amount, studentNotes, adminNotes
-teacherId (set on approval), levelId, groupName
-reviewedBy, reviewedAt
-subscriptionId (created on approval)
-```
+Input: { frequency, daysOfWeek, timeOfDay, startDate, sessionsTotal/endDate }
 
-### Business Rule: One Active Request Per Student
-A student can only have one `pending` or `under_review` request at a time.
-Approved or rejected requests don't block new submissions.
+Algorithm:
+1. Parse timeOfDay "HH:MM" → hours, minutes
+2. Iterate day-by-day from startDate
+3. For each day:
+   - daily: always include
+   - weekly: include if dayOfWeek in daysOfWeek
+   - biweekly: include if dayOfWeek in daysOfWeek AND week-number is even
+   - monthly: include if dayOfWeek in daysOfWeek (or same day-of-month)
+4. Skip if date in skipDates
+5. Build sessionDate with timeOfDay applied
+6. Stop when sessionsTotal reached OR endDate passed
+7. Safety: max 600 iterations
+
+Output: Array of Date objects → insertMany into Session collection
+```
 
 ---
 
-## To Start the Application
+## Data Model Changes
 
-### Development
-```bash
-# Terminal 1: Backend
-cd server
-npm install          # if not done
-npm run seed         # populate demo data (first time)
-npm run dev          # starts on port 5000
-
-# Terminal 2: Frontend
-cd client
-npm install          # if not done
-npm run dev          # starts on port 5173
+### ScheduleRule (NEW)
+```javascript
+{
+  teacherId, studentId, subscriptionId,
+  frequency: 'daily|weekly|biweekly|monthly|custom',
+  daysOfWeek: [0-6],          // 0=Sunday
+  timeOfDay: 'HH:MM',
+  durationMinutes: 60,
+  startDate, endDate, sessionsTotal,
+  meetingLink, meetingProvider,
+  titleTemplate,               // e.g. 'حصة تجويد'
+  status: 'active|paused|ended',
+  skipDates: [],
+  timezone: 'Asia/Riyadh',
+}
 ```
 
-### Test the Enrollment Flow
-1. Login as student (student1@tartelah.com / Student1234!)
-2. Go to "التسجيل في برنامج" in sidebar
-3. Select a package → fill form → submit
-4. Upload a payment proof image (any jpg/png)
-5. Logout → Login as admin (admin@tartelah.com / Admin1234!)
-6. Dashboard shows amber alert banner
-7. Go to "طلبات التسجيل" → see the request
-8. Click "مراجعة" → view proof → assign teacher → approve
-9. Logout → Login as teacher → see notification about new student
+### Session (UPDATED)
+```javascript
+{
+  // ... existing fields
+  seriesId: ObjectId,          // ref ScheduleRule
+  isException: Boolean,        // manually overridden
+  isMakeup: Boolean,
+  rescheduledFrom: Date,
+  status: '...| rescheduled | missed',  // now 7 statuses
+}
+```
 
 ---
 
-## Known Constraints (V2 Roadmap)
+## Intelligent Behaviors
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| Real payment gateway | High V2 | Stripe/Moyasar — replace proof upload flow |
-| S3/Cloudinary for file storage | High V2 | Replace local disk for payment proofs + avatars |
-| Zoom/Meet API | Medium V2 | Auto-generate meeting links |
-| AI: OpenAI/Claude API | Medium V2 | Replace rule-based engine |
-| E2E tests (Playwright) | Low V2 | Enrollment flow is highest priority |
-| Push notifications | Low V2 | PWA + web-push |
-
----
-
-## NEXT SESSION — Suggested Priorities
-
-If continuing development, suggested next improvements in order:
-
-1. **Payment Gateway (V2)** — Stripe or Moyasar integration to replace manual proof upload
-2. **Email notifications on enrollment** — Send email to student when approved/rejected
-3. **Admin student profile view** — Clicking a student shows full profile + enrollment history
-4. **Teacher workload display** — Show teacher's current student count in admin assignment UI
-5. **Enrollment statistics in reports** — Add enrollment funnel to AdminReportsPage
-
----
-
-## Demo Credentials
-```
-Admin:    admin@tartelah.com    / Admin1234!
-Teacher1: teacher1@tartelah.com / Teacher1234!
-Teacher2: teacher2@tartelah.com / Teacher1234!
-Student1: student1@tartelah.com / Student1234!
-Student2: student2@tartelah.com / Student1234!
-Student3: student3@tartelah.com / Student1234!
-```
+1. **Teacher creates schedule** → sessions auto-generated → student notified
+2. **Teacher marks attendance** → saved per-session, not overridden on complete
+3. **Teacher completes session** → auto-marks present ONLY if no attendance yet
+4. **Teacher reschedules** → original date stored, student notified
+5. **Admin sees** → unscheduled count in dashboard
+6. **Teacher sees** → unscheduled students in dashboard alert + action queue
 
 ---
 
@@ -192,11 +190,42 @@ Student3: student3@tartelah.com / Student1234!
 
 | Concern | Solution |
 |---------|----------|
-| Auth | JWT access (15m, in-memory) + refresh (7d, httpOnly cookie) |
-| State | Zustand v5 (client) + TanStack Query v5 (server cache) |
-| Enrollment | EnrollmentRequest model → Admin review → Subscription auto-created |
-| File Upload | Multer (local disk, `uploads/payment-proofs/`) → replace with S3 in V2 |
-| Notifications | DB-based + in-app + (email in V2) |
-| RTL | LTR wrapper for Student/Admin (sidebar left), RTL for Teacher (sidebar right) |
-| Rate Limiting | Auth: 20/15min prod, General: 100/15min |
-| Security | Helmet + CORS + bcryptjs + SHA256 reset tokens |
+| Session generation | ScheduleRule → schedule.service.js → Session.insertMany |
+| Attendance | Per-session upsert, teacher-only, inline in session card |
+| Session lifecycle | 7 statuses: scheduled→completed/cancelled/rescheduled/missed |
+| Notifications | Auto-created on: schedule created, session rescheduled, cancelled |
+| Admin intelligence | unscheduledStudents count in /admin/stats |
+
+---
+
+## To Start the Application
+
+```bash
+# Terminal 1: Backend
+cd server && npm run dev      # port 5000
+
+# Terminal 2: Frontend
+cd client && npm run dev      # port 5173
+```
+
+## Demo Credentials
+```
+Admin:    admin@tartelah.com    / Admin1234!
+Teacher1: teacher1@tartelah.com / Teacher1234!
+Student1: student1@tartelah.com / Student1234!
+```
+
+---
+
+## Remaining V2 Work
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Payment gateway (Stripe/Moyasar) | High | Revenue processing |
+| Admin schedule management UI | High | Admin can view/manage all schedule rules |
+| Email notifications on enrollment + schedule | Medium | Requires SMTP config |
+| Teacher salary management | Medium | Sessions × rate |
+| S3/Cloudinary file storage | High | Replace Multer local disk |
+| AI tutor (Claude API) | Medium | Tajweed Q&A |
+| Homework sessionId linkage | Low | Currently by student only |
+| Group session support | Low | Requires attendance model change |

@@ -93,36 +93,54 @@ export default function TeacherProgressPage() {
         </div>
       )}
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={`تسجيل ${activeTab === 'memorization' ? 'حفظ' : 'مراجعة'}`} size="sm"
-        footer={<>
-          <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
-          <Button variant="gold" onClick={() => createMutation.mutate({ ...form, surahNumber: Number(form.surahNumber), fromAyah: Number(form.fromAyah), toAyah: Number(form.toAyah) })} loading={createMutation.isPending}>حفظ</Button>
-        </>}
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={`تسجيل ${activeTab === 'memorization' ? 'حفظ' : 'مراجعة'}`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
+            <Button
+              variant="gold"
+              onClick={() => createMutation.mutate({
+                ...form,
+                surahNumber: Number(form.surahNumber),
+                fromAyah: Number(form.fromAyah),
+                toAyah: Number(form.toAyah),
+              })}
+              loading={createMutation.isPending}
+              disabled={!form.studentId}
+            >
+              حفظ السجل
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4" dir="rtl">
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">الطالب</label>
-            <select name="studentId" value={form.studentId} onChange={change} className="field w-full">
-              <option value="">اختر طالباً</option>
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">الطالب <span className="text-red-500">*</span></label>
+            <select name="studentId" value={form.studentId} onChange={change} className="field-light w-full">
+              <option value="">اختر طالباً...</option>
               {students.map(s => <option key={s._id} value={s._id}>{s.firstNameAr} {s.lastNameAr}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-white mb-1">السورة</label>
-              <input type="number" name="surahNumber" min="1" max="114" value={form.surahNumber} onChange={change} className="field w-full" />
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">السورة</label>
+              <input type="number" name="surahNumber" min="1" max="114" value={form.surahNumber} onChange={change} className="field-light w-full" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-white mb-1">من آية</label>
-              <input type="number" name="fromAyah" min="1" value={form.fromAyah} onChange={change} className="field w-full" />
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">من آية</label>
+              <input type="number" name="fromAyah" min="1" value={form.fromAyah} onChange={change} className="field-light w-full" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-white mb-1">إلى آية</label>
-              <input type="number" name="toAyah" min="1" value={form.toAyah} onChange={change} className="field w-full" />
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">إلى آية</label>
+              <input type="number" name="toAyah" min="1" value={form.toAyah} onChange={change} className="field-light w-full" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">الجودة</label>
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">الجودة</label>
             <div className="flex gap-2 flex-wrap">
               {qualityOptions.map(q => (
                 <button
@@ -130,7 +148,11 @@ export default function TeacherProgressPage() {
                   type="button"
                   onClick={() => setForm(p => ({ ...p, quality: q.value }))}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
-                  style={form.quality === q.value ? { background: `${q.color}25`, color: q.color, border: `1px solid ${q.color}60` } : { border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}
+                  style={
+                    form.quality === q.value
+                      ? { background: `${q.color}20`, color: q.color, border: `1px solid ${q.color}60` }
+                      : { border: '1px solid #e0d8f5', color: '#9b7fd6', background: 'transparent' }
+                  }
                 >
                   {q.label}
                 </button>
@@ -138,8 +160,15 @@ export default function TeacherProgressPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-white mb-1.5">ملاحظات</label>
-            <textarea name="teacherNotes" value={form.teacherNotes} onChange={change} rows={2} className="field resize-none w-full" />
+            <label className="block text-sm font-semibold text-brand-textBody mb-1.5">ملاحظات</label>
+            <textarea
+              name="teacherNotes"
+              value={form.teacherNotes}
+              onChange={change}
+              rows={2}
+              className="field-light resize-none w-full"
+              placeholder="ملاحظات إضافية..."
+            />
           </div>
         </div>
       </Modal>

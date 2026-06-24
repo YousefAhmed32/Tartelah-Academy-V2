@@ -1,6 +1,14 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+export const BACKEND_URL = API_URL.replace('/api/v1', '')
 export const APP_NAME = 'ترتيلة أونلاين'
 export const APP_NAME_EN = 'Tartelah Online'
+
+// Converts a relative server path like /uploads/... to a full URL
+export function getFileUrl(path) {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  return `${BACKEND_URL}${path}`
+}
 
 export const ROLES = {
   ADMIN: 'admin',
@@ -74,11 +82,32 @@ export const MEETING_PROVIDERS = {
 export const SESSION_STATUS_NO_SHOW = 'no_show'
 
 export const SESSION_STATUS = {
-  scheduled: { label: 'مجدولة', labelEn: 'Scheduled', color: '#7c3aed', bg: 'rgba(124,58,237,0.15)' },
-  ongoing: { label: 'جارية', labelEn: 'Ongoing', color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-  completed: { label: 'مكتملة', labelEn: 'Completed', color: '#64748b', bg: 'rgba(100,116,139,0.15)' },
-  cancelled: { label: 'ملغاة', labelEn: 'Cancelled', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+  scheduled:   { label: 'مجدولة',    labelEn: 'Scheduled',   color: '#7c3aed', bg: 'rgba(124,58,237,0.15)' },
+  ongoing:     { label: 'جارية',     labelEn: 'Ongoing',     color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+  completed:   { label: 'مكتملة',   labelEn: 'Completed',   color: '#64748b', bg: 'rgba(100,116,139,0.15)' },
+  cancelled:   { label: 'ملغاة',    labelEn: 'Cancelled',   color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+  rescheduled: { label: 'معاد جدولتها', labelEn: 'Rescheduled', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  missed:      { label: 'فائتة',    labelEn: 'Missed',      color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
+  no_show:     { label: 'لم يحضر',  labelEn: 'No Show',     color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
 }
+
+export const SCHEDULE_FREQUENCY = {
+  weekly:   { label: 'أسبوعياً',       labelEn: 'Weekly' },
+  biweekly: { label: 'كل أسبوعين',     labelEn: 'Biweekly' },
+  daily:    { label: 'يومياً',          labelEn: 'Daily' },
+  monthly:  { label: 'شهرياً',          labelEn: 'Monthly' },
+  custom:   { label: 'مخصص',            labelEn: 'Custom' },
+}
+
+export const DAYS_OF_WEEK = [
+  { value: 0, label: 'الأحد',   short: 'أح' },
+  { value: 1, label: 'الاثنين', short: 'ثن' },
+  { value: 2, label: 'الثلاثاء',short: 'ثل' },
+  { value: 3, label: 'الأربعاء',short: 'أر' },
+  { value: 4, label: 'الخميس', short: 'خم' },
+  { value: 5, label: 'الجمعة', short: 'جم' },
+  { value: 6, label: 'السبت',  short: 'سب' },
+]
 
 export const ATTENDANCE_STATUS = {
   present: { label: 'حاضر', color: '#22c55e' },
