@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema({
   avatar: { type: String },
   bioAr: { type: String },
   specialization: { type: String },
+  salaryPerSession: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   isEmailVerified: { type: Boolean, default: false },
   meetingLinks: [{

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Calendar } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -26,7 +27,7 @@ export default function StudentSchedulePage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
       ) : !sessions.length ? (
         <div className="card-light p-10 text-center">
-          <div className="text-4xl mb-3">📅</div>
+          <Calendar size={44} strokeWidth={1.3} color="#9b7fd6" className="mb-3 mx-auto" />
           <p className="text-[#9b7fd6]">لا توجد حصص مجدولة قادمة</p>
         </div>
       ) : (

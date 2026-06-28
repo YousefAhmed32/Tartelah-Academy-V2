@@ -23,4 +23,17 @@ async function authenticate(req, res, next) {
   }
 }
 
-module.exports = { authenticate }
+async function optionalAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1]
+      const decoded = verifyAccessToken(token)
+      const user = await User.findById(decoded.id).select('-password -refreshToken')
+      if (user && user.isActive) req.user = user
+    }
+  } catch (_) { /* ignore - optional */ }
+  next()
+}
+
+module.exports = { authenticate, optionalAuth }

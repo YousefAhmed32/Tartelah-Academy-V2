@@ -32,13 +32,14 @@ export default function AIAssistantPage() {
   }, [messages])
 
   const askMutation = useMutation({
-    mutationFn: (question) => api.post('/ai/ask', { question }).then(r => r.data.data),
+    mutationFn: ({ question, history }) => api.post('/ai/ask', { question, history }).then(r => r.data.data),
     onSuccess: (data) => {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: data.answer,
         timestamp: new Date().toISOString(),
         sources: data.sources,
+        mode: data.mode,
       }])
     },
     onError: () => {
@@ -54,9 +55,10 @@ export default function AIAssistantPage() {
   function sendMessage(text = input) {
     const question = text.trim()
     if (!question) return
+    const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
     setMessages(prev => [...prev, { role: 'user', content: question, timestamp: new Date().toISOString() }])
     setInput('')
-    askMutation.mutate(question)
+    askMutation.mutate({ question, history })
   }
 
   function handleKeyDown(e) {

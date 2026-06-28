@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { Calendar, Star, FileText } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -39,7 +40,7 @@ function getArabicDate() {
   })
 }
 
-function QuickActionBtn({ icon, label, onClick, color = '#7c3aed' }) {
+function QuickActionBtn({ Icon, label, onClick, color = '#7c3aed' }) {
   return (
     <motion.button
       whileHover={{ y: -2 }}
@@ -48,8 +49,8 @@ function QuickActionBtn({ icon, label, onClick, color = '#7c3aed' }) {
       className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all flex-1 text-center"
       style={{ background: `${color}15`, borderColor: `${color}30`, color }}
     >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${color}25` }}>
-        {icon}
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}25` }}>
+        <Icon size={20} strokeWidth={1.8} color={color} />
       </div>
       <span className="font-semibold text-xs text-white/80">{label}</span>
     </motion.button>
@@ -234,19 +235,19 @@ export default function TeacherDashboardPage() {
             <h2 className="font-heading font-bold text-white text-base mb-3">إجراء سريع</h2>
             <div className="flex gap-3">
               <QuickActionBtn
-                icon="📅"
+                Icon={Calendar}
                 label="حصة جديدة"
                 onClick={() => navigate(ROUTES.TEACHER_SESSIONS)}
                 color="#7c3aed"
               />
               <QuickActionBtn
-                icon="⭐"
+                Icon={Star}
                 label="تقييم"
                 onClick={() => navigate(ROUTES.TEACHER_EVALUATIONS)}
                 color="#E8C76A"
               />
               <QuickActionBtn
-                icon="📝"
+                Icon={FileText}
                 label="واجب"
                 onClick={() => navigate(ROUTES.TEACHER_HOMEWORK)}
                 color="#22c55e"
@@ -322,7 +323,7 @@ export default function TeacherDashboardPage() {
             </div>
             {!stats?.upcomingSessions?.length ? (
               <div className="text-center py-8" style={{ color: '#b3a4d0' }}>
-                <div className="text-3xl mb-2">📅</div>
+                <Calendar size={32} strokeWidth={1.4} color="#b3a4d0" className="mb-2" />
                 <p className="text-sm">لا توجد حصص مجدولة</p>
               </div>
             ) : (

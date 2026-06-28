@@ -55,16 +55,35 @@ const TeacherSettingsPage = lazy(() => import('./pages/teacher/TeacherSettingsPa
 // Admin
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage.jsx'))
 const AdminStudentsPage = lazy(() => import('./pages/admin/AdminStudentsPage.jsx'))
+const AdminStudentDetailPage = lazy(() => import('./pages/admin/AdminStudentDetailPage.jsx'))
 const AdminTeachersPage = lazy(() => import('./pages/admin/AdminTeachersPage.jsx'))
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage.jsx'))
 const AdminSessionsPage = lazy(() => import('./pages/admin/AdminSessionsPage.jsx'))
+const AdminScheduleRulesPage = lazy(() => import('./pages/admin/AdminScheduleRulesPage.jsx'))
 const AdminPackagesPage = lazy(() => import('./pages/admin/AdminPackagesPage.jsx'))
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage.jsx'))
 const AdminEnrollmentsPage = lazy(() => import('./pages/admin/AdminEnrollmentsPage.jsx'))
 const AdminWebsitePage = lazy(() => import('./pages/admin/AdminWebsitePage.jsx'))
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage.jsx'))
 const AdminNotificationsPage = lazy(() => import('./pages/admin/AdminNotificationsPage.jsx'))
+const AdminAuditLogsPage = lazy(() => import('./pages/admin/AdminAuditLogsPage.jsx'))
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage.jsx'))
+
+// Courses (public)
+const CoursesPage = lazy(() => import('./pages/marketing/CoursesPage.jsx'))
+const CourseDetailPage = lazy(() => import('./pages/marketing/CourseDetailPage.jsx'))
+
+// Courses (admin)
+const AdminCourseFormPage = lazy(() => import('./pages/admin/AdminCourseFormPage.jsx'))
+
+// Articles
+const ArticlesPage = lazy(() => import('./pages/marketing/ArticlesPage.jsx'))
+const ArticleDetailPage = lazy(() => import('./pages/marketing/ArticleDetailPage.jsx'))
+const AdminArticlesPage = lazy(() => import('./pages/admin/AdminArticlesPage.jsx'))
+const AdminArticleEditorPage = lazy(() => import('./pages/admin/AdminArticleEditorPage.jsx'))
+
+// Contact Messages
+const AdminContactPage = lazy(() => import('./pages/admin/AdminContactPage.jsx'))
 
 // AI
 const AIAssistantPage = lazy(() => import('./pages/ai/AIAssistantPage.jsx'))
@@ -93,6 +112,10 @@ export default function App() {
           <Route path={ROUTES.PRICING} element={<PricingPage />} />
           <Route path={ROUTES.FAQ} element={<FAQPage />} />
           <Route path={ROUTES.CONTACT} element={<ContactPage />} />
+          <Route path={ROUTES.COURSES} element={<CoursesPage />} />
+          <Route path={ROUTES.COURSE_DETAIL} element={<CourseDetailPage />} />
+          <Route path={ROUTES.ARTICLES} element={<ArticlesPage />} />
+          <Route path={ROUTES.ARTICLE_DETAIL} element={<ArticleDetailPage />} />
         </Route>
 
         {/* Auth */}
@@ -136,16 +159,25 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route path={ROUTES.ADMIN_DASHBOARD} element={<AdminDashboardPage />} />
           <Route path={ROUTES.ADMIN_STUDENTS} element={<AdminStudentsPage />} />
+          <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<AdminStudentDetailPage />} />
           <Route path={ROUTES.ADMIN_TEACHERS} element={<AdminTeachersPage />} />
           <Route path={ROUTES.ADMIN_COURSES} element={<AdminCoursesPage />} />
+          <Route path={ROUTES.ADMIN_COURSE_NEW} element={<AdminCourseFormPage />} />
+          <Route path={ROUTES.ADMIN_COURSE_EDIT} element={<AdminCourseFormPage />} />
           <Route path={ROUTES.ADMIN_SESSIONS} element={<AdminSessionsPage />} />
+          <Route path={ROUTES.ADMIN_SCHEDULE_RULES} element={<AdminScheduleRulesPage />} />
           <Route path={ROUTES.ADMIN_PACKAGES} element={<AdminPackagesPage />} />
           <Route path={ROUTES.ADMIN_SUBSCRIPTIONS} element={<AdminSubscriptionsPage />} />
           <Route path={ROUTES.ADMIN_ENROLLMENTS} element={<AdminEnrollmentsPage />} />
           <Route path={ROUTES.ADMIN_WEBSITE} element={<AdminWebsitePage />} />
           <Route path={ROUTES.ADMIN_REPORTS} element={<AdminReportsPage />} />
           <Route path={ROUTES.ADMIN_NOTIFICATIONS} element={<AdminNotificationsPage />} />
+          <Route path={ROUTES.ADMIN_AUDIT_LOGS} element={<AdminAuditLogsPage />} />
           <Route path={ROUTES.ADMIN_SETTINGS} element={<AdminSettingsPage />} />
+          <Route path={ROUTES.ADMIN_ARTICLES} element={<AdminArticlesPage />} />
+          <Route path={ROUTES.ADMIN_ARTICLE_NEW} element={<AdminArticleEditorPage />} />
+          <Route path={ROUTES.ADMIN_ARTICLE_EDIT} element={<AdminArticleEditorPage />} />
+          <Route path={ROUTES.ADMIN_CONTACT_MESSAGES} element={<AdminContactPage />} />
         </Route>
 
         {/* AI */}

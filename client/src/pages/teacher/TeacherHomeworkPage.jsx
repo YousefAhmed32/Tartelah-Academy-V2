@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { CheckSquare, Users, Clock, Star } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -8,12 +9,146 @@ import Modal from '../../components/ui/Modal.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
+import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
 
 const LABEL = 'block text-sm font-semibold text-brand-textBody mb-1.5'
+const inputCls = 'w-full h-10 bg-white/10 border border-white/20 rounded-xl px-3.5 text-sm text-white outline-none focus:border-brand-gold/60 focus:bg-white/15 transition-all placeholder:text-white/40'
+
+// ── Grade Submissions Modal ───────────────────────────────────────────────────
+
+function GradeSubmissionsModal({ hw, students, onClose }) {
+  const qc = useQueryClient()
+  const [grades, setGrades] = useState({}) // submissionId → { grade, feedback }
+
+  const setGrade = (subId, field, val) => {
+    setGrades(p => ({ ...p, [subId]: { ...p[subId], [field]: val } }))
+  }
+
+  const gradeMut = useMutation({
+    mutationFn: ({ subId, grade, teacherFeedback }) =>
+      api.patch(`/homework/${hw._id}/grade`, { submissionId: subId, grade, teacherFeedback }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['homework', 'teacher'] })
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  const handleGrade = async (subId) => {
+    const g = grades[subId]
+    if (!g?.grade) return toast.error('أدخل الدرجة')
+    await gradeMut.mutateAsync({ subId, grade: g.grade, teacherFeedback: g.feedback || '' })
+    toast.success('تم التصحيح')
+  }
+
+  const getStudentName = (studentId) => {
+    const s = students.find(st => st._id === (studentId?._id || studentId))
+    return s ? `${s.firstNameAr} ${s.lastNameAr}` : 'طالب'
+  }
+
+  const submissions = hw.submissions || []
+  const assignedCount = hw.assignedTo?.length || 0
+  const submittedCount = submissions.length
+
+  return (
+    <Modal open onClose={onClose} title={`تصحيح: ${hw.titleAr}`} size="md"
+      footer={<Button variant="ghost" onClick={onClose}>إغلاق</Button>}>
+      <div className="space-y-4" dir="rtl">
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col items-center p-3 bg-gray-50 rounded-xl">
+            <div className="font-bold text-xl text-gray-900">{assignedCount}</div>
+            <div className="text-xs text-gray-500">معيّن</div>
+          </div>
+          <div className="flex flex-col items-center p-3 bg-emerald-50 rounded-xl">
+            <div className="font-bold text-xl text-emerald-700">{submittedCount}</div>
+            <div className="text-xs text-emerald-600">سلّم</div>
+          </div>
+          <div className="flex flex-col items-center p-3 bg-amber-50 rounded-xl">
+            <div className="font-bold text-xl text-amber-600">{assignedCount - submittedCount}</div>
+            <div className="text-xs text-amber-500">لم يسلّم</div>
+          </div>
+        </div>
+
+        {/* Submissions */}
+        {submissions.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <CheckSquare size={32} className="mx-auto mb-2 opacity-40" />
+            <p>لا توجد تسليمات حتى الآن</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {submissions.map((sub) => {
+              const isGraded = !!sub.grade
+              const localGrade = grades[sub._id]
+              return (
+                <div key={sub._id} className={`p-4 rounded-xl border ${isGraded ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 bg-gray-50'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold text-gray-900 text-sm">{getStudentName(sub.studentId)}</div>
+                    </div>
+                    {isGraded && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">
+                        <Star size={11} /> {sub.grade}/10
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Submission content */}
+                  {sub.content && (
+                    <div className="text-sm text-gray-600 bg-white rounded-lg p-3 mb-3 border border-gray-100">
+                      {sub.content}
+                    </div>
+                  )}
+
+                  {/* Teacher feedback display */}
+                  {isGraded && sub.teacherFeedback && (
+                    <div className="text-xs text-emerald-600 mb-3">
+                      <span className="font-semibold">ملاحظاتك: </span>{sub.teacherFeedback}
+                    </div>
+                  )}
+
+                  {/* Grade form */}
+                  {!isGraded && (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input type="number" min="0" max="10" step="0.5"
+                          className="w-24 h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-800 outline-none focus:border-violet-400 text-center"
+                          placeholder="درجة/10"
+                          value={localGrade?.grade || ''}
+                          onChange={e => setGrade(sub._id, 'grade', e.target.value)} />
+                        <input
+                          className="flex-1 h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-800 outline-none focus:border-violet-400"
+                          placeholder="ملاحظات (اختياري)"
+                          value={localGrade?.feedback || ''}
+                          onChange={e => setGrade(sub._id, 'feedback', e.target.value)} />
+                        <button onClick={() => handleGrade(sub._id)} disabled={gradeMut.isPending}
+                          className="h-9 px-4 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-60">
+                          {gradeMut.isPending ? <Spinner size="xs" color="border-white" /> : <CheckSquare size={13} />}
+                          تصحيح
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isGraded && (
+                    <div className="text-xs text-gray-400 mt-1">صُحِّح في {formatDateAr(sub.gradedAt)}</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TeacherHomeworkPage() {
   const [showModal, setShowModal] = useState(false)
+  const [gradeHw, setGradeHw] = useState(null)
   const [form, setForm] = useState({ titleAr: '', descriptionAr: '', dueDate: '', assignedTo: [] })
   const qc = useQueryClient()
 
@@ -46,6 +181,8 @@ export default function TeacherHomeworkPage() {
     }))
   }
 
+  const now = new Date()
+
   return (
     <div>
       <PageHeader
@@ -65,111 +202,98 @@ export default function TeacherHomeworkPage() {
         />
       ) : (
         <div className="space-y-3">
-          {homework.map((hw) => (
-            <div
-              key={hw._id}
-              className="rounded-card p-5 flex items-start justify-between gap-4 flex-wrap"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-heading font-bold">{hw.titleAr}</div>
-                {hw.descriptionAr && (
-                  <p className="text-sm mt-1 line-clamp-2" style={{ color: '#b3a4d0' }}>{hw.descriptionAr}</p>
-                )}
-                <div className="text-xs mt-2 flex items-center gap-4 flex-wrap" style={{ color: '#b3a4d0' }}>
-                  <span className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18" stroke="currentColor" strokeWidth="1.8"/></svg>
-                    التسليم: {formatDateAr(hw.dueDate)}
-                  </span>
-                  <span>المعيّنون: {hw.assignedTo?.length || 0} طالب</span>
-                  <span>المسلّمون: {hw.submissions?.length || 0}</span>
+          {homework.map((hw) => {
+            const isOverdue = new Date(hw.dueDate) < now && hw.status !== 'completed'
+            const submittedCount = hw.submissions?.length || 0
+            const assignedCount = hw.assignedTo?.length || 0
+            const ungradedCount = hw.submissions?.filter(s => !s.grade).length || 0
+            return (
+              <div
+                key={hw._id}
+                className="rounded-card p-5 flex items-start justify-between gap-4 flex-wrap"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-white font-heading font-bold">{hw.titleAr}</div>
+                  {hw.descriptionAr && (
+                    <p className="text-sm mt-1 line-clamp-2" style={{ color: '#b3a4d0' }}>{hw.descriptionAr}</p>
+                  )}
+                  <div className="text-xs mt-2 flex items-center gap-4 flex-wrap" style={{ color: '#b3a4d0' }}>
+                    <span className="flex items-center gap-1">
+                      <Clock size={11} />
+                      التسليم: <span className={isOverdue ? 'text-red-400' : ''}>{formatDateAr(hw.dueDate)}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users size={11} /> {assignedCount} طالب
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckSquare size={11} />
+                      {submittedCount}/{assignedCount} سلّم
+                    </span>
+                    {ungradedCount > 0 && (
+                      <span className="text-amber-400 font-semibold">{ungradedCount} بانتظار التصحيح</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-none">
+                  {submittedCount > 0 && (
+                    <button onClick={() => setGradeHw(hw)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:bg-amber-400/10 transition-colors border border-amber-400/30">
+                      <Star size={12} />
+                      {ungradedCount > 0 ? `تصحيح (${ungradedCount})` : 'عرض التسليمات'}
+                    </button>
+                  )}
+                  <Badge variant={isOverdue ? 'danger' : hw.status === 'active' ? 'gold' : 'gray'}>
+                    {isOverdue ? 'منتهية' : hw.status === 'active' ? 'نشط' : 'منتهٍ'}
+                  </Badge>
                 </div>
               </div>
-              <Badge variant={hw.status === 'active' ? 'gold' : 'gray'}>
-                {hw.status === 'active' ? 'نشط' : 'منتهٍ'}
-              </Badge>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      <Modal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        title="إنشاء واجب جديد"
-        size="md"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
-            <Button
-              variant="gold"
-              onClick={() => createMutation.mutate(form)}
-              loading={createMutation.isPending}
-              disabled={!form.titleAr || !form.dueDate || !form.assignedTo.length}
-            >
-              إنشاء الواجب
-            </Button>
-          </>
-        }
-      >
+      {/* Grade Modal */}
+      {gradeHw && <GradeSubmissionsModal hw={gradeHw} students={students} onClose={() => setGradeHw(null)} />}
+
+      {/* Create Modal */}
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="إنشاء واجب جديد" size="md"
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
+          <Button variant="gold" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending}
+            disabled={!form.titleAr || !form.dueDate || !form.assignedTo.length}>
+            إنشاء الواجب
+          </Button>
+        </>}>
         <div className="space-y-4" dir="rtl">
           <div>
             <label className={LABEL}>عنوان الواجب <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              name="titleAr"
-              value={form.titleAr}
-              onChange={change}
-              className="field-light w-full"
-              placeholder="مثال: مراجعة سورة الكهف"
-            />
+            <input type="text" name="titleAr" value={form.titleAr} onChange={change}
+              className="field-light w-full" placeholder="مثال: مراجعة سورة الكهف" />
           </div>
-
           <div>
             <label className={LABEL}>الوصف</label>
-            <textarea
-              name="descriptionAr"
-              value={form.descriptionAr}
-              onChange={change}
-              rows={3}
-              className="field-light resize-none w-full"
-              placeholder="تفاصيل الواجب والتعليمات..."
-            />
+            <textarea name="descriptionAr" value={form.descriptionAr} onChange={change} rows={3}
+              className="field-light resize-none w-full" placeholder="تفاصيل الواجب والتعليمات..." />
           </div>
-
           <div>
             <label className={LABEL}>تاريخ التسليم <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              name="dueDate"
-              value={form.dueDate}
-              onChange={change}
-              className="field-light w-full"
-            />
+            <input type="date" name="dueDate" value={form.dueDate} onChange={change} className="field-light w-full" />
           </div>
-
           <div>
             <label className={LABEL}>
               الطلاب المعيّنون <span className="text-red-500">*</span>
-              {form.assignedTo.length > 0 && (
-                <span className="font-normal text-[#9b7fd6] mr-1">({form.assignedTo.length} محدد)</span>
-              )}
+              {form.assignedTo.length > 0 && <span className="font-normal text-[#9b7fd6] mr-1">({form.assignedTo.length} محدد)</span>}
             </label>
             {!students.length ? (
               <p className="text-sm text-amber-600 py-2">لا يوجد طلاب مُعيَّنون لك بعد</p>
             ) : (
-              <div
-                className="max-h-44 overflow-y-auto custom-scroll space-y-2 rounded-xl p-3 border"
-                style={{ background: '#faf8ff', borderColor: '#e8e0f5' }}
-              >
+              <div className="max-h-44 overflow-y-auto custom-scroll space-y-2 rounded-xl p-3 border"
+                style={{ background: '#faf8ff', borderColor: '#e8e0f5' }}>
                 {students.map(s => (
                   <label key={s._id} className="flex items-center gap-3 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-[#f0eaff] transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={form.assignedTo.includes(s._id)}
-                      onChange={() => toggleStudent(s._id)}
-                      className="w-4 h-4 accent-brand-purple rounded"
-                    />
+                    <input type="checkbox" checked={form.assignedTo.includes(s._id)} onChange={() => toggleStudent(s._id)}
+                      className="w-4 h-4 accent-brand-purple rounded" />
                     <span className="text-sm font-medium text-brand-textBody">{s.firstNameAr} {s.lastNameAr}</span>
                   </label>
                 ))}

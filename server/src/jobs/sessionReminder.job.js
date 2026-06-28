@@ -1,10 +1,9 @@
 const cron = require('node-cron')
 const Session = require('../models/Session')
-const Notification = require('../models/Notification')
 const User = require('../models/User')
+const { createNotification } = require('../services/notification.service')
 const { sendSessionReminderEmail } = require('../services/email.service')
 
-// Track sent reminders to avoid duplicates
 const sentReminders = new Set()
 
 async function sendReminders(hoursAhead, labelAr) {
@@ -25,25 +24,24 @@ async function sendReminders(hoursAhead, labelAr) {
     const student = session.studentId
     const teacher = session.teacherId
 
-    // In-app notification for student
-    await Notification.create({
+    await createNotification({
       userId: student._id,
       titleAr: `تذكير: حصة بعد ${labelAr}`,
       bodyAr: `حصتك "${session.titleAr}" ستبدأ بعد ${labelAr}`,
-      type: 'reminder',
-      data: { sessionId: session._id },
+      type: 'session',
+      priority: hoursAhead <= 0.25 ? 'urgent' : hoursAhead <= 1 ? 'high' : 'medium',
+      relatedId: session._id,
     })
 
-    // In-app notification for teacher
-    await Notification.create({
+    await createNotification({
       userId: teacher._id,
       titleAr: `تذكير: حصة بعد ${labelAr}`,
       bodyAr: `حصتك مع الطالب ${student.firstNameAr} ستبدأ بعد ${labelAr}`,
-      type: 'reminder',
-      data: { sessionId: session._id },
+      type: 'session',
+      priority: hoursAhead <= 0.25 ? 'urgent' : hoursAhead <= 1 ? 'high' : 'medium',
+      relatedId: session._id,
     })
 
-    // Email reminders
     if (hoursAhead === 24) {
       await sendSessionReminderEmail({
         to: student.email,
@@ -57,7 +55,6 @@ async function sendReminders(hoursAhead, labelAr) {
 }
 
 function startSessionReminderJob() {
-  // Run every 30 minutes
   cron.schedule('*/30 * * * *', async () => {
     try {
       await sendReminders(24, '24 ساعة')

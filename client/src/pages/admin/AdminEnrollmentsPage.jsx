@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { ClipboardList, Check } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -119,7 +120,7 @@ export default function AdminEnrollmentsPage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
       ) : !requests.length ? (
         <div className="card-light p-12 text-center">
-          <div className="text-5xl mb-4">📋</div>
+          <ClipboardList size={52} strokeWidth={1.3} color="#9b7fd6" className="mb-4 mx-auto" />
           <h3 className="font-heading font-bold text-lg text-brand-textBody mb-2">لا توجد طلبات</h3>
           <p className="text-[#9b7fd6] text-sm">لم يتم إيجاد أي طلبات تسجيل بهذه الحالة</p>
         </div>
@@ -169,8 +170,8 @@ export default function AdminEnrollmentsPage() {
                       <Button size="sm" variant="purple" onClick={() => openReview(req)}>مراجعة</Button>
                     )}
                     {req.status === 'approved' && (
-                      <span className="text-xs text-emerald-600 font-semibold">
-                        مُعتمد ✓ {req.teacherId && `• ${req.teacherId.firstNameAr}`}
+                      <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                        مُعتمد <Check size={13} strokeWidth={2.5} /> {req.teacherId && `• ${req.teacherId.firstNameAr}`}
                       </span>
                     )}
                   </div>

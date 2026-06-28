@@ -1,8 +1,8 @@
 const ScheduleRule = require('../models/ScheduleRule')
 const Session = require('../models/Session')
-const Notification = require('../models/Notification')
 const User = require('../models/User')
 const scheduleService = require('../services/schedule.service')
+const { createNotification } = require('../services/notification.service')
 const { sendSuccess, sendError } = require('../utils/response')
 
 // Preview session dates from rule params — no DB write
@@ -54,12 +54,13 @@ exports.createRule = async (req, res, next) => {
 
     const student = await User.findById(studentId).select('firstNameAr lastNameAr')
     if (student) {
-      await Notification.create({
+      await createNotification({
         userId: studentId,
         titleAr: 'تم إنشاء جدولك الدراسي',
         bodyAr: `تم إنشاء جدول حصصك الدراسية — ${sessions.length} حصة مجدولة`,
-        type: 'session',
-        data: { ruleId: rule._id },
+        type: 'schedule',
+        priority: 'high',
+        relatedId: rule._id,
       })
     }
 

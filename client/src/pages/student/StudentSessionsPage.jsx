@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Calendar, Clock, Timer, Link2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -74,10 +75,10 @@ function SessionRow({ session }) {
       <div className="flex-1 min-w-0">
         <div className="font-heading font-bold text-brand-textBody">{session.titleAr || session.title}</div>
         <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-[#9b7fd6]">
-          <span>📅 {formatDateAr(session.scheduledAt)}</span>
-          <span>🕐 {formatTimeAr(session.scheduledAt)}</span>
-          <span>⏱️ {session.durationMinutes} دقيقة</span>
-          {provider && <span style={{ color: provider.color }}>🔗 {provider.label}</span>}
+          <span className="flex items-center gap-1"><Calendar size={13} strokeWidth={1.8} /> {formatDateAr(session.scheduledAt)}</span>
+          <span className="flex items-center gap-1"><Clock size={13} strokeWidth={1.8} /> {formatTimeAr(session.scheduledAt)}</span>
+          <span className="flex items-center gap-1"><Timer size={13} strokeWidth={1.8} /> {session.durationMinutes} دقيقة</span>
+          {provider && <span className="flex items-center gap-1" style={{ color: provider.color }}><Link2 size={13} strokeWidth={1.8} /> {provider.label}</span>}
         </div>
       </div>
 

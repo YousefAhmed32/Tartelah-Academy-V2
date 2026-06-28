@@ -1,4 +1,5 @@
 require('dotenv').config()
+const http = require('http')
 const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
@@ -10,12 +11,14 @@ const path = require('path')
 const connectDB = require('./src/config/database')
 const routes = require('./src/routes/index')
 const { errorHandler, notFound } = require('./src/middleware/errorHandler.middleware')
+const socketService = require('./src/services/socket.service')
 
 const app = express()
+const httpServer = http.createServer(app)
 const PORT = process.env.PORT || 5000
 
 // Ensure upload directories exist
-;['uploads/avatars', 'uploads/payment-proofs'].forEach(dir => {
+;['uploads/avatars', 'uploads/payment-proofs', 'uploads/homework', 'uploads/articles', 'uploads/courses'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 })
 
@@ -32,6 +35,9 @@ connectDB().then(() => {
     ensureDevAccounts().catch(err => console.warn('[DEV] devSeed warning:', err.message))
   }
 })
+
+// Initialize Socket.io
+socketService.init(httpServer)
 
 // Trust proxy (for production behind nginx/load balancer)
 app.set('trust proxy', 1)
@@ -60,7 +66,6 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  // In development, allow many more requests so repeated testing never hits 429
   max: process.env.NODE_ENV !== 'production' ? 500 : 20,
   message: { success: false, message: 'محاولات دخول كثيرة، يرجى الانتظار 15 دقيقة' },
 })
@@ -104,10 +109,11 @@ app.use(notFound)
 // Error handler
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 Tartelah Server running on port ${PORT} [${process.env.NODE_ENV}]`)
   console.log(`   Health: http://localhost:${PORT}/health`)
-  console.log(`   API:    http://localhost:${PORT}/api/v1\n`)
+  console.log(`   API:    http://localhost:${PORT}/api/v1`)
+  console.log(`   Socket: ws://localhost:${PORT}\n`)
 })
 
 module.exports = app

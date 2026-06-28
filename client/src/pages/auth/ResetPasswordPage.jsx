@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { KeyRound } from 'lucide-react'
 import { authService } from '../../services/auth.service.js'
 import { ROUTES } from '../../config/constants.js'
 import Input from '../../components/ui/Input.jsx'
@@ -33,7 +34,9 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center px-6" dir="rtl">
       <div className="w-full max-w-[440px]">
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🔑</div>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
+            <KeyRound size={28} strokeWidth={1.6} color="#9b6cf0" />
+          </div>
           <h1 className="font-heading font-extrabold text-3xl text-white">إعادة تعيين كلمة المرور</h1>
           <p className="text-sm mt-2" style={{ color: '#b6a6d8' }}>أدخل كلمة مرور جديدة وقوية</p>
         </div>

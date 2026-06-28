@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -73,7 +74,7 @@ export default function TeacherProgressPage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
       ) : !records.length ? (
         <div className="text-center py-16" style={{ color: '#b3a4d0' }}>
-          <div className="text-4xl mb-3">📖</div>
+          <BookOpen size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
           <p>لا توجد سجلات</p>
         </div>
       ) : (

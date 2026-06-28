@@ -42,9 +42,9 @@ exports.getAllSubscriptions = async (req, res, next) => {
     if (req.query.status) filter.status = req.query.status
     const [data, total] = await Promise.all([
       Subscription.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
-        .populate('studentId', 'firstNameAr lastNameAr')
+        .populate('studentId', 'firstNameAr lastNameAr avatar')
         .populate('teacherId', 'firstNameAr lastNameAr')
-        .populate('packageId', 'nameAr price'),
+        .populate('packageId', 'nameAr price sessionsPerMonth'),
       Subscription.countDocuments(filter),
     ])
     sendPaginated(res, data, total, page, limit)
@@ -55,9 +55,40 @@ exports.getAllSubscriptions = async (req, res, next) => {
 
 exports.updateSubscription = async (req, res, next) => {
   try {
-    const sub = await Subscription.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    const allowed = ['status', 'sessionsRemaining', 'totalSessions', 'endDate', 'teacherId', 'notes', 'amountPaid']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    if (updates.sessionsRemaining !== undefined) {
+      updates.sessionsRemaining = Math.max(0, Number(updates.sessionsRemaining))
+    }
+    const sub = await Subscription.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
+      .populate('studentId', 'firstNameAr lastNameAr')
+      .populate('teacherId', 'firstNameAr lastNameAr')
+      .populate('packageId', 'nameAr price')
     if (!sub) return sendError(res, 'الاشتراك غير موجود', 404)
     sendSuccess(res, sub, 'تم تحديث الاشتراك')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.createSubscriptionExtra = async (req, res, next) => {
+  try {
+    const { studentId, packageId, teacherId, startDate, notes, sessionsRemaining, amountPaid } = req.body
+    const pkg = await Package.findById(packageId)
+    if (!pkg) return sendError(res, 'الباقة غير موجودة', 404)
+    const start = startDate ? new Date(startDate) : new Date()
+    const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
+    const sub = await Subscription.create({
+      studentId, packageId, teacherId, startDate: start, endDate: end,
+      sessionsRemaining: sessionsRemaining !== undefined ? Number(sessionsRemaining) : pkg.sessionsPerMonth,
+      totalSessions: pkg.sessionsPerMonth,
+      amountPaid: amountPaid !== undefined ? Number(amountPaid) : pkg.price,
+      notes, createdBy: req.user._id,
+    })
+    await sub.populate(['packageId', 'studentId', 'teacherId'])
+    await Notification.create({ userId: studentId, titleAr: 'تم تفعيل الاشتراك', bodyAr: `تم تفعيل باقة "${pkg.nameAr}"`, type: 'subscription' })
+    sendSuccess(res, sub, 'تم إنشاء الاشتراك', 201)
   } catch (err) {
     next(err)
   }

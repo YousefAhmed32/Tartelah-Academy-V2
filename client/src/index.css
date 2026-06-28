@@ -2,29 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  @layer base {
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  html {
-    scroll-behavior: smooth;
-  }
+    html {
+      scroll-behavior: smooth;
+    }
 
-  body {
-    font-family: 'Tajawal', sans-serif;
-    direction: rtl;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+    body {
+      font-family: 'Tajawal', sans-serif;
+      direction: rtl;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Cairo', sans-serif;
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Cairo', sans-serif;
+    }
   }
-}
 
 @layer components {
   /* ===== NAVIGATION ===== */
@@ -168,6 +168,13 @@
   .custom-scroll-light::-webkit-scrollbar-thumb {
     background: #d1d5db;
     border-radius: 4px;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 
   /* ===== SKELETON LOADING ===== */

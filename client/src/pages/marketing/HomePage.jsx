@@ -635,7 +635,7 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           FOOTER
       ════════════════════════════════════════ */}
-      <footer style={{ background: '#100327', padding: 'clamp(36px,4vw,52px) clamp(20px,5vw,68px) 30px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+      {/* <footer style={{ background: '#100327', padding: 'clamp(36px,4vw,52px) clamp(20px,5vw,68px) 30px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
         <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <img src="/images/logo.jpg" alt="ترتيلة أونلاين" style={{ width: 46, height: 46, borderRadius: 13, objectFit: 'cover', border: '1px solid rgba(212,175,55,.4)' }} />
@@ -668,7 +668,7 @@ export default function HomePage() {
         <div style={{ maxWidth: 1340, margin: '26px auto 0', paddingTop: 22, borderTop: '1px solid rgba(255,255,255,.06)', textAlign: 'center', color: '#8576a8', fontSize: 14 }}>
           © 2026 ترتيلة أونلاين — جميع الحقوق محفوظة
         </div>
-      </footer>
+      </footer> */}
 
       {/* ════════════════════════════════════════
           RESPONSIVE STYLES (via <style>)

@@ -98,7 +98,7 @@ exports.forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = Date.now() + 30 * 60 * 1000
     await user.save({ validateBeforeSave: false })
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
-    console.log(`[DEV] Reset link: ${resetUrl}`)
+    if (process.env.NODE_ENV !== 'production') console.log(`[DEV] Reset link: ${resetUrl}`)
     sendPasswordResetEmail({ to: user.email, name: user.firstNameAr, resetUrl }).catch(() => {})
     sendSuccess(res, null, 'إذا كان البريد مسجلاً، ستصلك رسالة')
   } catch (err) {

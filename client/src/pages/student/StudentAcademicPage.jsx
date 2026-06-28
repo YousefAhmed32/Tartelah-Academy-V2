@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -25,7 +26,7 @@ export default function StudentAcademicPage() {
               <h2 className="font-heading font-bold text-brand-textBody text-lg mb-5">المقررات المسجل بها</h2>
               {!data?.enrollments?.length ? (
                 <div className="text-center py-10">
-                  <div className="text-4xl mb-3">📚</div>
+                  <BookOpen size={44} strokeWidth={1.3} color="#9b7fd6" className="mb-3 mx-auto" />
                   <p className="text-[#9b7fd6]">لا توجد مقررات مسجلة</p>
                 </div>
               ) : (

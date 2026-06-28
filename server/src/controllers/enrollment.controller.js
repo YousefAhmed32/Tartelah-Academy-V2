@@ -1,8 +1,8 @@
 const EnrollmentRequest = require('../models/EnrollmentRequest')
 const Subscription = require('../models/Subscription')
 const Package = require('../models/Package')
-const Notification = require('../models/Notification')
 const User = require('../models/User')
+const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const path = require('path')
@@ -44,7 +44,7 @@ exports.submitRequest = async (req, res, next) => {
       type: 'enrollment',
       relatedId: request._id,
     }))
-    if (adminNotifs.length) await Notification.insertMany(adminNotifs)
+    if (adminNotifs.length) await createNotifications(adminNotifs)
 
     sendSuccess(res, request, 'تم إرسال طلب التسجيل بنجاح', 201)
   } catch (err) {
@@ -80,7 +80,7 @@ exports.uploadPaymentProof = async (req, res, next) => {
       type: 'enrollment',
       relatedId: request._id,
     }))
-    if (notifs.length) await Notification.insertMany(notifs)
+    if (notifs.length) await createNotifications(notifs)
 
     sendSuccess(res, { paymentProofUrl: fileUrl }, 'تم رفع إثبات الدفع بنجاح')
   } catch (err) {
@@ -189,30 +189,32 @@ exports.reviewRequest = async (req, res, next) => {
       request.subscriptionId = subscription._id
 
       // Notify student: approved
-      await Notification.create({
+      await createNotification({
         userId: request.studentId._id,
         titleAr: 'تمت الموافقة على طلب تسجيلك',
         bodyAr: `تمت الموافقة على طلبك وتم تفعيل باقة "${pkg.nameAr}". يمكنك الآن الوصول إلى حصصك.`,
         type: 'enrollment',
+        priority: 'high',
         relatedId: request._id,
       })
 
       // Notify teacher: new student assigned
-      const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr')
-      await Notification.create({
+      await createNotification({
         userId: teacherId,
         titleAr: 'تم تعيين طالب جديد',
         bodyAr: `تم تعيين الطالب ${request.studentId.firstNameAr} ${request.studentId.lastNameAr} إليك. يرجى جدولة أول حصة.`,
         type: 'enrollment',
+        priority: 'high',
         relatedId: request._id,
       })
     } else {
       // Notify student: rejected
-      await Notification.create({
+      await createNotification({
         userId: request.studentId._id,
         titleAr: 'طلب التسجيل — يحتاج مراجعة',
         bodyAr: adminNotes || 'تم رفض طلبك. يرجى التواصل مع الإدارة للاستفسار.',
         type: 'enrollment',
+        priority: 'medium',
         relatedId: request._id,
       })
     }

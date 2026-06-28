@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { Search, CircleCheck, AlertTriangle, Building2, Banknote, CreditCard, ClipboardList, X, Package } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -11,17 +12,17 @@ import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
-  pending:      { label: 'قيد الانتظار',  color: 'warning', desc: 'تم إرسال طلبك وسيتم مراجعته قريباً',              icon: '⏳' },
-  under_review: { label: 'قيد المراجعة',  color: 'info',    desc: 'يراجع فريقنا طلبك وإثبات الدفع',                icon: '🔍' },
-  approved:     { label: 'تمت الموافقة',  color: 'success', desc: 'تمت الموافقة على طلبك وتم تفعيل اشتراكك',       icon: '✅' },
-  rejected:     { label: 'يحتاج مراجعة', color: 'danger',  desc: 'يرجى التواصل مع الإدارة للاستفسار',            icon: '⚠️' },
+  pending:      { label: 'قيد الانتظار',  color: 'warning', desc: 'تم إرسال طلبك وسيتم مراجعته قريباً',              Icon: Search },
+  under_review: { label: 'قيد المراجعة',  color: 'info',    desc: 'يراجع فريقنا طلبك وإثبات الدفع',                Icon: Search },
+  approved:     { label: 'تمت الموافقة',  color: 'success', desc: 'تمت الموافقة على طلبك وتم تفعيل اشتراكك',       Icon: CircleCheck },
+  rejected:     { label: 'يحتاج مراجعة', color: 'danger',  desc: 'يرجى التواصل مع الإدارة للاستفسار',            Icon: AlertTriangle },
 }
 
 const PAYMENT_METHODS = [
-  { value: 'bank_transfer', label: 'حوالة بنكية',       icon: '🏦' },
-  { value: 'cash',          label: 'نقداً',              icon: '💵' },
-  { value: 'card',          label: 'بطاقة ائتمانية',    icon: '💳' },
-  { value: 'other',         label: 'أخرى',               icon: '📋' },
+  { value: 'bank_transfer', label: 'حوالة بنكية',       Icon: Building2 },
+  { value: 'cash',          label: 'نقداً',              Icon: Banknote },
+  { value: 'card',          label: 'بطاقة ائتمانية',    Icon: CreditCard },
+  { value: 'other',         label: 'أخرى',               Icon: ClipboardList },
 ]
 
 const fadeUp = (delay = 0) => ({
@@ -261,7 +262,7 @@ export default function StudentEnrollmentPage() {
               onClick={() => setLightboxUrl(null)}
               className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             >
-              ✕
+              <X size={18} strokeWidth={2} />
             </button>
           </motion.div>
         )}
@@ -419,7 +420,7 @@ function PackageGrid({ packages, selected, onSelect }) {
   if (packages.length === 0) {
     return (
       <div className="text-center py-16 card-light">
-        <div className="text-5xl mb-4">📦</div>
+        <Package size={52} strokeWidth={1.3} color="#9b7fd6" className="mb-4 mx-auto" />
         <h3 className="font-heading font-bold text-xl text-brand-textBody mb-2">لا توجد باقات متاحة</h3>
         <p className="text-[#9b7fd6]">تواصل مع الإدارة للاستفسار عن البرامج المتاحة</p>
       </div>
@@ -504,7 +505,7 @@ function PaymentForm({ pkg, form, onChange, onBack, onSubmit, submitting }) {
                     : 'border-[#e8e0f5] text-brand-textBody hover:border-brand-purple/50'
                 }`}
               >
-                <span>{m.icon}</span>
+                <m.Icon size={16} strokeWidth={1.8} />
                 {m.label}
               </button>
             ))}

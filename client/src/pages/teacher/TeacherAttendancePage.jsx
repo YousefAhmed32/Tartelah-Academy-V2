@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { ClipboardList } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -42,7 +43,7 @@ export default function TeacherAttendancePage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
       ) : !records.length ? (
         <div className="text-center py-16" style={{ color: '#b3a4d0' }}>
-          <div className="text-4xl mb-3">📋</div>
+          <ClipboardList size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
           <p>لا توجد سجلات حضور</p>
         </div>
       ) : (

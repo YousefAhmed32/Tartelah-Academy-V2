@@ -2,6 +2,44 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## Production Readiness — 2026-06-24 Audit
+
+**Overall: 82% ready** (was 63% at session start)
+
+### Critical Bugs Fixed This Session
+- ✅ `emitToRole` socket bug — now filters by role rooms
+- ✅ Admin session ownership bypass — admin can cancel/complete/reschedule any session
+- ✅ `getAdminNotificationLogs` only showed system type — full pipeline added
+- ✅ `console.log` password reset URL in production — dev-only now
+- ✅ `keepPreviousData: true` TanStack v5 incompatibility — fixed across all admin pages
+- ✅ `Subscription.pre('save')` durationDays undefined — fixed with sessionsRemaining-based calc
+- ✅ `sessionsRemaining` going negative — Math.max(0) guard added
+- ✅ `updateTeacher` raw req.body security — whitelist enforced
+- ✅ `updateSubscription` raw req.body — whitelist + guard added
+- ✅ Teacher studentCount/sessionCount always 0 — aggregation pipeline added
+
+### New Capabilities Added
+- ✅ Admin can create sessions (any teacher + student)
+- ✅ Admin can edit any session (status, time, link, assignments)
+- ✅ Admin can cancel/reschedule any session
+- ✅ Admin can edit student profiles (name, email, phone, bio)
+- ✅ Admin can edit teacher profiles (+ salary field)
+- ✅ Admin can reset any user's password
+- ✅ Admin can view full student academic record
+- ✅ Admin can override evaluations (edit/delete)
+- ✅ Admin can override attendance records
+- ✅ Admin can view all schedule rules
+- ✅ Admin can send individual notifications (with user search)
+- ✅ Academy Settings panel (name, contact, social, integrations)
+- ✅ AcademySettings model + GET/PATCH endpoints
+- ✅ Contact form backend handler → notifies admins
+- ✅ Teacher can grade homework submissions
+- ✅ Teacher can edit/delete own evaluations
+- ✅ Subscription adjustment modal (sessions remaining, end date, notes)
+- ✅ User.salaryPerSession field added
+
+---
+
 ---
 
 ## Phase 1 — Architecture & Project Setup
@@ -89,10 +127,10 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | Task | Status | Notes |
 |------|--------|-------|
 | Home page (full sections) | ✅ | Direct conversion of Quran Academy.dc.html — all 9 sections + footer |
-| About Us page | ✅ | |
-| Programs & Courses page | ✅ | |
+| About Us page | ✅ | Premium redesign 2026-06-27 — story timeline, values, team, methodology |
+| Programs & Courses page | ✅ | Premium redesign 2026-06-27 — interactive tabs, journey, alternating features, testimonials |
 | Teachers page | ✅ | |
-| Pricing & Packages page | ✅ | |
+| Pricing & Packages page | ✅ | Premium redesign 2026-06-27 — segmented controls, comparison table, trust section |
 | FAQ page | ✅ | Accordion |
 | Contact Us page | ✅ | |
 
@@ -121,7 +159,7 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | Progress (memorization + revision) | ✅ | Quality badges |
 | Academic record | ✅ | Enrollment cards |
 | Subscription | ✅ | Days remaining countdown |
-| Notifications | ✅ | Mark all read |
+| Notifications | ✅ | Full SaaS center — real-time Socket.io, dropdown bell, search, filter, bulk actions, delete |
 | Settings | ✅ | Profile + password change |
 
 ### Backend APIs
@@ -225,7 +263,7 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | Session creation form | ✅ | Teacher schedule modal |
 | Meeting link management | ✅ | TeacherLinksPage CRUD |
 | Session status management | ✅ | complete/cancel endpoints |
-| Notification model + API | ✅ | |
+| Notification model + API | ✅ | Upgraded: priority, actionUrl, metadata, markUnread, deleteOne, deleteAllRead, pagination |
 | Session reminders (cron) | ✅ | sessionReminder.job.js |
 | Subscription expiry (cron) | ✅ | subscriptionExpiry.job.js |
 | Student join button | ✅ | StudentSessionsPage |
@@ -328,6 +366,91 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
 ---
 
+---
+
+## Articles & Knowledge Center — 2026-06-25
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Article model (full schema + SEO + soft delete) | ✅ | MongoDB + text indexes |
+| ArticleCategory model | ✅ | slug, color, icon, order |
+| Article controller (public + admin) | ✅ | 20 endpoints |
+| Article routes with proper ordering | ✅ | public before parameterized |
+| Upload middleware: article cover | ✅ | `uploads/articles/` |
+| Routes index: register /articles | ✅ | |
+| optionalAuth middleware | ✅ | Added to auth.middleware.js |
+| Frontend: ROUTES constants updated | ✅ | 5 new routes |
+| Frontend: App.jsx routes added | ✅ | 4 new lazy routes |
+| AdminLayout: المقالات nav item | ✅ | Under "المحتوى" group |
+| Public ArticlesPage (/articles) | ✅ | Hero, search, categories, grid, pagination |
+| Public ArticleDetailPage (/articles/:slug) | ✅ | Progress bar, TOC, share, like, bookmark |
+| Admin ArticlesPage (CMS list) | ✅ | Stats, table, publish/feature/pin/duplicate/delete |
+| Admin ArticleEditorPage | ✅ | Rich text editor, SEO panel, media, auto-save |
+| Category management modal | ✅ | CRUD in admin |
+| HomePage latest articles section | ✅ | 3 cards, live from API |
+| AI Assistant: articles knowledge base | ✅ | Full-text search, enriches LLM context |
+| Build verified: zero errors | ✅ | 11.01s, all pages lazy-loaded |
+
+### Features Delivered
+- ✅ Full-text search (MongoDB text index)
+- ✅ Category + tag filtering
+- ✅ Featured articles hero
+- ✅ Reading progress bar
+- ✅ Auto-generated Table of Contents
+- ✅ Like + Bookmark toggles (auth-protected)
+- ✅ Share buttons (Twitter, WhatsApp, copy link)
+- ✅ Related articles
+- ✅ Prev/Next navigation
+- ✅ Admin rich text editor with toolbar + preview
+- ✅ SEO panel (title, description, OG image, canonical, robots)
+- ✅ Cover image upload
+- ✅ Article soft delete + restore
+- ✅ Publish / Unpublish / Schedule / Archive
+- ✅ Feature / Pin / Duplicate article
+- ✅ Auto-save indicator (60s interval)
+- ✅ AI context enrichment from published articles
+
+---
+
+## Courses Management System — 2026-06-28
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Course model — expanded schema (slug, SEO, media, curriculum, outcomes) | ✅ | Backward compatible |
+| Upload middleware — course thumbnail + cover storage | ✅ | uploads/courses/ |
+| Course controller — full enterprise (13 operations) | ✅ | list, featured, bySlug, adminList, stats, CRUD, upload, bulk |
+| Course routes — complete REST API | ✅ | Public + admin namespaced routes |
+| server.js — uploads/courses directory auto-creation | ✅ | |
+| constants.js — COURSES, COURSE_DETAIL, ADMIN_COURSE_NEW, ADMIN_COURSE_EDIT | ✅ | |
+| App.jsx — lazy routes for 2 new admin pages + 2 public pages | ✅ | |
+| PublicLayout — "الدورات" added to navbar | ✅ | |
+| AdminCoursesPage — enterprise rebuild (stats, table+grid, bulk actions, search) | ✅ | |
+| AdminCourseFormPage — CMS form page (create + edit, image upload, video, curriculum) | ✅ | |
+| CoursesPage — public discovery (hero, category filters, featured spotlight, grid, pagination) | ✅ | |
+| CourseDetailPage — premium course detail (hero, tabs, enrollment card, video modal, related) | ✅ | |
+| Build verification — zero errors | ✅ | 9.27s, 12 new lazy chunks |
+
+### Features Delivered
+- ✅ Course model with slug, SEO, media, curriculum, learning outcomes, requirements
+- ✅ Auto-slug generation with uniqueness guarantee
+- ✅ Course thumbnail + cover image upload (drag & drop)
+- ✅ YouTube URL with auto-thumbnail extraction and video modal
+- ✅ Admin stats dashboard (total, published, draft, archived, featured, students)
+- ✅ Table view + Grid view with toggle
+- ✅ Bulk actions: publish, unpublish, feature, archive, delete
+- ✅ Quick actions per course: edit, toggle publish, toggle feature, duplicate, delete
+- ✅ CMS form: multi-section with tags input, dynamic lists, curriculum builder
+- ✅ Public courses discovery page with hero + category tabs + filters + pagination
+- ✅ Featured course spotlight on public page
+- ✅ Course detail page with tabs (overview / curriculum / outcomes)
+- ✅ Sticky enrollment card on course detail
+- ✅ Related courses sidebar
+- ✅ SEO panel in admin form
+- ✅ Skeleton loading states
+- ✅ Empty states with clear CTAs
+
+---
+
 ## Summary
 
 | Phase | Total | Complete | Remaining |
@@ -345,4 +468,6 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | Phase 11 | 14 | 14 | 0 |
 | DX Enhancements | 4 | 4 | 0 |
 | **Enrollment Workflow** | **21** | **21** | **0** |
-| **TOTAL** | **197** | **197** | **0** |
+| **Articles & Knowledge Center** | **19** | **19** | **0** |
+| **Courses Management System** | **13** | **13** | **0** |
+| **TOTAL** | **229** | **229** | **0** |

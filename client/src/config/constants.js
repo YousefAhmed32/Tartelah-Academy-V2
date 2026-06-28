@@ -55,20 +55,38 @@ export const ROUTES = {
 
   ADMIN_DASHBOARD: '/admin',
   ADMIN_STUDENTS: '/admin/students',
+  ADMIN_STUDENT_DETAIL: '/admin/students/:id',
   ADMIN_TEACHERS: '/admin/teachers',
   ADMIN_ADMINS: '/admin/admins',
   ADMIN_COURSES: '/admin/courses',
   ADMIN_LEVELS: '/admin/levels',
   ADMIN_SESSIONS: '/admin/sessions',
+  ADMIN_SCHEDULE_RULES: '/admin/schedule-rules',
   ADMIN_PACKAGES: '/admin/packages',
   ADMIN_SUBSCRIPTIONS: '/admin/subscriptions',
   ADMIN_ENROLLMENTS: '/admin/enrollments',
   ADMIN_WEBSITE: '/admin/website',
   ADMIN_REPORTS: '/admin/reports',
   ADMIN_NOTIFICATIONS: '/admin/notifications',
+  ADMIN_AUDIT_LOGS: '/admin/audit-logs',
   ADMIN_SETTINGS: '/admin/settings',
 
   AI_ASSISTANT: '/ai',
+
+  COURSES: '/courses',
+  COURSE_DETAIL: '/courses/:slug',
+
+  ARTICLES: '/articles',
+  ARTICLE_DETAIL: '/articles/:slug',
+  ADMIN_ARTICLES: '/admin/articles',
+  ADMIN_ARTICLE_NEW: '/admin/articles/new',
+  ADMIN_ARTICLE_EDIT: '/admin/articles/:id/edit',
+
+  ADMIN_COURSES: '/admin/courses',
+  ADMIN_COURSE_NEW: '/admin/courses/new',
+  ADMIN_COURSE_EDIT: '/admin/courses/:id/edit',
+
+  ADMIN_CONTACT_MESSAGES: '/admin/contact-messages',
 }
 
 export const MEETING_PROVIDERS = {

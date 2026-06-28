@@ -1,14 +1,185 @@
+const mongoose = require('mongoose')
 const Course = require('../models/Course')
-const { sendSuccess, sendError } = require('../utils/response')
+const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 
-exports.getAll = async (req, res, next) => {
+// ── Slug Helpers ─────────────────────────────────────────────────────────────
+
+function baseSlug(name) {
+  if (!name || !name.trim()) return ''
+  return name.toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 80)
+}
+
+async function uniqueSlug(name, nameAr, excludeId = null) {
+  const base = baseSlug(name) || `course-${Date.now()}`
+  let slug = base
+  let counter = 1
+  const query = excludeId ? { slug, _id: { $ne: excludeId } } : { slug }
+  while (await Course.findOne(query).lean()) {
+    slug = `${base}-${counter++}`
+    query.slug = slug
+  }
+  return slug
+}
+
+// ── Public Routes ─────────────────────────────────────────────────────────────
+
+exports.listPublished = async (req, res, next) => {
   try {
-    const filter = {}
-    if (req.query.level) filter.level = req.query.level
-    if (req.query.ageGroup) filter.ageGroup = req.query.ageGroup
-    if (req.query.active !== undefined) filter.isActive = req.query.active === 'true'
-    const courses = await Course.find(filter).sort({ createdAt: -1 })
+    const { category, difficulty, language, tags, featured, search, page = 1, limit = 12 } = req.query
+    const filter = { status: 'published', isActive: true }
+    if (category)   filter.category = category
+    if (difficulty) filter.difficulty = difficulty
+    if (language)   filter.language = language
+    if (featured === 'true') filter.featured = true
+    if (tags)       filter.tags = { $in: tags.split(',').map(t => t.trim().toLowerCase()) }
+    if (search)     filter.$or = [
+      { nameAr: { $regex: search, $options: 'i' } },
+      { name: { $regex: search, $options: 'i' } },
+      { shortDescriptionAr: { $regex: search, $options: 'i' } },
+      { tags: { $in: [search.toLowerCase()] } },
+    ]
+
+    const skip = (Number(page) - 1) * Number(limit)
+    const [courses, total] = await Promise.all([
+      Course.find(filter)
+        .select('nameAr name slug shortDescriptionAr shortDescription thumbnailImage coverImage category difficulty ageGroup language estimatedDuration lessonsCount studentsCount enrollmentCount featured rating reviewCount certificateAvailable order createdAt')
+        .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar')
+        .sort({ featured: -1, order: 1, studentsCount: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Course.countDocuments(filter),
+    ])
+    sendPaginated(res, courses, total, page, limit)
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getFeatured = async (req, res, next) => {
+  try {
+    const courses = await Course.find({ status: 'published', isActive: true, featured: true })
+      .select('nameAr name slug shortDescriptionAr thumbnailImage category difficulty studentsCount estimatedDuration lessonsCount')
+      .populate('instructor', 'firstName firstNameAr avatar')
+      .sort({ order: 1, studentsCount: -1 })
+      .limit(6)
+      .lean()
     sendSuccess(res, courses)
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getBySlug = async (req, res, next) => {
+  try {
+    const { slug } = req.params
+    const filter = mongoose.Types.ObjectId.isValid(slug)
+      ? { _id: slug }
+      : { slug, status: 'published', isActive: true }
+
+    const course = await Course.findOne(filter)
+      .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar bio bioAr')
+      .lean()
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+
+    // Related courses
+    const related = await Course.find({
+      status: 'published',
+      isActive: true,
+      _id: { $ne: course._id },
+      category: course.category,
+    })
+      .select('nameAr name slug thumbnailImage category difficulty studentsCount lessonsCount estimatedDuration')
+      .limit(3)
+      .lean()
+
+    sendSuccess(res, { ...course, relatedCourses: related })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── Admin Routes ──────────────────────────────────────────────────────────────
+
+exports.adminList = async (req, res, next) => {
+  try {
+    const {
+      status, category, difficulty, featured, search,
+      page = 1, limit = 20,
+      sort = 'newest',
+    } = req.query
+
+    const filter = {}
+    if (status && status !== 'all')   filter.status = status
+    if (category && category !== 'all') filter.category = category
+    if (difficulty && difficulty !== 'all') filter.difficulty = difficulty
+    if (featured === 'true') filter.featured = true
+    if (search) filter.$or = [
+      { nameAr: { $regex: search, $options: 'i' } },
+      { name: { $regex: search, $options: 'i' } },
+    ]
+
+    const sortMap = {
+      newest:    { createdAt: -1 },
+      oldest:    { createdAt: 1 },
+      students:  { studentsCount: -1 },
+      alpha:     { nameAr: 1 },
+      order:     { order: 1, createdAt: -1 },
+    }
+    const sortObj = sortMap[sort] || sortMap.newest
+
+    const skip = (Number(page) - 1) * Number(limit)
+    const [courses, total] = await Promise.all([
+      Course.find(filter)
+        .populate('instructor', 'firstName lastName firstNameAr avatar')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Course.countDocuments(filter),
+    ])
+
+    sendPaginated(res, courses, total, page, limit)
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getAdminStats = async (req, res, next) => {
+  try {
+    const [total, published, draft, archived, featured, studentsAgg] = await Promise.all([
+      Course.countDocuments({}),
+      Course.countDocuments({ status: 'published' }),
+      Course.countDocuments({ status: 'draft' }),
+      Course.countDocuments({ status: 'archived' }),
+      Course.countDocuments({ featured: true }),
+      Course.aggregate([{ $group: { _id: null, total: { $sum: '$studentsCount' } } }]),
+    ])
+    sendSuccess(res, {
+      total,
+      published,
+      draft,
+      archived,
+      featured,
+      totalStudents: studentsAgg[0]?.total || 0,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getById = async (req, res, next) => {
+  try {
+    const course = await Course.findById(req.params.id)
+      .populate('instructor', 'firstName lastName firstNameAr avatar')
+      .lean()
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    sendSuccess(res, course)
   } catch (err) {
     next(err)
   }
@@ -16,7 +187,42 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const course = await Course.create(req.body)
+    const {
+      nameAr, name, shortDescriptionAr, shortDescription,
+      descriptionAr, description, category, subCategory, tags,
+      language, difficulty, level, ageGroup, estimatedDuration,
+      lessonsCount, durationWeeks, learningOutcomesAr, learningOutcomes,
+      requirementsAr, requirements, targetAudienceAr, targetAudience,
+      syllabusAr, curriculum, order, featured, status, enrollmentEnabled,
+      certificateAvailable, instructor, seo,
+    } = req.body
+
+    const slug = await uniqueSlug(name, nameAr)
+
+    const course = await Course.create({
+      nameAr, name, slug,
+      shortDescriptionAr, shortDescription,
+      descriptionAr, description,
+      category, subCategory,
+      tags: Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim().toLowerCase()) : []),
+      language, difficulty: difficulty || level || 'beginner',
+      level: level || difficulty || 'beginner',
+      ageGroup, estimatedDuration, lessonsCount, durationWeeks,
+      learningOutcomesAr, learningOutcomes,
+      requirementsAr, requirements,
+      targetAudienceAr, targetAudience,
+      syllabusAr, curriculum,
+      order: order || 0,
+      featured: !!featured,
+      status: status || 'draft',
+      isActive: status === 'published',
+      enrollmentEnabled: enrollmentEnabled !== false,
+      certificateAvailable: !!certificateAvailable,
+      instructor: instructor || null,
+      seo: seo || {},
+      createdBy: req.user._id,
+    })
+
     sendSuccess(res, course, 'تم إنشاء المقرر', 201)
   } catch (err) {
     next(err)
@@ -25,9 +231,149 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    const { id } = req.params
+    const course = await Course.findById(id)
     if (!course) return sendError(res, 'المقرر غير موجود', 404)
+
+    const {
+      nameAr, name, shortDescriptionAr, shortDescription,
+      descriptionAr, description, category, subCategory, tags,
+      language, difficulty, level, ageGroup, estimatedDuration,
+      lessonsCount, durationWeeks, learningOutcomesAr, learningOutcomes,
+      requirementsAr, requirements, targetAudienceAr, targetAudience,
+      syllabusAr, curriculum, order, featured, status, enrollmentEnabled,
+      certificateAvailable, instructor, seo, regenerateSlug,
+    } = req.body
+
+    if (nameAr !== undefined) course.nameAr = nameAr
+    if (name !== undefined) course.name = name
+    if (regenerateSlug) course.slug = await uniqueSlug(name || course.name, nameAr || course.nameAr, id)
+
+    if (shortDescriptionAr !== undefined) course.shortDescriptionAr = shortDescriptionAr
+    if (shortDescription !== undefined) course.shortDescription = shortDescription
+    if (descriptionAr !== undefined) course.descriptionAr = descriptionAr
+    if (description !== undefined) course.description = description
+    if (category !== undefined) course.category = category
+    if (subCategory !== undefined) course.subCategory = subCategory
+    if (language !== undefined) course.language = language
+    if (difficulty !== undefined) { course.difficulty = difficulty; course.level = difficulty }
+    if (level !== undefined) { course.level = level; course.difficulty = level }
+    if (ageGroup !== undefined) course.ageGroup = ageGroup
+    if (estimatedDuration !== undefined) course.estimatedDuration = estimatedDuration
+    if (lessonsCount !== undefined) course.lessonsCount = lessonsCount
+    if (durationWeeks !== undefined) course.durationWeeks = durationWeeks
+    if (tags !== undefined) {
+      course.tags = Array.isArray(tags) ? tags : String(tags).split(',').map(t => t.trim().toLowerCase())
+    }
+    if (learningOutcomesAr !== undefined) course.learningOutcomesAr = learningOutcomesAr
+    if (learningOutcomes !== undefined) course.learningOutcomes = learningOutcomes
+    if (requirementsAr !== undefined) course.requirementsAr = requirementsAr
+    if (requirements !== undefined) course.requirements = requirements
+    if (targetAudienceAr !== undefined) course.targetAudienceAr = targetAudienceAr
+    if (targetAudience !== undefined) course.targetAudience = targetAudience
+    if (syllabusAr !== undefined) course.syllabusAr = syllabusAr
+    if (curriculum !== undefined) course.curriculum = curriculum
+    if (order !== undefined) course.order = order
+    if (featured !== undefined) course.featured = !!featured
+    if (status !== undefined) {
+      course.status = status
+      course.isActive = status === 'published'
+    }
+    if (enrollmentEnabled !== undefined) course.enrollmentEnabled = !!enrollmentEnabled
+    if (certificateAvailable !== undefined) course.certificateAvailable = !!certificateAvailable
+    if (instructor !== undefined) course.instructor = instructor || null
+    if (seo !== undefined) course.seo = seo
+    course.updatedBy = req.user._id
+
+    await course.save()
     sendSuccess(res, course, 'تم تحديث المقرر')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.uploadThumbnail = async (req, res, next) => {
+  try {
+    if (!req.file) return sendError(res, 'لم يتم رفع ملف', 400)
+    const course = await Course.findByIdAndUpdate(
+      req.params.id,
+      { thumbnailImage: `/${req.file.path.replace(/\\/g, '/')}` },
+      { new: true }
+    )
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    sendSuccess(res, { thumbnailImage: course.thumbnailImage }, 'تم رفع الصورة المصغرة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.uploadCover = async (req, res, next) => {
+  try {
+    if (!req.file) return sendError(res, 'لم يتم رفع ملف', 400)
+    const course = await Course.findByIdAndUpdate(
+      req.params.id,
+      { coverImage: `/${req.file.path.replace(/\\/g, '/')}` },
+      { new: true }
+    )
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    sendSuccess(res, { coverImage: course.coverImage }, 'تم رفع صورة الغلاف')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.togglePublish = async (req, res, next) => {
+  try {
+    const course = await Course.findById(req.params.id)
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    const newStatus = course.status === 'published' ? 'draft' : 'published'
+    course.status = newStatus
+    course.isActive = newStatus === 'published'
+    course.updatedBy = req.user._id
+    await course.save()
+    sendSuccess(res, { status: course.status, isActive: course.isActive },
+      newStatus === 'published' ? 'تم نشر المقرر' : 'تم إلغاء نشر المقرر')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.toggleFeature = async (req, res, next) => {
+  try {
+    const course = await Course.findById(req.params.id)
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    course.featured = !course.featured
+    course.updatedBy = req.user._id
+    await course.save()
+    sendSuccess(res, { featured: course.featured },
+      course.featured ? 'تم تمييز المقرر' : 'تم إلغاء تمييز المقرر')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.duplicate = async (req, res, next) => {
+  try {
+    const original = await Course.findById(req.params.id).lean()
+    if (!original) return sendError(res, 'المقرر غير موجود', 404)
+
+    const { _id, slug, createdAt, updatedAt, studentsCount, enrollmentCount, __v, ...data } = original
+    const newSlug = await uniqueSlug((data.name ? `${data.name}-copy` : null), data.nameAr)
+
+    const copy = await Course.create({
+      ...data,
+      nameAr: `${data.nameAr} (نسخة)`,
+      name: data.name ? `${data.name} (Copy)` : undefined,
+      slug: newSlug,
+      status: 'draft',
+      isActive: false,
+      featured: false,
+      studentsCount: 0,
+      enrollmentCount: 0,
+      createdBy: req.user._id,
+    })
+
+    sendSuccess(res, copy, 'تم نسخ المقرر', 201)
   } catch (err) {
     next(err)
   }
@@ -35,8 +381,52 @@ exports.update = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    await Course.findByIdAndDelete(req.params.id)
+    const course = await Course.findByIdAndDelete(req.params.id)
+    if (!course) return sendError(res, 'المقرر غير موجود', 404)
     sendSuccess(res, null, 'تم حذف المقرر')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.bulkAction = async (req, res, next) => {
+  try {
+    const { ids, action } = req.body
+    if (!Array.isArray(ids) || !ids.length) return sendError(res, 'لم يتم تحديد أي مقررات', 400)
+
+    let updateData = {}
+    let message = ''
+
+    switch (action) {
+      case 'publish':
+        updateData = { status: 'published', isActive: true }
+        message = `تم نشر ${ids.length} مقرر`
+        break
+      case 'unpublish':
+        updateData = { status: 'draft', isActive: false }
+        message = `تم إلغاء نشر ${ids.length} مقرر`
+        break
+      case 'feature':
+        updateData = { featured: true }
+        message = `تم تمييز ${ids.length} مقرر`
+        break
+      case 'unfeature':
+        updateData = { featured: false }
+        message = `تم إلغاء تمييز ${ids.length} مقرر`
+        break
+      case 'archive':
+        updateData = { status: 'archived', isActive: false }
+        message = `تم أرشفة ${ids.length} مقرر`
+        break
+      case 'delete':
+        await Course.deleteMany({ _id: { $in: ids } })
+        return sendSuccess(res, null, `تم حذف ${ids.length} مقرر`)
+      default:
+        return sendError(res, 'إجراء غير معروف', 400)
+    }
+
+    await Course.updateMany({ _id: { $in: ids } }, { $set: { ...updateData, updatedBy: req.user._id } })
+    sendSuccess(res, null, message)
   } catch (err) {
     next(err)
   }

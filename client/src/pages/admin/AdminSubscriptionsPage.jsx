@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Edit2, Plus, Calendar, RefreshCw } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -10,18 +11,109 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
-import { formatCurrency } from '../../utils/format.js'
+
+const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
+
+const STATUS_CONFIG = {
+  active:    { label: 'نشط',    badge: 'success' },
+  expired:   { label: 'منتهي',  badge: 'gray' },
+  cancelled: { label: 'ملغى',   badge: 'danger' },
+  paused:    { label: 'موقوف',  badge: 'warning' },
+  pending:   { label: 'معلق',   badge: 'purple' },
+}
+
+// ── Adjust Subscription Modal ─────────────────────────────────────────────────
+
+function AdjustModal({ sub, onClose }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState({
+    status: sub.status,
+    sessionsRemaining: sub.sessionsRemaining || 0,
+    endDate: sub.endDate ? sub.endDate.slice(0, 10) : '',
+    notes: sub.notes || '',
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const mut = useMutation({
+    mutationFn: (data) => api.patch(`/subscriptions/${sub._id}`, data).then(r => r.data),
+    onSuccess: () => {
+      toast.success('تم تحديث الاشتراك')
+      qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] })
+      onClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  const handleSave = () => {
+    const updates = {
+      status: form.status,
+      sessionsRemaining: Number(form.sessionsRemaining),
+      notes: form.notes,
+    }
+    if (form.endDate) updates.endDate = new Date(form.endDate).toISOString()
+    mut.mutate(updates)
+  }
+
+  return (
+    <Modal open onClose={onClose} title="تعديل الاشتراك" size="sm"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="purple" onClick={handleSave} loading={mut.isPending}>حفظ</Button>
+      </>}>
+      <div className="space-y-4" dir="rtl">
+        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+          <div className="font-semibold text-gray-900">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{sub.packageId?.nameAr}</div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">الحالة</label>
+          <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
+            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">الحصص المتبقية</label>
+          <div className="flex items-center gap-2">
+            <button onClick={() => set('sessionsRemaining', Math.max(0, form.sessionsRemaining - 1))}
+              className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg transition-colors flex-none flex items-center justify-center">−</button>
+            <input type="number" min="0" className={`${inputCls} text-center`} value={form.sessionsRemaining} onChange={e => set('sessionsRemaining', e.target.value)} />
+            <button onClick={() => set('sessionsRemaining', form.sessionsRemaining + 1)}
+              className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg transition-colors flex-none flex items-center justify-center">+</button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">تاريخ الانتهاء</label>
+          <input type="date" className={inputCls} value={form.endDate} onChange={e => set('endDate', e.target.value)} />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظات</label>
+          <textarea className={`${inputCls} h-16 resize-none py-2`} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="ملاحظات داخلية..." />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminSubscriptionsPage() {
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ studentId: '', packageId: '', startDate: '', teacherId: '', notes: '' })
+  const [adjustSub, setAdjustSub] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [form, setForm] = useState({ studentId: '', packageId: '', startDate: '', teacherId: '', notes: '', sessionsRemaining: 0, amountPaid: 0 })
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'subscriptions', page],
-    queryFn: () => api.get(`/subscriptions?page=${page}&limit=20`).then(r => r.data),
-    placeholderData: { data: [], totalPages: 1 },
+    queryKey: ['admin', 'subscriptions', page, statusFilter],
+    queryFn: () => api.get(`/subscriptions?page=${page}&limit=20${statusFilter ? `&status=${statusFilter}` : ''}`).then(r => r.data),
+    placeholderData: (prev) => prev,
   })
 
   const { data: students = [] } = useQuery({ queryKey: ['admin', 'students', 'all'], queryFn: () => api.get('/admin/students?limit=200').then(r => r.data.data) })
@@ -30,88 +122,119 @@ export default function AdminSubscriptionsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/subscriptions', data),
-    onSuccess: () => { toast.success('تم إنشاء الاشتراك'); qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] }); setShowCreate(false) },
+    onSuccess: () => {
+      toast.success('تم إنشاء الاشتراك')
+      qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] })
+      setShowCreate(false)
+      setForm({ studentId: '', packageId: '', startDate: '', teacherId: '', notes: '', sessionsRemaining: 0, amountPaid: 0 })
+    },
     onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
   })
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }) => api.patch(`/subscriptions/${id}`, { status }),
-    onSuccess: () => { toast.success('تم التحديث'); qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] }) },
-  })
+  const subs = data?.data || []
 
-  const statusBadge = { active: 'success', expired: 'gray', cancelled: 'danger', paused: 'warning' }
-  const statusLabel = { active: 'نشط', expired: 'منتهي', cancelled: 'ملغى', paused: 'موقوف' }
+  const tabs = [
+    { key: '', label: 'الكل' },
+    { key: 'active', label: 'نشط' },
+    { key: 'paused', label: 'موقوف' },
+    { key: 'expired', label: 'منتهي' },
+    { key: 'cancelled', label: 'ملغى' },
+  ]
 
   return (
     <div dir="rtl">
-      <PageHeader
-        title="الاشتراكات"
-        subtitle="إدارة اشتراكات الطلاب"
-        actions={<Button variant="purple" onClick={() => setShowCreate(true)}>+ اشتراك جديد</Button>}
-      />
+      <PageHeader title="الاشتراكات" subtitle={`${data?.total || 0} اشتراك`}
+        actions={<Button variant="purple" onClick={() => setShowCreate(true)}><Plus size={14} className="ml-1" /> اشتراك جديد</Button>} />
+
+      {/* Status tabs */}
+      <div className="flex gap-1 p-1 bg-[#f0ecf8] rounded-xl w-fit mb-5">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => { setStatusFilter(t.key); setPage(1) }}
+            className={`px-4 py-1.5 rounded-[10px] text-sm font-semibold transition-all ${statusFilter === t.key ? 'bg-white text-brand-textBody shadow-sm' : 'text-[#9b7fd6] hover:text-brand-textBody'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
       ) : (
         <>
           <div className="card-light overflow-hidden">
-            <table className="w-full">
+            <table className="w-full min-w-[700px]">
               <thead>
                 <tr className="border-b border-[#f0ecf8]">
-                  {['الطالب', 'الباقة', 'المعلم', 'تاريخ البدء', 'الانتهاء', 'الحصص المتبقية', 'الحالة', 'إجراءات'].map(h => (
+                  {['الطالب', 'الباقة', 'المعلم', 'الانتهاء', 'الحصص المتبقية', 'الحالة', ''].map(h => (
                     <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#9b7fd6] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {(data?.data || []).map((sub) => (
-                  <tr key={sub._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar src={sub.studentId?.avatar} name={`${sub.studentId?.firstNameAr}`} size="xs" />
-                        <span className="text-sm font-semibold text-brand-textBody">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-brand-textBody">{sub.packageId?.nameAr}</td>
-                    <td className="px-4 py-3 text-sm text-[#9b7fd6]">{sub.teacherId?.firstNameAr || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#9b7fd6]">{formatDateAr(sub.startDate)}</td>
-                    <td className="px-4 py-3 text-sm text-[#9b7fd6]">{formatDateAr(sub.endDate)}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-brand-textBody">{sub.sessionsRemaining || 0}</td>
-                    <td className="px-4 py-3"><Badge variant={statusBadge[sub.status] || 'gray'}>{statusLabel[sub.status] || sub.status}</Badge></td>
-                    <td className="px-4 py-3">
-                      {sub.status === 'active' && (
-                        <button onClick={() => statusMutation.mutate({ id: sub._id, status: 'paused' })} className="text-xs text-amber-500 hover:text-amber-700 font-semibold">إيقاف</button>
-                      )}
-                      {sub.status === 'paused' && (
-                        <button onClick={() => statusMutation.mutate({ id: sub._id, status: 'active' })} className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold">تفعيل</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {subs.map((sub) => {
+                  const sc = STATUS_CONFIG[sub.status] || { label: sub.status, badge: 'gray' }
+                  const daysLeft = sub.endDate ? Math.ceil((new Date(sub.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0
+                  const isExpiringSoon = sub.status === 'active' && daysLeft <= 7 && daysLeft > 0
+                  return (
+                    <tr key={sub._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Avatar src={sub.studentId?.avatar} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="xs" />
+                          <span className="text-sm font-semibold text-brand-textBody">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-brand-textBody">{sub.packageId?.nameAr}</td>
+                      <td className="px-4 py-3 text-sm text-[#9b7fd6]">{sub.teacherId?.firstNameAr || '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-[#9b7fd6]">{formatDateAr(sub.endDate)}</div>
+                        {isExpiringSoon && (
+                          <div className="text-xs text-amber-600 font-semibold mt-0.5">{daysLeft} أيام للانتهاء</div>
+                        )}
+                        {daysLeft <= 0 && sub.status === 'active' && (
+                          <div className="text-xs text-red-500 font-semibold mt-0.5">منتهي الصلاحية</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`font-semibold text-sm ${sub.sessionsRemaining <= 2 ? 'text-amber-600' : 'text-brand-textBody'}`}>
+                          {sub.sessionsRemaining || 0} حصص
+                        </span>
+                      </td>
+                      <td className="px-4 py-3"><Badge variant={sc.badge}>{sc.label}</Badge></td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setAdjustSub(sub)}
+                          className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors">
+                          <Edit2 size={12} /> تعديل
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
-            {!data?.data?.length && <div className="text-center py-12 text-[#9b7fd6]">لا توجد اشتراكات</div>}
+            {!subs.length && <div className="text-center py-12 text-[#9b7fd6]">لا توجد اشتراكات</div>}
           </div>
           {data?.totalPages > 1 && <div className="mt-4 flex justify-center"><Pagination current={page} total={data.totalPages} onChange={setPage} /></div>}
         </>
       )}
 
+      {/* Adjust Modal */}
+      {adjustSub && <AdjustModal sub={adjustSub} onClose={() => setAdjustSub(null)} />}
+
+      {/* Create Modal */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="إنشاء اشتراك جديد" size="md"
         footer={<>
           <Button variant="ghost" onClick={() => setShowCreate(false)}>إلغاء</Button>
           <Button variant="purple" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending}>إنشاء</Button>
-        </>}
-      >
-        <div className="space-y-4">
+        </>}>
+        <div className="space-y-4" dir="rtl">
           <div>
-            <label className="block text-xs font-semibold text-brand-textBody mb-1">الطالب</label>
+            <label className="block text-xs font-semibold text-brand-textBody mb-1">الطالب *</label>
             <select value={form.studentId} onChange={e => setForm(p => ({ ...p, studentId: e.target.value }))} className="field-light w-full">
               <option value="">اختر طالباً</option>
               {students.map(s => <option key={s._id} value={s._id}>{s.firstNameAr} {s.lastNameAr}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-brand-textBody mb-1">الباقة</label>
+            <label className="block text-xs font-semibold text-brand-textBody mb-1">الباقة *</label>
             <select value={form.packageId} onChange={e => setForm(p => ({ ...p, packageId: e.target.value }))} className="field-light w-full">
               <option value="">اختر باقة</option>
               {packages.map(p => <option key={p._id} value={p._id}>{p.nameAr} — {p.price} ريال</option>)}
@@ -124,9 +247,19 @@ export default function AdminSubscriptionsPage() {
               {teachers.map(t => <option key={t._id} value={t._id}>{t.firstNameAr} {t.lastNameAr}</option>)}
             </select>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">تاريخ البدء</label>
+              <input type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="field-light w-full" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">المبلغ المدفوع (SAR)</label>
+              <input type="number" value={form.amountPaid} onChange={e => setForm(p => ({ ...p, amountPaid: e.target.value }))} className="field-light w-full" placeholder="0" />
+            </div>
+          </div>
           <div>
-            <label className="block text-xs font-semibold text-brand-textBody mb-1">تاريخ البدء</label>
-            <input type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="field-light w-full" />
+            <label className="block text-xs font-semibold text-brand-textBody mb-1">الحصص المتاحة</label>
+            <input type="number" value={form.sessionsRemaining} onChange={e => setForm(p => ({ ...p, sessionsRemaining: e.target.value }))} className="field-light w-full" placeholder="عدد الحصص" />
           </div>
         </div>
       </Modal>

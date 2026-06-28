@@ -3,12 +3,15 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../store/authStore.js'
 import { ROUTES } from '../config/constants.js'
+import Footer from '../components/shared/Footer.jsx'
 
 const navLinks = [
   { to: ROUTES.HOME, label: 'الرئيسية' },
   { to: ROUTES.PROGRAMS, label: 'مسارات التعلم' },
+  { to: ROUTES.COURSES, label: 'الدورات' },
   { to: ROUTES.TEACHERS, label: 'المعلمون' },
   { to: ROUTES.PRICING, label: 'الأسعار' },
+  { to: ROUTES.ARTICLES, label: 'المقالات' },
   { to: ROUTES.ABOUT, label: 'من نحن' },
   { to: ROUTES.CONTACT, label: 'تواصل معنا' },
 ]
@@ -47,14 +50,14 @@ export default function PublicLayout() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-8 font-medium text-base">
+        <nav className="hidden lg:flex items-center gap-6 font-medium text-base">
           {navLinks.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
               end={link.to === ROUTES.HOME}
               className={({ isActive }) =>
-                `relative text-[#E7E0F5] no-underline transition-colors duration-200 hover:text-brand-gold ${isActive ? '!text-brand-gold font-bold' : ''}`
+                `relative text-[#E7E0F5] no-underline transition-colors duration-200 hover:text-brand-gold text-[14.5px] ${isActive ? '!text-brand-gold font-bold' : ''}`
               }
             >
               {({ isActive }) => (
@@ -144,6 +147,9 @@ export default function PublicLayout() {
 
       {/* Page Content */}
       <Outlet />
+
+      {/* Global Footer */}
+      <Footer />
     </div>
   )
 }

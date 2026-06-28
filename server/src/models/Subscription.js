@@ -20,8 +20,12 @@ SubscriptionSchema.index({ teacherId: 1, status: 1 })
 SubscriptionSchema.index({ endDate: 1, status: 1 })
 SubscriptionSchema.pre('save', function (next) {
   if (this.isNew && !this.endDate) {
-    this.endDate = new Date(this.startDate.getTime() + (this.durationDays || 30) * 24 * 60 * 60 * 1000)
+    const startMs = (this.startDate || new Date()).getTime()
+    const days = this.totalSessions ? Math.ceil(this.totalSessions / 4) * 7 : 30
+    this.endDate = new Date(startMs + days * 24 * 60 * 60 * 1000)
   }
+  // Never let sessionsRemaining go negative
+  if (this.sessionsRemaining < 0) this.sessionsRemaining = 0
   next()
 })
 

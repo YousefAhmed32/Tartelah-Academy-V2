@@ -4,9 +4,16 @@ const SubmissionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String },
   attachmentUrl: { type: String },
+  attachments: [{
+    url: String,
+    originalName: String,
+    mimetype: String,
+    size: Number,
+  }],
   submittedAt: { type: Date, default: Date.now },
   grade: { type: Number, min: 0, max: 10 },
   teacherFeedback: { type: String },
+  gradedAt: { type: Date },
   status: { type: String, enum: ['submitted', 'graded', 'returned'], default: 'submitted' },
 }, { _id: true, timestamps: false })
 

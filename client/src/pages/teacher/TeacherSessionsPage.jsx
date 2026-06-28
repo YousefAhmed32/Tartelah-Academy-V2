@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import {
+  Check, Star, FileText, X, Users, CalendarDays, Calendar,
+  CircleCheck,
+} from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -343,7 +347,7 @@ function SessionCard({ session, onEval, onHomework }) {
                       className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
                       style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }}
                     >
-                      {completeMutation.isPending ? '...' : '✓ اكتملت'}
+                      {completeMutation.isPending ? '...' : <span className="flex items-center justify-center gap-1"><Check size={13} strokeWidth={2.5} /> اكتملت</span>}
                     </button>
                   )}
                   {isScheduled && (
@@ -357,26 +361,26 @@ function SessionCard({ session, onEval, onHomework }) {
                   )}
                   <button
                     onClick={() => onEval(session)}
-                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
+                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
                     style={{ background: 'rgba(232,199,106,0.12)', color: '#E8C76A', border: '1px solid rgba(232,199,106,0.2)' }}
                   >
-                    ★ تقييم
+                    <Star size={13} strokeWidth={2} /> تقييم
                   </button>
                   <button
                     onClick={() => onHomework(session)}
-                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
+                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
                     style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)' }}
                   >
-                    📝 واجب
+                    <FileText size={13} strokeWidth={2} /> واجب
                   </button>
                   {isScheduled && (
                     <button
                       onClick={() => cancelMutation.mutate()}
                       disabled={cancelMutation.isPending}
-                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
+                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
                       style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
                     >
-                      {cancelMutation.isPending ? '...' : '✕ إلغاء'}
+                      {cancelMutation.isPending ? '...' : <><X size={13} strokeWidth={2.5} /> إلغاء</>}
                     </button>
                   )}
                 </div>
@@ -502,7 +506,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
             <div key={s} className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                 style={{ background: s <= step ? '#7c3aed' : 'rgba(124,58,237,0.15)', color: s <= step ? 'white' : '#9b7fd6' }}>
-                {s < step ? '✓' : s}
+                {s < step ? <Check size={12} strokeWidth={2.5} /> : s}
               </div>
               {s < 4 && <div className="w-8 h-0.5 rounded-full" style={{ background: s < step ? '#7c3aed' : 'rgba(124,58,237,0.2)' }} />}
             </div>
@@ -515,7 +519,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
             <p className="text-sm text-[#9b7fd6] mb-4">اختر الطالب الذي تريد إنشاء جدول دوري معه</p>
             {students.length === 0 ? (
               <div className="text-center py-8 text-[#9b7fd6]">
-                <div className="text-3xl mb-2">👥</div>
+                <Users size={36} strokeWidth={1.4} color="#9b7fd6" className="mb-2 mx-auto" />
                 <p>لا يوجد طلاب مُعيَّنون لك بعد</p>
               </div>
             ) : (
@@ -716,8 +720,8 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
             </div>
 
             <div className="p-3 rounded-xl" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-              <p className="text-xs text-emerald-600">
-                ✓ سيتم إنشاء {preview.length} حصة في قاعدة البيانات وسيُرسل إشعار للطالب تلقائياً
+              <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+                <CircleCheck size={13} strokeWidth={2} /> سيتم إنشاء {preview.length} حصة في قاعدة البيانات وسيُرسل إشعار للطالب تلقائياً
               </p>
             </div>
           </div>
@@ -733,7 +737,7 @@ function ScheduleRulesView({ rules, isLoading, onRefresh }) {
   if (!rules.length) return (
     <div className="rounded-2xl p-16 text-center"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-      <div className="text-4xl mb-3">🗓️</div>
+      <CalendarDays size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
       <p className="text-white font-semibold mb-1">لا توجد جداول دورية</p>
       <p className="text-sm" style={{ color: '#b3a4d0' }}>أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
     </div>
@@ -941,7 +945,7 @@ export default function TeacherSessionsPage() {
           ) : sessions.length === 0 ? (
             <div className="rounded-2xl p-14 text-center"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <div className="text-4xl mb-3">📅</div>
+              <Calendar size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
               <p className="text-white font-semibold mb-1">لا توجد حصص هذا الشهر</p>
               <p className="text-sm mb-4" style={{ color: '#b3a4d0' }}>أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
               <Button size="sm" variant="gold" onClick={() => setShowWizard(true)}>إنشاء جدول دوري</Button>

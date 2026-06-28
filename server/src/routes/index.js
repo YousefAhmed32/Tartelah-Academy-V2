@@ -19,5 +19,6 @@ router.use('/website', require('./website.routes'))
 router.use('/ai', require('./ai.routes'))
 router.use('/enrollments', require('./enrollment.routes'))
 router.use('/schedule-rules', require('./scheduleRule.routes'))
+router.use('/articles', require('./article.routes'))
 
 module.exports = router

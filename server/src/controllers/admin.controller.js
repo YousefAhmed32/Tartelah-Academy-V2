@@ -2,10 +2,20 @@ const User = require('../models/User')
 const Session = require('../models/Session')
 const Subscription = require('../models/Subscription')
 const Evaluation = require('../models/Evaluation')
+const Attendance = require('../models/Attendance')
+const Homework = require('../models/Homework')
+const Memorization = require('../models/Memorization')
+const Revision = require('../models/Revision')
 const EnrollmentRequest = require('../models/EnrollmentRequest')
 const ScheduleRule = require('../models/ScheduleRule')
-const { sendSuccess, sendPaginated } = require('../utils/response')
+const Notification = require('../models/Notification')
+const { createNotification } = require('../services/notification.service')
+const { logAction } = require('../services/audit.service')
+const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
+const crypto = require('crypto')
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
 
 exports.getDashboardStats = async (req, res, next) => {
   try {
@@ -32,7 +42,6 @@ exports.getDashboardStats = async (req, res, next) => {
       { $group: { _id: null, total: { $sum: '$amountPaid' }, thisMonth: { $sum: { $cond: [{ $gte: ['$createdAt', monthStart] }, '$amountPaid', 0] } } } }
     ])
 
-    // Students with active subscriptions but no schedule rule (not yet scheduled)
     const activeSubStudentIds = await Subscription.distinct('studentId', { status: 'active' })
     const scheduledStudentIds = await ScheduleRule.distinct('studentId', { status: 'active' })
     const unscheduledCount = activeSubStudentIds.filter(
@@ -40,94 +49,17 @@ exports.getDashboardStats = async (req, res, next) => {
     ).length
 
     sendSuccess(res, {
-      totalStudents,
-      totalTeachers,
-      activeSubscriptions,
-      pendingEnrollments,
+      totalStudents, totalTeachers, activeSubscriptions, pendingEnrollments,
       unscheduledStudents: unscheduledCount,
       totalRevenue: revenue[0]?.total || 0,
       totalSessions: sessionStats[0]?.total || 0,
       sessionsToday: sessionStats[0]?.todayCount || 0,
-      recentRegistrations,
-      upcomingSessions,
+      recentRegistrations, upcomingSessions,
     })
-  } catch (err) {
-    next(err)
-  }
+  } catch (err) { next(err) }
 }
 
-exports.getStudents = async (req, res, next) => {
-  try {
-    const { page, limit, skip } = getPagination(req.query)
-    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
-    const filter = { role: 'student', ...searchFilter }
-    const [data, total] = await Promise.all([
-      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-password -refreshToken'),
-      User.countDocuments(filter),
-    ])
-    sendPaginated(res, data, total, page, limit)
-  } catch (err) {
-    next(err)
-  }
-}
-
-exports.updateStudent = async (req, res, next) => {
-  try {
-    const user = await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select('-password')
-    sendSuccess(res, user, 'تم تحديث الطالب')
-  } catch (err) {
-    next(err)
-  }
-}
-
-exports.getTeachers = async (req, res, next) => {
-  try {
-    const { page, limit, skip } = getPagination(req.query)
-    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
-    const filter = { role: 'teacher', ...searchFilter }
-    const [data, total] = await Promise.all([
-      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-password -refreshToken'),
-      User.countDocuments(filter),
-    ])
-    sendPaginated(res, data, total, page, limit)
-  } catch (err) {
-    next(err)
-  }
-}
-
-exports.createTeacher = async (req, res, next) => {
-  try {
-    const user = await User.create({ ...req.body, role: 'teacher' })
-    sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
-  } catch (err) {
-    next(err)
-  }
-}
-
-exports.updateTeacher = async (req, res, next) => {
-  try {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select('-password')
-    sendSuccess(res, user, 'تم تحديث المعلم')
-  } catch (err) {
-    next(err)
-  }
-}
-
-exports.getAllSessions = async (req, res, next) => {
-  try {
-    const { page, limit, skip } = getPagination(req.query)
-    const filter = {}
-    if (req.query.status) filter.status = req.query.status
-    const [data, total] = await Promise.all([
-      Session.find(filter).sort({ scheduledAt: -1 }).skip(skip).limit(limit)
-        .populate('studentId teacherId', 'firstNameAr lastNameAr'),
-      Session.countDocuments(filter),
-    ])
-    sendPaginated(res, data, total, page, limit)
-  } catch (err) {
-    next(err)
-  }
-}
+// ── Reports ──────────────────────────────────────────────────────────────────
 
 exports.getReports = async (req, res, next) => {
   try {
@@ -135,7 +67,7 @@ exports.getReports = async (req, res, next) => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 
-    const [thisMonthRev, lastMonthRev, totalRev, totalSessions, thisMonthSessions, totalStudents, activeStudents, newStudents, completedSessions, totalSessionsCount] = await Promise.all([
+    const [thisMonthRev, lastMonthRev, totalRev, totalSessions, thisMonthSessions, totalStudents, activeStudents, newStudents, completedSessions, totalSessionsCount, totalAttendance, presentAttendance] = await Promise.all([
       Subscription.aggregate([{ $match: { createdAt: { $gte: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
       Subscription.aggregate([{ $match: { createdAt: { $gte: lastMonthStart, $lt: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
       Subscription.aggregate([{ $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
@@ -146,17 +78,28 @@ exports.getReports = async (req, res, next) => {
       User.countDocuments({ role: 'student', createdAt: { $gte: monthStart } }),
       Session.countDocuments({ status: 'completed' }),
       Session.countDocuments(),
+      Attendance.countDocuments(),
+      Attendance.countDocuments({ status: 'present' }),
     ])
 
     const thisM = thisMonthRev[0]?.sum || 0
     const lastM = lastMonthRev[0]?.sum || 0
     const growth = lastM > 0 ? Math.round(((thisM - lastM) / lastM) * 100) : 0
+    const attendanceRate = totalAttendance > 0 ? Math.round((presentAttendance / totalAttendance) * 100) : 0
 
     const topTeachers = await User.aggregate([
       { $match: { role: 'teacher', isActive: true } },
       { $lookup: { from: 'subscriptions', localField: '_id', foreignField: 'teacherId', as: 'subs' } },
       { $lookup: { from: 'sessions', localField: '_id', foreignField: 'teacherId', as: 'sessions' } },
-      { $project: { firstNameAr: 1, lastNameAr: 1, studentCount: { $size: '$subs' }, sessionCount: { $size: '$sessions' } } },
+      { $lookup: { from: 'evaluations', localField: '_id', foreignField: 'teacherId', as: 'evals' } },
+      {
+        $project: {
+          firstNameAr: 1, lastNameAr: 1,
+          studentCount: { $size: '$subs' },
+          sessionCount: { $size: '$sessions' },
+          avgEvaluation: { $avg: '$evals.score' },
+        }
+      },
       { $sort: { sessionCount: -1 } },
       { $limit: 5 },
     ])
@@ -165,9 +108,308 @@ exports.getReports = async (req, res, next) => {
       revenue: { total: totalRev[0]?.sum || 0, thisMonth: thisM, lastMonth: lastM, growth },
       sessions: { total: totalSessions, thisMonth: thisMonthSessions, completionRate: totalSessionsCount > 0 ? Math.round((completedSessions / totalSessionsCount) * 100) : 0 },
       students: { total: totalStudents, active: activeStudents, new: newStudents },
+      attendance: { rate: attendanceRate },
       topTeachers,
     })
-  } catch (err) {
-    next(err)
-  }
+  } catch (err) { next(err) }
+}
+
+// ── Students ─────────────────────────────────────────────────────────────────
+
+exports.getStudents = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query)
+    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
+    const filter = { role: 'student', ...searchFilter }
+    if (req.query.status === 'active') filter.isActive = true
+    if (req.query.status === 'inactive') filter.isActive = false
+    const [data, total] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-password -refreshToken'),
+      User.countDocuments(filter),
+    ])
+    sendPaginated(res, data, total, page, limit)
+  } catch (err) { next(err) }
+}
+
+exports.getStudent = async (req, res, next) => {
+  try {
+    const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-password -refreshToken')
+    if (!student) return sendError(res, 'الطالب غير موجود', 404)
+
+    const [subscription, sessions, evaluations, enrollmentRequests] = await Promise.all([
+      Subscription.findOne({ studentId: req.params.id, status: 'active' })
+        .populate('packageId', 'nameAr price sessionsPerMonth')
+        .populate('teacherId', 'firstNameAr lastNameAr avatar'),
+      Session.find({ studentId: req.params.id }).sort({ scheduledAt: -1 }).limit(10)
+        .populate('teacherId', 'firstNameAr lastNameAr'),
+      Evaluation.find({ studentId: req.params.id }).sort({ createdAt: -1 }).limit(5)
+        .populate('teacherId', 'firstNameAr lastNameAr'),
+      EnrollmentRequest.find({ studentId: req.params.id }).sort({ createdAt: -1 })
+        .populate('packageId', 'nameAr price'),
+    ])
+
+    sendSuccess(res, { student, subscription, recentSessions: sessions, recentEvaluations: evaluations, enrollmentRequests })
+  } catch (err) { next(err) }
+}
+
+exports.updateStudent = async (req, res, next) => {
+  try {
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'student' },
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password -refreshToken')
+    if (!user) return sendError(res, 'الطالب غير موجود', 404)
+    logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'update_student', entity: 'User', entityId: user._id, changes: updates, ip: req.ip })
+    sendSuccess(res, user, 'تم تحديث بيانات الطالب')
+  } catch (err) { next(err) }
+}
+
+exports.deleteStudent = async (req, res, next) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'student' },
+      { isActive: false },
+      { new: true }
+    )
+    if (!user) return sendError(res, 'الطالب غير موجود', 404)
+    logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'deactivate_student', entity: 'User', entityId: user._id, ip: req.ip })
+    sendSuccess(res, null, 'تم إيقاف حساب الطالب')
+  } catch (err) { next(err) }
+}
+
+// ── Teachers ─────────────────────────────────────────────────────────────────
+
+exports.getTeachers = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query)
+    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
+    const filter = { role: 'teacher', ...searchFilter }
+    if (req.query.status === 'active') filter.isActive = true
+    if (req.query.status === 'inactive') filter.isActive = false
+
+    // Aggregate teacher stats with student/session counts
+    const pipeline = [
+      { $match: filter },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      { $lookup: { from: 'subscriptions', localField: '_id', foreignField: 'teacherId', as: 'subs' } },
+      { $lookup: { from: 'sessions', localField: '_id', foreignField: 'teacherId', as: 'sessionList' } },
+      {
+        $addFields: {
+          studentCount: { $size: '$subs' },
+          sessionCount: { $size: '$sessionList' },
+        }
+      },
+      {
+        $project: {
+          password: 0, refreshToken: 0, passwordResetToken: 0, passwordResetExpires: 0,
+          subs: 0, sessionList: 0,
+        }
+      },
+    ]
+    const [data, total] = await Promise.all([
+      User.aggregate(pipeline),
+      User.countDocuments(filter),
+    ])
+    sendPaginated(res, data, total, page, limit)
+  } catch (err) { next(err) }
+}
+
+exports.getTeacher = async (req, res, next) => {
+  try {
+    const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-password -refreshToken')
+    if (!teacher) return sendError(res, 'المعلم غير موجود', 404)
+
+    const [students, sessions, scheduleRules] = await Promise.all([
+      Subscription.find({ teacherId: req.params.id, status: 'active' })
+        .populate('studentId', 'firstNameAr lastNameAr avatar email phone'),
+      Session.find({ teacherId: req.params.id }).sort({ scheduledAt: -1 }).limit(10)
+        .populate('studentId', 'firstNameAr lastNameAr'),
+      ScheduleRule.find({ teacherId: req.params.id, status: 'active' })
+        .populate('studentId', 'firstNameAr lastNameAr avatar'),
+    ])
+
+    sendSuccess(res, { teacher, students, recentSessions: sessions, scheduleRules })
+  } catch (err) { next(err) }
+}
+
+exports.createTeacher = async (req, res, next) => {
+  try {
+    const existing = await User.findOne({ email: req.body.email })
+    if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
+    const user = await User.create({ ...req.body, role: 'teacher' })
+    sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
+  } catch (err) { next(err) }
+}
+
+exports.updateTeacher = async (req, res, next) => {
+  try {
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'teacher' },
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password -refreshToken')
+    if (!user) return sendError(res, 'المعلم غير موجود', 404)
+    sendSuccess(res, user, 'تم تحديث بيانات المعلم')
+  } catch (err) { next(err) }
+}
+
+// ── Password Reset (admin-initiated) ─────────────────────────────────────────
+
+exports.adminResetPassword = async (req, res, next) => {
+  try {
+    const { newPassword } = req.body
+    if (!newPassword || newPassword.length < 8) return sendError(res, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل', 400)
+    const user = await User.findById(req.params.id).select('+password')
+    if (!user) return sendError(res, 'المستخدم غير موجود', 404)
+    user.password = newPassword
+    user.passwordResetToken = undefined
+    user.passwordResetExpires = undefined
+    await user.save()
+    await createNotification({
+      userId: user._id,
+      titleAr: 'تم إعادة تعيين كلمة المرور',
+      bodyAr: 'قام المسؤول بإعادة تعيين كلمة مرورك. يرجى تسجيل الدخول بالكلمة الجديدة.',
+      type: 'system', priority: 'high',
+    })
+    sendSuccess(res, null, 'تم إعادة تعيين كلمة المرور')
+  } catch (err) { next(err) }
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+
+exports.getAllSessions = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query)
+    const filter = {}
+    if (req.query.status) filter.status = req.query.status
+    if (req.query.teacherId) filter.teacherId = req.query.teacherId
+    if (req.query.studentId) filter.studentId = req.query.studentId
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.scheduledAt = {}
+      if (req.query.dateFrom) filter.scheduledAt.$gte = new Date(req.query.dateFrom)
+      if (req.query.dateTo) filter.scheduledAt.$lte = new Date(req.query.dateTo)
+    }
+    const [data, total] = await Promise.all([
+      Session.find(filter).sort({ scheduledAt: -1 }).skip(skip).limit(limit)
+        .populate('studentId teacherId', 'firstNameAr lastNameAr avatar'),
+      Session.countDocuments(filter),
+    ])
+    sendPaginated(res, data, total, page, limit)
+  } catch (err) { next(err) }
+}
+
+// ── Academic Override ─────────────────────────────────────────────────────────
+
+exports.getStudentAcademics = async (req, res, next) => {
+  try {
+    const studentId = req.params.studentId
+    const [evaluations, attendance, homework, memorization, revision] = await Promise.all([
+      Evaluation.find({ studentId }).sort({ createdAt: -1 }).populate('teacherId', 'firstNameAr lastNameAr'),
+      Attendance.find({ studentId }).sort({ createdAt: -1 }).populate('sessionId', 'titleAr scheduledAt'),
+      Homework.find({ assignedTo: studentId }).sort({ dueDate: -1 }),
+      Memorization.find({ studentId }).sort({ createdAt: -1 }).limit(20),
+      Revision.find({ studentId }).sort({ createdAt: -1 }).limit(20),
+    ])
+    sendSuccess(res, { evaluations, attendance, homework, memorization, revision })
+  } catch (err) { next(err) }
+}
+
+exports.updateEvaluation = async (req, res, next) => {
+  try {
+    const allowed = ['score', 'notesAr', 'strengths', 'improvements', 'type', 'isSharedWithStudent']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const ev = await Evaluation.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
+      .populate('studentId teacherId', 'firstNameAr lastNameAr')
+    if (!ev) return sendError(res, 'التقييم غير موجود', 404)
+    sendSuccess(res, ev, 'تم تحديث التقييم')
+  } catch (err) { next(err) }
+}
+
+exports.deleteEvaluation = async (req, res, next) => {
+  try {
+    const ev = await Evaluation.findByIdAndDelete(req.params.id)
+    if (!ev) return sendError(res, 'التقييم غير موجود', 404)
+    sendSuccess(res, null, 'تم حذف التقييم')
+  } catch (err) { next(err) }
+}
+
+exports.updateAttendanceRecord = async (req, res, next) => {
+  try {
+    const allowed = ['status', 'notes']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const att = await Attendance.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate('studentId', 'firstNameAr lastNameAr')
+      .populate('sessionId', 'titleAr scheduledAt')
+    if (!att) return sendError(res, 'سجل الحضور غير موجود', 404)
+    sendSuccess(res, att, 'تم تحديث سجل الحضور')
+  } catch (err) { next(err) }
+}
+
+exports.updateHomework = async (req, res, next) => {
+  try {
+    const allowed = ['titleAr', 'descriptionAr', 'dueDate', 'status']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const hw = await Homework.findByIdAndUpdate(req.params.id, updates, { new: true })
+    if (!hw) return sendError(res, 'الواجب غير موجود', 404)
+    sendSuccess(res, hw, 'تم تحديث الواجب')
+  } catch (err) { next(err) }
+}
+
+// ── Individual Notification ───────────────────────────────────────────────────
+
+exports.sendIndividualNotification = async (req, res, next) => {
+  try {
+    const { userId, titleAr, bodyAr, type, priority } = req.body
+    if (!userId || !titleAr) return sendError(res, 'معرف المستخدم والعنوان مطلوبان', 400)
+    const user = await User.findById(userId)
+    if (!user) return sendError(res, 'المستخدم غير موجود', 404)
+    await createNotification({
+      userId, titleAr, bodyAr,
+      type: type || 'system',
+      priority: priority || 'medium',
+    })
+    sendSuccess(res, null, 'تم إرسال الإشعار')
+  } catch (err) { next(err) }
+}
+
+// ── Schedule Rules Overview ───────────────────────────────────────────────────
+
+exports.getAllScheduleRules = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query)
+    const filter = {}
+    if (req.query.teacherId) filter.teacherId = req.query.teacherId
+    if (req.query.status) filter.status = req.query.status
+    const [data, total] = await Promise.all([
+      ScheduleRule.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+        .populate('teacherId', 'firstNameAr lastNameAr avatar')
+        .populate('studentId', 'firstNameAr lastNameAr avatar'),
+      ScheduleRule.countDocuments(filter),
+    ])
+    sendPaginated(res, data, total, page, limit)
+  } catch (err) { next(err) }
+}
+
+exports.updateScheduleRule = async (req, res, next) => {
+  try {
+    const allowed = ['status', 'meetingLink', 'meetingProvider', 'endDate', 'sessionsTotal', 'notes']
+    const updates = {}
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    const rule = await ScheduleRule.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate('teacherId studentId', 'firstNameAr lastNameAr')
+    if (!rule) return sendError(res, 'القاعدة غير موجودة', 404)
+    sendSuccess(res, rule, 'تم تحديث الجدول الدوري')
+  } catch (err) { next(err) }
 }

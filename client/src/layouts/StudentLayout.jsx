@@ -6,6 +6,8 @@ import { useAuthStore } from '../store/authStore.js'
 import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
 import Avatar from '../components/ui/Avatar.jsx'
+import NotificationBell from '../components/ui/NotificationBell.jsx'
+import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import { ROUTES, ROLES } from '../config/constants.js'
 import api from '../utils/api.js'
 
@@ -69,6 +71,7 @@ export default function StudentLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  useNotificationInit()
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', 'me'],
@@ -266,14 +269,7 @@ export default function StudentLayout() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <NavLink to={ROUTES.STUDENT_NOTIFICATIONS} className="hdric relative">
-              <BellIcon />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -end-1 w-[18px] h-[18px] rounded-full bg-brand-purple text-white text-[9px] font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </NavLink>
+            <NotificationBell theme="light" viewAllPath={ROUTES.STUDENT_NOTIFICATIONS} />
             <NavLink to={ROUTES.STUDENT_SETTINGS}>
               <Avatar
                 src={user?.avatar}

@@ -7,5 +7,7 @@ router.use(authenticate)
 router.get('/student/me', authorize('student'), ctrl.getStudentEvaluations)
 router.get('/teacher', isAdminOrTeacher, ctrl.getTeacherEvaluations)
 router.post('/', isAdminOrTeacher, ctrl.create)
+router.patch('/:id', isAdminOrTeacher, ctrl.updateEvaluation)
+router.delete('/:id', isAdminOrTeacher, ctrl.deleteEvaluation)
 
 module.exports = router

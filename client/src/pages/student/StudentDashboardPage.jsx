@@ -8,6 +8,7 @@ import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, ROUTES } from '../../config/constants.js'
+// greeting uses no emoji — wave removed
 
 // ── Ayah rotation (by day of week) ────────────────────────────────────────
 const AYAT = [
@@ -105,7 +106,7 @@ export default function StudentDashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="font-heading font-extrabold text-[28px] lg:text-[32px] text-brand-textBody leading-tight">
-              أهلاً، {user?.firstNameAr || user?.firstName} 👋
+              أهلاً، {user?.firstNameAr || user?.firstName}
             </h1>
             <p className="text-[#9b7fd6] mt-1 text-[15px]">{getArabicDate()}</p>
           </div>

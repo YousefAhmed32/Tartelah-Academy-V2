@@ -1,7 +1,8 @@
 const router = require('express').Router()
-const { ask } = require('../controllers/ai.controller')
+const ctrl = require('../controllers/ai.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 
-router.post('/ask', authenticate, ask)
+router.post('/ask', authenticate, ctrl.ask)
+router.get('/status', authenticate, ctrl.getStatus)
 
 module.exports = router

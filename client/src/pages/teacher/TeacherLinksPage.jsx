@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Link2, Video, MonitorPlay, Briefcase } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -53,7 +54,7 @@ export default function TeacherLinksPage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
       ) : !links.length ? (
         <div className="rounded-card p-12 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="text-5xl mb-4">🔗</div>
+          <Link2 size={52} strokeWidth={1.3} color="#b3a4d0" className="mb-4 mx-auto" />
           <p className="text-white font-heading font-bold text-lg mb-2">لا توجد روابط محفوظة</p>
           <p style={{ color: '#b3a4d0' }} className="text-sm">أضف روابط الاجتماع الخاصة بك للاستخدام السريع</p>
         </div>
@@ -64,7 +65,7 @@ export default function TeacherLinksPage() {
             return (
               <div key={link._id} className="rounded-card p-5 flex items-center gap-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-none" style={{ background: `${provider?.color || '#7c3aed'}20` }}>
-                  {link.provider === 'zoom' ? '🎥' : link.provider === 'meet' ? '📹' : link.provider === 'teams' ? '💼' : '🔗'}
+                  {link.provider === 'zoom' ? <Video size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'meet' ? <MonitorPlay size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'teams' ? <Briefcase size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : <Link2 size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-white font-semibold">{link.label || provider?.label}</div>

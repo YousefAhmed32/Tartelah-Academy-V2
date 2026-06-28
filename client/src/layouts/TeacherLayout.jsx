@@ -5,6 +5,8 @@ import { useAuthStore } from '../store/authStore.js'
 import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
 import Avatar from '../components/ui/Avatar.jsx'
+import NotificationBell from '../components/ui/NotificationBell.jsx'
+import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import { ROUTES, ROLES } from '../config/constants.js'
 
 const NAV_GROUPS = [
@@ -78,6 +80,7 @@ export default function TeacherLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  useNotificationInit()
 
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
   if (getRole() !== ROLES.TEACHER) return <Navigate to="/" replace />
@@ -233,21 +236,7 @@ export default function TeacherLayout() {
 
           {/* Header Right: Notifications + Avatar */}
           <div className="flex items-center gap-3">
-            <NavLink
-              to={ROUTES.TEACHER_NOTIFICATIONS}
-              className="relative w-10 h-10 rounded-xl flex items-center justify-center border text-[#cdbef0] hover:bg-white/5 transition-colors"
-              style={{ borderColor: 'rgba(150,120,220,0.18)' }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.7"/>
-                <path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -end-1 w-4 h-4 rounded-full bg-brand-purple text-white text-[9px] font-bold flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </NavLink>
+            <NotificationBell theme="dark" viewAllPath={ROUTES.TEACHER_NOTIFICATIONS} />
             <Avatar
               src={user?.avatar}
               firstName={user?.firstNameAr || user?.firstName}
