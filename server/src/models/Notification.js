@@ -6,7 +6,7 @@ const NotificationSchema = new mongoose.Schema({
   title:     { type: String },
   bodyAr:    { type: String },
   body:      { type: String },
-  type:      { type: String, enum: ['session', 'homework', 'evaluation', 'subscription', 'enrollment', 'payment', 'schedule', 'system'], default: 'system' },
+  type:      { type: String, enum: ['session', 'homework', 'evaluation', 'subscription', 'enrollment', 'payment', 'schedule', 'system', 'attendance'], default: 'system' },
   priority:  { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
   isRead:    { type: Boolean, default: false },
   readAt:    { type: Date },

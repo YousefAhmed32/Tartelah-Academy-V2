@@ -1,11 +1,34 @@
 # Project Status — Tartelah Online
 
-**Last Updated:** 2026-06-28  
-**Current Phase:** PRODUCTION READY — Full Educational Operating System + Articles CMS + **Courses Management System**  
-**Overall Progress:** 100% (Core) + Scheduling Engine + Articles CMS + **Enterprise Courses Module**
-**Frontend Build:** ✅ Zero errors (9.27s, 229 features tracked)  
-**Backend:** ✅ All endpoints verified + scheduling engine + articles API + courses enterprise API  
-**Database:** ✅ MongoDB with ScheduleRule + Session Series + Article + ArticleCategory + **Course (expanded)**
+**Last Updated:** 2026-07-02  
+**Current Phase:** PRODUCTION READY — Full Educational Operating System + Articles CMS + Courses Management System + **Success Stories Homepage Section** + **Teacher Dashboard Light-Theme Redesign**  
+**Overall Progress:** 100% (Core) + Scheduling Engine + Articles CMS + Enterprise Courses Module + **Success Stories CMS**
+**Frontend Build:** ✅ Zero errors  
+**Backend:** ✅ All endpoints verified + scheduling engine + articles API + courses enterprise API + **success-stories API**  
+**Database:** ✅ MongoDB with ScheduleRule + Session Series + Article + ArticleCategory + Course (expanded) + **SuccessStory (singleton)**
+
+---
+
+## Teacher Dashboard Light-Theme Redesign (2026-07-02)
+
+The Teacher Dashboard (all 11 pages + layout chrome) was redesigned from a full dark-purple theme to a light SaaS theme (`#F8FAFC` background, white cards, violet/gray Tailwind palette) matching the Admin Dashboard's established visual language. The dark purple **sidebar** (brand identity/logo) was intentionally kept unchanged. Admin and Student dashboards were not touched. Full details in `SESSION_HANDOFF.md` → "Teacher Dashboard Redesign (2026-07-02, earlier session)".
+
+**Follow-up stability pass (same day, later):** fixed a root-cause `Suspense` boundary bug that unmounted the whole Teacher layout (blank white page) on every in-app navigation, added an `ErrorBoundary` + `ErrorState` pair so render/query errors show a retry panel instead of crashing the app, and normalized every list-returning teacher query against non-array responses. See `SESSION_HANDOFF.md` → "Teacher Dashboard Stability Fixes (2026-07-02, latest session)".
+
+---
+
+## Success Stories Homepage Section (2026-07-02) — New Capability
+
+Admin-managed homepage section ("قصص النجاح") spotlighting the best teacher, best student, and best achievement — with two mutually-exclusive display modes: three premium cards, or a single hero banner. Full details in `FEATURE_TRACKER.md`.
+
+Key additions:
+- **`SuccessStory` model** (singleton, like `AcademySettings`) — `displayMode`, `isActive`, `cards[]` (fixed roles: teacher/student/achievement), `banner`
+- **`/api/v1/success-stories`** — public GET (returns `null` if inactive) + admin CRUD + per-slot image upload/remove
+- **`ImageCropModal` + `ImageUploadField`** (`client/src/components/ui/`) — new reusable, project-wide image upload primitives (drag&drop, `react-easy-crop`-based crop, client-side canvas compression to JPEG q0.82 / max 1600px, preview, replace, remove). Intended for reuse in future upload flows beyond this feature.
+- **`AdminSuccessStoriesPage`** (`/admin/success-stories`, nav under "المحتوى") — light theme (matches CRM admin pages, not the dark CMS-form style), mode switcher, per-card/banner editors, live preview panel
+- **`SuccessStoriesSection`** (`client/src/components/home/`) — inserted into `HomePage.jsx` right after the Teachers section, before Testimonials. Renders nothing if the section is inactive or has no usable content for the active mode.
+
+Verified end-to-end via curl (full CRUD, auth guards, role validation, static file serving) and via a headless-browser pass (Playwright) confirming the homepage section and both admin display modes render with no console errors.
 
 ---
 

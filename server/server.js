@@ -18,7 +18,7 @@ const httpServer = http.createServer(app)
 const PORT = process.env.PORT || 5000
 
 // Ensure upload directories exist
-;['uploads/avatars', 'uploads/payment-proofs', 'uploads/homework', 'uploads/articles', 'uploads/courses'].forEach(dir => {
+;['uploads/avatars', 'uploads/payment-proofs', 'uploads/homework', 'uploads/articles', 'uploads/courses', 'uploads/success-stories'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 })
 
@@ -27,8 +27,10 @@ connectDB().then(() => {
   if (process.env.NODE_ENV !== 'test') {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')
+    const { startTeacherAttendanceSweepJob } = require('./src/jobs/teacherAttendanceSweep.job')
     startSessionReminderJob()
     startSubscriptionExpiryJob()
+    startTeacherAttendanceSweepJob()
   }
   if (process.env.NODE_ENV !== 'production') {
     const { ensureDevAccounts } = require('./src/seed/devSeed')

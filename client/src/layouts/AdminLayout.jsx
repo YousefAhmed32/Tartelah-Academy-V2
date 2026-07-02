@@ -78,6 +78,10 @@ const NAV_GROUPS = [
         to: ROUTES.ADMIN_WEBSITE, label: 'إدارة الموقع',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/><path d="M3 12h18M12 3c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10Z" stroke="currentColor" strokeWidth="1.8"/></svg>
       },
+      {
+        to: ROUTES.ADMIN_SUCCESS_STORIES, label: 'قصص النجاح',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l3.09 6.26L22 9.77l-5 4.87 1.18 6.88L12 18.27l-6.18 3.25L7 14.64l-5-4.87 6.91-1.01L12 2.5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
+      },
     ]
   },
   {
@@ -86,6 +90,10 @@ const NAV_GROUPS = [
       {
         to: ROUTES.ADMIN_REPORTS, label: 'التقارير والإحصائيات',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
+        to: ROUTES.ADMIN_TEACHER_PERFORMANCE, label: 'أداء المعلمين',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9 8.5 11 10.5 15.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
         to: ROUTES.ADMIN_NOTIFICATIONS, label: 'الإشعارات', notification: true,
@@ -107,8 +115,8 @@ const MOBILE_NAV = [
   NAV_GROUPS[0].items[0],  // Dashboard
   NAV_GROUPS[0].items[1],  // Enrollments
   NAV_GROUPS[1].items[0],  // Students
-  NAV_GROUPS[3].items[0],  // Articles (new)
-  NAV_GROUPS[4].items[1],  // Notifications (التقارير group is now index 4)
+  NAV_GROUPS[3].items[0],  // Articles
+  NAV_GROUPS[4].items[2],  // Notifications (شفت index بعد إضافة أداء المعلمين)
 ]
 
 function navLinkClass({ isActive }) {

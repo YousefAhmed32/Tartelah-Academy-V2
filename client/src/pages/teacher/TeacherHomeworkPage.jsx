@@ -9,11 +9,11 @@ import Modal from '../../components/ui/Modal.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
-import Avatar from '../../components/ui/Avatar.jsx'
+import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { toArray } from '../../utils/format.js'
 
 const LABEL = 'block text-sm font-semibold text-brand-textBody mb-1.5'
-const inputCls = 'w-full h-10 bg-white/10 border border-white/20 rounded-xl px-3.5 text-sm text-white outline-none focus:border-brand-gold/60 focus:bg-white/15 transition-all placeholder:text-white/40'
 
 // ── Grade Submissions Modal ───────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ function GradeSubmissionsModal({ hw, students, onClose }) {
 
   return (
     <Modal open onClose={onClose} title={`تصحيح: ${hw.titleAr}`} size="md"
-      footer={<Button variant="ghost" onClick={onClose}>إغلاق</Button>}>
+      footer={<Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إغلاق</Button>}>
       <div className="space-y-4" dir="rtl">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
@@ -152,14 +152,14 @@ export default function TeacherHomeworkPage() {
   const [form, setForm] = useState({ titleAr: '', descriptionAr: '', dueDate: '', assignedTo: [] })
   const qc = useQueryClient()
 
-  const { data: homework = [], isLoading } = useQuery({
+  const { data: homework = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['homework', 'teacher'],
-    queryFn: () => api.get('/homework/teacher').then(r => r.data.data),
+    queryFn: () => api.get('/homework/teacher').then(r => toArray(r.data?.data)),
   })
 
   const { data: students = [] } = useQuery({
     queryKey: ['teacher', 'students'],
-    queryFn: () => api.get('/teachers/me/students').then(r => r.data.data),
+    queryFn: () => api.get('/teachers/me/students').then(r => toArray(r.data?.data)),
   })
 
   const createMutation = useMutation({
@@ -188,17 +188,18 @@ export default function TeacherHomeworkPage() {
       <PageHeader
         title="الواجبات"
         subtitle={`${homework.length} واجب`}
-        actions={<Button variant="gold" onClick={() => setShowModal(true)}>+ واجب جديد</Button>}
+        actions={<Button variant="purple" onClick={() => setShowModal(true)}>+ واجب جديد</Button>}
       />
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
+        <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
+      ) : isError ? (
+        <ErrorState onRetry={refetch} isRetrying={isFetching} />
       ) : !homework.length ? (
         <EmptyState
           title="لا توجد واجبات"
           description="عيّن واجبات لمتابعة تقدم طلابك"
           action={{ label: '+ واجب جديد', onClick: () => setShowModal(true) }}
-          dark
         />
       ) : (
         <div className="space-y-3">
@@ -210,18 +211,17 @@ export default function TeacherHomeworkPage() {
             return (
               <div
                 key={hw._id}
-                className="rounded-card p-5 flex items-start justify-between gap-4 flex-wrap"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                className="rounded-2xl p-5 flex items-start justify-between gap-4 flex-wrap bg-white border border-gray-100 shadow-sm"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-white font-heading font-bold">{hw.titleAr}</div>
+                  <div className="text-gray-900 font-heading font-bold">{hw.titleAr}</div>
                   {hw.descriptionAr && (
-                    <p className="text-sm mt-1 line-clamp-2" style={{ color: '#b3a4d0' }}>{hw.descriptionAr}</p>
+                    <p className="text-sm mt-1 line-clamp-2 text-gray-500">{hw.descriptionAr}</p>
                   )}
-                  <div className="text-xs mt-2 flex items-center gap-4 flex-wrap" style={{ color: '#b3a4d0' }}>
+                  <div className="text-xs mt-2 flex items-center gap-4 flex-wrap text-gray-500">
                     <span className="flex items-center gap-1">
                       <Clock size={11} />
-                      التسليم: <span className={isOverdue ? 'text-red-400' : ''}>{formatDateAr(hw.dueDate)}</span>
+                      التسليم: <span className={isOverdue ? 'text-red-500 font-semibold' : ''}>{formatDateAr(hw.dueDate)}</span>
                     </span>
                     <span className="flex items-center gap-1">
                       <Users size={11} /> {assignedCount} طالب
@@ -231,19 +231,19 @@ export default function TeacherHomeworkPage() {
                       {submittedCount}/{assignedCount} سلّم
                     </span>
                     {ungradedCount > 0 && (
-                      <span className="text-amber-400 font-semibold">{ungradedCount} بانتظار التصحيح</span>
+                      <span className="text-amber-600 font-semibold">{ungradedCount} بانتظار التصحيح</span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-none">
                   {submittedCount > 0 && (
                     <button onClick={() => setGradeHw(hw)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:bg-amber-400/10 transition-colors border border-amber-400/30">
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors border border-amber-200">
                       <Star size={12} />
                       {ungradedCount > 0 ? `تصحيح (${ungradedCount})` : 'عرض التسليمات'}
                     </button>
                   )}
-                  <Badge variant={isOverdue ? 'danger' : hw.status === 'active' ? 'gold' : 'gray'}>
+                  <Badge variant={isOverdue ? 'danger' : hw.status === 'active' ? 'purple' : 'gray'}>
                     {isOverdue ? 'منتهية' : hw.status === 'active' ? 'نشط' : 'منتهٍ'}
                   </Badge>
                 </div>
@@ -259,8 +259,8 @@ export default function TeacherHomeworkPage() {
       {/* Create Modal */}
       <Modal open={showModal} onClose={() => setShowModal(false)} title="إنشاء واجب جديد" size="md"
         footer={<>
-          <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
-          <Button variant="gold" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending}
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={() => setShowModal(false)}>إلغاء</Button>
+          <Button variant="purple" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending}
             disabled={!form.titleAr || !form.dueDate || !form.assignedTo.length}>
             إنشاء الواجب
           </Button>

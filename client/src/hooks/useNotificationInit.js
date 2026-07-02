@@ -13,8 +13,8 @@ export function useNotificationInit() {
 
     // Fetch initial notifications + unread count
     api.get('/notifications?limit=30').then(r => {
-      const data = r.data.data
-      if (data?.notifications) {
+      const data = r.data?.data
+      if (Array.isArray(data?.notifications)) {
         setNotifications(data.notifications)
       }
     }).catch(() => {})

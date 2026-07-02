@@ -33,10 +33,10 @@
 |-----------|---------|--------|
 | `/images/logo.jpg` | Navbar (PublicLayout) + Footer | ✅ |
 | `/images/hero_bg.png` | Hero background | ✅ |
-| `/images/teacher1.png` | Teachers card 1 | ✅ |
-| `/images/teacher2.png` | Teachers card 2 | ✅ |
-| `/images/teacher3.png` | Teachers card 3 | ✅ |
-| `/images/teacher4.png` | Teachers card 4 | ✅ |
+| `/images/teacher-1.png` | Teachers card 1 | ✅ |
+| `/images/teacher-2.png` | Teachers card 2 | ✅ |
+| `/images/teacher-3.png` | Teachers card 3 | ✅ |
+| `/images/teacher-4.png` | Teachers card 4 | ✅ |
 | `/images/dashboard.png` | Platform section | ✅ |
 | `/images/story1.png` | Stories grid | ✅ |
 | `/images/story2.png` | Stories grid | ✅ |

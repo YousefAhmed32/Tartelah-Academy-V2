@@ -8,8 +8,9 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
+import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr } from '../../utils/date.js'
-import { scoreToGrade } from '../../utils/format.js'
+import { scoreToGrade, toArray } from '../../utils/format.js'
 
 const LABEL = 'block text-sm font-semibold text-brand-textBody mb-1.5'
 
@@ -33,14 +34,14 @@ export default function TeacherEvaluationsPage() {
   })
   const qc = useQueryClient()
 
-  const { data: evals = [], isLoading } = useQuery({
+  const { data: evals = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['evaluations', 'teacher'],
-    queryFn: () => api.get('/evaluations/teacher').then(r => r.data.data),
+    queryFn: () => api.get('/evaluations/teacher').then(r => toArray(r.data?.data)),
   })
 
   const { data: students = [] } = useQuery({
     queryKey: ['teacher', 'students'],
-    queryFn: () => api.get('/teachers/me/students').then(r => r.data.data),
+    queryFn: () => api.get('/teachers/me/students').then(r => toArray(r.data?.data)),
   })
 
   const createMutation = useMutation({
@@ -67,17 +68,18 @@ export default function TeacherEvaluationsPage() {
       <PageHeader
         title="التقييمات"
         subtitle={`${evals.length} تقييم`}
-        actions={<Button variant="gold" onClick={() => setShowModal(true)}>+ تقييم جديد</Button>}
+        actions={<Button variant="purple" onClick={() => setShowModal(true)}>+ تقييم جديد</Button>}
       />
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
+        <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
+      ) : isError ? (
+        <ErrorState onRetry={refetch} isRetrying={isFetching} />
       ) : !evals.length ? (
         <EmptyState
           title="لا توجد تقييمات"
           description="قيّم طلابك لمتابعة تقدمهم الدراسي"
           action={{ label: '+ تقييم جديد', onClick: () => setShowModal(true) }}
-          dark
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -87,21 +89,21 @@ export default function TeacherEvaluationsPage() {
             return (
               <div
                 key={ev._id}
-                className="rounded-card p-5"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                className="rounded-2xl p-5 bg-white border border-gray-100 shadow-sm"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar
                     src={ev.studentId?.avatar}
-                    name={`${ev.studentId?.firstNameAr} ${ev.studentId?.lastNameAr}`}
+                    firstName={ev.studentId?.firstNameAr}
+                    lastName={ev.studentId?.lastNameAr}
                     size="sm"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-semibold truncate">
+                    <div className="text-gray-900 font-semibold truncate">
                       {ev.studentId?.firstNameAr} {ev.studentId?.lastNameAr}
                     </div>
-                    <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: '#b3a4d0' }}>
-                      <span className="px-2 py-0.5 rounded-full text-[10px]" style={{ background: 'rgba(124,58,237,0.2)', color: '#c4b5fd' }}>
+                    <div className="text-xs mt-0.5 flex items-center gap-2 text-gray-500">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-violet-100 text-violet-700">
                         {typeLabel}
                       </span>
                       <span>{formatDateAr(ev.createdAt)}</span>
@@ -109,15 +111,15 @@ export default function TeacherEvaluationsPage() {
                   </div>
                   <div className="text-center flex-none">
                     <div className="font-heading font-extrabold text-2xl" style={{ color: grade.color }}>{ev.score}</div>
-                    <div className="text-[10px]" style={{ color: '#b3a4d0' }}>من ١٠</div>
+                    <div className="text-[10px] text-gray-400">من ١٠</div>
                   </div>
                 </div>
-                <div className="w-full h-1.5 rounded-full mb-1.5" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="w-full h-1.5 rounded-full mb-1.5 bg-gray-100">
                   <div className="h-1.5 rounded-full" style={{ width: `${ev.score * 10}%`, background: grade.color }} />
                 </div>
                 <div className="text-xs font-semibold" style={{ color: grade.color }}>{grade.label}</div>
                 {ev.notesAr && (
-                  <p className="text-sm mt-3 pt-3 line-clamp-2" style={{ color: '#b3a4d0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-sm mt-3 pt-3 line-clamp-2 text-gray-500 border-t border-gray-100">
                     {ev.notesAr}
                   </p>
                 )}
@@ -134,9 +136,9 @@ export default function TeacherEvaluationsPage() {
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
+            <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={() => setShowModal(false)}>إلغاء</Button>
             <Button
-              variant="gold"
+              variant="purple"
               onClick={() => createMutation.mutate(form)}
               loading={createMutation.isPending}
               disabled={!form.studentId}

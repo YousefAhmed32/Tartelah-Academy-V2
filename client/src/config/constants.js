@@ -50,6 +50,7 @@ export const ROUTES = {
   TEACHER_HOMEWORK: '/teacher/homework',
   TEACHER_PROGRESS: '/teacher/progress',
   TEACHER_LINKS: '/teacher/meeting-links',
+  TEACHER_PERFORMANCE: '/teacher/performance',
   TEACHER_NOTIFICATIONS: '/teacher/notifications',
   TEACHER_SETTINGS: '/teacher/settings',
 
@@ -87,6 +88,10 @@ export const ROUTES = {
   ADMIN_COURSE_EDIT: '/admin/courses/:id/edit',
 
   ADMIN_CONTACT_MESSAGES: '/admin/contact-messages',
+
+  ADMIN_SUCCESS_STORIES: '/admin/success-stories',
+
+  ADMIN_TEACHER_PERFORMANCE: '/admin/teacher-performance',
 }
 
 export const MEETING_PROVIDERS = {

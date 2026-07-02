@@ -25,6 +25,17 @@ const SessionSchema = new mongoose.Schema({
   isException: { type: Boolean, default: false },
   isMakeup: { type: Boolean, default: false },
   rescheduledFrom: { type: Date },
+
+  // Teacher attendance & performance tracking
+  teacherStartedAt: { type: Date },
+  teacherAttendanceStatus: {
+    type: String,
+    enum: ['pending', 'on_time', 'late', 'absent', 'excused'],
+    default: 'pending',
+  },
+  teacherAttendanceMarkedBy: { type: String, enum: ['system', 'admin'] },
+  teacherAttendanceNotes: { type: String },
+  teacherLateMinutes: { type: Number, default: 0 },
 }, { timestamps: true })
 
 SessionSchema.index({ studentId: 1, scheduledAt: -1 })
@@ -32,5 +43,6 @@ SessionSchema.index({ teacherId: 1, scheduledAt: -1 })
 SessionSchema.index({ scheduledAt: 1, status: 1 })
 SessionSchema.index({ status: 1, createdAt: -1 })
 SessionSchema.index({ seriesId: 1, scheduledAt: 1 })
+SessionSchema.index({ teacherId: 1, teacherAttendanceStatus: 1 })
 
 module.exports = mongoose.model('Session', SessionSchema)

@@ -204,6 +204,12 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | Meeting links CRUD | ✅ | GET/POST/DELETE /teachers/me/links |
 | Memorization/Revision CRUD | ✅ | POST /memorization + /revision |
 
+### UI Redesign — 2026-07-02
+| Task | Status | Notes |
+|------|--------|-------|
+| Light-theme redesign (all pages + layout chrome) | ✅ | Dark purple → light SaaS theme matching Admin's `bg-white/border-gray-100/shadow-sm` card language and violet/gray Tailwind palette. Sidebar branding kept dark purple by explicit request. |
+| Stability fixes (Suspense/ErrorBoundary + query safety) | ✅ | Root-caused blank-page-on-navigation to a mis-scoped `Suspense` boundary in `App.jsx`; scoped it to `TeacherLayout`'s `Outlet` + added `ErrorBoundary`. Added `toArray()` normalization + `isError`/retry UI to every list query across all 11 teacher pages and the shared `NotificationCenter`. |
+
 ---
 
 ## Phase 7 — Admin Dashboard
@@ -451,6 +457,36 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
 ---
 
+## Success Stories Homepage Section — 2026-07-02
+
+| Task | Status | Notes |
+|------|--------|-------|
+| SuccessStory model (singleton, fixed-role cards + banner) | ✅ | `server/src/models/SuccessStory.js` |
+| Upload middleware — success-story image storage | ✅ | `uploads/success-stories/`, 8MB limit |
+| successStory controller — public + admin CRUD | ✅ | getPublic, getAdmin, updateConfig, upload/remove card+banner image |
+| successStory routes — registered at `/success-stories` | ✅ | Public GET first, then admin-guarded routes |
+| ImageCropModal — reusable dark/gold crop modal (react-easy-crop) | ✅ | `client/src/components/ui/ImageCropModal.jsx`, canvas resize+JPEG compress |
+| ImageUploadField — reusable drag&drop/preview/replace/remove field | ✅ | `client/src/components/ui/ImageUploadField.jsx`, light/dark theme prop |
+| AdminSuccessStoriesPage — full CMS (mode switch, editors, live preview) | ✅ | `/admin/success-stories`, light theme matching CRM admin pages |
+| AdminLayout — "قصص النجاح" nav item under المحتوى | ✅ | |
+| SuccessStoriesSection — homepage section (cards or banner mode) | ✅ | `client/src/components/home/SuccessStoriesSection.jsx` |
+| HomePage.jsx — section inserted after Teachers, before Testimonials | ✅ | |
+| constants.js / App.jsx routing wired | ✅ | `ADMIN_SUCCESS_STORIES` |
+| Build verification — zero errors | ✅ | |
+| End-to-end verification — curl (CRUD/auth/validation) + Playwright screenshots | ✅ | Both display modes + crop modal confirmed rendering, no console errors |
+
+### Features Delivered
+- ✅ Two mutually-exclusive display modes (three cards / single banner), switchable without code changes
+- ✅ Per-card fields: image, name, subtitle, description, badge, optional CTA, display order, enable/disable
+- ✅ Banner fields: image, title, subtitle, optional button + link, enable/disable
+- ✅ Master section on/off toggle — hides section from homepage entirely when off
+- ✅ Image crop (fixed aspect per slot: ~0.72 portrait for cards, 21:9 for banner) + client-side compression
+- ✅ Live preview panel in admin reflecting unsaved edits
+- ✅ Premium homepage presentation: floating badges, gradient overlays, hover lift, RTL, prefers-reduced-motion support
+- ✅ Graceful empty states — section renders nothing if inactive or the active mode has no usable content
+
+---
+
 ## Summary
 
 | Phase | Total | Complete | Remaining |
@@ -470,4 +506,5 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | **Enrollment Workflow** | **21** | **21** | **0** |
 | **Articles & Knowledge Center** | **19** | **19** | **0** |
 | **Courses Management System** | **13** | **13** | **0** |
-| **TOTAL** | **229** | **229** | **0** |
+| **Success Stories Homepage Section** | **13** | **13** | **0** |
+| **TOTAL** | **242** | **242** | **0** |

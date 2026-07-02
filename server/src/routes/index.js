@@ -20,5 +20,7 @@ router.use('/ai', require('./ai.routes'))
 router.use('/enrollments', require('./enrollment.routes'))
 router.use('/schedule-rules', require('./scheduleRule.routes'))
 router.use('/articles', require('./article.routes'))
+router.use('/success-stories', require('./successStory.routes'))
+router.use('/teacher-performance', require('./teacherPerformance.routes'))
 
 module.exports = router

@@ -49,6 +49,7 @@ const TeacherEvaluationsPage = lazy(() => import('./pages/teacher/TeacherEvaluat
 const TeacherHomeworkPage = lazy(() => import('./pages/teacher/TeacherHomeworkPage.jsx'))
 const TeacherProgressPage = lazy(() => import('./pages/teacher/TeacherProgressPage.jsx'))
 const TeacherLinksPage = lazy(() => import('./pages/teacher/TeacherLinksPage.jsx'))
+const TeacherPerformancePage = lazy(() => import('./pages/teacher/TeacherPerformancePage.jsx'))
 const TeacherNotificationsPage = lazy(() => import('./pages/teacher/TeacherNotificationsPage.jsx'))
 const TeacherSettingsPage = lazy(() => import('./pages/teacher/TeacherSettingsPage.jsx'))
 
@@ -84,6 +85,12 @@ const AdminArticleEditorPage = lazy(() => import('./pages/admin/AdminArticleEdit
 
 // Contact Messages
 const AdminContactPage = lazy(() => import('./pages/admin/AdminContactPage.jsx'))
+
+// Success Stories
+const AdminSuccessStoriesPage = lazy(() => import('./pages/admin/AdminSuccessStoriesPage.jsx'))
+
+// Teacher Performance
+const AdminTeacherPerformancePage = lazy(() => import('./pages/admin/AdminTeacherPerformancePage.jsx'))
 
 // AI
 const AIAssistantPage = lazy(() => import('./pages/ai/AIAssistantPage.jsx'))
@@ -151,6 +158,7 @@ export default function App() {
           <Route path={ROUTES.TEACHER_HOMEWORK} element={<TeacherHomeworkPage />} />
           <Route path={ROUTES.TEACHER_PROGRESS} element={<TeacherProgressPage />} />
           <Route path={ROUTES.TEACHER_LINKS} element={<TeacherLinksPage />} />
+          <Route path={ROUTES.TEACHER_PERFORMANCE} element={<TeacherPerformancePage />} />
           <Route path={ROUTES.TEACHER_NOTIFICATIONS} element={<TeacherNotificationsPage />} />
           <Route path={ROUTES.TEACHER_SETTINGS} element={<TeacherSettingsPage />} />
         </Route>
@@ -178,6 +186,8 @@ export default function App() {
           <Route path={ROUTES.ADMIN_ARTICLE_NEW} element={<AdminArticleEditorPage />} />
           <Route path={ROUTES.ADMIN_ARTICLE_EDIT} element={<AdminArticleEditorPage />} />
           <Route path={ROUTES.ADMIN_CONTACT_MESSAGES} element={<AdminContactPage />} />
+          <Route path={ROUTES.ADMIN_SUCCESS_STORIES} element={<AdminSuccessStoriesPage />} />
+          <Route path={ROUTES.ADMIN_TEACHER_PERFORMANCE} element={<AdminTeacherPerformancePage />} />
         </Route>
 
         {/* AI */}

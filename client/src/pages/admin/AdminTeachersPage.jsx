@@ -1,8 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Edit2, Phone, Mail, MessageCircle, KeyRound, Plus, GraduationCap, Users, Calendar } from 'lucide-react'
+import {
+  Edit2, Phone, Mail, MessageCircle, KeyRound, Plus, GraduationCap, Users, Calendar,
+  TrendingUp, Wallet, FileText, CheckCircle2,
+} from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import api from '../../utils/api.js'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -10,7 +15,10 @@ import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
-import { formatDateAr } from '../../utils/date.js'
+import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
+import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { formatCurrency } from '../../utils/format.js'
+import { exportReportToPDF } from '../../utils/exportUtils.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -105,8 +113,180 @@ function ResetPasswordForm({ teacherId, onDone }) {
   )
 }
 
-function TeacherCRMPanel({ teacher, onClose, onUpdate }) {
-  const [tab, setTab] = useState('info')
+// ── Teacher Performance Tab (attendance, salary, correction) ──────────────────
+
+function getPeriodRange(preset) {
+  const now = new Date()
+  if (preset === 'week') {
+    const from = new Date(now); from.setDate(now.getDate() - now.getDay()); from.setHours(0, 0, 0, 0)
+    return { from: from.toISOString(), to: now.toISOString(), label: 'هذا الأسبوع' }
+  }
+  if (preset === 'quarter') {
+    const from = new Date(now); from.setMonth(now.getMonth() - 3)
+    return { from: from.toISOString(), to: now.toISOString(), label: 'آخر 3 أشهر' }
+  }
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  return { from: from.toISOString(), to: now.toISOString(), label: 'هذا الشهر' }
+}
+
+const CORRECTION_OPTIONS = [
+  { value: 'on_time', label: 'في الموعد' },
+  { value: 'late', label: 'متأخر' },
+  { value: 'absent', label: 'غائب' },
+  { value: 'excused', label: 'معذور' },
+]
+
+function AttendanceCorrectionMenu({ session, onDone }) {
+  const [open, setOpen] = useState(false)
+  const qc = useQueryClient()
+  const mut = useMutation({
+    mutationFn: (status) => api.patch(`/teacher-performance/admin/session/${session._id}/attendance`, { status }),
+    onSuccess: () => {
+      toast.success('تم تحديث الحضور')
+      qc.invalidateQueries({ queryKey: ['admin', 'teacher-performance'] })
+      setOpen(false)
+      onDone?.()
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(p => !p)} className="text-[10px] font-semibold text-violet-500 hover:text-violet-700 transition-colors">
+        تصحيح
+      </button>
+      {open && (
+        <div className="absolute left-0 top-6 z-10 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-32">
+          {CORRECTION_OPTIONS.map(o => (
+            <button key={o.value} onClick={() => mut.mutate(o.value)} disabled={mut.isPending}
+              className="w-full text-right px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TeacherPerformanceTab({ teacherId }) {
+  const [period, setPeriod] = useState('month')
+  const periodRange = useMemo(() => getPeriodRange(period), [period])
+
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'summary', teacherId, periodRange.from, periodRange.to],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/summary`, { params: { from: periodRange.from, to: periodRange.to } }).then(r => r.data.data),
+  })
+
+  const { data: trend } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'trend', teacherId],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/trend`, { params: { range: 'weekly' } }).then(r => r.data.data),
+  })
+
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'attendance', teacherId, periodRange.from, periodRange.to],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/attendance`, { params: { from: periodRange.from, to: periodRange.to, limit: 8 } }).then(r => r.data.data),
+  })
+
+  async function handleExport() {
+    if (!summary?.salary) return toast.error('لا توجد بيانات')
+    await exportReportToPDF({
+      title: 'تقرير أداء المعلم',
+      subtitle: `${summary.salary.teacherName} — الفترة: ${periodRange.label}`,
+      meta: `تم إنشاء التقرير في ${formatDateAr(new Date())}`,
+      columns: [{ key: 'label', label: 'البند' }, { key: 'value', label: 'القيمة' }],
+      rows: [
+        { label: 'إجمالي الحصص', value: summary.attendance.totalSessions },
+        { label: 'نسبة الالتزام بالمواعيد', value: `${summary.attendance.punctualityRate}%` },
+        { label: 'نسبة الإكمال', value: `${summary.attendance.completionRate}%` },
+        { label: 'حصص مستحقة الدفع', value: summary.salary.payableSessions },
+        { label: 'غياب بدون أجر', value: summary.salary.unpaidAbsences },
+        { label: 'سعر الحصة', value: formatCurrency(summary.salary.salaryPerSession, 'SAR') },
+      ],
+      summary: `الإجمالي المستحق: ${formatCurrency(summary.salary.totalAmount, 'SAR')}`,
+      filename: 'تقرير-أداء-المعلم',
+    })
+    toast.success('تم إنشاء ملف PDF')
+  }
+
+  return (
+    <div className="py-4 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
+          {[['week', 'أسبوع'], ['month', 'شهر'], ['quarter', '3 أشهر']].map(([k, l]) => (
+            <button key={k} onClick={() => setPeriod(k)}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${period === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <button onClick={handleExport} className="flex items-center gap-1.5 text-[11px] font-bold text-violet-600 hover:text-violet-800 transition-colors">
+          <FileText size={12} /> تصدير PDF
+        </button>
+      </div>
+
+      {summaryLoading ? <div className="flex justify-center py-8"><Spinner color="border-violet-600" /></div> : (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center p-3 rounded-xl bg-emerald-50">
+              <div className="font-heading font-extrabold text-lg text-emerald-700">{summary?.attendance?.punctualityRate ?? 0}%</div>
+              <div className="text-[10px] text-emerald-500 mt-0.5">الالتزام</div>
+            </div>
+            <div className="flex flex-col items-center p-3 rounded-xl bg-violet-50">
+              <div className="font-heading font-extrabold text-lg text-violet-700">{summary?.attendance?.completionRate ?? 0}%</div>
+              <div className="text-[10px] text-violet-500 mt-0.5">الإكمال</div>
+            </div>
+            <div className="flex flex-col items-center p-3 rounded-xl bg-blue-50 min-w-0 w-full">
+              <div className="font-heading font-extrabold text-base text-blue-700 whitespace-nowrap" dir="ltr">{formatCurrency(summary?.salary?.totalAmount || 0, 'SAR')}</div>
+              <div className="text-[10px] text-blue-500 mt-0.5">الراتب المستحق</div>
+            </div>
+          </div>
+
+          {trend?.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">اتجاه الحضور (أسبوعي)</h4>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={trend} barSize={10}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f0fc" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip />
+                  <Bar dataKey="onTime" name="في الموعد" stackId="a" fill="#22c55e" />
+                  <Bar dataKey="late" name="متأخر" stackId="a" fill="#f59e0b" />
+                  <Bar dataKey="absent" name="غياب" stackId="a" fill="#ef4444" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          <div>
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">آخر السجلات</h4>
+            {historyLoading ? <Spinner size="sm" color="border-violet-600" /> : !history?.sessions?.length ? (
+              <p className="text-xs text-gray-400 py-3">لا توجد سجلات لهذه الفترة</p>
+            ) : (
+              <div className="space-y-1.5">
+                {history.sessions.map(s => (
+                  <div key={s._id} className="flex items-center justify-between gap-2 py-2 border-b border-gray-50 last:border-0">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-gray-700 truncate">{s.titleAr}</div>
+                      <div className="text-[10px] text-gray-400">{formatDateAr(s.scheduledAt)} • {formatTimeAr(s.scheduledAt)}</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-none">
+                      <AttendanceStatusBadge status={s.teacherAttendanceStatus} size="sm" />
+                      <AttendanceCorrectionMenu session={s} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
+  const [tab, setTab] = useState(initialTab)
   const qc = useQueryClient()
 
   const updateMut = useMutation({
@@ -134,6 +314,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate }) {
 
   const tabs = [
     { key: 'info', label: 'الملف' },
+    { key: 'performance', label: 'الأداء' },
     { key: 'edit', label: 'تعديل' },
     { key: 'reset', label: 'كلمة المرور' },
   ]
@@ -245,6 +426,10 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate }) {
             </>
           )}
 
+          {tab === 'performance' && (
+            <TeacherPerformanceTab teacherId={teacher._id} />
+          )}
+
           {tab === 'edit' && (
             <EditTeacherForm teacher={teacher} onSave={(data) => updateMut.mutate(data)} isSaving={updateMut.isPending} />
           )}
@@ -266,15 +451,30 @@ export default function AdminTeachersPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [panelInitialTab, setPanelInitialTab] = useState('info')
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(initialForm)
   const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'teachers', page, search],
     queryFn: () => api.get(`/admin/teachers?page=${page}&limit=15&search=${encodeURIComponent(search)}`).then(r => r.data),
     placeholderData: (prev) => prev,
   })
+
+  // Deep-link support: /admin/teachers?teacherId=... auto-opens that teacher's
+  // performance tab (used by AdminTeacherPerformancePage's "عرض الملف" link)
+  useEffect(() => {
+    const teacherId = searchParams.get('teacherId')
+    if (!teacherId || !data?.data) return
+    const found = data.data.find(t => t._id === teacherId)
+    if (found) {
+      setSelected(found)
+      setPanelInitialTab('performance')
+      setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete('teacherId'); return p }, { replace: true })
+    }
+  }, [searchParams, data])
 
   const createMutation = useMutation({
     mutationFn: (d) => api.post('/admin/teachers', { ...d, role: 'teacher' }),
@@ -328,7 +528,7 @@ export default function AdminTeachersPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teachers.map((t) => (
             <motion.div key={t._id} whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
-              onClick={() => setSelected(t)}
+              onClick={() => { setSelected(t); setPanelInitialTab('info') }}
               className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm cursor-pointer transition-all">
               <div className="flex items-start gap-3 mb-4">
                 <Avatar src={t.avatar} firstName={t.firstNameAr} lastName={t.lastNameAr} size="md" />
@@ -353,7 +553,7 @@ export default function AdminTeachersPage() {
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                 <span className="text-xs text-gray-400">انضم {formatDateAr(t.createdAt)}</span>
-                <button onClick={e => { e.stopPropagation(); setSelected(t) }}
+                <button onClick={e => { e.stopPropagation(); setSelected(t); setPanelInitialTab('info') }}
                   className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
                   <Edit2 size={11} /> إدارة
                 </button>
@@ -378,7 +578,7 @@ export default function AdminTeachersPage() {
 
       {/* CRM Panel */}
       <AnimatePresence>
-        {selected && <TeacherCRMPanel teacher={selected} onClose={() => setSelected(null)} onUpdate={handlePanelUpdate} />}
+        {selected && <TeacherCRMPanel teacher={selected} onClose={() => setSelected(null)} onUpdate={handlePanelUpdate} initialTab={panelInitialTab} />}
       </AnimatePresence>
 
       {/* Create Modal */}

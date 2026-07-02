@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, FileText, Star, CreditCard, UserRound, CalendarDays,
-  Wallet, Bell, LayoutGrid, Inbox, Search, CircleCheck,
+  Wallet, Bell, LayoutGrid, Inbox, Search, CircleCheck, Clock3,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../shared/PageHeader.jsx'
@@ -19,6 +19,7 @@ const TYPE_CONFIG = {
   enrollment:   { label: 'تسجيل',  color: '#b45309', bg: 'rgba(180,83,9,0.13)',   Icon: UserRound     },
   schedule:     { label: 'جدول',   color: '#0891b2', bg: 'rgba(8,145,178,0.13)',  Icon: CalendarDays  },
   payment:      { label: 'دفع',    color: '#059669', bg: 'rgba(5,150,105,0.13)',  Icon: Wallet        },
+  attendance:   { label: 'حضور',   color: '#f59e0b', bg: 'rgba(245,158,11,0.13)', Icon: Clock3        },
   system:       { label: 'نظام',   color: '#7c6aaa', bg: 'rgba(124,106,170,0.1)', Icon: Bell          },
 }
 
@@ -37,6 +38,7 @@ const FILTER_TABS = [
   { key: 'evaluation',   label: 'التقييمات',    Icon: Star        },
   { key: 'enrollment',   label: 'التسجيل',      Icon: UserRound   },
   { key: 'subscription', label: 'الاشتراك',     Icon: CreditCard  },
+  { key: 'attendance',   label: 'الحضور',       Icon: Clock3      },
   { key: 'system',       label: 'النظام',       Icon: Bell        },
 ]
 
@@ -60,19 +62,19 @@ export default function NotificationCenter({ theme = 'light' }) {
   const isDark = theme === 'dark'
   const { markRead, markUnread, markAllRead, removeNotification } = useNotificationStore()
 
-  const { data: raw = {}, isLoading, isFetching } = useQuery({
+  const { data: raw = {}, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['notifications', 'center', filter],
     queryFn: async () => {
       const params = new URLSearchParams({ limit: 100 })
       if (filter === 'unread') params.set('isRead', 'false')
       else if (filter !== 'all') params.set('type', filter)
       const r = await api.get(`/notifications?${params}`)
-      return r.data.data
+      return r.data?.data || {}
     },
     staleTime: 30 * 1000,
   })
 
-  const notifications = raw.notifications || []
+  const notifications = Array.isArray(raw?.notifications) ? raw.notifications : []
 
   const filtered = useMemo(() => {
     if (!search.trim()) return notifications
@@ -305,6 +307,38 @@ export default function NotificationCenter({ theme = 'light' }) {
       {isLoading ? (
         <div className="flex justify-center py-24">
           <Spinner color={isDark ? 'border-brand-gold' : 'border-brand-purple'} />
+        </div>
+      ) : isError ? (
+        <div
+          className="flex flex-col items-center justify-center py-20 px-4 text-center rounded-2xl"
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.02)' : '#faf8ff',
+            border: `1px dashed ${isDark ? 'rgba(255,255,255,0.08)' : '#e0d4f7'}`,
+          }}
+        >
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2' }}
+          >
+            <Bell size={26} strokeWidth={1.6} className="text-red-500" />
+          </div>
+          <p className="font-bold text-sm mb-1" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#1d0a3f' }}>
+            تعذّر تحميل الإشعارات
+          </p>
+          <p className="text-xs mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#9b7fd6' }}>
+            حدث خطأ أثناء الاتصال بالخادم
+          </p>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="text-xs font-bold px-4 py-2 rounded-xl transition-all disabled:opacity-60"
+            style={{
+              background: isDark ? '#E8C76A' : '#7c3aed',
+              color: isDark ? '#1d0a3f' : '#fff',
+            }}
+          >
+            {isFetching ? 'جارٍ إعادة المحاولة...' : 'إعادة المحاولة'}
+          </button>
         </div>
       ) : !filtered.length ? (
         <EmptyState filter={filter} search={search} isDark={isDark} />

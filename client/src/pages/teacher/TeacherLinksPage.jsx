@@ -1,23 +1,25 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Link2, Video, MonitorPlay, Briefcase } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
-import Badge from '../../components/ui/Badge.jsx'
-import Spinner from '../../components/ui/Spinner.jsx'
 import { MEETING_PROVIDERS } from '../../config/constants.js'
+import { SkeletonCardGrid } from '../../components/ui/Skeleton.jsx'
+import ErrorState from '../../components/shared/ErrorState.jsx'
+import { toArray } from '../../utils/format.js'
 
 export default function TeacherLinksPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ provider: 'zoom', label: '', link: '' })
   const qc = useQueryClient()
 
-  const { data: links = [], isLoading } = useQuery({
+  const { data: links = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['teacher', 'links'],
-    queryFn: () => api.get('/teachers/me/links').then(r => r.data.data),
+    queryFn: () => api.get('/teachers/me/links').then(r => toArray(r.data?.data)),
   })
 
   const createMutation = useMutation({
@@ -47,35 +49,42 @@ export default function TeacherLinksPage() {
       <PageHeader
         title="روابط الاجتماعات"
         subtitle="إدارة روابط الاجتماع الدائمة"
-        actions={<Button variant="gold" onClick={() => setShowModal(true)}>+ إضافة رابط</Button>}
+        actions={<Button variant="purple" onClick={() => setShowModal(true)}>+ إضافة رابط</Button>}
       />
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
+        <SkeletonCardGrid count={4} cols="md:grid-cols-2" />
+      ) : isError ? (
+        <ErrorState onRetry={refetch} isRetrying={isFetching} />
       ) : !links.length ? (
-        <div className="rounded-card p-12 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <Link2 size={52} strokeWidth={1.3} color="#b3a4d0" className="mb-4 mx-auto" />
-          <p className="text-white font-heading font-bold text-lg mb-2">لا توجد روابط محفوظة</p>
-          <p style={{ color: '#b3a4d0' }} className="text-sm">أضف روابط الاجتماع الخاصة بك للاستخدام السريع</p>
+        <div className="rounded-2xl p-12 text-center bg-white border-2 border-dashed border-gray-200">
+          <Link2 size={52} strokeWidth={1.3} className="mb-4 mx-auto text-gray-300" />
+          <p className="text-gray-900 font-heading font-bold text-lg mb-2">لا توجد روابط محفوظة</p>
+          <p className="text-sm text-gray-500">أضف روابط الاجتماع الخاصة بك للاستخدام السريع</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {links.map((link) => {
+          {links.map((link, i) => {
             const provider = MEETING_PROVIDERS[link.provider]
             return (
-              <div key={link._id} className="rounded-card p-5 flex items-center gap-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-none" style={{ background: `${provider?.color || '#7c3aed'}20` }}>
+              <motion.div key={link._id}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.05, 0.3) }}
+                whileHover={{ y: -3, boxShadow: '0 12px 28px rgba(15,23,42,0.08)' }}
+                className="rounded-2xl p-5 flex items-center gap-4 transition-all bg-white border border-gray-100 shadow-sm">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-none" style={{ background: `${provider?.color || '#7c3aed'}18` }}>
                   {link.provider === 'zoom' ? <Video size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'meet' ? <MonitorPlay size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'teams' ? <Briefcase size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : <Link2 size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-white font-semibold">{link.label || provider?.label}</div>
-                  <a href={link.link} target="_blank" rel="noopener noreferrer" className="text-xs truncate block mt-0.5" style={{ color: '#b3a4d0' }}>{link.link}</a>
+                  <div className="text-gray-900 font-semibold">{link.label || provider?.label}</div>
+                  <a href={link.link} target="_blank" rel="noopener noreferrer" className="text-xs truncate block mt-0.5 text-gray-500">{link.link}</a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={link.link} target="_blank" rel="noopener noreferrer" className="btn-gold text-xs py-1.5 px-3">فتح</a>
-                  <button onClick={() => deleteMutation.mutate(link._id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">حذف</button>
+                  <a href={link.link} target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors">فتح</a>
+                  <button onClick={() => deleteMutation.mutate(link._id)} className="text-red-500 hover:text-red-600 text-xs transition-colors font-semibold">حذف</button>
                 </div>
-              </div>
+              </motion.div>
             )
           })}
         </div>
@@ -88,8 +97,8 @@ export default function TeacherLinksPage() {
         size="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
-            <Button variant="gold" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending} disabled={!form.link}>
+            <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={() => setShowModal(false)}>إلغاء</Button>
+            <Button variant="purple" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending} disabled={!form.link}>
               حفظ الرابط
             </Button>
           </>

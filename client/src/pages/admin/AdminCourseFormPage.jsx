@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FileText, BookOpen, Target, Search, Star } from 'lucide-react'
+import { FileText, BookOpen, Target, Search, Info, ChevronLeft, Upload, Save, X, Plus, Link2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -21,14 +21,23 @@ function youtubeThumbnail(url) {
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
 }
 
+// ── Shared design-language primitives ────────────────────────────────────────
+
+const inputCls = 'w-full text-sm px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 outline-none transition-all hover:border-slate-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-100'
+const selectCls = `${inputCls} cursor-pointer`
+
 // ── Section Card ──────────────────────────────────────────────────────────────
 
 function FormSection({ title, children, Icon }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.1)' }}>
-      <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(150,120,220,0.08)', background: 'rgba(124,58,237,0.06)' }}>
-        {Icon && <Icon size={18} strokeWidth={1.8} color="#9b7fd6" />}
-        <h2 className="font-heading font-bold text-base text-white">{title}</h2>
+    <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+      <div className="px-5 py-4 flex items-center gap-3 bg-slate-50 border-b border-slate-200">
+        {Icon && (
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-none bg-violet-100">
+            <Icon size={16} strokeWidth={1.8} className="text-violet-600" />
+          </span>
+        )}
+        <h2 className="font-heading font-extrabold text-lg text-slate-900">{title}</h2>
       </div>
       <div className="p-5 space-y-4">
         {children}
@@ -42,24 +51,12 @@ function FormSection({ title, children, Icon }) {
 function Field({ label, children, required }) {
   return (
     <div>
-      <label className="block text-xs font-semibold mb-2" style={{ color: '#b3a4d0' }}>
-        {label}{required && <span className="text-red-400 mr-1">*</span>}
+      <label className="block text-xs font-semibold mb-1.5 text-slate-600">
+        {label}{required && <span className="text-red-600 mr-1">*</span>}
       </label>
       {children}
     </div>
   )
-}
-
-const inputCls = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(150,120,220,0.18)',
-  color: '#E7E0F5',
-  borderRadius: '10px',
-  outline: 'none',
-  padding: '9px 12px',
-  width: '100%',
-  fontSize: '14px',
-  fontFamily: 'inherit',
 }
 
 function TField({ value, onChange, placeholder, rows = 4 }) {
@@ -69,8 +66,7 @@ function TField({ value, onChange, placeholder, rows = 4 }) {
       onChange={onChange}
       placeholder={placeholder}
       rows={rows}
-      className="resize-none w-full text-sm transition-all"
-      style={{ ...inputCls, padding: '10px 12px' }}
+      className={`${inputCls} resize-none py-2.5`}
     />
   )
 }
@@ -88,12 +84,11 @@ function TagsInput({ tags, onChange }) {
   }
 
   return (
-    <div className="rounded-xl p-2 min-h-[44px] flex flex-wrap gap-1.5 items-center" style={inputCls}>
+    <div className="rounded-xl p-2 min-h-[44px] flex flex-wrap gap-1.5 items-center bg-white border border-slate-200 transition-all focus-within:border-violet-500 focus-within:ring-4 focus-within:ring-violet-100">
       {tags.map(tag => (
-        <span key={tag} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
-          style={{ background: 'rgba(124,58,237,0.2)', color: '#a78fd6' }}>
+        <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
           {tag}
-          <button type="button" onClick={() => onChange(tags.filter(t => t !== tag))} style={{ color: '#8b7aad', marginRight: '2px' }}>×</button>
+          <button type="button" onClick={() => onChange(tags.filter(t => t !== tag))} className="text-violet-400 hover:text-violet-700 transition-colors leading-none">×</button>
         </span>
       ))}
       <input
@@ -101,8 +96,7 @@ function TagsInput({ tags, onChange }) {
         onChange={e => setInput(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() } }}
         placeholder={tags.length === 0 ? 'اكتب وسمًا واضغط Enter' : ''}
-        className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
-        style={{ color: '#E7E0F5', fontSize: '13px' }}
+        className="flex-1 min-w-[120px] bg-transparent outline-none text-sm text-slate-900 placeholder-slate-400"
       />
     </div>
   )
@@ -110,7 +104,7 @@ function TagsInput({ tags, onChange }) {
 
 // ── Dynamic List Input ────────────────────────────────────────────────────────
 
-function DynamicList({ items, onChange, placeholder, label, addLabel }) {
+function DynamicList({ items, onChange, placeholder, addLabel }) {
   const [input, setInput] = useState('')
 
   function add() {
@@ -124,17 +118,15 @@ function DynamicList({ items, onChange, placeholder, label, addLabel }) {
     <div className="space-y-2">
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-none text-[10px] font-bold" style={{ background: 'rgba(124,58,237,0.2)', color: '#a78fd6' }}>{i + 1}</div>
+          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-none text-[10px] font-bold bg-violet-100 text-violet-700">{i + 1}</div>
           <input
             value={item}
             onChange={e => { const next = [...items]; next[i] = e.target.value; onChange(next) }}
-            className="flex-1 text-sm px-3 py-2 rounded-xl outline-none transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(150,120,220,0.14)', color: '#E7E0F5' }}
+            className={`${inputCls} flex-1 py-2`}
           />
           <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors flex-none"
-            style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-none bg-red-50 text-red-600 hover:bg-red-100">
+            <X size={13} strokeWidth={2} />
           </button>
         </div>
       ))}
@@ -144,13 +136,11 @@ function DynamicList({ items, onChange, placeholder, label, addLabel }) {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
           placeholder={placeholder}
-          className="flex-1 text-sm px-3 py-2 rounded-xl outline-none"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(150,120,220,0.2)', color: '#E7E0F5' }}
+          className={`${inputCls} flex-1 py-2 border-dashed`}
         />
         <button type="button" onClick={add}
-          className="px-3 py-2 rounded-xl text-xs font-semibold flex-none transition-colors"
-          style={{ background: 'rgba(124,58,237,0.15)', color: '#a78fd6' }}>
-          + {addLabel || 'إضافة'}
+          className="px-3.5 py-2 rounded-xl text-xs font-bold flex-none transition-colors bg-violet-50 text-violet-700 hover:bg-violet-100 flex items-center gap-1">
+          <Plus size={13} strokeWidth={2.5} /> {addLabel || 'إضافة'}
         </button>
       </div>
     </div>
@@ -197,39 +187,37 @@ function CurriculumBuilder({ sections, onChange }) {
   return (
     <div className="space-y-3">
       {sections.map((sec, i) => (
-        <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(150,120,220,0.14)', background: 'rgba(124,58,237,0.04)' }}>
-          <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid rgba(150,120,220,0.1)' }}>
-            <span className="text-xs font-bold text-purple-400">وحدة {i + 1}</span>
+        <div key={i} className="rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-white">
+            <span className="text-xs font-extrabold text-violet-600 flex-none">وحدة {i + 1}</span>
             <input
               value={sec.sectionTitleAr}
               onChange={e => updateSection(i, 'sectionTitleAr', e.target.value)}
               placeholder="عنوان الوحدة بالعربية"
-              className="flex-1 bg-transparent outline-none text-sm font-semibold text-white"
+              className="flex-1 bg-transparent outline-none text-sm font-semibold text-slate-900 placeholder-slate-400"
             />
-            <button onClick={() => removeSection(i)} className="text-red-400 hover:text-red-300 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            <button onClick={() => removeSection(i)} className="text-red-500 hover:text-red-600 transition-colors flex-none">
+              <X size={15} strokeWidth={2} />
             </button>
           </div>
           <div className="p-3 space-y-2">
             {sec.lessons.map((lesson, j) => (
               <div key={j} className="flex items-center gap-2">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="flex-none"><path d="M9 18V5l12-2v13" stroke="#b3a4d0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <FileText size={13} strokeWidth={1.8} className="flex-none text-slate-400" />
                 <input
                   value={lesson}
                   onChange={e => updateLesson(i, j, e.target.value)}
                   placeholder={`درس ${j + 1}`}
-                  className="flex-1 bg-transparent outline-none text-sm"
-                  style={{ color: '#E7E0F5', borderBottom: '1px solid rgba(150,120,220,0.1)', padding: '4px 0' }}
+                  className="flex-1 bg-transparent outline-none text-sm text-slate-700 placeholder-slate-400 border-b border-slate-200 focus:border-violet-400 transition-colors py-1"
                 />
-                <button onClick={() => removeLesson(i, j)} style={{ color: '#6b5f8a' }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                <button onClick={() => removeLesson(i, j)} className="text-slate-300 hover:text-red-500 transition-colors flex-none">
+                  <X size={12} strokeWidth={2} />
                 </button>
               </div>
             ))}
             <button onClick={() => addLesson(i)}
-              className="text-xs font-semibold transition-colors mt-1 flex items-center gap-1"
-              style={{ color: '#8b7aad' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              className="text-xs font-semibold transition-colors mt-1 flex items-center gap-1 text-violet-600 hover:text-violet-700">
+              <Plus size={12} strokeWidth={2.5} />
               إضافة درس
             </button>
           </div>
@@ -237,10 +225,9 @@ function CurriculumBuilder({ sections, onChange }) {
       ))}
       <button
         onClick={addSection}
-        className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ border: '1px dashed rgba(124,58,237,0.3)', color: '#8b7aad', background: 'rgba(124,58,237,0.04)' }}
+        className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all border border-dashed border-violet-300 text-violet-600 bg-violet-50/60 hover:bg-violet-50 hover:border-violet-400"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+        <Plus size={14} strokeWidth={2.5} />
         إضافة وحدة
       </button>
     </div>
@@ -273,27 +260,27 @@ function ImageUploadPanel({ title, currentUrl, onUploaded, endpoint, field }) {
 
   return (
     <div>
-      <div className="text-xs font-semibold mb-2" style={{ color: '#b3a4d0' }}>{title}</div>
+      <div className="text-xs font-semibold mb-2 text-slate-600">{title}</div>
       <div
-        className="relative rounded-xl overflow-hidden cursor-pointer flex items-center justify-center"
-        style={{ height: '130px', background: 'rgba(124,58,237,0.06)', border: '1px dashed rgba(150,120,220,0.25)' }}
+        className="relative rounded-xl overflow-hidden cursor-pointer flex items-center justify-center transition-colors bg-slate-50 border border-dashed border-slate-300 hover:border-violet-400 hover:bg-violet-50/50"
+        style={{ height: '130px' }}
         onClick={() => inputRef.current?.click()}
         onDragOver={e => e.preventDefault()}
         onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}
       >
         {uploading ? (
-          <Spinner size="sm" color="border-purple-500" />
+          <Spinner size="sm" color="border-violet-600" />
         ) : imgUrl ? (
           <>
             <img src={imgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" style={{ background: 'rgba(15,23,42,0.55)' }}>
               <span className="text-white text-xs font-semibold">تغيير الصورة</span>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center gap-2 pointer-events-none">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="#8b7aad" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <span className="text-xs" style={{ color: '#8b7aad' }}>اسحب أو اضغط للرفع</span>
+            <Upload size={22} strokeWidth={1.6} className="text-slate-400" />
+            <span className="text-xs text-slate-500">اسحب أو اضغط للرفع</span>
           </div>
         )}
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files[0])} />
@@ -309,16 +296,26 @@ function Toggle({ checked, onChange, label }) {
     <label className="flex items-center gap-3 cursor-pointer select-none">
       <div
         onClick={() => onChange(!checked)}
-        className="relative w-11 h-6 rounded-full transition-all flex-none"
-        style={{ background: checked ? '#7c3aed' : 'rgba(255,255,255,0.1)' }}
+        className={`relative w-11 h-6 rounded-full transition-all flex-none ${checked ? 'bg-violet-600' : 'bg-slate-200'}`}
       >
         <div
           className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
           style={{ left: checked ? '26px' : '4px' }}
         />
       </div>
-      <span className="text-sm" style={{ color: '#E7E0F5' }}>{label}</span>
+      <span className="text-sm text-slate-700">{label}</span>
     </label>
+  )
+}
+
+// ── Sidebar Card ──────────────────────────────────────────────────────────────
+
+function SideCard({ title, children }) {
+  return (
+    <div className="rounded-2xl p-4 space-y-3 bg-white border border-slate-200 shadow-sm">
+      <div className="font-heading font-extrabold text-sm text-slate-900">{title}</div>
+      {children}
+    </div>
   )
 }
 
@@ -341,6 +338,12 @@ const EMPTY_FORM = {
   order: 0, featured: false,
   status: 'draft', enrollmentEnabled: true, certificateAvailable: false,
   seo: { title: '', description: '', keywords: [] },
+}
+
+const STATUS_STYLES = {
+  draft: 'bg-slate-100 text-slate-600',
+  published: 'bg-green-50 text-green-700',
+  archived: 'bg-amber-50 text-amber-700',
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -469,7 +472,7 @@ export default function AdminCourseFormPage() {
   if (!isNew && loadingCourse) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner color="border-purple-500" />
+        <Spinner color="border-violet-600" />
       </div>
     )
   }
@@ -480,12 +483,12 @@ export default function AdminCourseFormPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 text-xs mb-2" style={{ color: '#8b7aad' }}>
-            <Link to={ROUTES.ADMIN_COURSES} className="hover:text-purple-300 transition-colors">المقررات</Link>
-            <span>›</span>
-            <span style={{ color: '#b3a4d0' }}>{isNew ? 'دورة جديدة' : (form.nameAr || 'تعديل')}</span>
+          <div className="flex items-center gap-2 text-xs mb-2 text-slate-500">
+            <Link to={ROUTES.ADMIN_COURSES} className="hover:text-violet-600 transition-colors font-medium">المقررات</Link>
+            <ChevronLeft size={12} className="text-slate-300" />
+            <span className="text-slate-700 font-medium">{isNew ? 'دورة جديدة' : (form.nameAr || 'تعديل')}</span>
           </div>
-          <h1 className="font-heading font-extrabold text-2xl text-white">
+          <h1 className="font-heading font-extrabold text-2xl text-slate-900">
             {isNew ? 'إنشاء دورة جديدة' : 'تعديل الدورة'}
           </h1>
         </div>
@@ -495,42 +498,34 @@ export default function AdminCourseFormPage() {
           <AnimatePresence>
             {saved && !unsaved && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex items-center gap-1.5 text-xs" style={{ color: '#10b981' }}>
+                className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 تم الحفظ
               </motion.div>
             )}
           </AnimatePresence>
           {unsaved && (
-            <span className="text-xs" style={{ color: '#f59e0b' }}>• تغييرات غير محفوظة</span>
+            <span className="text-xs font-semibold text-amber-600">• تغييرات غير محفوظة</span>
           )}
 
           {/* Status badge */}
           <select
             value={form.status}
             onChange={e => set('status', e.target.value)}
-            className="py-2 px-3 rounded-xl text-xs font-bold outline-none cursor-pointer"
-            style={{
-              background: form.status === 'published' ? 'rgba(16,185,129,0.15)' : form.status === 'archived' ? 'rgba(245,158,11,0.15)' : 'rgba(156,163,175,0.15)',
-              color: form.status === 'published' ? '#10b981' : form.status === 'archived' ? '#f59e0b' : '#9ca3af',
-              border: '1px solid transparent',
-            }}
+            className={`py-2 px-3 rounded-xl text-xs font-bold outline-none cursor-pointer border border-transparent transition-colors ${STATUS_STYLES[form.status] || STATUS_STYLES.draft}`}
           >
-            <option value="draft" style={{ background: '#1d0a3f', color: '#E7E0F5' }}>مسودة</option>
-            <option value="published" style={{ background: '#1d0a3f', color: '#E7E0F5' }}>منشور</option>
-            <option value="archived" style={{ background: '#1d0a3f', color: '#E7E0F5' }}>أرشيف</option>
+            <option value="draft">مسودة</option>
+            <option value="published">منشور</option>
+            <option value="archived">أرشيف</option>
           </select>
 
           {/* Save button */}
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-opacity disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: '#fff', boxShadow: '0 8px 20px rgba(124,58,237,0.4)' }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-lg shadow-violet-600/25 bg-gradient-to-br from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
           >
-            {saving ? <Spinner size="sm" color="border-white" /> : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            )}
+            {saving ? <Spinner size="sm" color="border-white" /> : <Save size={15} strokeWidth={1.8} />}
             حفظ
           </button>
         </div>
@@ -550,8 +545,7 @@ export default function AdminCourseFormPage() {
                   value={form.nameAr}
                   onChange={e => set('nameAr', e.target.value)}
                   placeholder="مثال: دورة التجويد المتكامل"
-                  style={inputCls}
-                  className="transition-all"
+                  className={inputCls}
                 />
               </Field>
               <Field label="Course Name (English)">
@@ -559,8 +553,8 @@ export default function AdminCourseFormPage() {
                   value={form.name}
                   onChange={e => set('name', e.target.value)}
                   placeholder="e.g. Complete Tajweed Course"
-                  style={{ ...inputCls, direction: 'ltr' }}
-                  className="transition-all"
+                  dir="ltr"
+                  className={inputCls}
                 />
               </Field>
             </div>
@@ -586,27 +580,27 @@ export default function AdminCourseFormPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="الفئة">
-                <select value={form.category} onChange={e => set('category', e.target.value)} style={inputCls} className="cursor-pointer">
+                <select value={form.category} onChange={e => set('category', e.target.value)} className={selectCls}>
                   {[['tajweed','التجويد'],['hifz','الحفظ'],['nazra','النظر'],['arabic','العربية'],['quran','القرآن'],['other','أخرى']].map(([v,l]) =>
-                    <option key={v} value={v} style={{ background: '#1d0a3f' }}>{l}</option>)}
+                    <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
               <Field label="المستوى">
-                <select value={form.difficulty} onChange={e => set('difficulty', e.target.value)} style={inputCls} className="cursor-pointer">
+                <select value={form.difficulty} onChange={e => set('difficulty', e.target.value)} className={selectCls}>
                   {[['beginner','مبتدئ'],['intermediate','متوسط'],['advanced','متقدم']].map(([v,l]) =>
-                    <option key={v} value={v} style={{ background: '#1d0a3f' }}>{l}</option>)}
+                    <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
               <Field label="الفئة العمرية">
-                <select value={form.ageGroup} onChange={e => set('ageGroup', e.target.value)} style={inputCls} className="cursor-pointer">
+                <select value={form.ageGroup} onChange={e => set('ageGroup', e.target.value)} className={selectCls}>
                   {[['children','أطفال'],['teens','مراهقون'],['adults','بالغون']].map(([v,l]) =>
-                    <option key={v} value={v} style={{ background: '#1d0a3f' }}>{l}</option>)}
+                    <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
               <Field label="اللغة">
-                <select value={form.language} onChange={e => set('language', e.target.value)} style={inputCls} className="cursor-pointer">
+                <select value={form.language} onChange={e => set('language', e.target.value)} className={selectCls}>
                   {[['ar','العربية'],['en','English'],['both','الاثنان']].map(([v,l]) =>
-                    <option key={v} value={v} style={{ background: '#1d0a3f' }}>{l}</option>)}
+                    <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
             </div>
@@ -617,15 +611,14 @@ export default function AdminCourseFormPage() {
                   value={form.subCategory}
                   onChange={e => set('subCategory', e.target.value)}
                   placeholder="مثال: أحكام النون الساكنة"
-                  style={inputCls}
-                  className="transition-all"
+                  className={inputCls}
                 />
               </Field>
               <Field label="المعلم">
-                <select value={form.instructor} onChange={e => set('instructor', e.target.value)} style={inputCls} className="cursor-pointer">
-                  <option value="" style={{ background: '#1d0a3f' }}>اختر معلمًا (اختياري)</option>
+                <select value={form.instructor} onChange={e => set('instructor', e.target.value)} className={selectCls}>
+                  <option value="">اختر معلمًا (اختياري)</option>
                   {teachers.map(t => (
-                    <option key={t._id || t.userId} value={t._id || t.userId} style={{ background: '#1d0a3f' }}>
+                    <option key={t._id || t.userId} value={t._id || t.userId}>
                       {t.firstNameAr || t.firstName} {t.lastNameAr || t.lastName}
                     </option>
                   ))}
@@ -700,10 +693,9 @@ export default function AdminCourseFormPage() {
                 value={form.seo.title}
                 onChange={e => setSeo('title', e.target.value)}
                 placeholder="عنوان مخصص لمحركات البحث (يترك فارغًا لاستخدام اسم المقرر)"
-                style={inputCls}
-                className="transition-all"
+                className={inputCls}
               />
-              <div className="text-xs mt-1" style={{ color: '#6b5f8a' }}>{form.seo.title.length}/200 حرف</div>
+              <div className="text-xs mt-1 text-slate-400">{form.seo.title.length}/200 حرف</div>
             </Field>
             <Field label="وصف SEO">
               <TField
@@ -712,7 +704,7 @@ export default function AdminCourseFormPage() {
                 placeholder="وصف مخصص لمحركات البحث..."
                 rows={3}
               />
-              <div className="text-xs mt-1" style={{ color: '#6b5f8a' }}>{form.seo.description.length}/500 حرف</div>
+              <div className="text-xs mt-1 text-slate-400">{form.seo.description.length}/500 حرف</div>
             </Field>
             <Field label="الكلمات المفتاحية">
               <TagsInput
@@ -728,8 +720,7 @@ export default function AdminCourseFormPage() {
 
           {/* Thumbnail */}
           {!isNew && (
-            <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.1)' }}>
-              <div className="font-heading font-bold text-sm text-white">الصور</div>
+            <SideCard title="الصور">
               <ImageUploadPanel
                 title="الصورة المصغرة"
                 currentUrl={form.thumbnailImage}
@@ -744,13 +735,13 @@ export default function AdminCourseFormPage() {
                 endpoint={`/courses/admin/${id}/cover`}
                 field="cover"
               />
-            </div>
+            </SideCard>
           )}
           {isNew && (
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
+            <div className="rounded-2xl p-4 bg-violet-50 border border-violet-200">
               <div className="flex items-start gap-3">
-                <svg className="flex-none mt-0.5" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#a78fd6" strokeWidth="1.8"/><path d="M12 8v4M12 16h.01" stroke="#a78fd6" strokeWidth="2" strokeLinecap="round"/></svg>
-                <p className="text-xs leading-relaxed" style={{ color: '#a78fd6' }}>
+                <Info size={16} strokeWidth={1.8} className="flex-none mt-0.5 text-violet-500" />
+                <p className="text-xs leading-relaxed text-violet-700">
                   يمكنك رفع الصور بعد إنشاء الدورة. احفظ المعلومات الأساسية أولاً ثم أضف الصور.
                 </p>
               </div>
@@ -758,70 +749,68 @@ export default function AdminCourseFormPage() {
           )}
 
           {/* Intro Video */}
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.1)' }}>
-            <div className="font-heading font-bold text-sm text-white">الفيديو التعريفي</div>
+          <SideCard title="الفيديو التعريفي">
             <Field label="رابط YouTube">
               <input
                 value={form.introVideoUrl}
                 onChange={e => { set('introVideoUrl', e.target.value); setVideoPreview(false) }}
                 placeholder="https://youtube.com/watch?v=..."
-                style={{ ...inputCls, direction: 'ltr', fontSize: '12px' }}
-                className="transition-all"
+                dir="ltr"
+                className={`${inputCls} text-xs`}
               />
             </Field>
             {ytThumb && (
-              <div className="relative rounded-xl overflow-hidden cursor-pointer" style={{ height: '120px' }} onClick={() => setVideoPreview(true)}>
+              <div className="relative rounded-xl overflow-hidden cursor-pointer border border-slate-200" style={{ height: '120px' }} onClick={() => setVideoPreview(true)}>
                 <img src={ytThumb} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,0,0,0.85)' }}>
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(15,23,42,0.35)' }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-red-600/90">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="m5 3 14 9-14 9V3Z"/></svg>
                   </div>
                 </div>
               </div>
             )}
-          </div>
+          </SideCard>
 
           {/* Publishing */}
-          <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.1)' }}>
-            <div className="font-heading font-bold text-sm text-white">الإعدادات</div>
-            <Toggle checked={form.featured} onChange={v => set('featured', v)} label="مقرر مميز" />
-            <Toggle checked={form.enrollmentEnabled} onChange={v => set('enrollmentEnabled', v)} label="التسجيل مفتوح" />
-            <Toggle checked={form.certificateAvailable} onChange={v => set('certificateAvailable', v)} label="شهادة إتمام متاحة" />
-            <div className="pt-2" style={{ borderTop: '1px solid rgba(150,120,220,0.1)' }}>
+          <SideCard title="الإعدادات">
+            <div className="space-y-3">
+              <Toggle checked={form.featured} onChange={v => set('featured', v)} label="مقرر مميز" />
+              <Toggle checked={form.enrollmentEnabled} onChange={v => set('enrollmentEnabled', v)} label="التسجيل مفتوح" />
+              <Toggle checked={form.certificateAvailable} onChange={v => set('certificateAvailable', v)} label="شهادة إتمام متاحة" />
+            </div>
+            <div className="pt-3 border-t border-slate-200">
               <Field label="ترتيب العرض">
                 <input
                   type="number"
                   value={form.order}
                   onChange={e => set('order', e.target.value)}
                   min="0"
-                  style={inputCls}
-                  className="transition-all"
+                  className={inputCls}
                 />
               </Field>
             </div>
-          </div>
+          </SideCard>
 
           {/* Academic Info */}
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.1)' }}>
-            <div className="font-heading font-bold text-sm text-white">المعلومات الأكاديمية</div>
+          <SideCard title="المعلومات الأكاديمية">
             <div className="grid grid-cols-3 gap-2">
               <Field label="المدة (ساعة)">
-                <input type="number" min="0" value={form.estimatedDuration} onChange={e => set('estimatedDuration', e.target.value)} style={{ ...inputCls, padding: '7px 8px', fontSize: '13px' }} className="transition-all" />
+                <input type="number" min="0" value={form.estimatedDuration} onChange={e => set('estimatedDuration', e.target.value)} className={`${inputCls} px-2 py-2 text-xs`} />
               </Field>
               <Field label="عدد الدروس">
-                <input type="number" min="0" value={form.lessonsCount} onChange={e => set('lessonsCount', e.target.value)} style={{ ...inputCls, padding: '7px 8px', fontSize: '13px' }} className="transition-all" />
+                <input type="number" min="0" value={form.lessonsCount} onChange={e => set('lessonsCount', e.target.value)} className={`${inputCls} px-2 py-2 text-xs`} />
               </Field>
               <Field label="المدة (أسبوع)">
-                <input type="number" min="1" value={form.durationWeeks} onChange={e => set('durationWeeks', e.target.value)} style={{ ...inputCls, padding: '7px 8px', fontSize: '13px' }} className="transition-all" />
+                <input type="number" min="1" value={form.durationWeeks} onChange={e => set('durationWeeks', e.target.value)} className={`${inputCls} px-2 py-2 text-xs`} />
               </Field>
             </div>
-          </div>
+          </SideCard>
 
           {/* Slug info */}
           {!isNew && course?.slug && (
-            <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(150,120,220,0.08)' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#6b5f8a" strokeWidth="1.8"/><path d="M9 12h6M12 9l3 3-3 3" stroke="#6b5f8a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <span className="text-[11px] font-mono break-all" style={{ color: '#6b5f8a' }}>
+            <div className="rounded-xl px-4 py-3 flex items-center gap-2 bg-slate-50 border border-slate-200">
+              <Link2 size={13} strokeWidth={1.8} className="text-slate-400 flex-none" />
+              <span className="text-[11px] font-mono break-all text-slate-500">
                 /courses/{course.slug}
               </span>
             </div>
@@ -837,7 +826,7 @@ export default function AdminCourseFormPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.85)' }}
+            style={{ background: 'rgba(15,23,42,0.85)' }}
             onClick={() => setVideoPreview(false)}
           >
             <motion.div

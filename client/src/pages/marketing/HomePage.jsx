@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../../config/constants.js'
+import TestimonialsSection from '../../components/home/TestimonialsSection.jsx'
+import SuccessStoriesSection from '../../components/home/SuccessStoriesSection.jsx'
 
 /* ─────────────────────────────────────────────
    Shared micro-components
@@ -275,74 +277,302 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           TEACHERS
       ════════════════════════════════════════ */}
-      <section id="teachers" style={{ position: 'relative', background: 'radial-gradient(120% 90% at 100% 0%,#3a1273 0%,#1c0942 45%,#140530 100%)', padding: 'clamp(64px,8vw,108px) clamp(20px,5vw,68px)', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 'clamp(30px,4vw,64px)', flexWrap: 'wrap' }}>
+   <section
+  id="teachers"
+  style={{
+    position: "relative",
+    background:
+      "radial-gradient(120% 90% at 100% 0%,#3a1273 0%,#1c0942 45%,#140530 100%)",
+    padding: "clamp(64px,8vw,108px) clamp(20px,5vw,68px)",
+    overflow: "hidden",
+  }}
+>
+  <div
+    style={{
+      maxWidth: 1340,
+      margin: "0 auto",
+      display: "flex",
+      alignItems: "center",
+      gap: "clamp(30px,4vw,64px)",
+      flexWrap: "wrap",
+    }}
+  >
+    {/* Teacher cards */}
+    <div
+      style={{
+        flex: "1 1 720px",
+        minWidth: 300,
+        order: 1,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: "clamp(16px,1.8vw,26px)",
+          overflowX: "auto",
+          paddingBottom: 6,
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}
+      >
+        {[
+          {
+            img: "/images/teacher-1.png",
+            name: "د/ محمد صلاح",
+            cert: "إجازة في حفص عن عاصم",
+            rating: "4.9",
+          },
+          {
+            img: "/images/teacher-2.png",
+            name: "أ/ عبد الرحمان حسن",
+            cert: "إجازة في حفص عن عاصم",
+            rating: "5.0",
+          },
+          {
+            img: "/images/teacher-3.png",
+            name: "أ/ أحمد محمد",
+            cert: "إجازة في شعبة عن عاصم",
+            rating: "4.9",
+          },
+          {
+            img: "/images/teacher-4.png",
+            name: "أ/ أحمد خليفة",
+            cert: "إجازة في ورش عن نافع",
+            rating: "4.8",
+          },
+        ].map((t) => (
+          <div
+            key={t.name}
+            style={{
+              flex: "0 0 215px", // يمنع الكارد من التمدد
+              width: 215,
+              background: "#1d0c40",
+              border: "1px solid rgba(255,255,255,.07)",
+              borderRadius: 20,
+              overflow: "hidden",
+              transition:
+                "transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s",
+              boxShadow: "0 12px 30px rgba(0,0,0,.18)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-8px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "";
+            }}
+          >
+            <img
+              src={t.img}
+              alt={t.name}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              style={{
+                width: "100%",
+                height: 320,
+                objectFit: "cover",
+                objectPosition: "center top",
+                display: "block",
+                imageRendering: "auto",
+                backfaceVisibility: "hidden",
+                transform: "translateZ(0)",
+              }}
+            />
 
-          {/* Teacher cards */}
-          <div style={{ flex: '1 1 720px', minWidth: 300, order: 1 }}>
-            <div style={{ display: 'flex', gap: 'clamp(16px,1.8vw,26px)', overflowX: 'auto', paddingBottom: 6 }}>
-              {[
-                { img: '/images/teacher1.png', name: 'أ. فاطمة محمد', cert: 'إجازة في حفص عن عاصم', rating: '4.9' },
-                { img: '/images/teacher2.png', name: 'أ. أحمد حسن', cert: 'إجازة في حفص عن عاصم', rating: '5.0' },
-                { img: '/images/teacher3.png', name: 'أ. محمد الغامدي', cert: 'إجازة في شعبة عن عاصم', rating: '4.9' },
-                { img: '/images/teacher4.png', name: 'أ. سيف عبدالله', cert: 'إجازة في ورش عن نافع', rating: '4.8' },
-              ].map((t) => (
-                <div
-                  key={t.name}
-                  style={{ flex: '1 0 215px', background: '#1d0c40', border: '1px solid rgba(255,255,255,.07)', borderRadius: 20, overflow: 'hidden', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+            <div style={{ padding: "16px 18px 18px" }}>
+              <div
+                style={{
+                  color: "#fff",
+                  fontFamily: "Cairo",
+                  fontWeight: 800,
+                  fontSize: 18,
+                }}
+              >
+                {t.name}
+              </div>
+
+              <div
+                style={{
+                  color: "#b6a6d8",
+                  fontSize: 14,
+                  marginTop: 5,
+                }}
+              >
+                {t.cert}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <StarIcon />
+                <span
+                  style={{
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 15,
+                  }}
                 >
-                  <img src={t.img} alt={t.name} style={{ width: '100%', height: 268, objectFit: 'cover', display: 'block' }} />
-                  <div style={{ padding: '16px 18px 18px' }}>
-                    <div style={{ color: '#fff', fontFamily: 'Cairo', fontWeight: 800, fontSize: 18 }}>{t.name}</div>
-                    <div style={{ color: '#b6a6d8', fontSize: 14, marginTop: 5 }}>{t.cert}</div>
-                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <StarIcon />
-                      <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{t.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Nav arrows */}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 22 }}>
-              {[
-                <path key="l" d="M15 6l-6 6 6 6" stroke="#E8C76A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
-                <path key="r" d="M9 6l6 6-6 6" stroke="#E8C76A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
-              ].map((p, i) => (
-                <button
-                  key={i}
-                  style={{ cursor: 'pointer', width: 46, height: 46, borderRadius: '50%', border: '1px solid rgba(232,199,106,.4)', background: 'transparent', display: 'grid', placeItems: 'center', transition: 'transform .25s, border-color .25s, background .25s' }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#E8C76A' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(232,199,106,.4)' }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">{p}</svg>
-                </button>
-              ))}
+                  {t.rating}
+                </span>
+              </div>
             </div>
           </div>
+        ))}
+      </div>
 
-          {/* Lead text */}
-          <div style={{ flex: '0 1 330px', minWidth: 280, textAlign: 'right', order: 2 }}>
-            <div style={{ color: '#9b6cf0', fontWeight: 700, fontSize: 16, marginBottom: 14 }}>معلمون متخصصون</div>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(34px,4vw,52px)', lineHeight: 1.2, color: '#fff', fontFamily: 'Cairo' }}>
-              تعلم على يد<br />أهل القرآن
-            </h2>
-            <p style={{ marginTop: 20, color: '#c4b6e0', fontSize: 17, lineHeight: 1.9, maxWidth: 360, marginInlineStart: 'auto' }}>
-              نخبة من المعلمين المتخصصين في القراءات والتجويد وعلوم القرآن لمساعدتك على الإتقان خطوة بخطوة
-            </p>
-            <Link
-              to={ROUTES.TEACHERS}
-              style={{ cursor: 'pointer', marginTop: 28, display: 'inline-block', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 17, color: '#fff', background: 'transparent', border: '1.5px solid rgba(232,199,106,.55)', borderRadius: 34, padding: '15px 34px', textDecoration: 'none', transition: 'transform .25s, border-color .25s, background .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#E8C76A'; e.currentTarget.style.background = 'rgba(232,199,106,.08)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(232,199,106,.55)'; e.currentTarget.style.background = 'transparent' }}
-            >
-              عرض جميع المعلمين
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Nav arrows */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          justifyContent: "flex-end",
+          marginTop: 22,
+        }}
+      >
+        {[
+          <path
+            key="l"
+            d="M15 6l-6 6 6 6"
+            stroke="#E8C76A"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />,
+          <path
+            key="r"
+            d="M9 6l6 6-6 6"
+            stroke="#E8C76A"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />,
+        ].map((p, i) => (
+          <button
+            key={i}
+            style={{
+              cursor: "pointer",
+              width: 46,
+              height: 46,
+              borderRadius: "50%",
+              border: "1px solid rgba(232,199,106,.4)",
+              background: "transparent",
+              display: "grid",
+              placeItems: "center",
+              transition:
+                "transform .25s, border-color .25s, background .25s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.borderColor = "#E8C76A";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "";
+              e.currentTarget.style.borderColor =
+                "rgba(232,199,106,.4)";
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              {p}
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Lead text */}
+    <div
+      style={{
+        flex: "0 1 330px",
+        minWidth: 280,
+        textAlign: "right",
+        order: 2,
+      }}
+    >
+      <div
+        style={{
+          color: "#9b6cf0",
+          fontWeight: 700,
+          fontSize: 16,
+          marginBottom: 14,
+        }}
+      >
+        معلمون متخصصون
+      </div>
+
+      <h2
+        style={{
+          fontWeight: 800,
+          fontSize: "clamp(34px,4vw,52px)",
+          lineHeight: 1.2,
+          color: "#fff",
+          fontFamily: "Cairo",
+        }}
+      >
+        تعلم على يد
+        <br />
+        أهل القرآن
+      </h2>
+
+      <p
+        style={{
+          marginTop: 20,
+          color: "#c4b6e0",
+          fontSize: 17,
+          lineHeight: 1.9,
+          maxWidth: 360,
+          marginInlineStart: "auto",
+        }}
+      >
+        نخبة من المعلمين المتخصصين في القراءات والتجويد وعلوم القرآن
+        لمساعدتك على الإتقان خطوة بخطوة
+      </p>
+
+      <Link
+        to={ROUTES.TEACHERS}
+        style={{
+          cursor: "pointer",
+          marginTop: 28,
+          display: "inline-block",
+          fontFamily: "Tajawal",
+          fontWeight: 700,
+          fontSize: 17,
+          color: "#fff",
+          background: "transparent",
+          border: "1.5px solid rgba(232,199,106,.55)",
+          borderRadius: 34,
+          padding: "15px 34px",
+          textDecoration: "none",
+          transition:
+            "transform .25s, border-color .25s, background .25s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.borderColor = "#E8C76A";
+          e.currentTarget.style.background =
+            "rgba(232,199,106,.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "";
+          e.currentTarget.style.borderColor =
+            "rgba(232,199,106,.55)";
+          e.currentTarget.style.background = "transparent";
+        }}
+      >
+        عرض جميع المعلمين
+      </Link>
+    </div>
+  </div>
+</section>
+
+      {/* ════════════════════════════════════════
+          SUCCESS STORIES — نجوم المنصة
+      ════════════════════════════════════════ */}
+      <SuccessStoriesSection />
 
       {/* ════════════════════════════════════════
           PLATFORM
@@ -390,47 +620,9 @@ export default function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════
-          STORIES
+          TESTIMONIALS — real WhatsApp + audio proof
       ════════════════════════════════════════ */}
-      <section id="stories" style={{ position: 'relative', background: 'radial-gradient(110% 120% at 0% 0%,#34106a 0%,#1c0942 46%,#160734 100%)', padding: 'clamp(60px,7vw,96px) clamp(20px,5vw,68px)', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 'clamp(30px,4vw,60px)', flexWrap: 'wrap' }}>
-
-          {/* Story images */}
-          <div style={{ flex: '1 1 660px', minWidth: 300, order: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 'clamp(16px,1.6vw,24px)' }}>
-            {[
-              { img: '/images/story1.png', alt: 'من القراءة المقطعة إلى ختم القرآن — محمد 13 سنة' },
-              { img: '/images/story2.png', alt: 'رحلتي مع التجويد غيرت تلاوتي — سارة 22 سنة' },
-              { img: '/images/story3.png', alt: 'حفظت القرآن في 8 أشهر — علي 19 سنة' },
-            ].map((s) => (
-              <div
-                key={s.img}
-                style={{ borderRadius: 18, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 20px 44px rgba(0,0,0,.32)', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-              >
-                <img src={s.img} alt={s.alt} style={{ width: '100%', height: 'auto', display: 'block' }} />
-              </div>
-            ))}
-          </div>
-
-          {/* Lead text */}
-          <div style={{ flex: '0 1 300px', minWidth: 260, textAlign: 'right', order: 2 }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,3.6vw,48px)', lineHeight: 1.25, color: '#fff', fontFamily: 'Cairo' }}>
-              قصص نجاح<br />من واقع تجربتهم
-            </h2>
-            <p style={{ marginTop: 18, color: '#c4b6e0', fontSize: 16.5, lineHeight: 1.9, maxWidth: 320, marginInlineStart: 'auto' }}>
-              آلاف الطلاب حول العالم حققوا أهدافهم في تعلم وحفظ القرآن مع ترتيلة أونلاين
-            </p>
-            <button
-              style={{ cursor: 'pointer', marginTop: 26, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 16, color: '#fff', background: 'transparent', border: '1.5px solid rgba(232,199,106,.5)', borderRadius: 34, padding: '14px 30px', transition: 'transform .25s, border-color .25s, background .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#E8C76A'; e.currentTarget.style.background = 'rgba(232,199,106,.08)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(232,199,106,.5)'; e.currentTarget.style.background = 'transparent' }}
-            >
-              شاهد المزيد من القصص
-            </button>
-          </div>
-        </div>
-      </section>
+      <TestimonialsSection />
 
       {/* ════════════════════════════════════════
           COMMUNITY

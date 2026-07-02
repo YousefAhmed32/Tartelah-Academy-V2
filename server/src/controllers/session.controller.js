@@ -5,6 +5,17 @@ const { createNotification } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 
+const ON_TIME_GRACE_MINUTES = 10
+
+function computeAttendanceFromTiming(scheduledAt, actualAt) {
+  const diffMinutes = Math.round((actualAt.getTime() - new Date(scheduledAt).getTime()) / 60000)
+  const lateMinutes = Math.max(0, diffMinutes)
+  return {
+    status: lateMinutes > ON_TIME_GRACE_MINUTES ? 'late' : 'on_time',
+    lateMinutes,
+  }
+}
+
 exports.createSession = async (req, res, next) => {
   try {
     const { studentId, titleAr, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
@@ -102,6 +113,43 @@ exports.getTeacherSessionsByMonth = async (req, res, next) => {
   }
 }
 
+// Teacher marks that they've actually joined/started the session — captures
+// punctuality (on_time / late) by comparing the timestamp to scheduledAt.
+exports.startSession = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+    const isAdmin = req.user.role === 'admin'
+    if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    if (session.status !== 'scheduled') return sendError(res, 'لا يمكن بدء هذه الحصة', 400)
+
+    const now = new Date()
+    const { status, lateMinutes } = computeAttendanceFromTiming(session.scheduledAt, now)
+
+    session.status = 'ongoing'
+    session.teacherStartedAt = now
+    session.teacherAttendanceStatus = status
+    session.teacherLateMinutes = lateMinutes
+    session.teacherAttendanceMarkedBy = 'system'
+    await session.save()
+
+    if (status === 'late') {
+      await createNotification({
+        userId: session.teacherId,
+        titleAr: 'تأخرت في بدء الحصة',
+        bodyAr: `بدأت حصة "${session.titleAr}" متأخراً بـ ${lateMinutes} دقيقة`,
+        type: 'attendance',
+        priority: 'medium',
+        relatedId: session._id,
+      })
+    }
+
+    sendSuccess(res, session, 'تم بدء الحصة')
+  } catch (err) {
+    next(err)
+  }
+}
+
 exports.completeSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id)
@@ -110,6 +158,15 @@ exports.completeSession = async (req, res, next) => {
     if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
     session.status = 'completed'
     session.completedAt = new Date()
+    // Fallback: if the teacher completed the session without ever calling
+    // /start (older clients, or direct completion), infer punctuality from
+    // the completion timestamp so attendance data stays populated.
+    if (session.teacherAttendanceStatus === 'pending') {
+      const { status, lateMinutes } = computeAttendanceFromTiming(session.scheduledAt, session.completedAt)
+      session.teacherAttendanceStatus = status
+      session.teacherLateMinutes = lateMinutes
+      session.teacherAttendanceMarkedBy = 'system'
+    }
     await session.save()
     await Subscription.findOneAndUpdate(
       { studentId: session.studentId, status: 'active' },

@@ -1,13 +1,23 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom'
+import { Suspense, useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../store/authStore.js'
 import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
 import Avatar from '../components/ui/Avatar.jsx'
 import NotificationBell from '../components/ui/NotificationBell.jsx'
+import Spinner from '../components/ui/Spinner.jsx'
+import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import { ROUTES, ROLES } from '../config/constants.js'
+
+function ContentFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Spinner color="border-brand-purple" />
+    </div>
+  )
+}
 
 const NAV_GROUPS = [
   {
@@ -56,6 +66,10 @@ const NAV_GROUPS = [
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M9 17H7a4 4 0 0 1 0-8h2M15 7h2a4 4 0 0 1 0 8h-2M8 13h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
+        to: ROUTES.TEACHER_PERFORMANCE, label: 'أدائي والراتب',
+        icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="17" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.8"/></svg>
+      },
+      {
         to: ROUTES.TEACHER_NOTIFICATIONS, label: 'الإشعارات', notification: true,
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
@@ -68,11 +82,11 @@ const NAV_GROUPS = [
 ]
 
 const MOBILE_ITEMS = [
-  NAV_GROUPS[0].items[0],
-  NAV_GROUPS[0].items[2],
-  NAV_GROUPS[1].items[1],
-  NAV_GROUPS[1].items[2],
-  NAV_GROUPS[2].items[1],
+  NAV_GROUPS[0].items[0], // Dashboard
+  NAV_GROUPS[0].items[2], // Sessions
+  NAV_GROUPS[1].items[1], // Evaluations
+  NAV_GROUPS[1].items[2], // Homework
+  NAV_GROUPS[2].items[2], // Notifications
 ]
 
 export default function TeacherLayout() {
@@ -80,6 +94,7 @@ export default function TeacherLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   useNotificationInit()
 
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
@@ -181,7 +196,7 @@ export default function TeacherLayout() {
   return (
     <div
       className="flex min-h-screen"
-      style={{ background: 'linear-gradient(165deg, #1d0c3a 0%, #150729 60%, #10061f 100%)', direction: 'rtl' }}
+      style={{ background: '#F8FAFC', direction: 'rtl' }}
     >
       {/* Desktop Sidebar */}
       <aside
@@ -220,23 +235,23 @@ export default function TeacherLayout() {
       {/* Main Content */}
       <main className="flex-1 min-w-0 flex flex-col">
         {/* Top Header */}
-        <div
-          className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 py-3.5 backdrop-blur-sm"
-          style={{ background: 'rgba(15,5,35,0.8)', borderBottom: '1px solid rgba(150,120,220,0.1)' }}
-        >
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 h-16 bg-white border-b border-gray-200">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="lg:hidden w-10 h-10 rounded-xl flex items-center justify-center border text-white/70 hover:bg-white/5 transition-colors"
-            style={{ borderColor: 'rgba(150,120,220,0.2)' }}
+            className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/>
             </svg>
           </button>
 
+          <div className="font-heading font-bold text-base text-gray-900 hidden lg:block">
+            لوحة المعلم
+          </div>
+
           {/* Header Right: Notifications + Avatar */}
-          <div className="flex items-center gap-3">
-            <NotificationBell theme="dark" viewAllPath={ROUTES.TEACHER_NOTIFICATIONS} />
+          <div className="flex items-center gap-2.5">
+            <NotificationBell theme="light" viewAllPath={ROUTES.TEACHER_NOTIFICATIONS} />
             <Avatar
               src={user?.avatar}
               firstName={user?.firstNameAr || user?.firstName}
@@ -249,13 +264,17 @@ export default function TeacherLayout() {
 
         {/* Page Content */}
         <div className="flex-1 p-5 lg:p-8 pb-24 lg:pb-8">
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<ContentFallback />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Mobile Bottom Nav */}
         <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-20 flex"
-          style={{ background: 'rgba(22,7,41,0.98)', borderTop: '1px solid rgba(150,120,220,0.15)', direction: 'rtl' }}
+          className="lg:hidden fixed bottom-0 inset-x-0 z-20 flex bg-white border-t border-gray-200"
+          style={{ direction: 'rtl' }}
         >
           {MOBILE_ITEMS.map((item) => (
             <NavLink
@@ -263,7 +282,7 @@ export default function TeacherLayout() {
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-semibold transition-colors ${isActive ? 'text-brand-gold' : 'text-[#b1a0d6]'}`
+                `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-semibold transition-colors ${isActive ? 'text-violet-700' : 'text-gray-400'}`
               }
             >
               {item.icon}

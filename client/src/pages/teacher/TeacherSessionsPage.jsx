@@ -12,7 +12,10 @@ import Badge from '../../components/ui/Badge.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
+import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { toArray } from '../../utils/format.js'
 import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY } from '../../config/constants.js'
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
@@ -52,20 +55,20 @@ function QuickEvalModal({ session, onClose }) {
     onError: () => toast.error('حدث خطأ'),
   })
 
-  const scoreColor = score >= 8 ? '#22c55e' : score >= 6 ? '#E8C76A' : score >= 4 ? '#f59e0b' : '#ef4444'
+  const scoreColor = score >= 8 ? '#22c55e' : score >= 6 ? '#7c3aed' : score >= 4 ? '#f59e0b' : '#ef4444'
 
   return (
     <Modal open onClose={onClose} title="تقييم سريع" size="sm"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button variant="gold" onClick={() => mutation.mutate()} loading={mutation.isPending}>حفظ التقييم</Button>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إلغاء</Button>
+          <Button variant="purple" onClick={() => mutation.mutate()} loading={mutation.isPending}>حفظ التقييم</Button>
         </>
       }
     >
       <div className="space-y-4" dir="rtl">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-[#f8f5ff]">
-          <Avatar src={session.studentId?.avatar} name={`${session.studentId?.firstNameAr} ${session.studentId?.lastNameAr}`} size="sm" />
+          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div>
             <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
             <div className="text-xs text-[#9b7fd6]">{session.titleAr}</div>
@@ -123,14 +126,14 @@ function QuickHomeworkModal({ session, onClose }) {
     <Modal open onClose={onClose} title="واجب سريع" size="sm"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button variant="gold" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!title || !due}>إنشاء الواجب</Button>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إلغاء</Button>
+          <Button variant="purple" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!title || !due}>إنشاء الواجب</Button>
         </>
       }
     >
       <div className="space-y-4" dir="rtl">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-[#f8f5ff]">
-          <Avatar src={session.studentId?.avatar} name={`${session.studentId?.firstNameAr} ${session.studentId?.lastNameAr}`} size="sm" />
+          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
         </div>
         <div>
@@ -167,8 +170,8 @@ function RescheduleModal({ session, onClose, qc }) {
     <Modal open onClose={onClose} title="إعادة جدولة" size="sm"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button variant="gold" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!newDate}>تأكيد</Button>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إلغاء</Button>
+          <Button variant="purple" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!newDate}>تأكيد</Button>
         </>
       }
     >
@@ -225,6 +228,23 @@ function SessionCard({ session, onEval, onHomework }) {
     onError: () => toast.error('حدث خطأ'),
   })
 
+  // Captures teacher punctuality (on_time/late) by timestamping the actual join —
+  // fires silently alongside opening the meeting link, no extra click needed.
+  const startMutation = useMutation({
+    mutationFn: () => api.patch(`/sessions/${session._id}/start`),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
+      if (res.data.data.teacherAttendanceStatus === 'late') {
+        toast('بدأت الحصة متأخراً — تم تسجيل ذلك في سجل حضورك', { icon: '⏱️' })
+      }
+    },
+  })
+
+  function handleJoin() {
+    if (session.status === 'scheduled') startMutation.mutate()
+    window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+  }
+
   const cancelMutation = useMutation({
     mutationFn: () => api.patch(`/sessions/${session._id}/cancel`, { reason: '' }),
     onSuccess: () => {
@@ -239,18 +259,18 @@ function SessionCard({ session, onEval, onHomework }) {
 
   return (
     <>
-      <motion.div layout className="rounded-2xl overflow-hidden transition-all"
-        style={{ background: 'rgba(255,255,255,0.05)', border: expanded ? '1px solid rgba(232,199,106,0.25)' : '1px solid rgba(255,255,255,0.08)' }}
+      <motion.div layout className="rounded-2xl overflow-hidden transition-all bg-white shadow-sm"
+        style={{ border: expanded ? '1px solid rgba(124,58,237,0.3)' : '1px solid #f3f4f6' }}
       >
         {/* Main row */}
         <button
           className="w-full flex items-center gap-3 p-4 text-start"
           onClick={() => setExpanded(p => !p)}
         >
-          <Avatar src={session.studentId?.avatar} name={`${session.studentId?.firstNameAr} ${session.studentId?.lastNameAr}`} size="sm" />
+          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-sm truncate">{session.titleAr}</div>
-            <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: '#b3a4d0' }}>
+            <div className="text-gray-900 font-semibold text-sm truncate">{session.titleAr}</div>
+            <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap text-gray-500">
               <span>{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</span>
               <span>•</span>
               <span>{formatDateAr(session.scheduledAt)}</span>
@@ -262,16 +282,19 @@ function SessionCard({ session, onEval, onHomework }) {
           <div className="flex items-center gap-2 flex-none">
             {existingAtt && isPast && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.bg || 'rgba(255,255,255,0.1)', color: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.color || '#b3a4d0' }}>
+                style={{ background: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.bg || '#f3f4f6', color: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.color || '#6b7280' }}>
                 {ATT_OPTIONS.find(o => o.value === existingAtt.status)?.label || ''}
               </span>
+            )}
+            {session.teacherAttendanceStatus && session.teacherAttendanceStatus !== 'pending' && (
+              <AttendanceStatusBadge status={session.teacherAttendanceStatus} size="sm" />
             )}
             <span className="text-xs font-bold px-2 py-0.5 rounded-full"
               style={{ background: statusInfo.bg, color: statusInfo.color }}>
               {statusInfo.label}
             </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-none transition-transform"
-              style={{ color: '#b3a4d0', transform: expanded ? 'rotate(180deg)' : '' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-none transition-transform text-gray-400"
+              style={{ transform: expanded ? 'rotate(180deg)' : '' }}>
               <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
@@ -287,32 +310,32 @@ function SessionCard({ session, onEval, onHomework }) {
               transition={{ duration: 0.2 }}
               style={{ overflow: 'hidden' }}
             >
-              <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
 
-                {/* Meeting link */}
+                {/* Meeting link — also captures teacher punctuality on first join */}
                 {session.meetingLink && (
                   <div className="pt-3">
-                    <a href={session.meetingLink} target="_blank" rel="noopener noreferrer"
-                      className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold">
+                    <button onClick={handleJoin} disabled={startMutation.isPending}
+                      className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold disabled:opacity-60">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                         <path d="M15 10l5-5M15 10h4V6M10 9a5 5 0 0 0-5 5v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      ابدأ الحصة
-                    </a>
+                      {session.status === 'scheduled' ? 'ابدأ الحصة' : 'الانضمام للرابط'}
+                    </button>
                   </div>
                 )}
 
                 {/* Attendance section — only for past sessions */}
                 {isPast && (
                   <div className="pt-3">
-                    <div className="text-xs font-bold mb-2.5" style={{ color: '#E8C76A' }}>سجّل الحضور</div>
+                    <div className="text-xs font-bold mb-2.5 text-gray-700">سجّل الحضور</div>
                     <div className="grid grid-cols-4 gap-2 mb-2.5">
                       {ATT_OPTIONS.map(opt => (
                         <button key={opt.value} onClick={() => setAttStatus(opt.value)}
                           className="py-2 rounded-xl text-xs font-bold transition-all"
                           style={{
-                            background: attStatus === opt.value ? opt.bg : 'rgba(255,255,255,0.06)',
-                            color: attStatus === opt.value ? opt.color : '#b3a4d0',
+                            background: attStatus === opt.value ? opt.bg : '#f9fafb',
+                            color: attStatus === opt.value ? opt.color : '#9ca3af',
                             border: attStatus === opt.value ? `1.5px solid ${opt.color}` : '1.5px solid transparent',
                           }}>
                           {opt.label}
@@ -324,14 +347,13 @@ function SessionCard({ session, onEval, onHomework }) {
                       onChange={e => setAttNotes(e.target.value)}
                       rows={1}
                       placeholder="ملاحظات الحضور..."
-                      className="w-full rounded-xl px-3 py-2 text-xs resize-none mb-2"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: '#e2d9f3', border: '1px solid rgba(255,255,255,0.1)' }}
+                      className="w-full rounded-xl px-3 py-2 text-xs resize-none mb-2 bg-gray-50 text-gray-700 border border-gray-200 outline-none focus:border-violet-400"
                     />
                     <button
                       onClick={() => saveAttMutation.mutate()}
                       disabled={!attStatus || saveAttMutation.isPending}
                       className="w-full py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                      style={{ background: attOpt ? attOpt.bg : 'rgba(124,58,237,0.2)', color: attOpt ? attOpt.color : '#c4b5fd' }}
+                      style={{ background: attOpt ? attOpt.bg : 'rgba(124,58,237,0.12)', color: attOpt ? attOpt.color : '#7c3aed' }}
                     >
                       {saveAttMutation.isPending ? 'جارٍ الحفظ...' : existingAtt ? 'تحديث الحضور' : 'حفظ الحضور'}
                     </button>
@@ -362,14 +384,14 @@ function SessionCard({ session, onEval, onHomework }) {
                   <button
                     onClick={() => onEval(session)}
                     className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                    style={{ background: 'rgba(232,199,106,0.12)', color: '#E8C76A', border: '1px solid rgba(232,199,106,0.2)' }}
+                    style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', border: '1px solid rgba(217,119,6,0.2)' }}
                   >
                     <Star size={13} strokeWidth={2} /> تقييم
                   </button>
                   <button
                     onClick={() => onHomework(session)}
                     className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                    style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)' }}
+                    style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)' }}
                   >
                     <FileText size={13} strokeWidth={2} /> واجب
                   </button>
@@ -473,7 +495,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
       size="lg"
       footer={
         <div className="flex items-center justify-between w-full gap-3">
-          <Button variant="ghost" onClick={step === 1 ? onClose : () => setStep(p => p - 1)}>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={step === 1 ? onClose : () => setStep(p => p - 1)}>
             {step === 1 ? 'إلغاء' : 'رجوع'}
           </Button>
           <div className="flex gap-2">
@@ -486,12 +508,12 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               </Button>
             )}
             {step === 3 && (
-              <Button variant="gold" onClick={() => previewMutation.mutate()} loading={previewMutation.isPending} disabled={!canPreview}>
+              <Button variant="purple" onClick={() => previewMutation.mutate()} loading={previewMutation.isPending} disabled={!canPreview}>
                 معاينة الجدول
               </Button>
             )}
             {step === 4 && (
-              <Button variant="gold" onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
+              <Button variant="purple" onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
                 إنشاء الجدول ({preview.length} حصة)
               </Button>
             )}
@@ -533,7 +555,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                       border: form.studentId === s._id ? '1.5px solid #7c3aed' : '1.5px solid transparent',
                     }}
                   >
-                    <Avatar src={s.avatar} name={`${s.firstNameAr} ${s.lastNameAr}`} size="sm" />
+                    <Avatar src={s.avatar} firstName={s.firstNameAr} lastName={s.lastNameAr} size="sm" />
                     <div className="text-start">
                       <div className="font-semibold text-sm text-brand-textBody">{s.firstNameAr} {s.lastNameAr}</div>
                       <div className="text-xs text-[#9b7fd6]">{s.email}</div>
@@ -680,7 +702,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
           <div className="space-y-4">
             {selectedStudent && (
               <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
-                <Avatar src={selectedStudent.avatar} name={`${selectedStudent.firstNameAr} ${selectedStudent.lastNameAr}`} size="sm" />
+                <Avatar src={selectedStudent.avatar} firstName={selectedStudent.firstNameAr} lastName={selectedStudent.lastNameAr} size="sm" />
                 <div>
                   <div className="font-bold text-sm text-brand-textBody">{selectedStudent.firstNameAr} {selectedStudent.lastNameAr}</div>
                   <div className="text-xs text-[#9b7fd6]">
@@ -732,27 +754,26 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
 }
 
 // ─── Schedule Rules Tab ───────────────────────────────────────────────────────
-function ScheduleRulesView({ rules, isLoading, onRefresh }) {
-  if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-brand-gold" /></div>
+function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
+  if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
+  if (isError) return <ErrorState onRetry={onRetry} isRetrying={isFetching} />
   if (!rules.length) return (
-    <div className="rounded-2xl p-16 text-center"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-      <CalendarDays size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
-      <p className="text-white font-semibold mb-1">لا توجد جداول دورية</p>
-      <p className="text-sm" style={{ color: '#b3a4d0' }}>أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
+    <div className="rounded-2xl p-16 text-center bg-white border-2 border-dashed border-gray-200">
+      <CalendarDays size={44} strokeWidth={1.3} className="mb-3 mx-auto text-gray-300" />
+      <p className="text-gray-900 font-semibold mb-1">لا توجد جداول دورية</p>
+      <p className="text-sm text-gray-500">أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
     </div>
   )
 
   return (
     <div className="space-y-3">
       {rules.map(rule => (
-        <div key={rule._id} className="rounded-2xl p-4"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div key={rule._id} className="rounded-2xl p-4 bg-white border border-gray-100 shadow-sm">
           <div className="flex items-start gap-3">
-            <Avatar src={rule.studentId?.avatar} name={`${rule.studentId?.firstNameAr} ${rule.studentId?.lastNameAr}`} size="md" />
+            <Avatar src={rule.studentId?.avatar} firstName={rule.studentId?.firstNameAr} lastName={rule.studentId?.lastNameAr} size="md" />
             <div className="flex-1 min-w-0">
-              <div className="text-white font-bold truncate">{rule.studentId?.firstNameAr} {rule.studentId?.lastNameAr}</div>
-              <div className="text-xs mt-1 flex flex-wrap gap-2" style={{ color: '#b3a4d0' }}>
+              <div className="text-gray-900 font-bold truncate">{rule.studentId?.firstNameAr} {rule.studentId?.lastNameAr}</div>
+              <div className="text-xs mt-1 flex flex-wrap gap-2 text-gray-500">
                 <span>{SCHEDULE_FREQUENCY[rule.frequency]?.label}</span>
                 {rule.daysOfWeek.length > 0 && (
                   <span>•  {rule.daysOfWeek.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label).join(' + ')}</span>
@@ -761,39 +782,33 @@ function ScheduleRulesView({ rules, isLoading, onRefresh }) {
                 <span>• {rule.durationMinutes} دقيقة</span>
               </div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                   {rule.stats?.completed || 0} مكتملة
                 </span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd' }}>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
                   {rule.stats?.total || 0} إجمالي
                 </span>
                 {rule.stats?.nextSession && (
-                  <span className="text-xs" style={{ color: '#E8C76A' }}>
+                  <span className="text-xs text-amber-600">
                     التالية: {formatDateAr(rule.stats.nextSession)}
                   </span>
                 )}
               </div>
             </div>
             <div className="flex-none">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{
-                  background: rule.status === 'active' ? 'rgba(34,197,94,0.15)' : 'rgba(100,116,139,0.15)',
-                  color: rule.status === 'active' ? '#22c55e' : '#94a3b8',
-                }}>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${rule.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                 {rule.status === 'active' ? 'نشط' : rule.status === 'paused' ? 'موقوف' : 'منتهٍ'}
               </span>
             </div>
           </div>
           {rule.meetingLink && (
-            <div className="mt-3 pt-3 border-t flex items-center gap-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ color: '#b3a4d0' }}>
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-gray-400">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
               <a href={rule.meetingLink} target="_blank" rel="noopener noreferrer"
-                className="text-xs truncate" style={{ color: '#b3a4d0' }}>
+                className="text-xs truncate text-gray-500 hover:text-violet-600">
                 {rule.meetingLink}
               </a>
             </div>
@@ -827,25 +842,25 @@ export default function TeacherSessionsPage() {
     else setViewMonth(m => m + 1)
   }
 
-  const { data: sessions = [], isLoading: sessLoading } = useQuery({
+  const { data: sessions = [], isLoading: sessLoading, isError: sessError, isFetching: sessFetching, refetch: refetchSessions } = useQuery({
     queryKey: ['teacher', 'sessions', 'month', viewYear, viewMonth],
-    queryFn: () => api.get(`/sessions/teacher-month?year=${viewYear}&month=${viewMonth}`).then(r => r.data.data),
+    queryFn: () => api.get(`/sessions/teacher-month?year=${viewYear}&month=${viewMonth}`).then(r => toArray(r.data?.data)),
   })
 
-  const { data: rules = [], isLoading: rulesLoading } = useQuery({
+  const { data: rules = [], isLoading: rulesLoading, isError: rulesError, isFetching: rulesFetching, refetch: refetchRules } = useQuery({
     queryKey: ['teacher', 'schedule-rules'],
-    queryFn: () => api.get('/schedule-rules/my').then(r => r.data.data),
+    queryFn: () => api.get('/schedule-rules/my').then(r => toArray(r.data?.data)),
     enabled: tab === 'rules',
   })
 
   const { data: students = [] } = useQuery({
     queryKey: ['teacher', 'students'],
-    queryFn: () => api.get('/teachers/me/students').then(r => r.data.data),
+    queryFn: () => api.get('/teachers/me/students').then(r => toArray(r.data?.data)),
   })
 
-  const { data: history = [], isLoading: histLoading } = useQuery({
+  const { data: history = [], isLoading: histLoading, isError: histError, isFetching: histFetching, refetch: refetchHistory } = useQuery({
     queryKey: ['teacher', 'sessions', 'history'],
-    queryFn: () => api.get('/sessions/history').then(r => r.data.data),
+    queryFn: () => api.get('/sessions/history').then(r => toArray(r.data?.data)),
     enabled: tab === 'history',
   })
 
@@ -881,12 +896,12 @@ export default function TeacherSessionsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start gap-3 justify-between">
         <div>
-          <h1 className="font-heading font-extrabold text-2xl text-white">الحصص الدراسية</h1>
-          <p className="text-sm mt-0.5" style={{ color: '#b3a4d0' }}>إدارة حصصك وجداولك الدورية</p>
+          <h1 className="font-heading font-extrabold text-2xl text-gray-900">الحصص الدراسية</h1>
+          <p className="text-sm mt-0.5 text-gray-500">إدارة حصصك وجداولك الدورية</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="ghost" onClick={() => setShowManual(true)}>+ حصة واحدة</Button>
-          <Button size="sm" variant="gold" onClick={() => setShowWizard(true)}>
+          <Button size="sm" variant="ghost" className="!bg-white !text-gray-700 !border-gray-200 hover:!bg-gray-50" onClick={() => setShowManual(true)}>+ حصة واحدة</Button>
+          <Button size="sm" variant="purple" onClick={() => setShowWizard(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="inline me-1.5">
               <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
@@ -896,18 +911,13 @@ export default function TeacherSessionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="flex gap-1.5 p-1 rounded-xl w-fit bg-gray-100">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className="px-4 py-1.5 rounded-[10px] text-xs font-semibold transition-all flex items-center gap-1.5"
-            style={{
-              background: tab === t.key ? 'rgba(232,199,106,0.2)' : 'transparent',
-              color: tab === t.key ? '#E8C76A' : '#b3a4d0',
-            }}>
+            className={`px-4 py-1.5 rounded-[10px] text-xs font-semibold transition-all flex items-center gap-1.5 ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.label}
             {t.count != null && t.count > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ background: tab === t.key ? 'rgba(232,199,106,0.3)' : 'rgba(255,255,255,0.1)' }}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-violet-100 text-violet-700' : 'bg-gray-200 text-gray-500'}`}>
                 {t.count}
               </span>
             )}
@@ -921,19 +931,17 @@ export default function TeacherSessionsPage() {
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-4">
             <button onClick={prevMonth}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#b3a4d0' }}>
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all bg-gray-100 text-gray-500 hover:bg-gray-200">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             <div className="text-center">
-              <div className="text-white font-bold font-heading">{AR_MONTHS[viewMonth - 1]} {viewYear}</div>
-              <div className="text-xs" style={{ color: '#b3a4d0' }}>{sessions.length} حصة</div>
+              <div className="text-gray-900 font-bold font-heading">{AR_MONTHS[viewMonth - 1]} {viewYear}</div>
+              <div className="text-xs text-gray-500">{sessions.length} حصة</div>
             </div>
             <button onClick={nextMonth}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#b3a4d0' }}>
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all bg-gray-100 text-gray-500 hover:bg-gray-200">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -941,26 +949,26 @@ export default function TeacherSessionsPage() {
           </div>
 
           {sessLoading ? (
-            <div className="flex justify-center py-16"><Spinner color="border-brand-gold" /></div>
+            <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
+          ) : sessError ? (
+            <ErrorState onRetry={refetchSessions} isRetrying={sessFetching} />
           ) : sessions.length === 0 ? (
-            <div className="rounded-2xl p-14 text-center"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <Calendar size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
-              <p className="text-white font-semibold mb-1">لا توجد حصص هذا الشهر</p>
-              <p className="text-sm mb-4" style={{ color: '#b3a4d0' }}>أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
-              <Button size="sm" variant="gold" onClick={() => setShowWizard(true)}>إنشاء جدول دوري</Button>
+            <div className="rounded-2xl p-14 text-center bg-white border-2 border-dashed border-gray-200">
+              <Calendar size={44} strokeWidth={1.3} className="mb-3 mx-auto text-gray-300" />
+              <p className="text-gray-900 font-semibold mb-1">لا توجد حصص هذا الشهر</p>
+              <p className="text-sm mb-4 text-gray-500">أنشئ جدولاً دورياً لتوليد الحصص تلقائياً</p>
+              <Button size="sm" variant="purple" onClick={() => setShowWizard(true)}>إنشاء جدول دوري</Button>
             </div>
           ) : (
             <div className="space-y-5">
               {Object.entries(grouped).map(([dateKey, daySessions]) => (
                 <div key={dateKey}>
                   <div className="flex items-center gap-2 mb-2.5">
-                    <div className="text-xs font-bold px-3 py-1 rounded-full"
-                      style={{ background: 'rgba(232,199,106,0.15)', color: '#E8C76A' }}>
+                    <div className="text-xs font-bold px-3 py-1 rounded-full bg-violet-100 text-violet-700">
                       {formatDateAr(new Date(dateKey))}
                     </div>
-                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                    <span className="text-xs" style={{ color: '#b3a4d0' }}>{daySessions.length} حصة</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                    <span className="text-xs text-gray-500">{daySessions.length} حصة</span>
                   </div>
                   <div className="space-y-2">
                     {daySessions.map(s => (
@@ -981,7 +989,9 @@ export default function TeacherSessionsPage() {
         <ScheduleRulesView
           rules={rules}
           isLoading={rulesLoading}
-          onRefresh={() => qc.invalidateQueries({ queryKey: ['teacher', 'schedule-rules'] })}
+          isError={rulesError}
+          isFetching={rulesFetching}
+          onRetry={refetchRules}
         />
       )}
 
@@ -989,11 +999,12 @@ export default function TeacherSessionsPage() {
       {tab === 'history' && (
         <div>
           {histLoading ? (
-            <div className="flex justify-center py-16"><Spinner color="border-brand-gold" /></div>
+            <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
+          ) : histError ? (
+            <ErrorState onRetry={refetchHistory} isRetrying={histFetching} />
           ) : !history.length ? (
-            <div className="rounded-2xl p-14 text-center"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <p className="text-white font-semibold">لا يوجد سجل حصص</p>
+            <div className="rounded-2xl p-14 text-center bg-white border-2 border-dashed border-gray-200">
+              <p className="text-gray-900 font-semibold">لا يوجد سجل حصص</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -1009,8 +1020,8 @@ export default function TeacherSessionsPage() {
       <Modal open={showManual} onClose={() => setShowManual(false)} title="جدولة حصة واحدة" size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowManual(false)}>إلغاء</Button>
-            <Button variant="gold" onClick={() => createManualMutation.mutate(manualForm)}
+            <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={() => setShowManual(false)}>إلغاء</Button>
+            <Button variant="purple" onClick={() => createManualMutation.mutate(manualForm)}
               loading={createManualMutation.isPending}
               disabled={!manualForm.studentId || !manualForm.titleAr || !manualForm.scheduledAt}>
               جدولة الحصة

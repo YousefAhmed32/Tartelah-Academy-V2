@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
@@ -8,8 +9,11 @@ import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
-import Spinner from '../../components/ui/Spinner.jsx'
+import EmptyState from '../../components/shared/EmptyState.jsx'
+import ErrorState from '../../components/shared/ErrorState.jsx'
+import { SkeletonRows } from '../../components/ui/Skeleton.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { toArray } from '../../utils/format.js'
 
 const SURAH_NAMES = ['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه']
 const qualityOptions = [
@@ -25,14 +29,14 @@ export default function TeacherProgressPage() {
   const [form, setForm] = useState({ studentId: '', surahNumber: 1, fromAyah: 1, toAyah: 7, quality: 'good', teacherNotes: '' })
   const qc = useQueryClient()
 
-  const { data: records = [], isLoading } = useQuery({
+  const { data: records = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: [activeTab, 'teacher'],
-    queryFn: () => api.get(`/${activeTab}/teacher`).then(r => r.data.data),
+    queryFn: () => api.get(`/${activeTab}/teacher`).then(r => toArray(r.data?.data)),
   })
 
   const { data: students = [] } = useQuery({
     queryKey: ['teacher', 'students'],
-    queryFn: () => api.get('/teachers/me/students').then(r => r.data.data),
+    queryFn: () => api.get('/teachers/me/students').then(r => toArray(r.data?.data)),
   })
 
   const createMutation = useMutation({
@@ -55,15 +59,15 @@ export default function TeacherProgressPage() {
       <PageHeader
         title="التقدم الدراسي"
         subtitle="تسجيل الحفظ والمراجعة"
-        actions={<Button variant="gold" onClick={() => setShowModal(true)}>+ تسجيل تقدم</Button>}
+        actions={<Button variant="purple" onClick={() => setShowModal(true)}>+ تسجيل تقدم</Button>}
       />
 
-      <div className="flex gap-1 mb-6 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex gap-1 mb-6 p-1 rounded-xl w-fit bg-gray-100">
         {[['memorization', 'الحفظ'], ['revision', 'المراجعة']].map(([key, label]) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`px-5 py-2 rounded-[10px] text-sm font-semibold transition-all ${activeTab === key ? 'bg-brand-gold text-brand-goldText' : 'text-white/60 hover:text-white'}`}
+            className={`px-5 py-2 rounded-[10px] text-sm font-semibold transition-all ${activeTab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {label}
           </button>
@@ -71,25 +75,33 @@ export default function TeacherProgressPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner color="border-brand-gold" /></div>
+        <SkeletonRows count={5} />
+      ) : isError ? (
+        <ErrorState onRetry={refetch} isRetrying={isFetching} />
       ) : !records.length ? (
-        <div className="text-center py-16" style={{ color: '#b3a4d0' }}>
-          <BookOpen size={44} strokeWidth={1.3} color="#b3a4d0" className="mb-3 mx-auto" />
-          <p>لا توجد سجلات</p>
-        </div>
+        <EmptyState
+          icon={<BookOpen size={28} strokeWidth={1.6} />}
+          title="لا توجد سجلات بعد"
+          description={`سجّل ${activeTab === 'memorization' ? 'حفظ' : 'مراجعة'} طلابك ليظهر هنا`}
+          action={{ label: '+ تسجيل تقدم', onClick: () => setShowModal(true) }}
+        />
       ) : (
-        <div className="space-y-3">
-          {records.map((r) => (
-            <div key={r._id} className="rounded-card p-4 flex items-center gap-4 flex-wrap" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <Avatar src={r.studentId?.avatar} name={`${r.studentId?.firstNameAr} ${r.studentId?.lastNameAr}`} size="sm" />
+        <div className="space-y-2.5">
+          {records.map((r, i) => (
+            <motion.div key={r._id}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.03, 0.3) }}
+              whileHover={{ y: -2, boxShadow: '0 10px 24px rgba(15,23,42,0.06)' }}
+              className="rounded-2xl p-4 flex items-center gap-4 flex-wrap transition-all bg-white border border-gray-100 shadow-sm">
+              <Avatar src={r.studentId?.avatar} firstName={r.studentId?.firstNameAr} lastName={r.studentId?.lastNameAr} size="sm" />
               <div className="flex-1 min-w-0">
-                <div className="text-white font-semibold">{r.studentId?.firstNameAr} {r.studentId?.lastNameAr}</div>
-                <div className="text-xs mt-0.5" style={{ color: '#b3a4d0' }}>
+                <div className="text-gray-900 font-semibold">{r.studentId?.firstNameAr} {r.studentId?.lastNameAr}</div>
+                <div className="text-xs mt-0.5 text-gray-500">
                   {SURAH_NAMES[r.surahNumber - 1] || `سورة ${r.surahNumber}`} • آية {r.fromAyah} - {r.toAyah} • {formatDateAr(r.recordedAt)}
                 </div>
               </div>
-              <span className="text-sm font-bold" style={{ color: qualityColor[r.quality] }}>{qualityLabel[r.quality]}</span>
-            </div>
+              <span className="text-sm font-bold px-2.5 py-1 rounded-lg" style={{ color: qualityColor[r.quality], background: `${qualityColor[r.quality]}18` }}>{qualityLabel[r.quality]}</span>
+            </motion.div>
           ))}
         </div>
       )}
@@ -101,9 +113,9 @@ export default function TeacherProgressPage() {
         size="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
+            <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={() => setShowModal(false)}>إلغاء</Button>
             <Button
-              variant="gold"
+              variant="purple"
               onClick={() => createMutation.mutate({
                 ...form,
                 surahNumber: Number(form.surahNumber),

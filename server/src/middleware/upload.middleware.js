@@ -128,6 +128,25 @@ exports.uploadCourseCover = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
 }).single('cover')
 
+const successStoryStorage = multer.diskStorage({
+  destination(req, file, cb) {
+    const dir = path.join(UPLOAD_BASE, 'success-stories')
+    ensureDir(dir)
+    cb(null, dir)
+  },
+  filename(req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase()
+    const slot = req.params.role || 'banner'
+    cb(null, `story_${slot}_${Date.now()}${ext}`)
+  },
+})
+
+exports.uploadSuccessStoryImage = multer({
+  storage: successStoryStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 8 * 1024 * 1024 },
+}).single('image')
+
 exports.handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
