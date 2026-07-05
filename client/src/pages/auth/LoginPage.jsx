@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { ShieldCheck, Users, BookOpen, Mail, Lock, Eye, EyeOff, ChevronUp } from 'lucide-react'
+import { ShieldCheck, Users, GraduationCap, BookOpen, Mail, Lock, Eye, EyeOff, ChevronUp } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore.js'
 import { authService } from '../../services/auth.service.js'
 import { ROUTES } from '../../config/constants.js'
@@ -17,9 +17,10 @@ import {
 const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true'
 
 const DEV_ACCOUNTS = [
-  { role: 'admin',   label: 'Admin',   Icon: ShieldCheck, color: '#ef4444', bg: 'rgba(239,68,68,0.09)',  border: 'rgba(239,68,68,0.22)'  },
-  { role: 'teacher', label: 'Teacher', Icon: Users,       color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)' },
-  { role: 'student', label: 'Student', Icon: BookOpen,    color: '#22c55e', bg: 'rgba(34,197,94,0.09)',  border: 'rgba(34,197,94,0.22)'  },
+  { role: 'admin',          label: 'Admin',   Icon: ShieldCheck,  color: '#ef4444', bg: 'rgba(239,68,68,0.09)',  border: 'rgba(239,68,68,0.22)'  },
+  { role: 'teacher',        label: 'Teacher', Icon: Users,        color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)' },
+  { role: 'teacher_female', label: 'معلمة',   Icon: GraduationCap,color: '#8b5cf6', bg: 'rgba(139,92,246,0.09)', border: 'rgba(139,92,246,0.22)' },
+  { role: 'student',        label: 'Student', Icon: BookOpen,     color: '#22c55e', bg: 'rgba(34,197,94,0.09)',  border: 'rgba(34,197,94,0.22)'  },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ export default function LoginPage() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {DEV_ACCOUNTS.map(acc => (
                     <button
                       key={acc.role}

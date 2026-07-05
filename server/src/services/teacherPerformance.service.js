@@ -153,7 +153,7 @@ async function getOrgWidePerformance({ from, to, search, page = 1, limit = 20 } 
 
   const total = await User.countDocuments(filter)
   const teachers = await User.find(filter)
-    .select('firstNameAr lastNameAr avatar email salaryPerSession isActive')
+    .select('firstNameAr lastNameAr avatar gender email salaryPerSession isActive')
     .sort({ firstNameAr: 1 })
     .skip((page - 1) * limit)
     .limit(limit)
@@ -166,6 +166,7 @@ async function getOrgWidePerformance({ from, to, search, page = 1, limit = 20 } 
       firstNameAr: t.firstNameAr,
       lastNameAr: t.lastNameAr,
       avatar: t.avatar,
+      gender: t.gender,
       email: t.email,
       isActive: t.isActive,
       salaryPerSession: t.salaryPerSession || 0,
@@ -190,14 +191,63 @@ async function getSalaryReport({ from, to } = {}) {
 }
 
 /** Admin manual correction of a specific session's teacher-attendance status. */
-async function correctAttendance(sessionId, { status, notes }) {
+async function correctAttendance(sessionId, { status, notes, payrollStatus, payrollStatusReason }) {
   const session = await Session.findById(sessionId)
   if (!session) return null
   if (status) session.teacherAttendanceStatus = status
   if (notes !== undefined) session.teacherAttendanceNotes = notes
   session.teacherAttendanceMarkedBy = 'admin'
+
+  // A correction is, by definition, a durable admin decision — mark it so
+  // the sweep job / completeSession never silently recompute over it again.
+  if (payrollStatus) {
+    session.payrollStatus = payrollStatus
+    session.payrollStatusReason = payrollStatusReason || 'تصحيح يدوي من الإدارة'
+    session.payrollStatusSetBy = 'admin'
+    session.payrollStatusSetAt = new Date()
+  }
+
   await session.save()
   return session
+}
+
+/**
+ * Payroll-readiness breakdown for one teacher over a period — counts and
+ * amounts grouped by the stored payrollStatus field (system-computed by
+ * default, durable once an admin corrects it). This is the concrete answer
+ * to "how many payable sessions did this teacher teach this month, and
+ * what's still pending review."
+ */
+async function getPayrollReadiness(teacherId, { from, to } = {}) {
+  const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession')
+  if (!teacher) return null
+  const rate = teacher.salaryPerSession || 0
+
+  const rows = await Session.aggregate([
+    { $match: { teacherId: toObjectId(teacherId), ...dateRangeMatch(from, to) } },
+    { $group: { _id: '$payrollStatus', count: { $sum: 1 } } },
+  ])
+
+  const counts = { pending: 0, payable: 0, non_payable: 0, pending_review: 0, excluded: 0 }
+  rows.forEach(r => { if (r._id in counts) counts[r._id] = r.count })
+
+  return {
+    teacherId: teacher._id,
+    teacherName: `${teacher.firstNameAr} ${teacher.lastNameAr}`,
+    salaryPerSession: rate,
+    ...counts,
+    estimatedAmount: counts.payable * rate,
+    currency: 'SAR',
+  }
+}
+
+/** Org-wide payroll-readiness breakdown, one row per teacher — for the admin payroll queue. */
+async function getOrgWidePayrollReadiness({ from, to } = {}) {
+  const teachers = await User.find({ role: 'teacher', isActive: true })
+    .select('firstNameAr lastNameAr salaryPerSession')
+    .sort({ firstNameAr: 1 })
+  const rows = await Promise.all(teachers.map(t => getPayrollReadiness(t._id, { from, to })))
+  return rows.filter(Boolean)
 }
 
 module.exports = {
@@ -209,4 +259,6 @@ module.exports = {
   getOrgWidePerformance,
   getSalaryReport,
   correctAttendance,
+  getPayrollReadiness,
+  getOrgWidePayrollReadiness,
 }

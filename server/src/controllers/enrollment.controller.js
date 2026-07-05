@@ -5,6 +5,7 @@ const User = require('../models/User')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
+const { logAction } = require('../services/audit.service')
 const path = require('path')
 
 // Student: Submit enrollment request
@@ -221,6 +222,12 @@ exports.reviewRequest = async (req, res, next) => {
 
     await request.save()
     await request.populate(['packageId', 'studentId', 'teacherId', 'reviewedBy'])
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: `enrollment.${action}`,
+      entity: 'EnrollmentRequest', entityId: request._id,
+      changes: { action, teacherId: request.teacherId, subscriptionId: request.subscriptionId }, ip: req.ip,
+    })
 
     sendSuccess(res, request, action === 'approved' ? 'تمت الموافقة وتفعيل الاشتراك' : 'تم رفض الطلب')
   } catch (err) {

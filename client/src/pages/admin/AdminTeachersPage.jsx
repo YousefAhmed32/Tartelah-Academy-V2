@@ -16,9 +16,11 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
+import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { exportReportToPDF } from '../../utils/exportUtils.js'
+import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -46,12 +48,14 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
     specialization: teacher.specialization || '',
     bioAr: teacher.bioAr || '',
     salaryPerSession: teacher.salaryPerSession || '',
+    gender: teacher.gender || '',
   })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const handleSubmit = (e) => { e.preventDefault(); onSave(form) }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 py-4">
+      <GenderSegmentedControl value={form.gender} onChange={v => set('gender', v)} />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-bold text-gray-400 mb-1 block">الاسم الأول</label>
@@ -333,12 +337,15 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
         <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar src={teacher.avatar} firstName={teacher.firstNameAr} lastName={teacher.lastNameAr} size="lg" />
+              <Avatar src={resolveTeacherIdentity(teacher).displayAvatar} firstName={teacher.firstNameAr} lastName={teacher.lastNameAr} size="lg" />
               <div>
                 <div className="font-heading font-bold text-gray-900 text-base">{teacher.firstNameAr} {teacher.lastNameAr}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full" style={{ background: sc }} />
                   <span className="text-xs font-semibold" style={{ color: sc }}>{teacher.isActive ? 'معلم نشط' : 'حساب موقوف'}</span>
+                  {!teacher.gender && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">التصنيف غير محدد</span>
+                  )}
                 </div>
                 {teacher.specialization && <div className="text-xs text-gray-400 mt-0.5">{teacher.specialization}</div>}
               </div>
@@ -445,7 +452,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const initialForm = { firstNameAr: '', lastNameAr: '', email: '', password: '', phone: '', specialization: '' }
+const initialForm = { firstNameAr: '', lastNameAr: '', email: '', password: '', phone: '', specialization: '', gender: '' }
 
 export default function AdminTeachersPage() {
   const [page, setPage] = useState(1)
@@ -488,6 +495,10 @@ export default function AdminTeachersPage() {
   })
 
   function change(e) { setForm(p => ({ ...p, [e.target.name]: e.target.value })) }
+  function submitCreate() {
+    if (!form.gender) return toast.error('يرجى تحديد تصنيف المعلم: معلم أو معلمة')
+    createMutation.mutate(form)
+  }
   const teachers = data?.data || []
 
   const handlePanelUpdate = (updated) => {
@@ -531,14 +542,19 @@ export default function AdminTeachersPage() {
               onClick={() => { setSelected(t); setPanelInitialTab('info') }}
               className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm cursor-pointer transition-all">
               <div className="flex items-start gap-3 mb-4">
-                <Avatar src={t.avatar} firstName={t.firstNameAr} lastName={t.lastNameAr} size="md" />
+                <Avatar src={resolveTeacherIdentity(t).displayAvatar} firstName={t.firstNameAr} lastName={t.lastNameAr} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="font-heading font-bold text-gray-900 text-base truncate">{t.firstNameAr} {t.lastNameAr}</div>
                   {t.specialization && <div className="text-xs text-gray-500 mt-0.5 truncate">{t.specialization}</div>}
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold mt-1 px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${t.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                    {t.isActive ? 'نشط' : 'موقوف'}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${t.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                      {t.isActive ? 'نشط' : 'موقوف'}
+                    </span>
+                    {!t.gender && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">التصنيف غير محدد</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mb-4">
@@ -585,9 +601,10 @@ export default function AdminTeachersPage() {
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="إضافة معلم جديد" size="md"
         footer={<>
           <Button variant="ghost" onClick={() => setShowCreate(false)}>إلغاء</Button>
-          <Button variant="purple" onClick={() => createMutation.mutate(form)} loading={createMutation.isPending}>إنشاء الحساب</Button>
+          <Button variant="purple" onClick={submitCreate} loading={createMutation.isPending}>إنشاء الحساب</Button>
         </>}>
         <div className="space-y-4">
+          <GenderSegmentedControl value={form.gender} onChange={v => setForm(p => ({ ...p, gender: v }))} required />
           <div className="grid grid-cols-2 gap-4">
             <Input label="الاسم الأول" name="firstNameAr" value={form.firstNameAr} onChange={change} variant="light" />
             <Input label="اسم العائلة" name="lastNameAr" value={form.lastNameAr} onChange={change} variant="light" />

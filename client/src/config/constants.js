@@ -21,6 +21,7 @@ export const ROUTES = {
   ABOUT: '/about',
   PROGRAMS: '/programs',
   TEACHERS: '/teachers',
+  TEACHER_PROFILE: '/teachers/:id',
   PRICING: '/pricing',
   FAQ: '/faq',
   CONTACT: '/contact',
@@ -92,6 +93,8 @@ export const ROUTES = {
   ADMIN_SUCCESS_STORIES: '/admin/success-stories',
 
   ADMIN_TEACHER_PERFORMANCE: '/admin/teacher-performance',
+
+  ADMIN_OPERATIONS: '/admin/operations',
 }
 
 export const MEETING_PROVIDERS = {
@@ -137,6 +140,79 @@ export const ATTENDANCE_STATUS = {
   absent: { label: 'غائب', color: '#ef4444' },
   late: { label: 'متأخر', color: '#f59e0b' },
   excused: { label: 'معذور', color: '#7c3aed' },
+  left_early: { label: 'غادر مبكراً', color: '#0ea5e9' },
+  technical_issue: { label: 'مشكلة تقنية', color: '#64748b' },
+}
+
+// Explicit session-outcome confirmation — distinct from the coarse
+// scheduled/ongoing/completed/... status lifecycle in SESSION_STATUS.
+export const SESSION_OUTCOME = {
+  pending_review: { label: 'بانتظار التأكيد', color: '#9ca3af' },
+  delivered: { label: 'تمت الحصة بنجاح', color: '#22c55e' },
+  partially_delivered: { label: 'تمت جزئياً', color: '#f59e0b' },
+  teacher_absent: { label: 'غياب المعلم', color: '#ef4444' },
+  cancelled_by_teacher: { label: 'ألغاها المعلم', color: '#ef4444' },
+  cancelled_by_admin: { label: 'ألغتها الإدارة', color: '#ef4444' },
+  cancelled_by_student: { label: 'ألغاها الطالب', color: '#ef4444' },
+  technical_issue: { label: 'مشكلة تقنية', color: '#64748b' },
+  rescheduled: { label: 'أُعيدت جدولتها', color: '#f59e0b' },
+  no_students_attended: { label: 'لم يحضر الطالب', color: '#f59e0b' },
+}
+
+// Payroll-readiness state for a session — system-computed by default,
+// durable once an admin corrects it (see docs/INTELLIGENT_ATTENDANCE_SYSTEM.md).
+export const PAYROLL_STATUS = {
+  pending: { label: 'بانتظار الحسم', color: '#9ca3af' },
+  payable: { label: 'مستحقة الدفع', color: '#22c55e' },
+  non_payable: { label: 'غير مستحقة', color: '#ef4444' },
+  pending_review: { label: 'تحتاج مراجعة الإدارة', color: '#f59e0b' },
+  excluded: { label: 'مستبعدة', color: '#6b7280' },
+}
+
+export const DELAY_REASON = {
+  teacher_delay: 'تأخر المعلم',
+  student_delay: 'تأخر الطالب',
+  technical_issue: 'مشكلة تقنية',
+  previous_session_overrun: 'امتداد الحصة السابقة',
+  mutual_agreement: 'اتفاق بين الطرفين',
+  emergency: 'ظرف طارئ',
+  other: 'سبب آخر',
+}
+
+// Mirrors server/src/config/attendancePolicy.js — display-only; the backend
+// remains authoritative for every actual decision.
+export const ATTENDANCE_POLICY = {
+  PRE_SESSION_ACCESS_MINUTES: 60,
+  POST_SESSION_GRACE_MINUTES: 60,
+  EXTENDED_COMPLETION_MINUTES: 180,
+  LATE_TOLERANCE_MINUTES: 15,
+}
+
+// Needs-Review queue severity — computed deterministically by
+// server/src/services/sessionIntelligence.service.js (assessSessionReview).
+export const REVIEW_SEVERITY = {
+  critical: { label: 'حرجة', color: '#dc2626' },
+  high: { label: 'عالية', color: '#ea580c' },
+  medium: { label: 'متوسطة', color: '#f59e0b' },
+  low: { label: 'منخفضة', color: '#6b7280' },
+}
+
+// Review lifecycle — persisted per-session so a dismissed/resolved flag
+// never silently reappears just because the underlying evidence is unchanged.
+export const REVIEW_STATE = {
+  open: { label: 'مفتوحة', color: '#ea580c' },
+  in_review: { label: 'قيد المراجعة', color: '#7c3aed' },
+  resolved: { label: 'مُعتمدة', color: '#22c55e' },
+  dismissed: { label: 'مُتجاهلة', color: '#6b7280' },
+}
+
+// Confidence is about how much OPERATIONAL EVIDENCE backs a session's
+// record — never a claim of verified external-meeting attendance. See
+// server/src/services/sessionIntelligence.service.js computeConfidence().
+export const CONFIDENCE_LEVEL = {
+  high: { label: 'أدلة تشغيلية قوية', color: '#22c55e' },
+  medium: { label: 'طبيعي', color: '#7c3aed' },
+  needs_review: { label: 'يحتاج مراجعة', color: '#ea580c' },
 }
 
 export const EVALUATION_QUALITY = {

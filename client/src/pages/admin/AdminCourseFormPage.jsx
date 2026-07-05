@@ -3,10 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FileText, BookOpen, Target, Search, Info, ChevronLeft, Upload, Save, X, Plus, Link2 } from 'lucide-react'
+import { FileText, BookOpen, Target, Search, Info, ChevronLeft, Upload, Save, X, Plus, Link2, WandSparkles } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
+import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -346,6 +347,135 @@ const STATUS_STYLES = {
   archived: 'bg-amber-50 text-amber-700',
 }
 
+// ── Demo Content Generator (dev/testing helper) ──────────────────────────────
+// A single realistic, coherent sample course used to quickly populate the
+// form for manual QA. Kept as plain data (not inline in the button handler)
+// so it stays readable and easy to extend with more presets later.
+
+const DEMO_CURRICULUM = [
+  {
+    sectionTitleAr: 'مدخل إلى علم التجويد',
+    sectionTitle: 'Introduction to Tajweed',
+    lessons: ['مفهوم التجويد وأهميته', 'مراتب القراءة', 'اللحن الجلي واللحن الخفي'],
+  },
+  {
+    sectionTitleAr: 'مخارج الحروف وصفاتها',
+    sectionTitle: 'Articulation Points and Letter Characteristics',
+    lessons: ['مقدمة في مخارج الحروف', 'المخارج الرئيسية', 'صفات الحروف الأساسية', 'تدريبات عملية على النطق'],
+  },
+  {
+    sectionTitleAr: 'أحكام النون الساكنة والتنوين',
+    sectionTitle: 'Rules of Noon Sakinah and Tanween',
+    lessons: ['الإظهار', 'الإدغام', 'الإقلاب', 'الإخفاء'],
+  },
+  {
+    sectionTitleAr: 'أحكام المدود',
+    sectionTitle: 'Rules of Madd (Elongation)',
+    lessons: ['المد الطبيعي', 'المد المتصل والمنفصل', 'المد اللازم', 'تطبيقات عملية'],
+  },
+  {
+    sectionTitleAr: 'التطبيق العملي',
+    sectionTitle: 'Practical Application',
+    lessons: ['تحليل تلاوات مختارة', 'تصحيح الأخطاء الشائعة', 'تدريب نهائي', 'تقييم مستوى الطالب'],
+  },
+]
+
+const DEMO_COURSE_DATA = {
+  nameAr: 'دورة التجويد المتكامل',
+  name: 'Complete Tajweed Course',
+  shortDescriptionAr: 'دورة تعليمية متكاملة لإتقان أحكام التجويد وتطبيقها عمليًا أثناء تلاوة القرآن الكريم.',
+  shortDescription: 'A comprehensive course designed to help students master Tajweed rules and apply them accurately during Quran recitation.',
+  descriptionAr: 'تهدف هذه الدورة إلى تمكين الطالب من إتقان أحكام التجويد بشكل تدريجي ومتكامل، بدءًا من الأساسيات النظرية وصولًا إلى التطبيق العملي أثناء التلاوة. تعتمد الدورة على منهجية تجمع بين الشرح المبسط لمخارج الحروف وصفاتها، وأحكام النون الساكنة والتنوين، وأنواع المدود، مع تدريبات صوتية وتطبيقات مباشرة على آيات مختارة من القرآن الكريم. يحرص المحتوى التعليمي على ربط كل قاعدة نظرية بتطبيق عملي فوري، بحيث يلاحظ الطالب تحسّنًا ملموسًا في جودة تلاوته خطوة بخطوة. وبنهاية الدورة، يكون الطالب قادرًا على تلاوة القرآن الكريم بأحكام تجويد صحيحة، والتمييز بين الأخطاء الشائعة وتصحيحها بثقة واستقلالية.',
+  description: 'This course is designed to help students master the rules of Tajweed in a gradual and integrated manner, starting from theoretical foundations and progressing to practical application during recitation. The curriculum combines clear explanations of articulation points, letter characteristics, the rules of Noon Sakinah and Tanween, and the different types of Madd, paired with audio exercises and direct application on selected Quranic verses. Each theoretical rule is immediately reinforced with hands-on practice, allowing students to observe tangible improvement in their recitation quality step by step. By the end of the course, students will be able to recite the Quran with correct Tajweed rules, confidently identify common mistakes, and correct them independently.',
+  category: 'tajweed',
+  subCategory: 'أحكام التجويد وتطبيقاتها العملية',
+  tags: ['التجويد', 'القرآن', 'تلاوة', 'أحكام التجويد', 'تعليم القرآن'],
+  language: 'ar',
+  difficulty: 'beginner',
+  ageGroup: 'adults',
+  estimatedDuration: 24,
+  durationWeeks: 8,
+  learningOutcomesAr: [
+    'إتقان مخارج الحروف وصفاتها الأساسية',
+    'تطبيق أحكام النون الساكنة والتنوين',
+    'التمييز بين أنواع المدود وتطبيقها',
+    'تحسين جودة التلاوة وتقليل الأخطاء الشائعة',
+    'قراءة آيات مختارة مع تطبيق أحكام التجويد عمليًا',
+  ],
+  learningOutcomes: [
+    'Master the articulation points (makharij) and basic characteristics of letters',
+    'Apply the rules of Noon Sakinah and Tanween correctly',
+    'Distinguish between types of Madd and apply them properly',
+    'Improve recitation quality and reduce common mistakes',
+    'Recite selected verses while practically applying Tajweed rules',
+  ],
+  requirementsAr: [
+    'القدرة الأساسية على قراءة القرآن الكريم',
+    'الالتزام بحضور الدروس والتدريب المنتظم',
+    'توفر مصحف للتطبيق العملي',
+    'لا يشترط دراسة سابقة متقدمة في التجويد',
+  ],
+  requirements: [
+    'Basic ability to read the Quran',
+    'Commitment to attending lessons and regular practice',
+    'Access to a Mushaf for practical application',
+    'No advanced prior study of Tajweed required',
+  ],
+  targetAudienceAr: 'هذه الدورة مناسبة لكل من يرغب في إتقان أحكام التجويد، سواء كان مبتدئًا يسعى لتصحيح تلاوته أو دارسًا يرغب في تعميق فهمه لأحكام القراءة الصحيحة، دون اشتراط خبرة سابقة متقدمة.',
+  targetAudience: 'This course is suitable for anyone who wants to master the rules of Tajweed, whether a beginner looking to correct their recitation or a student seeking a deeper understanding of proper recitation rules, with no advanced prior experience required.',
+  featured: true,
+  status: 'draft',
+  enrollmentEnabled: true,
+  certificateAvailable: true,
+  seo: {
+    title: 'دورة التجويد المتكامل | تعلم أحكام التجويد',
+    description: 'تعلم أحكام التجويد خطوة بخطوة من خلال دورة تعليمية متكاملة تجمع بين الشرح النظري والتطبيق العملي.',
+    keywords: ['تعلم التجويد', 'دورة تجويد', 'أحكام التجويد', 'تعليم القرآن', 'تلاوة القرآن'],
+  },
+}
+
+// Builds a safe copy of the demo course, preserving anything on the current
+// form that must never be fabricated (uploaded images, a real intro video
+// URL, an already-chosen instructor, display order).
+function createDemoCourseData(currentForm, teachers) {
+  const curriculum = DEMO_CURRICULUM.map(section => ({ ...section, lessons: [...section.lessons] }))
+  const lessonsCount = curriculum.reduce((sum, section) => sum + section.lessons.length, 0)
+  const firstTeacherId = teachers?.[0] ? (teachers[0]._id || teachers[0].userId) : ''
+
+  return {
+    ...DEMO_COURSE_DATA,
+    tags: [...DEMO_COURSE_DATA.tags],
+    learningOutcomesAr: [...DEMO_COURSE_DATA.learningOutcomesAr],
+    learningOutcomes: [...DEMO_COURSE_DATA.learningOutcomes],
+    requirementsAr: [...DEMO_COURSE_DATA.requirementsAr],
+    requirements: [...DEMO_COURSE_DATA.requirements],
+    seo: { ...DEMO_COURSE_DATA.seo, keywords: [...DEMO_COURSE_DATA.seo.keywords] },
+    curriculum,
+    lessonsCount,
+    // Never fabricated — always carried over from whatever the form already had.
+    thumbnailImage: currentForm.thumbnailImage,
+    coverImage: currentForm.coverImage,
+    introVideoUrl: currentForm.introVideoUrl,
+    instructor: currentForm.instructor || firstTeacherId,
+    order: currentForm.order,
+  }
+}
+
+// A fresh/empty-ish form shouldn't trigger a "replace your data?" prompt —
+// only real, user-authored content should. Default select values (category,
+// language, difficulty, ageGroup, durationWeeks, status) don't count.
+function hasMeaningfulCourseContent(form) {
+  return Boolean(
+    form.nameAr.trim() || form.name.trim() ||
+    form.shortDescriptionAr.trim() || form.shortDescription.trim() ||
+    form.descriptionAr.trim() || form.description.trim() ||
+    form.targetAudienceAr.trim() || form.targetAudience.trim() ||
+    form.tags.length || form.learningOutcomesAr.length || form.learningOutcomes.length ||
+    form.requirementsAr.length || form.requirements.length || form.curriculum.length ||
+    form.seo.title.trim() || form.seo.description.trim() || (form.seo.keywords || []).length
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminCourseFormPage() {
@@ -359,6 +489,7 @@ export default function AdminCourseFormPage() {
   const [saved, setSaved] = useState(false)
   const [unsaved, setUnsaved] = useState(false)
   const [videoPreview, setVideoPreview] = useState(false)
+  const [confirmDemoFill, setConfirmDemoFill] = useState(false)
 
   const { data: course, isLoading: loadingCourse } = useQuery({
     queryKey: ['admin', 'course', id],
@@ -466,6 +597,22 @@ export default function AdminCourseFormPage() {
     }
   }
 
+  function applyDemoContent() {
+    setForm(prev => createDemoCourseData(prev, teachers))
+    setUnsaved(true)
+    setSaved(false)
+    setConfirmDemoFill(false)
+    toast.success('تمت إضافة محتوى تجريبي')
+  }
+
+  function handleFillDemoContent() {
+    if (hasMeaningfulCourseContent(form)) {
+      setConfirmDemoFill(true)
+    } else {
+      applyDemoContent()
+    }
+  }
+
   const ytThumb = youtubeThumbnail(form.introVideoUrl)
   const ytId = extractYouTubeId(form.introVideoUrl)
 
@@ -518,6 +665,17 @@ export default function AdminCourseFormPage() {
             <option value="published">منشور</option>
             <option value="archived">أرشيف</option>
           </select>
+
+          {/* Demo content helper — dev/testing only, secondary to Save */}
+          <button
+            type="button"
+            onClick={handleFillDemoContent}
+            title="تعبئة النموذج ببيانات تجريبية واقعية لأغراض الاختبار"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border active:scale-[0.98] bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 hover:border-violet-300"
+          >
+            <WandSparkles size={15} strokeWidth={1.8} />
+            إضافة محتوى تجريبي
+          </button>
 
           {/* Save button */}
           <button
@@ -846,6 +1004,18 @@ export default function AdminCourseFormPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Demo content confirmation — only shown when replacing real content */}
+      <ConfirmDialog
+        open={confirmDemoFill}
+        onClose={() => setConfirmDemoFill(false)}
+        onConfirm={applyDemoContent}
+        title="استبدال البيانات الحالية؟"
+        message="سيتم استبدال محتوى النموذج الحالي ببيانات تجريبية. هل تريد المتابعة؟"
+        confirmLabel="متابعة"
+        cancelLabel="إلغاء"
+        variant="purple"
+      />
     </div>
   )
 }

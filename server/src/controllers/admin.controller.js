@@ -13,6 +13,7 @@ const { createNotification } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
+const { isValidGender } = require('../config/teacherIdentity')
 const crypto = require('crypto')
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -242,6 +243,9 @@ exports.createTeacher = async (req, res, next) => {
   try {
     const existing = await User.findOne({ email: req.body.email })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
+    if (req.body.gender !== undefined && !isValidGender(req.body.gender)) {
+      return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
+    }
     const user = await User.create({ ...req.body, role: 'teacher' })
     sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
   } catch (err) { next(err) }
@@ -249,7 +253,10 @@ exports.createTeacher = async (req, res, next) => {
 
 exports.updateTeacher = async (req, res, next) => {
   try {
-    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession']
+    if (req.body.gender !== undefined && req.body.gender !== null && !isValidGender(req.body.gender)) {
+      return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
+    }
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession', 'gender']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     const user = await User.findOneAndUpdate(
@@ -293,6 +300,7 @@ exports.getAllSessions = async (req, res, next) => {
     if (req.query.status) filter.status = req.query.status
     if (req.query.teacherId) filter.teacherId = req.query.teacherId
     if (req.query.studentId) filter.studentId = req.query.studentId
+    if (req.query.payrollStatus) filter.payrollStatus = req.query.payrollStatus
     if (req.query.dateFrom || req.query.dateTo) {
       filter.scheduledAt = {}
       if (req.query.dateFrom) filter.scheduledAt.$gte = new Date(req.query.dateFrom)
@@ -352,6 +360,12 @@ exports.updateAttendanceRecord = async (req, res, next) => {
       .populate('studentId', 'firstNameAr lastNameAr')
       .populate('sessionId', 'titleAr scheduledAt')
     if (!att) return sendError(res, 'سجل الحضور غير موجود', 404)
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'attendance.admin_override',
+      entity: 'Attendance', entityId: att._id, changes: updates, ip: req.ip,
+    })
+
     sendSuccess(res, att, 'تم تحديث سجل الحضور')
   } catch (err) { next(err) }
 }

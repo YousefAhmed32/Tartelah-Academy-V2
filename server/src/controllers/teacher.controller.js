@@ -3,6 +3,42 @@ const Subscription = require('../models/Subscription')
 const Evaluation = require('../models/Evaluation')
 const User = require('../models/User')
 const { sendSuccess, sendError } = require('../utils/response')
+const { getPagination } = require('../utils/pagination')
+const { toPublicTeacher } = require('../utils/teacherPublic')
+const { isValidGender } = require('../config/teacherIdentity')
+
+// ── Public (unauthenticated) teacher directory ───────────────────────────────
+// Deliberately separate from /admin/teachers: no salary, email, phone,
+// internal notes or admin metadata ever leaves toPublicTeacher().
+
+exports.getPublicTeachers = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query)
+    const filter = { role: 'teacher', isActive: true }
+    if (req.query.gender) {
+      if (!isValidGender(req.query.gender)) return sendError(res, 'قيمة غير صالحة لتصنيف المعلم', 400)
+      filter.gender = req.query.gender
+    }
+    const [teachers, total] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+        .select('firstNameAr lastNameAr gender avatar specialization bioAr createdAt'),
+      User.countDocuments(filter),
+    ])
+    sendSuccess(res, {
+      teachers: teachers.map(toPublicTeacher),
+      total, page, limit, totalPages: Math.ceil(total / limit),
+    })
+  } catch (err) { next(err) }
+}
+
+exports.getPublicTeacher = async (req, res, next) => {
+  try {
+    const teacher = await User.findOne({ _id: req.params.id, role: 'teacher', isActive: true })
+      .select('firstNameAr lastNameAr gender avatar specialization bioAr createdAt')
+    if (!teacher) return sendError(res, 'المعلم غير موجود', 404)
+    sendSuccess(res, toPublicTeacher(teacher))
+  } catch (err) { next(err) }
+}
 
 exports.getMyStudents = async (req, res, next) => {
   try {
@@ -26,7 +62,12 @@ exports.getMyStats = async (req, res, next) => {
     const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents] = await Promise.all([
+    // Bounded to the last 14 days — old unresolved sessions are an admin
+    // review-queue concern (see Operations Center), not something to keep
+    // nagging the teacher about indefinitely on their own dashboard.
+    const attentionWindowStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+
+    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention] = await Promise.all([
       Subscription.countDocuments({ teacherId, status: 'active' }),
       Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lte: todayEnd } }),
       Evaluation.countDocuments({ teacherId, createdAt: { $gte: monthStart } }),
@@ -35,9 +76,20 @@ exports.getMyStats = async (req, res, next) => {
         .sort({ scheduledAt: 1 }).limit(6).populate('studentId', 'firstNameAr lastNameAr avatar'),
       User.find({ _id: { $in: (await Subscription.find({ teacherId, status: 'active' }).distinct('studentId')) } })
         .limit(5).select('firstNameAr lastNameAr avatar'),
+      Session.countDocuments({
+        teacherId,
+        scheduledAt: { $gte: attentionWindowStart, $lte: now },
+        $or: [
+          { status: 'missed' },
+          { status: 'completed', attendanceFinalizedAt: null },
+        ],
+      }),
     ])
 
-    sendSuccess(res, { totalStudents, sessionsToday, pendingEvaluations: pendingEvals, completedThisMonth: completedMonth, upcomingSessions, recentStudents })
+    sendSuccess(res, {
+      totalStudents, sessionsToday, pendingEvaluations: pendingEvals, completedThisMonth: completedMonth,
+      upcomingSessions, recentStudents, needsAttention,
+    })
   } catch (err) {
     next(err)
   }

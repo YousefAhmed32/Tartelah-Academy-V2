@@ -20,6 +20,7 @@ import { SkeletonStatRow, SkeletonChart, SkeletonRows } from '../../components/u
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency, toArray } from '../../utils/format.js'
 import { exportRowsToCSV, exportReportToPDF } from '../../utils/exportUtils.js'
+import { PAYROLL_STATUS } from '../../config/constants.js'
 
 // ── Period presets ──────────────────────────────────────────────────────────
 
@@ -296,6 +297,49 @@ function AttendanceHistoryTab({ periodRange }) {
 
 // ── Salary tab ─────────────────────────────────────────────────────────────────
 
+// Shows exactly which sessions are/aren't counted toward pay yet — the
+// concrete, per-status breakdown behind the single "salary due" number.
+function PayrollReadinessCard({ periodRange }) {
+  const { data: readiness, isLoading } = useQuery({
+    queryKey: ['teacher-performance', 'me', 'payroll-readiness', periodRange.from, periodRange.to],
+    queryFn: () => api.get('/teacher-performance/me/payroll-readiness', { params: { from: periodRange.from, to: periodRange.to } }).then(r => r.data?.data),
+  })
+
+  if (isLoading) return <SkeletonStatRow count={4} />
+  if (!readiness) return null
+
+  const rows = [
+    { key: 'payable', count: readiness.payable },
+    { key: 'pending_review', count: readiness.pending_review },
+    { key: 'pending', count: readiness.pending },
+    { key: 'non_payable', count: readiness.non_payable },
+    { key: 'excluded', count: readiness.excluded },
+  ].filter(r => r.count > 0)
+
+  return (
+    <div className="rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
+      <div className="text-sm font-bold text-gray-800 mb-3">تفصيل جاهزية الراتب</div>
+      <div className="flex flex-wrap gap-2">
+        {rows.length === 0 && <span className="text-xs text-gray-400">لا توجد حصص في هذه الفترة</span>}
+        {rows.map(r => {
+          const cfg = PAYROLL_STATUS[r.key]
+          return (
+            <span key={r.key} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
+              style={{ background: `${cfg.color}18`, color: cfg.color }}>
+              {cfg.label}: {r.count}
+            </span>
+          )
+        })}
+      </div>
+      {readiness.pending_review > 0 && (
+        <p className="text-[11px] text-amber-600 mt-3">
+          هناك {readiness.pending_review} حصة بانتظار مراجعة الإدارة قبل احتسابها ضمن الراتب.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SalaryTab({ periodRange, salary, isLoading }) {
   async function handleExportPDF() {
     if (!salary) return toast.error('لا توجد بيانات')
@@ -341,6 +385,8 @@ function SalaryTab({ periodRange, salary, isLoading }) {
         <KpiCard label="غياب بدون أجر" value={salary.unpaidAbsences} Icon={XCircle} color="#ef4444" />
         <KpiCard label="حصص معذورة" value={salary.excusedSessions} Icon={Clock3} color="#7c3aed" />
       </div>
+
+      <PayrollReadinessCard periodRange={periodRange} />
 
       <button onClick={handleExportPDF}
         className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-violet-50 text-violet-700 border border-violet-100 hover:bg-violet-100">

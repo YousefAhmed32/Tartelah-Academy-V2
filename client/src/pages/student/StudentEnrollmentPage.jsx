@@ -36,7 +36,20 @@ export default function StudentEnrollmentPage() {
   const fileInputRef = useRef(null)
   const [step, setStep] = useState('packages')
   const [selectedPackage, setSelectedPackage] = useState(null)
-  const [form, setForm] = useState({ paymentMethod: 'bank_transfer', paymentReference: '', studentNotes: '' })
+  // If the student arrived here after choosing a teacher on the public
+  // Teachers page (see TeacherProfilePage's "سجّل الآن مع ..." CTA), carry
+  // that preference into the request as a note for the admin who assigns
+  // the teacher on approval — there's no dedicated field for this on
+  // EnrollmentRequest, and adding one would duplicate the admin's actual
+  // assignment step.
+  const [form, setForm] = useState(() => {
+    const preferredTeacherName = localStorage.getItem('preferredTeacherName')
+    return {
+      paymentMethod: 'bank_transfer',
+      paymentReference: '',
+      studentNotes: preferredTeacherName ? `أرغب بالتسجيل مع ${preferredTeacherName} إن أمكن.` : '',
+    }
+  })
   const [proofFile, setProofFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [lightboxUrl, setLightboxUrl] = useState(null)
@@ -56,6 +69,8 @@ export default function StudentEnrollmentPage() {
     onSuccess: () => {
       toast.success('تم إرسال طلب التسجيل بنجاح')
       qc.invalidateQueries({ queryKey: ['enrollments', 'me'] })
+      localStorage.removeItem('preferredTeacherId')
+      localStorage.removeItem('preferredTeacherName')
       setStep('status')
     },
     onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),

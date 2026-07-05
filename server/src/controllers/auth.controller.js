@@ -143,18 +143,27 @@ exports.devLogin = async (req, res, next) => {
   }
   try {
     const { role } = req.body
-    if (!['admin', 'teacher', 'student'].includes(role)) {
-      return sendError(res, 'Invalid role. Use: admin | teacher | student', 400)
+    // `role` is the quick-login key, not always the literal User.role — teacher_female
+    // is a distinct dev account but authenticates with the normal 'teacher' RBAC role
+    // (see server/src/config/teacherIdentity.js for the canonical gender field it uses).
+    const DEV_ACCOUNTS = {
+      admin:          { dbRole: 'admin',   email: 'admin@tartelah.com' },
+      teacher:        { dbRole: 'teacher', email: 'teacher@tartelah.com' },
+      teacher_female: { dbRole: 'teacher', email: 'teacher.female@tartelah.com', gender: 'female' },
+      student:        { dbRole: 'student', email: 'student@tartelah.com' },
     }
-    // Prefer the specific dev account, fall back to any active user with that role
-    const DEV_EMAILS = {
-      admin: 'admin@tartelah.com',
-      teacher: 'teacher@tartelah.com',
-      student: 'student@tartelah.com',
+    const account = DEV_ACCOUNTS[role]
+    if (!account) {
+      return sendError(res, 'Invalid role. Use: admin | teacher | teacher_female | student', 400)
     }
-    let user = await User.findOne({ email: DEV_EMAILS[role], isActive: true })
-    if (!user) user = await User.findOne({ role, isActive: true })
-    if (!user) return sendError(res, `No active ${role} account found. Run npm run seed first.`, 404)
+    // Prefer the specific dev account, fall back to any active user matching the role (+gender, if relevant)
+    let user = await User.findOne({ email: account.email, isActive: true })
+    if (!user) {
+      const fallbackFilter = { role: account.dbRole, isActive: true }
+      if (account.gender) fallbackFilter.gender = account.gender
+      user = await User.findOne(fallbackFilter)
+    }
+    if (!user) return sendError(res, `No active ${account.dbRole} account found. Run npm run seed first.`, 404)
     const accessToken = issueTokens(user, res)
     sendSuccess(res, { user: user.toPublic(), accessToken }, `Dev login successful as ${role}`)
   } catch (err) {

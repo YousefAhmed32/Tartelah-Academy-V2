@@ -4,6 +4,13 @@ const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
 
+// audit.service's logAction takes a single object; wrap it so call sites
+// below can pass just (req, action, entityId, changes) without repeating
+// actorId/actorRole/entity boilerplate at every site.
+function auditArticle(req, action, entityId, changes) {
+  return logAction({ actorId: req.user._id, actorRole: req.user.role, action, entity: 'Article', entityId, changes })
+}
+
 // ── Slug generation ────────────────────────────────────────────────────────────
 
 function slugify(text) {
@@ -284,7 +291,7 @@ exports.createArticle = async (req, res, next) => {
       updatedBy: req.user._id,
     })
 
-    await logAction(req, 'article.create', { articleId: article._id, title })
+    await auditArticle(req, 'article.create', article._id, { title })
     sendSuccess(res, article, 'تم إنشاء المقال بنجاح', 201)
   } catch (err) { next(err) }
 }
@@ -315,7 +322,7 @@ exports.updateArticle = async (req, res, next) => {
     article.updatedBy = req.user._id
     await article.save()
 
-    await logAction(req, 'article.update', { articleId: article._id })
+    await auditArticle(req, 'article.update', article._id, {})
     sendSuccess(res, article, 'تم تحديث المقال بنجاح')
   } catch (err) { next(err) }
 }
@@ -336,7 +343,7 @@ exports.publishArticle = async (req, res, next) => {
       { new: true }
     )
     if (!article) return sendError(res, 'المقال غير موجود', 404)
-    await logAction(req, 'article.publish', { articleId: article._id })
+    await auditArticle(req, 'article.publish', article._id, {})
     sendSuccess(res, article, 'تم نشر المقال بنجاح')
   } catch (err) { next(err) }
 }
@@ -349,7 +356,7 @@ exports.unpublishArticle = async (req, res, next) => {
       { new: true }
     )
     if (!article) return sendError(res, 'المقال غير موجود', 404)
-    await logAction(req, 'article.unpublish', { articleId: article._id })
+    await auditArticle(req, 'article.unpublish', article._id, {})
     sendSuccess(res, article, 'تم إلغاء نشر المقال')
   } catch (err) { next(err) }
 }
@@ -404,7 +411,7 @@ exports.duplicateArticle = async (req, res, next) => {
       updatedBy: req.user._id,
     })
 
-    await logAction(req, 'article.duplicate', { sourceId: source._id, copyId: copy._id })
+    await auditArticle(req, 'article.duplicate', copy._id, { sourceId: source._id })
     sendSuccess(res, copy, 'تم نسخ المقال بنجاح', 201)
   } catch (err) { next(err) }
 }
@@ -417,7 +424,7 @@ exports.softDeleteArticle = async (req, res, next) => {
       { new: true }
     )
     if (!article) return sendError(res, 'المقال غير موجود', 404)
-    await logAction(req, 'article.delete', { articleId: article._id })
+    await auditArticle(req, 'article.delete', article._id, {})
     sendSuccess(res, null, 'تم حذف المقال')
   } catch (err) { next(err) }
 }
@@ -430,7 +437,7 @@ exports.restoreArticle = async (req, res, next) => {
       { new: true }
     )
     if (!article) return sendError(res, 'المقال غير موجود أو غير محذوف', 404)
-    await logAction(req, 'article.restore', { articleId: article._id })
+    await auditArticle(req, 'article.restore', article._id, {})
     sendSuccess(res, article, 'تم استعادة المقال')
   } catch (err) { next(err) }
 }

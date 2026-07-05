@@ -22,5 +22,6 @@ router.use('/schedule-rules', require('./scheduleRule.routes'))
 router.use('/articles', require('./article.routes'))
 router.use('/success-stories', require('./successStory.routes'))
 router.use('/teacher-performance', require('./teacherPerformance.routes'))
+router.use('/operations', require('./operations.routes'))
 
 module.exports = router

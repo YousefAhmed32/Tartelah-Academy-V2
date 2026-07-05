@@ -2,6 +2,103 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## Teacher Identity System & Teachers Page Refactor — 2026-07-04
+
+Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Trace real teacher data flow (DB → API → admin → public) | ✅ | No `Teacher` model — `User{role:'teacher'}`; no gender field existed anywhere |
+| Canonical `User.gender` enum (male/female, not required/defaulted) | ✅ | `server/src/models/User.js` — one source of truth, no competing fields |
+| Legacy data safety (no name-inference, unresolved is valid) | ✅ | Nothing to safely backfill from; unresolved teachers surfaced for admin correction |
+| Idempotent gender audit/migration script | ✅ | `npm run migrate-teacher-gender` — dry-run default, `--apply` only normalizes invalid→null, never guesses |
+| Admin create/edit gender control | ✅ | `GenderSegmentedControl` in `AdminTeachersPage.jsx`, required client-side on create |
+| Teacher self-service gender control | ✅ | `TeacherSettingsPage.jsx`, preserved across unrelated saves |
+| Unrelated updates never erase gender | ✅ | Verified via curl — `PATCH` with only `specialization` leaves `gender` untouched |
+| Centralized identity resolver | ✅ | `server/src/utils/teacherIdentityResolver.js` (tested) + mirrored `client/src/utils/teacherIdentity.js` |
+| Gender-aware Arabic honorific (`الأستاذ`/`الأستاذة`) | ✅ | `فضيلة الشيخ` removed repo-wide; unresolved teachers get no honorific |
+| Gender-aware default avatars (male/female/neutral SVGs) | ✅ | `client/public/images/avatars/teacher-{male,female,neutral}-default.svg` |
+| Custom avatar precedence + removal fallback | ✅ | Unit-tested + verified live in-browser |
+| Public teacher directory API, safely projected | ✅ | `GET /teachers/public[/:id]`, fixes the old page hitting the admin-gated `/admin/teachers` (always 401 for real visitors) |
+| Removed fake-fallback-on-API-failure behavior | ✅ | `FALLBACK_TEACHERS` deleted entirely; honest loading/error/empty states |
+| Teachers page full redesign (hero/discovery sections, robust layout) | ✅ | No more gradient-percentage-dependent card readability |
+| `TeacherCard` redesigned from scratch (no 3D flip) | ✅ | Accessible at rest — keyboard/touch/reduced-motion safe |
+| Male/female discovery filter | ✅ | Backed by real `?gender=` API param, verified exact counts live |
+| Loading/error/empty states | ✅ | Skeleton matches real card geometry; distinct empty copy per filter state |
+| Public Teacher Profile page (`/teachers/:id`) | ✅ | Full bio, gender-correct CTA, carries teacher choice into registration |
+| Cross-surface avatar/honorific consistency sweep | ✅ | Course instructor display, admin teacher list/CRM/performance — see docs §17 for what was deliberately left alone and why |
+| Tests (resolver, public projection, migration audit) | ✅ | 28 new Jest tests, 68/68 total passing |
+| Build + live browser verification (Playwright) | ✅ | `npm run build` clean; full click-through of filters, profile page, admin modal, teacher settings against live seeded DB |
+
+### Known limitations (deliberate, documented in the refactor doc §18)
+- Migration script can only report/normalize invalid values — it cannot backfill legacy gender since no trustworthy source field ever existed.
+- No frontend test runner in this repo — presentation logic verified via the mirrored, unit-tested backend resolver + a live Playwright pass, not component tests.
+- Homepage `#teachers` decorative carousel (fake stock names/photos, unrelated to the real teacher model) intentionally left untouched — out of scope for an identity-data refactor.
+
+---
+
+## Admin Operations Center + Needs Review Queue + Recurring-Session Dedupe — 2026-07-04 (continuation)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Re-verify prior attendance/payroll implementation against docs | ✅ | One stale docblock comment found + fixed; no behavioral drift |
+| Admin Operations Center page (Live / Timeline / Review Queue tabs) | ✅ | `AdminOperationsCenterPage.jsx`, route `/admin/operations`, nav item |
+| Operations backend API (`/operations/live`, `/timeline`, `/review-queue`) | ✅ | `operations.controller.js` + `operations.routes.js`, isAdmin-gated |
+| Needs Review assessment engine (`assessSessionReview`) | ✅ | `sessionIntelligence.service.js` — critical/high/medium deterministic rules |
+| Review lifecycle (open/in_review/resolved/dismissed) | ✅ | New `Session` fields + `PATCH /operations/review/:sessionId`, audit-logged |
+| Review action workflow (start review / correct / resolve / dismiss) | ✅ | Reuses existing correction endpoint rather than inventing a new one |
+| `computeConfidence()` actually surfaced in UI (was backend-only) | ✅ | Timeline row drill-down + `GET /sessions/:id`; plain-language labels only |
+| Recurring-session dedupe (unique `{seriesId,scheduledAt}` index) | ✅ | `models/Session.js` + `schedule.service.js` idempotent bulkWrite upserts |
+| Legacy-duplicate cleanup script | ✅ | `server/src/scripts/dedupeSessions.js` (`npm run dedupe-sessions`, dry-run default) |
+| Contradictory session-state detection | ✅ | Folded into `assessSessionReview` as critical-severity checks |
+| Admin Dashboard intelligence strip | ✅ | `AdminDashboardPage.jsx` `OperationsIntelligenceStrip` |
+| Teacher Dashboard "needs attention" count | ✅ | `teacher.controller.js` `getMyStats` + dashboard action item |
+| Audit log human-readable UX | ✅ | `AdminAuditLogsPage.jsx` full action-label map + `summarizeChanges()` |
+| Payroll review hardening (reasons surfaced, no silent auto-resolution) | ✅ | Open business-policy question deliberately left open, per brief |
+| Bounded queries + new indexes for Operations Center | ✅ | All new queries date-bounded + capped; `{reviewState,scheduledAt}` index added |
+| Tests: review engine, dedupe (mocked Mongoose), date determinism | ✅ | 21 new tests, 40/40 total passing |
+| Build + full test suite verification | ✅ | `npm run build` (client) + `npm test` (server) both clean |
+| `docs/INTELLIGENT_ATTENDANCE_SYSTEM.md` updated (§21–§31) | ✅ | Operations Center, review engine, dedupe, self-audit |
+
+### Known limitations carried forward (unchanged from continuation pass's own audit)
+- No ESLint config exists anywhere in the repo — still not retrofitted (orthogonal, unbounded-scope cleanup)
+- Three separate attendance-correction UI entry points (Teachers page, Sessions page, Operations Center) still exist, unconsolidated — all call the same backend endpoint, no functional gap
+- No DB-backed integration tests (no mongodb-memory-server in this repo) — dedupe tested via mocked Mongoose calls asserting the real op shapes; the actual guarantee is the MongoDB unique index itself
+
+---
+
+## Intelligent Attendance / Payroll-Ready Operations System — 2026-07-04
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Reverse-engineer existing attendance/payroll architecture | ✅ | Full findings in `docs/PLATFORM_FLOW_AND_TEACHER_ATTENDANCE_PLAN.md` |
+| Centralized attendance/session time-window policy | ✅ | `server/src/config/attendancePolicy.js` (new) |
+| Deterministic payroll-status + confidence-scoring engine | ✅ | `server/src/services/sessionIntelligence.service.js` (new), unit-tested |
+| Session model — outcome, delay, evidence, payroll fields | ✅ | Additive schema changes, no destructive migration |
+| Attendance model — left_early/technical_issue, arrivalTime, finalize | ✅ | |
+| Teacher check-in relaxed to self-resolve missed/no_show | ✅ | `session.controller.js` |
+| Delay reporting (distinct from full reschedule) | ✅ | `PATCH /sessions/:id/delay` + `DelayModal` |
+| External link-open evidence tracking (not attendance proof) | ✅ | `POST /sessions/:id/link-opened` |
+| Session outcome confirmation on completion | ✅ | Fast-path default + optional outcome picker |
+| Graduated, forgiving cron sweep (missed → no_show) | ✅ | `teacherAttendanceSweep.job.js` rewritten |
+| Payroll-readiness reporting (teacher + org-wide) | ✅ | New endpoints + `PayrollReadinessCard` / admin summary bar |
+| Audit trail repair — fixed broken article.controller.js calls | ✅ | 7 call sites had wrong argument shape, always failed silently |
+| Audit trail — session/attendance/subscription/enrollment coverage | ✅ | Previously ~0% coverage on payroll-adjacent actions |
+| Admin attendance/payroll correction reachable from Sessions page | ✅ | `AdminSessionsPage.jsx` `CorrectionModal` |
+| Fixed schedule-rule admin teacher-attribution bug | ✅ | Admin must now explicitly name the teacher |
+| Fixed subscription double-decrement + scoping bug | ✅ | `completeSession` now idempotent + scoped to `subscriptionId` |
+| Fixed missing ownership check on `PATCH /attendance/:id` | ✅ | |
+| `jest` installed (was declared but never actually present) | ✅ | 19/19 tests passing, `npm test` now works end-to-end |
+| Build verification | ✅ | `npm run build` zero errors |
+| `docs/INTELLIGENT_ATTENDANCE_SYSTEM.md` report | ✅ | Full architecture, diagrams, limitations, file list |
+
+### Known limitations carried forward
+- No dedupe guard yet on regenerated recurring sessions (documented, not hardened this pass)
+- `computeConfidence()` implemented + tested but not yet surfaced in an admin UI queue
+- Repo-wide ESLint config is missing entirely (pre-existing gap, not introduced here — `npm run lint` could not be run)
+
+---
+
 ## Production Readiness — 2026-06-24 Audit
 
 **Overall: 82% ready** (was 63% at session start)
@@ -507,4 +604,6 @@ Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 | **Articles & Knowledge Center** | **19** | **19** | **0** |
 | **Courses Management System** | **13** | **13** | **0** |
 | **Success Stories Homepage Section** | **13** | **13** | **0** |
-| **TOTAL** | **242** | **242** | **0** |
+| **Intelligent Attendance / Payroll-Ready Operations** | **19** | **19** | **0** |
+| **Admin Operations Center + Review Queue + Dedupe** | **19** | **19** | **0** |
+| **TOTAL** | **280** | **280** | **0** |

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video } from 'lucide-react'
+import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, AlertCircle } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -15,7 +15,7 @@ import { ROUTES } from '../../config/constants.js'
 
 const DEFAULT_STATS = {
   totalStudents: 0, sessionsToday: 0, pendingEvaluations: 0, completedThisMonth: 0,
-  upcomingSessions: [], recentStudents: [],
+  upcomingSessions: [], recentStudents: [], needsAttention: 0,
 }
 
 function useCountdown(targetDate) {
@@ -79,11 +79,6 @@ function NextSessionCard({ session }) {
     },
   })
 
-  function handleJoin() {
-    if (session.status === 'scheduled') startMutation.mutate()
-    window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
-  }
-
   if (!session) {
     return (
       <div className="rounded-2xl p-6 text-center bg-white border-2 border-dashed border-gray-200">
@@ -94,6 +89,14 @@ function NextSessionCard({ session }) {
         <p className="text-sm text-gray-500 mb-1">قم بإنشاء حصة جديدة لطلابك</p>
       </div>
     )
+  }
+
+  const canCheckIn = ['scheduled', 'missed', 'no_show'].includes(session.status)
+
+  function handleJoin() {
+    if (canCheckIn) startMutation.mutate()
+    api.post(`/sessions/${session._id}/link-opened`).catch(() => {})
+    window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -140,7 +143,7 @@ function NextSessionCard({ session }) {
           className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 disabled:opacity-60"
         >
           <Video size={16} strokeWidth={1.8} />
-          {session.status === 'scheduled' ? 'ابدأ الحصة' : 'الانضمام للرابط'}
+          {canCheckIn ? 'تسجيل الحضور وفتح الفصل' : 'فتح الفصل الخارجي'}
         </button>
       )}
     </div>
@@ -184,6 +187,7 @@ export default function TeacherDashboardPage() {
         completedThisMonth: d.completedThisMonth || 0,
         upcomingSessions: toArray(d.upcomingSessions),
         recentStudents: toArray(d.recentStudents),
+        needsAttention: d.needsAttention || 0,
       }
     }),
     placeholderData: DEFAULT_STATS,
@@ -196,7 +200,7 @@ export default function TeacherDashboardPage() {
   })
 
   const nextSession = stats?.upcomingSessions?.[0] || null
-  const hasActions = stats?.pendingEvaluations > 0 || stats?.sessionsToday > 0
+  const hasActions = stats?.pendingEvaluations > 0 || stats?.sessionsToday > 0 || stats?.needsAttention > 0
 
   // Students without a schedule rule
   const scheduledStudentIds = new Set(toArray(scheduleRules).map(r => r.studentId?._id || r.studentId))
@@ -294,6 +298,13 @@ export default function TeacherDashboardPage() {
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               </h2>
               <div className="space-y-2.5">
+                <ActionItem
+                  icon={<AlertCircle size={16} strokeWidth={1.8} />}
+                  title="حصص سابقة بحاجة إجراء منك"
+                  count={stats?.needsAttention}
+                  color="#ef4444"
+                  onClick={() => navigate(ROUTES.TEACHER_SESSIONS)}
+                />
                 <ActionItem
                   icon={<Calendar size={16} strokeWidth={1.8} />}
                   title="طلاب بدون جدول دوري"

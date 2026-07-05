@@ -13,6 +13,11 @@ const UserSchema = new mongoose.Schema({
   avatar: { type: String },
   bioAr: { type: String },
   specialization: { type: String },
+  // Canonical teacher identity (see server/src/config/teacherIdentity.js). Not
+  // required/defaulted — legacy teachers with no value are "unresolved" and
+  // must be corrected explicitly by an admin or the teacher, never guessed
+  // (e.g. from their Arabic name). Only meaningful for role: 'teacher'.
+  gender: { type: String, enum: ['male', 'female'] },
   salaryPerSession: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   isEmailVerified: { type: Boolean, default: false },

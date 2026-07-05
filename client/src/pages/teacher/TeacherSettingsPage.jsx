@@ -8,6 +8,8 @@ import { useAuthStore } from '../../store/authStore.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
+import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
+import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
 
 export default function TeacherSettingsPage() {
   const { user, setAuth } = useAuthStore()
@@ -17,6 +19,7 @@ export default function TeacherSettingsPage() {
     phone: user?.phone || '',
     bioAr: user?.bioAr || '',
     specialization: user?.specialization || '',
+    gender: user?.gender || '',
   })
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
 
@@ -55,13 +58,14 @@ export default function TeacherSettingsPage() {
             الملف الشخصي
           </h2>
           <div className="flex items-center gap-4 mb-6">
-            <Avatar src={user?.avatar} firstName={user?.firstNameAr} lastName={user?.lastNameAr} size="lg" />
+            <Avatar src={resolveTeacherIdentity(user).displayAvatar} firstName={user?.firstNameAr} lastName={user?.lastNameAr} size="lg" />
             <div>
               <div className="text-gray-900 font-bold">{user?.firstNameAr} {user?.lastNameAr}</div>
               <div className="text-sm text-gray-500">{user?.email}</div>
             </div>
           </div>
           <div className="space-y-4">
+            <GenderSegmentedControl value={form.gender} onChange={v => setForm(p => ({ ...p, gender: v }))} label="تصنيفك كمعلم" />
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">الاسم الأول</label><input name="firstNameAr" value={form.firstNameAr} onChange={change} className="field-light w-full" /></div>
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">اسم العائلة</label><input name="lastNameAr" value={form.lastNameAr} onChange={change} className="field-light w-full" /></div>

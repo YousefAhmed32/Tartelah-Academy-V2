@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { BookOpen, Frown, Trophy, Star, Handshake } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
+import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -315,13 +316,13 @@ export default function CourseDetailPage() {
               {/* Instructor */}
               {course.instructor && (
                 <div className="flex items-center gap-3">
-                  {course.instructor.avatar ? (
-                    <img src={getFileUrl(course.instructor.avatar)} alt="" className="w-10 h-10 rounded-full object-cover" style={{ border: '2px solid rgba(124,58,237,0.4)' }} />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold" style={{ background: 'rgba(124,58,237,0.2)', color: '#a78fd6' }}>
-                      {(course.instructor.firstNameAr || course.instructor.firstName || '?')[0]}
-                    </div>
-                  )}
+                  <img
+                    src={resolveTeacherIdentity(course.instructor).displayAvatar}
+                    alt=""
+                    aria-hidden="true"
+                    className="w-10 h-10 rounded-full object-cover flex-none"
+                    style={{ border: '2px solid rgba(124,58,237,0.4)' }}
+                  />
                   <div>
                     <div className="text-xs font-semibold text-white">
                       {course.instructor.firstNameAr || course.instructor.firstName}{' '}
@@ -495,29 +496,33 @@ export default function CourseDetailPage() {
                 )}
 
                 {/* Instructor section */}
-                {course.instructor && (
-                  <div>
-                    <h2 className="font-heading font-bold text-xl text-white mb-5">المعلم</h2>
-                    <div className="flex items-start gap-5 p-6 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.12)' }}>
-                      {course.instructor.avatar ? (
-                        <img src={getFileUrl(course.instructor.avatar)} alt="" className="w-16 h-16 rounded-2xl object-cover flex-none" style={{ border: '2px solid rgba(124,58,237,0.3)' }} />
-                      ) : (
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold flex-none" style={{ background: 'rgba(124,58,237,0.2)', color: '#a78fd6' }}>
-                          {(course.instructor.firstNameAr || course.instructor.firstName || '?')[0]}
+                {course.instructor && (() => {
+                  const identity = resolveTeacherIdentity(course.instructor)
+                  return (
+                    <div>
+                      <h2 className="font-heading font-bold text-xl text-white mb-5">المعلم</h2>
+                      <div className="flex items-start gap-5 p-6 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(150,120,220,0.12)' }}>
+                        <img
+                          src={identity.displayAvatar}
+                          alt=""
+                          aria-hidden="true"
+                          className="w-16 h-16 rounded-2xl object-cover flex-none"
+                          style={{ border: '2px solid rgba(124,58,237,0.3)' }}
+                        />
+                        <div>
+                          <div className="font-heading font-bold text-base text-white mb-1">
+                            {identity.honorificAr ? `${identity.honorificAr} ` : ''}
+                            {course.instructor.firstNameAr || course.instructor.firstName}{' '}
+                            {course.instructor.lastNameAr || course.instructor.lastName}
+                          </div>
+                          {course.instructor.bioAr && (
+                            <p className="text-xs leading-relaxed" style={{ color: '#b3a4d0', maxWidth: '400px' }}>{course.instructor.bioAr}</p>
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <div className="font-heading font-bold text-base text-white mb-1">
-                          {course.instructor.firstNameAr || course.instructor.firstName}{' '}
-                          {course.instructor.lastNameAr || course.instructor.lastName}
-                        </div>
-                        {course.instructor.bioAr && (
-                          <p className="text-xs leading-relaxed" style={{ color: '#b3a4d0', maxWidth: '400px' }}>{course.instructor.bioAr}</p>
-                        )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </motion.div>
             )}
 

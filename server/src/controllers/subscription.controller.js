@@ -3,6 +3,7 @@ const Package = require('../models/Package')
 const Notification = require('../models/Notification')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
+const { logAction } = require('../services/audit.service')
 
 exports.getMySubscription = async (req, res, next) => {
   try {
@@ -29,6 +30,12 @@ exports.createSubscription = async (req, res, next) => {
     })
     await sub.populate(['packageId', 'studentId', 'teacherId'])
     await Notification.create({ userId: studentId, titleAr: 'تم تفعيل الاشتراك', bodyAr: `تم تفعيل باقة "${pkg.nameAr}"`, type: 'subscription' })
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'subscription.create',
+      entity: 'Subscription', entityId: sub._id, changes: { studentId, teacherId, packageId }, ip: req.ip,
+    })
+
     sendSuccess(res, sub, 'تم إنشاء الاشتراك', 201)
   } catch (err) {
     next(err)
@@ -66,6 +73,12 @@ exports.updateSubscription = async (req, res, next) => {
       .populate('teacherId', 'firstNameAr lastNameAr')
       .populate('packageId', 'nameAr price')
     if (!sub) return sendError(res, 'الاشتراك غير موجود', 404)
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'subscription.update',
+      entity: 'Subscription', entityId: sub._id, changes: updates, ip: req.ip,
+    })
+
     sendSuccess(res, sub, 'تم تحديث الاشتراك')
   } catch (err) {
     next(err)

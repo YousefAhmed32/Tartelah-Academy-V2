@@ -13,7 +13,8 @@ import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx
 import { formatDateAr } from '../../utils/date.js'
 import { formatCurrency, formatNumber } from '../../utils/format.js'
 import { exportRowsToCSV, exportReportToPDF } from '../../utils/exportUtils.js'
-import { ROUTES } from '../../config/constants.js'
+import { ROUTES, PAYROLL_STATUS } from '../../config/constants.js'
+import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
 
 function getPeriodRange(preset) {
   const now = new Date()
@@ -66,6 +67,13 @@ export default function AdminTeacherPerformancePage() {
       params: { from: periodRange.from, to: periodRange.to, search: search || undefined, page, limit: 15 },
     }).then(r => r.data.data),
     placeholderData: (prev) => prev,
+  })
+
+  const { data: readiness } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'payroll-readiness', periodRange.from, periodRange.to],
+    queryFn: () => api.get('/teacher-performance/admin/payroll-readiness', {
+      params: { from: periodRange.from, to: periodRange.to },
+    }).then(r => r.data.data),
   })
 
   const rows = data?.rows || []
@@ -172,6 +180,29 @@ export default function AdminTeacherPerformancePage() {
         <StatCard label="الأفضل التزاماً" value={totals.topPerformer ? `${totals.topPerformer.firstNameAr} ${totals.topPerformer.lastNameAr}` : '—'} Icon={Award} color="#E8C76A" bg="#fffbeb" />
       </div>
 
+      {/* Payroll readiness — how many sessions are actually ready to pay vs still pending review */}
+      {readiness?.totals && (
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+          <div className="text-sm font-bold text-gray-800 mb-3">جاهزية الرواتب لهذه الفترة</div>
+          <div className="flex flex-wrap gap-2">
+            {['payable', 'pending_review', 'pending', 'non_payable', 'excluded'].filter(k => readiness.totals[k] > 0).map(k => {
+              const cfg = PAYROLL_STATUS[k]
+              return (
+                <span key={k} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: `${cfg.color}18`, color: cfg.color }}>
+                  {cfg.label}: {readiness.totals[k]}
+                </span>
+              )
+            })}
+          </div>
+          {readiness.totals.pending_review > 0 && (
+            <p className="text-[11px] text-amber-600 mt-2.5">
+              {readiness.totals.pending_review} حصة عبر جميع المعلمين بانتظار مراجعتك قبل احتسابها ضمن الرواتب.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between flex-wrap gap-3">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
@@ -218,7 +249,7 @@ export default function AdminTeacherPerformancePage() {
                   <tr key={t._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <Avatar src={t.avatar} firstName={t.firstNameAr} lastName={t.lastNameAr} size="sm" />
+                        <Avatar src={resolveTeacherIdentity(t).displayAvatar} firstName={t.firstNameAr} lastName={t.lastNameAr} size="sm" />
                         <div>
                           <div className="font-semibold text-gray-900">{t.firstNameAr} {t.lastNameAr}</div>
                           <div className="text-[11px] text-gray-400">{t.email}</div>

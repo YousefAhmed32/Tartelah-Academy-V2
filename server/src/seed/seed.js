@@ -80,8 +80,8 @@ async function seed() {
       phone: '+966501234567', isEmailVerified: true,
     },
     {
-      firstNameAr: 'الشيخ محمد', lastNameAr: 'العمري', firstName: 'Sheikh Mohammed', lastName: 'Al-Omari',
-      email: 'teacher1@tartelah.com', password: 'Teacher1234!', role: 'teacher',
+      firstNameAr: 'محمد', lastNameAr: 'العمري', firstName: 'Mohammed', lastName: 'Al-Omari',
+      email: 'teacher1@tartelah.com', password: 'Teacher1234!', role: 'teacher', gender: 'male',
       phone: '+966507654321', bioAr: 'حافظ للقرآن الكريم بالروايات العشر، متخصص في التجويد وعلوم القرآن، خبرة 15 عاماً في التعليم',
       specialization: 'تجويد وحفظ', isEmailVerified: true,
       meetingLinks: [
@@ -90,8 +90,8 @@ async function seed() {
       ],
     },
     {
-      firstNameAr: 'الشيخة فاطمة', lastNameAr: 'الزهراني', firstName: 'Sheikha Fatima', lastName: 'Al-Zahrani',
-      email: 'teacher2@tartelah.com', password: 'Teacher1234!', role: 'teacher',
+      firstNameAr: 'فاطمة', lastNameAr: 'الزهراني', firstName: 'Fatima', lastName: 'Al-Zahrani',
+      email: 'teacher2@tartelah.com', password: 'Teacher1234!', role: 'teacher', gender: 'female',
       phone: '+966509876543', bioAr: 'معلمة القرآن والتجويد للأطفال والنساء، حاصلة على إجازة برواية حفص عن عاصم',
       specialization: 'تعليم الأطفال والتجويد', isEmailVerified: true,
       meetingLinks: [

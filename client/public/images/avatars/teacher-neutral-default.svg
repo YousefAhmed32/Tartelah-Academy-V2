@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="صورة افتراضية — الهوية بانتظار التحديد">
+  <defs>
+    <linearGradient id="tn-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4b5563"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="100" cy="100" r="99" fill="url(#tn-bg)"/>
+  <circle cx="100" cy="100" r="96.5" fill="none" stroke="#9ca3af" stroke-opacity="0.4" stroke-width="2.5"/>
+
+  <!-- neutral bust silhouette, no headwear — deliberately non-gendered -->
+  <path d="M42,201 C42,150 66,116 100,116 C134,116 158,150 158,201 Z" fill="#d1d5db" fill-opacity="0.85"/>
+  <circle cx="100" cy="80" r="33" fill="#d1d5db" fill-opacity="0.85"/>
+  <path d="M78,80 a22,22 0 0,0 44,0" fill="none" stroke="#4b5563" stroke-opacity="0.4" stroke-width="3" stroke-linecap="round"/>
+</svg>

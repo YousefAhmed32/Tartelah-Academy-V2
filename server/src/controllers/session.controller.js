@@ -4,16 +4,24 @@ const Subscription = require('../models/Subscription')
 const { createNotification } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
+const { classifyCheckIn, getSessionWindow } = require('../config/attendancePolicy')
+const { computePayrollStatus, computeConfidence, assessSessionReview } = require('../services/sessionIntelligence.service')
+const { logAction } = require('../services/audit.service')
 
-const ON_TIME_GRACE_MINUTES = 10
+function isOwnerOrAdmin(session, user) {
+  return user.role === 'admin' || session.teacherId.toString() === user._id.toString()
+}
 
-function computeAttendanceFromTiming(scheduledAt, actualAt) {
-  const diffMinutes = Math.round((actualAt.getTime() - new Date(scheduledAt).getTime()) / 60000)
-  const lateMinutes = Math.max(0, diffMinutes)
-  return {
-    status: lateMinutes > ON_TIME_GRACE_MINUTES ? 'late' : 'on_time',
-    lateMinutes,
-  }
+// Applies the system-computed payroll status unless an admin has already
+// made a durable manual decision — once payrollStatusSetBy is 'admin', the
+// session is never silently overwritten by automatic recomputation.
+function applySystemPayrollStatus(session) {
+  if (session.payrollStatusSetBy === 'admin') return
+  const { payrollStatus, reason } = computePayrollStatus(session)
+  session.payrollStatus = payrollStatus
+  session.payrollStatusReason = reason
+  session.payrollStatusSetBy = 'system'
+  session.payrollStatusSetAt = new Date()
 }
 
 exports.createSession = async (req, res, next) => {
@@ -49,7 +57,10 @@ exports.getSession = async (req, res, next) => {
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
 
     const attendance = await Attendance.findOne({ sessionId: session._id, studentId: session.studentId })
-    sendSuccess(res, { ...session.toObject(), attendance: attendance || null })
+    const window = getSessionWindow(session.scheduledAt, session.durationMinutes)
+    const confidence = computeConfidence(session, attendance)
+    const reviewAssessment = req.user.role === 'admin' ? assessSessionReview(session, attendance) : null
+    sendSuccess(res, { ...session.toObject(), attendance: attendance || null, window, confidence, reviewAssessment })
   } catch (err) {
     next(err)
   }
@@ -107,31 +118,53 @@ exports.getTeacherSessionsByMonth = async (req, res, next) => {
       .sort({ scheduledAt: 1 })
       .populate('studentId', 'firstNameAr lastNameAr avatar email')
 
-    sendSuccess(res, sessions)
+    // Attach the computed window/phase so the UI can show forgiving,
+    // human-readable operational state without re-deriving policy math.
+    const now = new Date()
+    const withWindow = sessions.map(s => ({
+      ...s.toObject(),
+      window: getSessionWindow(s.scheduledAt, s.durationMinutes, now),
+    }))
+
+    sendSuccess(res, withWindow)
   } catch (err) {
     next(err)
   }
 }
 
-// Teacher marks that they've actually joined/started the session — captures
-// punctuality (on_time / late) by comparing the timestamp to scheduledAt.
+// Teacher platform check-in — records that the teacher declared readiness
+// through the academy at this moment. This does NOT prove the teacher
+// joined the external Zoom/Meet/Teams call — see models/Session.js comment.
+// Allowed even if the sweep job already soft-flagged the session as
+// missed/no_show: a late self check-in is strictly better evidence than a
+// system guess, and the platform must never lock a teacher out just because
+// time passed (see attendancePolicy.js — soft windows, not hard punishment).
 exports.startSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
-    const isAdmin = req.user.role === 'admin'
-    if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
-    if (session.status !== 'scheduled') return sendError(res, 'لا يمكن بدء هذه الحصة', 400)
+    if (!isOwnerOrAdmin(session, req.user)) return sendError(res, 'غير مصرح', 403)
+    if (!['scheduled', 'missed', 'no_show'].includes(session.status)) {
+      return sendError(res, 'لا يمكن بدء هذه الحصة', 400)
+    }
 
+    const wasAutoFlagged = session.status === 'missed' || session.status === 'no_show'
     const now = new Date()
-    const { status, lateMinutes } = computeAttendanceFromTiming(session.scheduledAt, now)
+    const { status, lateMinutes } = classifyCheckIn(session.scheduledAt, now)
 
     session.status = 'ongoing'
     session.teacherStartedAt = now
     session.teacherAttendanceStatus = status
     session.teacherLateMinutes = lateMinutes
-    session.teacherAttendanceMarkedBy = 'system'
+    session.teacherAttendanceMarkedBy = 'teacher'
     await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.check_in',
+      entity: 'Session', entityId: session._id,
+      changes: { status, lateMinutes, selfResolvedFromAutoFlag: wasAutoFlagged },
+      ip: req.ip,
+    })
 
     if (status === 'late') {
       await createNotification({
@@ -144,7 +177,62 @@ exports.startSession = async (req, res, next) => {
       })
     }
 
-    sendSuccess(res, session, 'تم بدء الحصة')
+    sendSuccess(res, session, 'تم تسجيل حضورك للحصة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Records that someone opened the external meeting link through the
+// platform. Evidence only — a click is never treated as proof of actual
+// meeting participation.
+exports.recordLinkOpened = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
+    const userId = req.user._id.toString()
+    const isTeacher = session.teacherId.toString() === userId
+    const isStudent = session.studentId.toString() === userId
+    if (!isTeacher && !isStudent && req.user.role !== 'admin') return sendError(res, 'غير مصرح', 403)
+    if (!session.meetingLink) return sendError(res, 'لا يوجد رابط اجتماع لهذه الحصة بعد', 400)
+
+    const now = new Date()
+    if (isTeacher || req.user.role === 'admin') session.teacherLinkOpenedAt = now
+    if (isStudent) session.studentLinkOpenedAt = now
+    await session.save()
+
+    sendSuccess(res, { meetingLink: session.meetingLink, openedAt: now }, 'تم فتح رابط الحصة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Reports that a session started later than scheduled without a full
+// reschedule — e.g. the teacher or student was a bit late, the previous
+// session overran, or there was a short technical delay. Preserves the
+// original schedule; stores the real timing alongside it.
+exports.reportDelay = async (req, res, next) => {
+  try {
+    const { actualStartAt, delayReasonCode, delayNote } = req.body
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+    if (!isOwnerOrAdmin(session, req.user)) return sendError(res, 'غير مصرح', 403)
+
+    const actual = actualStartAt ? new Date(actualStartAt) : new Date()
+    session.actualStartAt = actual
+    session.delayMinutes = Math.max(0, Math.round((actual.getTime() - new Date(session.scheduledAt).getTime()) / 60000))
+    if (delayReasonCode) session.delayReasonCode = delayReasonCode
+    if (delayNote !== undefined) session.delayNote = delayNote
+    await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.report_delay',
+      entity: 'Session', entityId: session._id,
+      changes: { delayMinutes: session.delayMinutes, delayReasonCode }, ip: req.ip,
+    })
+
+    sendSuccess(res, session, 'تم تسجيل تأخر الحصة')
   } catch (err) {
     next(err)
   }
@@ -152,27 +240,48 @@ exports.startSession = async (req, res, next) => {
 
 exports.completeSession = async (req, res, next) => {
   try {
+    const { outcome } = req.body
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
-    const isAdmin = req.user.role === 'admin'
-    if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    if (!isOwnerOrAdmin(session, req.user)) return sendError(res, 'غير مصرح', 403)
+    if (session.status === 'completed') return sendError(res, 'تم إكمال هذه الحصة بالفعل', 400)
+
     session.status = 'completed'
     session.completedAt = new Date()
+    if (!session.actualEndAt) session.actualEndAt = session.completedAt
+    session.outcome = outcome && outcome !== 'pending_review' ? outcome : 'delivered'
+
     // Fallback: if the teacher completed the session without ever calling
     // /start (older clients, or direct completion), infer punctuality from
     // the completion timestamp so attendance data stays populated.
     if (session.teacherAttendanceStatus === 'pending') {
-      const { status, lateMinutes } = computeAttendanceFromTiming(session.scheduledAt, session.completedAt)
+      const { status, lateMinutes } = classifyCheckIn(session.scheduledAt, session.completedAt)
       session.teacherAttendanceStatus = status
       session.teacherLateMinutes = lateMinutes
       session.teacherAttendanceMarkedBy = 'system'
     }
+
+    applySystemPayrollStatus(session)
     await session.save()
-    await Subscription.findOneAndUpdate(
-      { studentId: session.studentId, status: 'active' },
-      { $inc: { sessionsRemaining: -1 } }
-    )
-    // Only auto-create attendance as 'present' if not already recorded
+
+    // Scope the decrement to this session's own subscription when known;
+    // fall back to the legacy studentId+active lookup for older ad-hoc
+    // sessions created before subscriptionId was populated on generation.
+    if (session.subscriptionId) {
+      await Subscription.findOneAndUpdate(
+        { _id: session.subscriptionId },
+        { $inc: { sessionsRemaining: -1 } }
+      )
+    } else {
+      await Subscription.findOneAndUpdate(
+        { studentId: session.studentId, status: 'active' },
+        { $inc: { sessionsRemaining: -1 } }
+      )
+    }
+
+    // Only auto-create attendance as an unconfirmed 'present' draft if not
+    // already recorded — this is NOT the same as the teacher explicitly
+    // finalizing attendance (isFinalized stays false).
     const existingAtt = await Attendance.findOne({ sessionId: session._id })
     if (!existingAtt) {
       await Attendance.create({
@@ -181,8 +290,16 @@ exports.completeSession = async (req, res, next) => {
         teacherId: session.teacherId,
         status: 'present',
         recordedAt: new Date(),
+        isFinalized: false,
       })
     }
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.complete',
+      entity: 'Session', entityId: session._id,
+      changes: { outcome: session.outcome, payrollStatus: session.payrollStatus }, ip: req.ip,
+    })
+
     sendSuccess(res, session, 'تم إكمال الحصة')
   } catch (err) {
     next(err)
@@ -198,7 +315,22 @@ exports.cancelSession = async (req, res, next) => {
     session.status = 'cancelled'
     session.cancelledAt = new Date()
     session.cancelReason = req.body.reason || ''
+    session.outcome = req.body.cancelledByRole === 'student'
+      ? 'cancelled_by_student'
+      : (isAdmin ? 'cancelled_by_admin' : 'cancelled_by_teacher')
+    if (session.payrollStatusSetBy !== 'admin') {
+      session.payrollStatus = 'excluded'
+      session.payrollStatusReason = 'الحصة ملغاة'
+      session.payrollStatusSetBy = 'system'
+      session.payrollStatusSetAt = new Date()
+    }
     await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.cancel',
+      entity: 'Session', entityId: session._id,
+      changes: { reason: session.cancelReason, outcome: session.outcome }, ip: req.ip,
+    })
 
     await createNotification({
       userId: session.studentId,
@@ -223,11 +355,18 @@ exports.rescheduleSession = async (req, res, next) => {
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
     const isAdmin = req.user.role === 'admin'
     if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    const previousDate = session.scheduledAt
     session.rescheduledFrom = session.scheduledAt
     session.scheduledAt = new Date(newDate)
     session.status = 'scheduled'
     session.isException = true
     await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.reschedule',
+      entity: 'Session', entityId: session._id,
+      changes: { from: previousDate, to: session.scheduledAt }, ip: req.ip,
+    })
 
     await createNotification({
       userId: session.studentId,
@@ -268,6 +407,12 @@ exports.adminUpdateSession = async (req, res, next) => {
     const session = await Session.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
       .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email')
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_update',
+      entity: 'Session', entityId: session._id, changes: updates, ip: req.ip,
+    })
+
     sendSuccess(res, session, 'تم تحديث الحصة')
   } catch (err) {
     next(err)
@@ -286,6 +431,12 @@ exports.adminCreateSession = async (req, res, next) => {
       isException: true,
     })
     await session.populate('studentId teacherId', 'firstNameAr lastNameAr avatar')
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_create',
+      entity: 'Session', entityId: session._id, changes: { studentId, teacherId, scheduledAt }, ip: req.ip,
+    })
+
     await createNotification({
       userId: studentId,
       titleAr: 'حصة جديدة مجدولة',
@@ -309,6 +460,12 @@ exports.adminDeleteSession = async (req, res, next) => {
   try {
     const session = await Session.findByIdAndDelete(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_delete',
+      entity: 'Session', entityId: session._id, ip: req.ip,
+    })
+
     sendSuccess(res, null, 'تم حذف الحصة')
   } catch (err) {
     next(err)

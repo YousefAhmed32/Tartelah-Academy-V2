@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Plus, Edit2, XCircle, Video, User, GraduationCap, Search, ChevronDown, RefreshCw } from 'lucide-react'
+import { Calendar, Clock, Plus, Edit2, XCircle, Video, User, GraduationCap, Search, ChevronDown, RefreshCw, ShieldAlert } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
+import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { PAYROLL_STATUS } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',   bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -15,6 +17,7 @@ const STATUS_CONFIG = {
   completed:    { label: 'مكتملة',   bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelled:    { label: 'ملغاة',    bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500' },
   rescheduled:  { label: 'معادة',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500' },
+  missed:       { label: 'بحاجة متابعة', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   no_show:      { label: 'غياب',     bg: 'bg-gray-100',   text: 'text-gray-600',    dot: 'bg-gray-400' },
 }
 
@@ -236,9 +239,81 @@ function RescheduleModal({ session, onClose }) {
   )
 }
 
+// ── Payroll status badge ──────────────────────────────────────────────────────
+
+function PayrollBadge({ status }) {
+  if (!status) return null
+  const cfg = PAYROLL_STATUS[status] || PAYROLL_STATUS.pending
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+      style={{ background: `${cfg.color}18`, color: cfg.color }}>
+      {cfg.label}
+    </span>
+  )
+}
+
+// ── Attendance Correction Modal ───────────────────────────────────────────────
+// Lets an admin correct a specific session's teacher-attendance / payroll
+// status directly from the sessions table — previously this was only
+// reachable via a teacher's profile page.
+
+function CorrectionModal({ session, onClose }) {
+  const qc = useQueryClient()
+  const [status, setStatus] = useState(session.teacherAttendanceStatus || 'pending')
+  const [payrollStatus, setPayrollStatus] = useState(session.payrollStatus || 'pending')
+  const [notes, setNotes] = useState('')
+
+  const mut = useMutation({
+    mutationFn: () => api.patch(`/teacher-performance/admin/session/${session._id}/attendance`, {
+      status, payrollStatus, payrollStatusReason: notes || undefined, notes: notes || undefined,
+    }).then(r => r.data),
+    onSuccess: () => {
+      toast.success('تم تحديث سجل الحضور والراتب')
+      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+      onClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+        <h2 className="font-heading font-bold text-gray-900 mb-1 flex items-center gap-2">
+          <ShieldAlert size={18} className="text-violet-600" /> تصحيح الحضور والراتب
+        </h2>
+        <p className="text-xs text-gray-500 mb-4">هذا التصحيح مُوثَّق في سجل التدقيق (Audit Log) ولن يُستبدل تلقائياً بعد الآن.</p>
+        <div className="space-y-3">
+          <Field label="حالة حضور المعلم">
+            <select className={selectCls} value={status} onChange={e => setStatus(e.target.value)}>
+              {['pending', 'on_time', 'late', 'absent', 'excused'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="حالة الاستحقاق للراتب">
+            <select className={selectCls} value={payrollStatus} onChange={e => setPayrollStatus(e.target.value)}>
+              {Object.entries(PAYROLL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </Field>
+          <Field label="سبب التصحيح (سيظهر للمعلم)">
+            <textarea className={`${inputCls} h-16 resize-none py-2`} value={notes} onChange={e => setNotes(e.target.value)} placeholder="اختياري..." />
+          </Field>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button onClick={() => mut.mutate()} disabled={mut.isPending}
+            className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+            {mut.isPending && <Spinner size="sm" color="border-white" />}
+            حفظ التصحيح
+          </button>
+          <button onClick={onClose} className="px-4 h-10 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm">إلغاء</button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 // ── Session Row ───────────────────────────────────────────────────────────────
 
-function SessionRow({ session, onEdit, onReschedule, onCancel }) {
+function SessionRow({ session, onEdit, onReschedule, onCancel, onCorrect }) {
   const sc = STATUS_CONFIG[session.status] || STATUS_CONFIG.scheduled
   const canCancel = ['scheduled', 'ongoing'].includes(session.status)
 
@@ -252,6 +327,12 @@ function SessionRow({ session, onEdit, onReschedule, onCancel }) {
             <Video size={11} /> رابط الاجتماع
           </a>
         )}
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {session.teacherAttendanceStatus && session.teacherAttendanceStatus !== 'pending' && (
+            <AttendanceStatusBadge status={session.teacherAttendanceStatus} size="sm" />
+          )}
+          <PayrollBadge status={session.payrollStatus} />
+        </div>
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2">
@@ -281,6 +362,10 @@ function SessionRow({ session, onEdit, onReschedule, onCancel }) {
             className="p-1.5 rounded-lg hover:bg-violet-100 text-violet-600 transition-colors" title="تعديل">
             <Edit2 size={14} />
           </button>
+          <button onClick={() => onCorrect(session)}
+            className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 transition-colors" title="تصحيح الحضور والراتب">
+            <ShieldAlert size={14} />
+          </button>
           {canCancel && (
             <button onClick={() => onReschedule(session)}
               className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 transition-colors" title="إعادة جدولة">
@@ -307,9 +392,11 @@ export default function AdminSessionsPage() {
   const [teacherId, setTeacherId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [payrollStatus, setPayrollStatus] = useState('')
   const [createModal, setCreateModal] = useState(false)
   const [editSession, setEditSession] = useState(null)
   const [rescheduleSession, setRescheduleSession] = useState(null)
+  const [correctSession, setCorrectSession] = useState(null)
   const qc = useQueryClient()
 
   const buildQuery = () => {
@@ -318,11 +405,12 @@ export default function AdminSessionsPage() {
     if (teacherId) p.set('teacherId', teacherId)
     if (dateFrom) p.set('dateFrom', dateFrom)
     if (dateTo) p.set('dateTo', dateTo)
+    if (payrollStatus) p.set('payrollStatus', payrollStatus)
     return p.toString()
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'sessions', page, status, teacherId, dateFrom, dateTo],
+    queryKey: ['admin', 'sessions', page, status, teacherId, dateFrom, dateTo, payrollStatus],
     queryFn: () => api.get(`/admin/sessions?${buildQuery()}`).then(r => r.data),
     placeholderData: (prev) => prev,
   })
@@ -364,6 +452,7 @@ export default function AdminSessionsPage() {
     { key: 'ongoing', label: 'جارية' },
     { key: 'completed', label: 'مكتملة' },
     { key: 'cancelled', label: 'ملغاة' },
+    { key: 'missed', label: 'بحاجة متابعة' },
     { key: 'no_show', label: 'غياب' },
   ]
 
@@ -405,8 +494,13 @@ export default function AdminSessionsPage() {
             value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} placeholder="من تاريخ" />
           <input type="date" className="h-9 bg-gray-50 border border-gray-200 rounded-xl px-3 text-sm text-gray-700 outline-none focus:border-violet-400"
             value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} placeholder="إلى تاريخ" />
-          {(teacherId || dateFrom || dateTo) && (
-            <button onClick={() => { setTeacherId(''); setDateFrom(''); setDateTo(''); setPage(1) }}
+          <select className="h-9 bg-gray-50 border border-gray-200 rounded-xl px-3 text-sm text-gray-700 outline-none focus:border-violet-400 cursor-pointer min-w-[150px]"
+            value={payrollStatus} onChange={e => { setPayrollStatus(e.target.value); setPage(1) }}>
+            <option value="">كل حالات الاستحقاق</option>
+            {Object.entries(PAYROLL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          {(teacherId || dateFrom || dateTo || payrollStatus) && (
+            <button onClick={() => { setTeacherId(''); setDateFrom(''); setDateTo(''); setPayrollStatus(''); setPage(1) }}
               className="h-9 px-3 bg-red-50 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors">
               مسح الفلاتر
             </button>
@@ -433,6 +527,7 @@ export default function AdminSessionsPage() {
                   onEdit={setEditSession}
                   onReschedule={setRescheduleSession}
                   onCancel={handleCancel}
+                  onCorrect={setCorrectSession}
                 />
               ))}
             </tbody>
@@ -465,6 +560,9 @@ export default function AdminSessionsPage() {
         )}
         {rescheduleSession && (
           <RescheduleModal session={rescheduleSession} onClose={() => setRescheduleSession(null)} />
+        )}
+        {correctSession && (
+          <CorrectionModal session={correctSession} onClose={() => setCorrectSession(null)} />
         )}
       </AnimatePresence>
     </div>

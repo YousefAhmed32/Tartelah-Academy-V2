@@ -48,7 +48,7 @@ exports.listPublished = async (req, res, next) => {
     const [courses, total] = await Promise.all([
       Course.find(filter)
         .select('nameAr name slug shortDescriptionAr shortDescription thumbnailImage coverImage category difficulty ageGroup language estimatedDuration lessonsCount studentsCount enrollmentCount featured rating reviewCount certificateAvailable order createdAt')
-        .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar')
+        .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar gender')
         .sort({ featured: -1, order: 1, studentsCount: -1, createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -65,7 +65,7 @@ exports.getFeatured = async (req, res, next) => {
   try {
     const courses = await Course.find({ status: 'published', isActive: true, featured: true })
       .select('nameAr name slug shortDescriptionAr thumbnailImage category difficulty studentsCount estimatedDuration lessonsCount')
-      .populate('instructor', 'firstName firstNameAr avatar')
+      .populate('instructor', 'firstName firstNameAr avatar gender')
       .sort({ order: 1, studentsCount: -1 })
       .limit(6)
       .lean()
@@ -83,7 +83,7 @@ exports.getBySlug = async (req, res, next) => {
       : { slug, status: 'published', isActive: true }
 
     const course = await Course.findOne(filter)
-      .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar bio bioAr')
+      .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar bio bioAr gender')
       .lean()
     if (!course) return sendError(res, 'المقرر غير موجود', 404)
 

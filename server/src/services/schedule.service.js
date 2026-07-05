@@ -71,10 +71,23 @@ exports.previewFromRule = (ruleData, limitCount = 20) => {
 }
 
 /**
- * Generates Session documents from a ScheduleRule and inserts them.
- * Supports extending an existing series — existing sessions are counted
- * for title numbering but not duplicated (dates already past are handled
- * by the caller updating startDate before calling this again).
+ * Generates Session documents from a ScheduleRule.
+ *
+ * Idempotent by design (Phase 10 — recurring-session dedupe): a `{seriesId,
+ * scheduledAt}` unique index exists on Session (see models/Session.js), and
+ * this function upserts on that same key via `$setOnInsert` rather than
+ * `insertMany`. Calling this twice with the same rule and overlapping date
+ * ranges — whether from a genuine double-click, a retried request, or two
+ * near-simultaneous calls racing each other — can never create duplicate
+ * occurrences: MongoDB's unique index is the actual safety net, not just
+ * the application-level `existing` check below (which exists only to keep
+ * the human-facing title numbering, e.g. "حصة 9", continuous across
+ * multiple generation calls — it is not relied on for correctness).
+ *
+ * A legitimate reschedule is unaffected: reschedule mutates a single
+ * existing Session's `scheduledAt` field directly (see
+ * session.controller.js `rescheduleSession`) rather than going through
+ * this generation path, so it never collides with this index.
  */
 exports.generateSessionsFromRule = async (rule) => {
   const dates = generateDates(rule)
@@ -82,18 +95,34 @@ exports.generateSessionsFromRule = async (rule) => {
 
   const existing = await Session.countDocuments({ seriesId: rule._id })
 
-  const sessions = dates.map((date, i) => ({
-    teacherId: rule.teacherId,
-    studentId: rule.studentId,
-    subscriptionId: rule.subscriptionId,
-    seriesId: rule._id,
-    titleAr: `${rule.titleTemplate || 'حصة'} ${existing + i + 1}`,
-    scheduledAt: date,
-    durationMinutes: rule.durationMinutes || 60,
-    meetingLink: rule.meetingLink || '',
-    meetingProvider: rule.meetingProvider || 'zoom',
-    status: 'scheduled',
+  const ops = dates.map((date, i) => ({
+    updateOne: {
+      filter: { seriesId: rule._id, scheduledAt: date },
+      update: {
+        $setOnInsert: {
+          teacherId: rule.teacherId,
+          studentId: rule.studentId,
+          subscriptionId: rule.subscriptionId,
+          seriesId: rule._id,
+          titleAr: `${rule.titleTemplate || 'حصة'} ${existing + i + 1}`,
+          scheduledAt: date,
+          durationMinutes: rule.durationMinutes || 60,
+          meetingLink: rule.meetingLink || '',
+          meetingProvider: rule.meetingProvider || 'zoom',
+          status: 'scheduled',
+        },
+      },
+      upsert: true,
+    },
   }))
 
-  return Session.insertMany(sessions)
+  const result = await Session.bulkWrite(ops, { ordered: false })
+
+  // Only return the sessions actually newly inserted by this call (not
+  // pre-existing ones the upsert matched-and-skipped) — matches the old
+  // insertMany's return semantics that callers (schedule-rule controller,
+  // notifications) depend on for an accurate "N sessions generated" count.
+  const insertedIds = Object.values(result.upsertedIds || {})
+  if (!insertedIds.length) return []
+  return Session.find({ _id: { $in: insertedIds } }).sort({ scheduledAt: 1 })
 }

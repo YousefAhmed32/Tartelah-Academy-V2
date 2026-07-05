@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="صورة افتراضية لمعلم">
+  <defs>
+    <linearGradient id="tm-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#2e1065"/>
+    </linearGradient>
+    <linearGradient id="tm-cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#a6821f"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="100" cy="100" r="99" fill="url(#tm-bg)"/>
+  <circle cx="100" cy="100" r="96.5" fill="none" stroke="#E8C76A" stroke-opacity="0.55" stroke-width="2.5"/>
+
+  <!-- shoulders / body -->
+  <path d="M42,201 C42,150 66,116 100,116 C134,116 158,150 158,201 Z" fill="#ddd6fe" fill-opacity="0.92"/>
+  <!-- collar notch -->
+  <path d="M88,118 L100,136 L112,118" fill="none" stroke="#4c1d95" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+  <!-- head -->
+  <circle cx="100" cy="80" r="33" fill="#ddd6fe" fill-opacity="0.92"/>
+
+  <!-- taqiyah cap -->
+  <path d="M70,63 C70,45 84,35 100,35 C116,35 130,45 130,63 C130,67 128,70 124,70 L76,70 C72,70 70,67 70,63 Z" fill="url(#tm-cap)"/>
+  <path d="M74,68 L126,68" stroke="#2a1500" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round"/>
+</svg>

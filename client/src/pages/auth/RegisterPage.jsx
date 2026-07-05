@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Mail, Lock, Eye, EyeOff, Phone, User } from 'lucide-react'
@@ -119,6 +119,12 @@ export default function RegisterPage() {
   const [loading,   setLoading]   = useState(false)
   const { setAuth, getDashboardPath } = useAuthStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Set when arriving from a Teacher Profile page's "سجّل الآن مع ..." CTA —
+  // preserves the visitor's chosen teacher into the enrollment step instead
+  // of silently dropping it at the generic registration form.
+  const preferredTeacherId = searchParams.get('teacherId')
+  const preferredTeacherName = searchParams.get('teacherName')
 
   function change(e) {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }))
@@ -144,6 +150,10 @@ export default function RegisterPage() {
       })
       const { user, accessToken } = res.data.data
       setAuth(user, accessToken)
+      if (preferredTeacherId) {
+        localStorage.setItem('preferredTeacherId', preferredTeacherId)
+        if (preferredTeacherName) localStorage.setItem('preferredTeacherName', preferredTeacherName)
+      }
       toast.success('تم إنشاء حسابك بنجاح! أهلاً بك في ترتيلة.')
       navigate(getDashboardPath(), { replace: true })
     } catch (err) {
@@ -179,6 +189,15 @@ export default function RegisterPage() {
             delay={0.07}
             bottomMargin="mb-6"
           />
+
+          {preferredTeacherName && (
+            <div
+              className="mb-5 rounded-2xl px-4 py-3 text-sm font-semibold text-center"
+              style={{ background: 'rgba(232,199,106,0.12)', color: T.purpleDark, border: '1px solid rgba(212,175,55,0.35)' }}
+            >
+              ستبدأ رحلتك مع {preferredTeacherName}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
 

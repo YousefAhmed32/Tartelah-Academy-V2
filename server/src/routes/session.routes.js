@@ -13,5 +13,9 @@ router.patch('/:id/start', isAdminOrTeacher, ctrl.startSession)
 router.patch('/:id/complete', isAdminOrTeacher, ctrl.completeSession)
 router.patch('/:id/cancel', ctrl.cancelSession)
 router.patch('/:id/reschedule', isAdminOrTeacher, ctrl.rescheduleSession)
+router.patch('/:id/delay', isAdminOrTeacher, ctrl.reportDelay)
+// Any authenticated participant (teacher or student on their own session) may
+// record an "I opened the external meeting link" evidence event.
+router.post('/:id/link-opened', ctrl.recordLinkOpened)
 
 module.exports = router

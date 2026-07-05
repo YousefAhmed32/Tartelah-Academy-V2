@@ -124,6 +124,49 @@ function QuickActionBtn({ icon, label, to, color = '#7c3aed', badge }) {
   )
 }
 
+// Compact "what needs my attention right now" strip — the dashboard's job
+// is to answer that question in one glance; the full breakdown, timeline,
+// and review actions live in the Operations Center this links to.
+function OperationsIntelligenceStrip() {
+  const navigate = useNavigate()
+  const { data } = useQuery({
+    queryKey: ['admin', 'operations', 'live'],
+    queryFn: () => api.get('/operations/live').then(r => r.data.data),
+    refetchInterval: 120000,
+  })
+  const c = data?.counts
+  if (!c) return null
+
+  const items = [
+    { label: 'جارية الآن', value: c.liveNow, color: '#22c55e' },
+    { label: 'لم يسجّل المعلم حضوره', value: c.missingCheckIn, color: '#ef4444' },
+    { label: 'بلا رابط اجتماع', value: c.missingLink, color: '#f59e0b' },
+    { label: 'بحاجة مراجعة', value: c.needsReviewCount, color: '#ea580c' },
+    { label: 'مراجعة راتب معلّقة', value: c.payrollReviewCount, color: '#7c3aed' },
+  ]
+  const anyUrgent = items.some(i => i.value > 0)
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+      onClick={() => navigate(ROUTES.ADMIN_OPERATIONS)}
+      className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all text-start flex-wrap"
+    >
+      <span className="text-xs font-bold text-gray-700 flex-none">مركز العمليات</span>
+      <div className="flex items-center gap-4 flex-wrap flex-1">
+        {items.map(i => (
+          <span key={i.label} className="text-xs text-gray-500 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: i.value > 0 ? i.color : '#d1d5db' }} />
+            <b style={{ color: i.value > 0 ? i.color : '#9ca3af' }}>{i.value ?? 0}</b> {i.label}
+          </span>
+        ))}
+      </div>
+      {!anyUrgent && <span className="text-xs text-emerald-600 font-semibold flex-none">كل شيء طبيعي ✓</span>}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-gray-400 flex-none"><path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </motion.button>
+  )
+}
+
 export default function AdminDashboardPage() {
   const { user } = useAuthStore()
 
@@ -175,6 +218,9 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Operations intelligence strip */}
+      <OperationsIntelligenceStrip />
 
       {/* Alert banners */}
       <AlertBanner count={pending} to={ROUTES.ADMIN_ENROLLMENTS} />

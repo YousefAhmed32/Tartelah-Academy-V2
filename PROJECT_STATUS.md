@@ -1,11 +1,49 @@
 # Project Status — Tartelah Online
 
-**Last Updated:** 2026-07-02  
-**Current Phase:** PRODUCTION READY — Full Educational Operating System + Articles CMS + Courses Management System + **Success Stories Homepage Section** + **Teacher Dashboard Light-Theme Redesign**  
-**Overall Progress:** 100% (Core) + Scheduling Engine + Articles CMS + Enterprise Courses Module + **Success Stories CMS**
+**Last Updated:** 2026-07-04  
+**Current Phase:** PRODUCTION READY — Full Educational Operating System + Articles CMS + Courses Management System + Success Stories Homepage Section + Teacher Dashboard Light-Theme Redesign + Intelligent Attendance / Payroll-Ready Operations System + Admin Operations Center + **Teacher Identity System & Teachers Page Refactor**
+**Overall Progress:** 100% (Core) + Scheduling Engine + Articles CMS + Enterprise Courses Module + Success Stories CMS + Session-Centric Attendance Intelligence + Needs-Review Queue + Recurring-Session Dedupe + **Canonical Teacher Gender Identity + Redesigned Public Teachers Page**
 **Frontend Build:** ✅ Zero errors  
-**Backend:** ✅ All endpoints verified + scheduling engine + articles API + courses enterprise API + **success-stories API**  
-**Database:** ✅ MongoDB with ScheduleRule + Session Series + Article + ArticleCategory + Course (expanded) + **SuccessStory (singleton)**
+**Backend:** ✅ All endpoints verified + scheduling engine + articles API + courses enterprise API + success-stories API + teacher-performance payroll-readiness API + operations (live/timeline/review-queue) API + **public teacher directory API (`/teachers/public`)**
+**Database:** ✅ MongoDB with ScheduleRule + Session Series + Article + ArticleCategory + Course (expanded) + SuccessStory (singleton) + Session/Attendance extended with payroll-readiness, outcome, delay, and evidence fields + review lifecycle fields + unique {seriesId, scheduledAt} dedupe index + **`User.gender` canonical enum**
+**Tests:** ✅ `npm test` (server, jest) — **68/68 passing**, covering attendance-policy/payroll-intelligence logic, the Needs-Review assessment engine, recurring-session dedupe, and **the teacher identity resolver/public-projection/migration-audit logic**
+
+---
+
+## Teacher Identity System & Teachers Page Refactor (2026-07-04, latest)
+
+Added `User.gender` (`male`/`female`, enum-validated, not required/defaulted) as the single canonical source of a teacher's identity — no legacy field existed to infer it from, so every pre-existing teacher is "unresolved" until corrected via the admin UI or the teacher's own settings, never guessed. Built a centralized identity resolver (mirrored in `server/src/utils/teacherIdentityResolver.js` and `client/src/utils/teacherIdentity.js`) that turns `{gender, avatar}` into the correct honorific (`الأستاذ`/`الأستاذة`), avatar (custom photo → gender-correct default → neutral-unresolved default), used everywhere a teacher's identity is shown. Discovered and fixed a real production bug: the public Teachers page was calling the `authenticate + isAdmin`-gated `/admin/teachers` endpoint, which could never succeed for a real anonymous visitor — it silently fell back to 4 hardcoded fake teachers via `.catch(() => FALLBACK_TEACHERS)` every time. Replaced with a genuine public, safely-projected `/teachers/public` API and removed the fake fallback entirely. Fully redesigned the Teachers page and `TeacherCard` (no more hover-only 3D flip, no more `فضيلة الشيخ` hardcoding, no more generic book-icon fallback), added a male/female discovery filter, a public Teacher Profile page, and admin/teacher-self gender controls. Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
+
+---
+
+## Admin Operations Center + Needs Review Queue + Recurring-Session Dedupe (2026-07-04, continuation pass)
+
+Second implementation pass on the attendance/payroll system, building directly on the first pass rather than redoing it. Re-verified all prior code against `docs/INTELLIGENT_ATTENDANCE_SYSTEM.md` first (found and fixed one stale docblock comment — no behavioral drift). Then closed the two biggest gaps flagged at the end of the first pass: `computeConfidence()` was fully implemented and tested but never actually called from any surfaced UI, and recurring-session generation had no de-duplication guard.
+
+Key additions — full detail in `docs/INTELLIGENT_ATTENDANCE_SYSTEM.md` §21–§31:
+- **Admin Operations Center** (`/admin/operations`, new page + nav item) — three tabs: الآن (live today's-sessions bucket view), الجدول الزمني (filterable chronological timeline), قائمة المراجعة (Needs Review queue)
+- **`assessSessionReview()`** (new, in `sessionIntelligence.service.js`) — deterministic severity + reasons engine (critical/high/medium) covering missing check-ins, unfinalized attendance on completed sessions, significant lateness, late finalization, missing meeting links, and three internal-contradiction checks (cancelled-but-payable, no_show-status-mismatch, outcome-status-mismatch)
+- **Review lifecycle** — new `Session.reviewState/reviewedBy/reviewedAt/reviewNote` fields; `PATCH /operations/review/:sessionId` with start_review/resolve/dismiss/reopen actions, all audit-logged
+- **Confidence now actually surfaced** — Timeline row drill-down + `GET /sessions/:id`, using plain-language labels (never a raw score, never "proof of attendance")
+- **Recurring-session dedupe** — unique partial index `{seriesId, scheduledAt}` on `Session` + `schedule.service.js` rewritten to idempotent `bulkWrite`/`$setOnInsert` upserts instead of `insertMany`; new `server/src/scripts/dedupeSessions.js` cleanup utility for any pre-existing legacy duplicates
+- **Audit log UX** — `AdminAuditLogsPage.jsx` rewritten with a full action-label map and human-readable change summaries instead of raw JSON
+- **Dashboard intelligence** — compact "needs attention" strip on `AdminDashboardPage.jsx`; teacher-side `needsAttention` count on `TeacherDashboardPage.jsx`
+
+---
+
+## Intelligent Attendance, Session Tracking & Payroll-Ready Operations System (2026-07-04)
+
+Full reverse-engineering + hardening pass on the platform's attendance/payroll pipeline. Prior sessions had already built a working teacher-attendance/salary subsystem (`Session.teacherAttendanceStatus`, `teacherPerformance.service.js`, a cron sweep, dedicated performance dashboards) — this session closed its real trust gaps rather than rebuilding it: payability now visibly (not silently) accounts for student attendance via a `pending_review` state, the audit trail (previously ~90% non-functional due to a call-signature bug) is now correctly wired across the entire session/attendance/subscription/enrollment pipeline, admin corrections are reachable directly from the sessions table, and the teacher check-in/attendance workflow now uses forgiving, graduated time windows instead of a single hard 15-minute cutoff. Full detail, diagrams, and file list in `docs/INTELLIGENT_ATTENDANCE_SYSTEM.md`.
+
+Key additions:
+- **`server/src/config/attendancePolicy.js`** (new) — centralized, configurable time-window policy (pre-session access, post-session grace, extended completion, late tolerance, missed/absence thresholds)
+- **`server/src/services/sessionIntelligence.service.js`** (new) — deterministic, unit-tested payroll-status and confidence-scoring rules
+- **`Session` model** — new `outcome`, `actualStartAt/actualEndAt`, `delayMinutes/delayReasonCode/delayNote`, `teacherLinkOpenedAt/studentLinkOpenedAt`, `attendanceFinalizedAt/By`, `payrollStatus` + related fields — all additive, no destructive migration
+- **`Attendance` model** — extended status enum (`left_early`, `technical_issue`), `arrivalTime`, `isFinalized/finalizedAt/finalizedBy`
+- **New endpoints** — `PATCH /sessions/:id/delay`, `POST /sessions/:id/link-opened`, `GET /teacher-performance/me|admin/payroll-readiness`
+- **Audit trail repaired** — fixed 7 broken `logAction` call sites in `article.controller.js` (wrong argument shape, silently failing since introduction) and added real audit coverage to session check-in/complete/cancel/reschedule/delay, attendance save/finalize/update, admin corrections, subscription create/update, and enrollment approval/rejection
+- **Graduated, forgiving cron sweep** (`teacherAttendanceSweep.job.js` rewritten) — replaces the old single 15-minute hard cutoff with a 3-stage model (untouched → `missed` at 4h past end → `no_show` at 7h past end), always admin-correctable
+- **Frontend** — `TeacherSessionsPage.jsx` (check-in vs. link-open distinction, delay reporting, extended attendance statuses, draft/finalize split, outcome picker), `TeacherDashboardPage.jsx` (consistent forgiving check-in), `AdminSessionsPage.jsx` (payroll badges + inline correction modal + payrollStatus filter), `TeacherPerformancePage.jsx` / `AdminTeacherPerformancePage.jsx` (payroll-readiness breakdown)
 
 ---
 

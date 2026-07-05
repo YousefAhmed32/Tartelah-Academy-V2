@@ -1,6 +1,7 @@
 const Attendance = require('../models/Attendance')
 const Session = require('../models/Session')
 const { sendSuccess, sendError } = require('../utils/response')
+const { logAction } = require('../services/audit.service')
 
 exports.getTeacherAttendance = async (req, res, next) => {
   try {
@@ -15,14 +16,29 @@ exports.getTeacherAttendance = async (req, res, next) => {
   }
 }
 
+// PATCH /attendance/:id — direct-by-id update. Ownership-checked: a teacher
+// may only touch attendance records tied to their own sessions (previously
+// this endpoint had no ownership check at all — a teacher who could guess/
+// enumerate another teacher's Attendance _id could edit it).
 exports.updateAttendance = async (req, res, next) => {
   try {
-    const record = await Attendance.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status, notes: req.body.notes },
-      { new: true }
-    )
+    const record = await Attendance.findById(req.params.id)
     if (!record) return sendError(res, 'سجل الحضور غير موجود', 404)
+    if (req.user.role === 'teacher' && record.teacherId.toString() !== req.user._id.toString()) {
+      return sendError(res, 'غير مصرح', 403)
+    }
+
+    const before = { status: record.status, notes: record.notes }
+    if (req.body.status !== undefined) record.status = req.body.status
+    if (req.body.notes !== undefined) record.notes = req.body.notes
+    if (req.body.arrivalTime !== undefined) record.arrivalTime = req.body.arrivalTime ? new Date(req.body.arrivalTime) : null
+    await record.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'attendance.update',
+      entity: 'Attendance', entityId: record._id, changes: { before, after: { status: record.status, notes: record.notes } }, ip: req.ip,
+    })
+
     sendSuccess(res, record, 'تم تحديث سجل الحضور')
   } catch (err) {
     next(err)
@@ -46,33 +62,57 @@ exports.getSessionAttendance = async (req, res, next) => {
   }
 }
 
-// Create or update attendance for a specific session
+// Create/update (draft) or finalize attendance for a specific session.
+// `finalize: true` marks the record as the teacher's confirmed attendance
+// (distinct from the auto-created 'present' default on session completion —
+// see Session.completeSession) and stamps who/when finalized it, which also
+// mirrors onto the parent Session for admin visibility/confidence scoring.
 exports.saveSessionAttendance = async (req, res, next) => {
   try {
-    const session = await Session.findById(req.params.sessionId).select('studentId teacherId')
+    const session = await Session.findById(req.params.sessionId).select('studentId teacherId attendanceFinalizedAt')
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
 
     if (req.user.role === 'teacher' && session.teacherId.toString() !== req.user._id.toString()) {
       return sendError(res, 'غير مصرح', 403)
     }
 
-    const { status, notes } = req.body
+    const { status, notes, arrivalTime, finalize } = req.body
     if (!status) return sendError(res, 'status مطلوب', 400)
+
+    const update = {
+      sessionId: session._id,
+      studentId: session.studentId,
+      teacherId: session.teacherId,
+      status,
+      notes: notes || '',
+      arrivalTime: arrivalTime ? new Date(arrivalTime) : undefined,
+      recordedAt: new Date(),
+    }
+    if (finalize) {
+      update.isFinalized = true
+      update.finalizedAt = new Date()
+      update.finalizedBy = req.user._id
+    }
 
     const record = await Attendance.findOneAndUpdate(
       { sessionId: session._id, studentId: session.studentId },
-      {
-        sessionId: session._id,
-        studentId: session.studentId,
-        teacherId: session.teacherId,
-        status,
-        notes: notes || '',
-        recordedAt: new Date(),
-      },
+      update,
       { upsert: true, new: true }
     ).populate('studentId', 'firstNameAr lastNameAr')
 
-    sendSuccess(res, record, 'تم حفظ الحضور')
+    if (finalize) {
+      await Session.findByIdAndUpdate(session._id, {
+        attendanceFinalizedAt: update.finalizedAt,
+        attendanceFinalizedBy: req.user._id,
+      })
+    }
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: finalize ? 'attendance.finalize' : 'attendance.save',
+      entity: 'Attendance', entityId: record._id, changes: { status, finalize: !!finalize }, ip: req.ip,
+    })
+
+    sendSuccess(res, record, finalize ? 'تم اعتماد الحضور' : 'تم حفظ الحضور')
   } catch (err) {
     next(err)
   }

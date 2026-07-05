@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Check, Star, FileText, X, Users, CalendarDays, Calendar,
-  CircleCheck,
+  CircleCheck, Clock, ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
@@ -16,19 +16,18 @@ import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
-import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY } from '../../config/constants.js'
+import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATTENDANCE_STATUS, SESSION_OUTCOME, DELAY_REASON } from '../../config/constants.js'
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
 const AR_MONTHS = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 const HOURS_LIST = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINS_LIST = ['00', '15', '30', '45']
 
-const ATT_OPTIONS = [
-  { value: 'present', label: 'حاضر',  color: '#22c55e', bg: 'rgba(34,197,94,0.18)' },
-  { value: 'absent',  label: 'غائب',  color: '#ef4444', bg: 'rgba(239,68,68,0.18)' },
-  { value: 'late',    label: 'متأخر', color: '#f59e0b', bg: 'rgba(245,158,11,0.18)' },
-  { value: 'excused', label: 'معذور', color: '#7c3aed', bg: 'rgba(124,58,237,0.18)' },
-]
+const ATT_OPTIONS = Object.entries(ATTENDANCE_STATUS).map(([value, { label, color }]) => ({
+  value, label, color, bg: `${color}2e`,
+}))
+
+const DELAY_REASON_OPTIONS = Object.entries(DELAY_REASON).map(([value, label]) => ({ value, label }))
 
 const FIELD = 'field-light w-full'
 const LBL = 'block text-xs font-bold text-brand-textBody mb-1.5'
@@ -186,16 +185,67 @@ function RescheduleModal({ session, onClose, qc }) {
   )
 }
 
+// ─── Delay Report Modal ────────────────────────────────────────────────────────
+// For a minor/same-day delay (session started later than scheduled) — NOT a
+// full reschedule. The original schedule is preserved; only the real timing
+// and a short reason are recorded.
+function DelayModal({ session, onClose, qc }) {
+  const [reasonCode, setReasonCode] = useState('teacher_delay')
+  const [note, setNote] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => api.patch(`/sessions/${session._id}/delay`, { delayReasonCode: reasonCode, delayNote: note }),
+    onSuccess: () => {
+      toast.success('تم تسجيل تأخر الحصة')
+      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
+      onClose()
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="الإبلاغ عن تأخر الحصة" size="sm"
+      footer={
+        <>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إلغاء</Button>
+          <Button variant="purple" onClick={() => mutation.mutate()} loading={mutation.isPending}>تسجيل</Button>
+        </>
+      }
+    >
+      <div className="space-y-4" dir="rtl">
+        <p className="text-sm text-[#9b7fd6]">لا داعي للقلق — هذا لا يُلغي الحصة، فقط نسجّل الوقت الفعلي وسببه.</p>
+        <div>
+          <label className={LBL}>سبب التأخر</label>
+          <select value={reasonCode} onChange={e => setReasonCode(e.target.value)} className={FIELD}>
+            {DELAY_REASON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={LBL}>ملاحظة (اختياري)</label>
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} className="field-light resize-none w-full" placeholder="أي تفاصيل إضافية..." />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Session Card ─────────────────────────────────────────────────────────────
 function SessionCard({ session, onEval, onHomework }) {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [attStatus, setAttStatus] = useState('')
   const [attNotes, setAttNotes] = useState('')
+  const [arrivalTime, setArrivalTime] = useState('')
   const [showReschedule, setShowReschedule] = useState(false)
+  const [showDelay, setShowDelay] = useState(false)
+  const [showOutcomePicker, setShowOutcomePicker] = useState(false)
+  const [outcome, setOutcome] = useState('delivered')
 
   const isPast = new Date(session.scheduledAt) < new Date()
-  const isScheduled = session.status === 'scheduled'
+  const isScheduled = ['scheduled', 'missed', 'no_show'].includes(session.status)
+  const canCheckIn = ['scheduled', 'missed', 'no_show'].includes(session.status)
+  const canComplete = session.status !== 'completed' && session.status !== 'cancelled'
+  const window_ = session.window || null
 
   const { data: existingAtt } = useQuery({
     queryKey: ['attendance', 'session', session._id],
@@ -207,41 +257,55 @@ function SessionCard({ session, onEval, onHomework }) {
     if (existingAtt) {
       setAttStatus(existingAtt.status || '')
       setAttNotes(existingAtt.notes || '')
+      setArrivalTime(existingAtt.arrivalTime ? new Date(existingAtt.arrivalTime).toISOString().slice(0, 16) : '')
     }
   }, [existingAtt])
 
   const saveAttMutation = useMutation({
-    mutationFn: () => api.post(`/attendance/session/${session._id}`, { status: attStatus, notes: attNotes }),
-    onSuccess: () => {
-      toast.success('تم حفظ الحضور')
+    mutationFn: (finalize) => api.post(`/attendance/session/${session._id}`, {
+      status: attStatus, notes: attNotes,
+      arrivalTime: attStatus === 'late' && arrivalTime ? arrivalTime : undefined,
+      finalize,
+    }),
+    onSuccess: (_res, finalize) => {
+      toast.success(finalize ? 'تم اعتماد الحضور نهائياً' : 'تم حفظ الحضور')
       qc.invalidateQueries({ queryKey: ['attendance', 'session', session._id] })
     },
     onError: () => toast.error('حدث خطأ في الحفظ'),
   })
 
   const completeMutation = useMutation({
-    mutationFn: () => api.patch(`/sessions/${session._id}/complete`),
+    mutationFn: (outcomeValue) => api.patch(`/sessions/${session._id}/complete`, { outcome: outcomeValue }),
     onSuccess: () => {
       toast.success('تم إكمال الحصة')
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
+      setShowOutcomePicker(false)
     },
     onError: () => toast.error('حدث خطأ'),
   })
 
-  // Captures teacher punctuality (on_time/late) by timestamping the actual join —
-  // fires silently alongside opening the meeting link, no extra click needed.
+  // Platform check-in — captures teacher punctuality (on_time/late) against
+  // the scheduled time. This is a declaration of readiness through the
+  // academy, NOT proof the teacher actually joined the external meeting.
   const startMutation = useMutation({
     mutationFn: () => api.patch(`/sessions/${session._id}/start`),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
       if (res.data.data.teacherAttendanceStatus === 'late') {
-        toast('بدأت الحصة متأخراً — تم تسجيل ذلك في سجل حضورك', { icon: '⏱️' })
+        toast('سُجّلت متأخراً — لا مشكلة، تم تسجيل الوقت الفعلي', { icon: '⏱️' })
       }
     },
   })
 
+  // Evidence-only: records that the external link was opened. A click is
+  // only a click — never treated as proof of actual meeting attendance.
+  const linkOpenMutation = useMutation({
+    mutationFn: () => api.post(`/sessions/${session._id}/link-opened`),
+  })
+
   function handleJoin() {
-    if (session.status === 'scheduled') startMutation.mutate()
+    if (canCheckIn) startMutation.mutate()
+    linkOpenMutation.mutate()
     window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
   }
 
@@ -256,6 +320,13 @@ function SessionCard({ session, onEval, onHomework }) {
 
   const statusInfo = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled
   const attOpt = ATT_OPTIONS.find(o => o.value === attStatus)
+  const windowNote = window_?.phase === 'grace_period'
+    ? 'يمكنك إكمال الحصة أو تسجيل الحضور الآن بشكل طبيعي.'
+    : window_?.phase === 'extended_completion'
+      ? 'تجاوزنا وقت الحصة بقليل — لا مشكلة، يمكنك المتابعة وسيُحفظ ذلك كإكمال متأخر.'
+      : window_?.phase === 'overdue'
+        ? 'مضى وقت طويل على هذه الحصة — يمكنك إكمالها الآن، وسيظهر ذلك للإدارة كتحديث متأخر.'
+        : null
 
   return (
     <>
@@ -312,24 +383,36 @@ function SessionCard({ session, onEval, onHomework }) {
             >
               <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
 
-                {/* Meeting link — also captures teacher punctuality on first join */}
+                {windowNote && (
+                  <div className="pt-3 flex items-start gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(245,158,11,0.08)', color: '#b45309' }}>
+                    <Clock size={13} strokeWidth={2} className="flex-none mt-0.5" />
+                    <span>{windowNote}</span>
+                  </div>
+                )}
+
+                {/* Check-in (platform declaration, not proof of external attendance)
+                    + open external meeting — one click does both. */}
                 {session.meetingLink && (
                   <div className="pt-3">
                     <button onClick={handleJoin} disabled={startMutation.isPending}
                       className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold disabled:opacity-60">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                        <path d="M15 10l5-5M15 10h4V6M10 9a5 5 0 0 0-5 5v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      {session.status === 'scheduled' ? 'ابدأ الحصة' : 'الانضمام للرابط'}
+                      <ExternalLink size={15} strokeWidth={1.8} />
+                      {canCheckIn ? 'تسجيل الحضور وفتح الفصل الخارجي' : 'فتح الفصل الخارجي'}
                     </button>
+                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">فتح الرابط لا يُثبت الحضور الفعلي داخل الاجتماع — هو تسجيل حضورك على المنصة فقط.</p>
                   </div>
                 )}
 
-                {/* Attendance section — only for past sessions */}
-                {isPast && (
+                {/* Attendance section — only for past/actionable sessions */}
+                {(isPast || window_?.isActionable) && (
                   <div className="pt-3">
-                    <div className="text-xs font-bold mb-2.5 text-gray-700">سجّل الحضور</div>
-                    <div className="grid grid-cols-4 gap-2 mb-2.5">
+                    <div className="text-xs font-bold mb-2.5 text-gray-700 flex items-center justify-between">
+                      <span>سجّل حضور الطالب</span>
+                      {existingAtt?.isFinalized && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">مُعتمد نهائياً</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-2.5">
                       {ATT_OPTIONS.map(opt => (
                         <button key={opt.value} onClick={() => setAttStatus(opt.value)}
                           className="py-2 rounded-xl text-xs font-bold transition-all"
@@ -342,6 +425,13 @@ function SessionCard({ session, onEval, onHomework }) {
                         </button>
                       ))}
                     </div>
+                    {attStatus === 'late' && (
+                      <div className="mb-2">
+                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">وقت الوصول (اختياري)</label>
+                        <input type="datetime-local" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)}
+                          className="w-full rounded-xl px-3 py-2 text-xs bg-gray-50 text-gray-700 border border-gray-200 outline-none focus:border-violet-400" />
+                      </div>
+                    )}
                     <textarea
                       value={attNotes}
                       onChange={e => setAttNotes(e.target.value)}
@@ -349,27 +439,54 @@ function SessionCard({ session, onEval, onHomework }) {
                       placeholder="ملاحظات الحضور..."
                       className="w-full rounded-xl px-3 py-2 text-xs resize-none mb-2 bg-gray-50 text-gray-700 border border-gray-200 outline-none focus:border-violet-400"
                     />
-                    <button
-                      onClick={() => saveAttMutation.mutate()}
-                      disabled={!attStatus || saveAttMutation.isPending}
-                      className="w-full py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                      style={{ background: attOpt ? attOpt.bg : 'rgba(124,58,237,0.12)', color: attOpt ? attOpt.color : '#7c3aed' }}
-                    >
-                      {saveAttMutation.isPending ? 'جارٍ الحفظ...' : existingAtt ? 'تحديث الحضور' : 'حفظ الحضور'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveAttMutation.mutate(false)}
+                        disabled={!attStatus || saveAttMutation.isPending}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                        style={{ background: '#f3f4f6', color: '#6b7280' }}
+                      >
+                        {saveAttMutation.isPending ? '...' : 'حفظ كمسودة'}
+                      </button>
+                      <button
+                        onClick={() => saveAttMutation.mutate(true)}
+                        disabled={!attStatus || saveAttMutation.isPending}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                        style={{ background: attOpt ? attOpt.bg : 'rgba(124,58,237,0.12)', color: attOpt ? attOpt.color : '#7c3aed' }}
+                      >
+                        {saveAttMutation.isPending ? '...' : 'اعتماد نهائي'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {/* Quick actions */}
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {isScheduled && (
+                  {canComplete && !showOutcomePicker && (
                     <button
-                      onClick={() => completeMutation.mutate()}
+                      onClick={() => completeMutation.mutate('delivered')}
                       disabled={completeMutation.isPending}
                       className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
                       style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }}
                     >
                       {completeMutation.isPending ? '...' : <span className="flex items-center justify-center gap-1"><Check size={13} strokeWidth={2.5} /> اكتملت</span>}
+                    </button>
+                  )}
+                  {canComplete && !showOutcomePicker && (
+                    <button
+                      onClick={() => setShowOutcomePicker(true)}
+                      className="py-2 px-3 rounded-xl text-[11px] font-semibold text-gray-400 hover:text-gray-600 transition-all"
+                    >
+                      نتيجة مختلفة؟
+                    </button>
+                  )}
+                  {isScheduled && (
+                    <button
+                      onClick={() => setShowDelay(true)}
+                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                      style={{ background: 'rgba(14,165,233,0.1)', color: '#0ea5e9', border: '1px solid rgba(14,165,233,0.2)' }}
+                    >
+                      <AlertTriangle size={13} strokeWidth={2} /> تأخرت الحصة
                     </button>
                   )}
                   {isScheduled && (
@@ -406,6 +523,25 @@ function SessionCard({ session, onEval, onHomework }) {
                     </button>
                   )}
                 </div>
+
+                {/* Outcome picker — only surfaced when the happy-path "اكتملت" isn't the right call */}
+                {showOutcomePicker && (
+                  <div className="rounded-xl p-3 bg-gray-50 border border-gray-100 space-y-2">
+                    <div className="text-xs font-bold text-gray-700">ما نتيجة الحصة فعلياً؟</div>
+                    <select value={outcome} onChange={e => setOutcome(e.target.value)} className={FIELD}>
+                      {Object.entries(SESSION_OUTCOME).filter(([k]) => k !== 'pending_review').map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <button onClick={() => setShowOutcomePicker(false)} className="flex-1 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600">إلغاء</button>
+                      <button onClick={() => completeMutation.mutate(outcome)} disabled={completeMutation.isPending}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold bg-violet-600 text-white">
+                        {completeMutation.isPending ? '...' : 'تأكيد'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -414,6 +550,9 @@ function SessionCard({ session, onEval, onHomework }) {
 
       {showReschedule && (
         <RescheduleModal session={session} onClose={() => setShowReschedule(false)} qc={qc} />
+      )}
+      {showDelay && (
+        <DelayModal session={session} onClose={() => setShowDelay(false)} qc={qc} />
       )}
     </>
   )

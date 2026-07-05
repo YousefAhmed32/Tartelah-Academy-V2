@@ -4,6 +4,7 @@ const User = require('../models/User')
 const scheduleService = require('../services/schedule.service')
 const { createNotification } = require('../services/notification.service')
 const { sendSuccess, sendError } = require('../utils/response')
+const { logAction } = require('../services/audit.service')
 
 // Preview session dates from rule params — no DB write
 exports.previewRule = async (req, res, next) => {
@@ -23,12 +24,21 @@ exports.previewRule = async (req, res, next) => {
 // Create a schedule rule and generate sessions from it
 exports.createRule = async (req, res, next) => {
   try {
-    const teacherId = req.user._id
     const {
       studentId, subscriptionId, frequency, daysOfWeek, timeOfDay,
       durationMinutes, startDate, endDate, sessionsTotal,
       meetingLink, meetingProvider, titleTemplate, notes,
     } = req.body
+
+    // An admin creating a schedule on a teacher's behalf must explicitly
+    // name that teacher — defaulting to req.user._id here would silently
+    // attribute the whole recurring series (and its payroll data) to the
+    // admin instead of the teacher who actually teaches it.
+    let teacherId = req.user._id
+    if (req.user.role === 'admin') {
+      if (!req.body.teacherId) return sendError(res, 'يجب تحديد المعلم عند إنشاء الجدول كإدارة', 400)
+      teacherId = req.body.teacherId
+    }
 
     if (!studentId) return sendError(res, 'studentId مطلوب', 400)
     if (!startDate) return sendError(res, 'startDate مطلوب', 400)
@@ -65,6 +75,13 @@ exports.createRule = async (req, res, next) => {
     }
 
     await rule.populate('studentId', 'firstNameAr lastNameAr avatar')
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'schedule_rule.create',
+      entity: 'ScheduleRule', entityId: rule._id,
+      changes: { teacherId, studentId, sessionCount: sessions.length }, ip: req.ip,
+    })
+
     sendSuccess(res, { rule, sessions, sessionCount: sessions.length }, 'تم إنشاء الجدول وتوليد الحصص بنجاح', 201)
   } catch (err) {
     next(err)

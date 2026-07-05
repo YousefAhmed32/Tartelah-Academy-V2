@@ -17,6 +17,7 @@ const HomePage = lazy(() => import('./pages/marketing/HomePage.jsx'))
 const AboutPage = lazy(() => import('./pages/marketing/AboutPage.jsx'))
 const ProgramsPage = lazy(() => import('./pages/marketing/ProgramsPage.jsx'))
 const TeachersPage = lazy(() => import('./pages/marketing/TeachersPage.jsx'))
+const TeacherProfilePage = lazy(() => import('./pages/marketing/TeacherProfilePage.jsx'))
 const PricingPage = lazy(() => import('./pages/marketing/PricingPage.jsx'))
 const FAQPage = lazy(() => import('./pages/marketing/FAQPage.jsx'))
 const ContactPage = lazy(() => import('./pages/marketing/ContactPage.jsx'))
@@ -92,6 +93,9 @@ const AdminSuccessStoriesPage = lazy(() => import('./pages/admin/AdminSuccessSto
 // Teacher Performance
 const AdminTeacherPerformancePage = lazy(() => import('./pages/admin/AdminTeacherPerformancePage.jsx'))
 
+// Operations Center
+const AdminOperationsCenterPage = lazy(() => import('./pages/admin/AdminOperationsCenterPage.jsx'))
+
 // AI
 const AIAssistantPage = lazy(() => import('./pages/ai/AIAssistantPage.jsx'))
 
@@ -116,6 +120,7 @@ export default function App() {
           <Route path={ROUTES.ABOUT} element={<AboutPage />} />
           <Route path={ROUTES.PROGRAMS} element={<ProgramsPage />} />
           <Route path={ROUTES.TEACHERS} element={<TeachersPage />} />
+          <Route path={ROUTES.TEACHER_PROFILE} element={<TeacherProfilePage />} />
           <Route path={ROUTES.PRICING} element={<PricingPage />} />
           <Route path={ROUTES.FAQ} element={<FAQPage />} />
           <Route path={ROUTES.CONTACT} element={<ContactPage />} />
@@ -188,6 +193,7 @@ export default function App() {
           <Route path={ROUTES.ADMIN_CONTACT_MESSAGES} element={<AdminContactPage />} />
           <Route path={ROUTES.ADMIN_SUCCESS_STORIES} element={<AdminSuccessStoriesPage />} />
           <Route path={ROUTES.ADMIN_TEACHER_PERFORMANCE} element={<AdminTeacherPerformancePage />} />
+          <Route path={ROUTES.ADMIN_OPERATIONS} element={<AdminOperationsCenterPage />} />
         </Route>
 
         {/* AI */}
