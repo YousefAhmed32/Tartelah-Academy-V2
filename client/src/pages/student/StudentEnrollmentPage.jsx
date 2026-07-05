@@ -10,6 +10,7 @@ import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
+import { usePackages } from '../../hooks/usePackages.js'
 
 const STATUS_CONFIG = {
   pending:      { label: 'قيد الانتظار',  color: 'warning', desc: 'تم إرسال طلبك وسيتم مراجعته قريباً',              Icon: Search },
@@ -54,10 +55,7 @@ export default function StudentEnrollmentPage() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [lightboxUrl, setLightboxUrl] = useState(null)
 
-  const { data: packages = [], isLoading: pkgLoading } = useQuery({
-    queryKey: ['packages', 'active'],
-    queryFn: () => api.get('/packages').then(r => r.data.data?.filter(p => p.isActive) || []),
-  })
+  const { packages, isLoading: pkgLoading } = usePackages({ activeOnly: true })
 
   const { data: myRequests = [], isLoading: reqLoading } = useQuery({
     queryKey: ['enrollments', 'me'],

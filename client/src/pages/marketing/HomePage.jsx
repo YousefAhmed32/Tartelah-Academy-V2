@@ -4,6 +4,8 @@ import { ROUTES } from '../../config/constants.js'
 import TestimonialsSection from '../../components/home/TestimonialsSection.jsx'
 import SuccessStoriesSection from '../../components/home/SuccessStoriesSection.jsx'
 import TeachersSection from '../../components/home/TeachersSection.jsx'
+import { usePackages } from '../../hooks/usePackages.js'
+import { formatCurrency } from '../../utils/format.js'
 
 /* ─────────────────────────────────────────────
    Shared micro-components
@@ -56,17 +58,27 @@ function useCountUp(targets, duration = 1700) {
 }
 
 /* ─────────────────────────────────────────────
-   Pricing logic
+   Duration helper — the Package schema stores a single price for a
+   durationDays-long cycle, so we only ever derive a human-readable label
+   from it (never invent a monthly/yearly split or a discount).
 ───────────────────────────────────────────── */
-const BASE = { basic: 19, pro: 39, prem: 69, fam: 99 }
-const MULT = { سنوي: 1, فصلي: 1.12, شهري: 1.3 }
-function price(key, period) { return '$' + Math.round(BASE[key] * MULT[period]) }
+function humanizeDuration(days) {
+  if (!days) return ''
+  if (days % 365 === 0) return days === 365 ? 'سنة كاملة' : `${days / 365} سنوات`
+  if (days % 30 === 0) {
+    const months = days / 30
+    if (months === 1) return 'شهر واحد'
+    if (months === 2) return 'شهرين'
+    return `${months} أشهر`
+  }
+  return `${days} يوم`
+}
 
 /* ─────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────── */
 export default function HomePage() {
-  const [period, setPeriod] = useState('سنوي')
+  const { packages, isLoading: pkgLoading, isError: pkgError, refetch: refetchPkgs } = usePackages({ activeOnly: true })
   const [counts, startCount] = useCountUp({ students: 20, teachers: 120, hours: 10, rating: 4.9 })
 
   // Trigger counter when hero is visible
@@ -390,61 +402,82 @@ export default function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════
-          PRICING
+          PRICING — real, admin-managed packages (single source of truth)
       ════════════════════════════════════════ */}
       <section id="pricing" style={{ background: '#FBFAFE', padding: 'clamp(60px,7vw,100px) clamp(20px,5vw,68px)' }}>
         <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'stretch', gap: 'clamp(28px,4vw,56px)', flexWrap: 'wrap' }}>
 
           {/* Pricing cards */}
-          <div style={{ flex: '1 1 700px', minWidth: 300, order: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18, alignItems: 'start' }}>
-
-            {/* أساسي */}
-            <PriceCard name="أساسي" sub="لبداية رحلتك" price={price('basic', period)} featured={false}
-              features={['حصة أسبوعية', 'محتوى مقسّم', 'تقارير تقدم أساسية']}
-              checkColor="#6D34D6" btnStyle={{ background: 'linear-gradient(135deg,#5b2bc4,#3d1894)', color: '#fff' }}
-            />
-
-            {/* متقدم — featured */}
-            <div
-              style={{ position: 'relative', background: '#fff', border: '2px solid #E8B24A', borderRadius: 20, padding: '34px 24px 30px', boxShadow: '0 24px 50px rgba(212,160,50,.2)', textAlign: 'right', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-            >
-              <div style={{ position: 'absolute', top: -15, insetInlineStart: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', color: '#3a2200', fontFamily: 'Cairo', fontWeight: 800, fontSize: 13, padding: '6px 18px', borderRadius: 30, whiteSpace: 'nowrap', boxShadow: '0 8px 18px rgba(212,175,55,.4)' }}>الأكثر اختياراً</div>
-              <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 22, color: '#1A0447' }}>متقدم</div>
-              <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>لتعلم مستمر</div>
-              <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
-                <span style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 36, color: '#1A0447' }}>{price('pro', period)}</span>
-                <span style={{ color: '#9aa0ab', fontSize: 14 }}>/الشهر</span>
-              </div>
-              <div style={{ height: 1, background: '#f1e6cf', margin: '20px 0' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 15, color: '#4b5563' }}>
-                {['4 حصص أسبوعياً', 'معلم مخصص', 'تقارير تقدم متقدمة', 'محتوى تفاعلي'].map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, flexDirection: 'row-reverse', justifyContent: 'flex-start' }}>
-                    <CheckIcon color="#D4AF37" /><span>{f}</span>
-                  </div>
+          <div style={{ flex: '1 1 700px', minWidth: 300, order: 1 }}>
+            {pkgLoading ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18 }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="animate-pulse" style={{ height: 280, borderRadius: 20, background: '#efeaf8' }} />
                 ))}
               </div>
-              <Link to={ROUTES.REGISTER} style={{ display: 'block', width: '100%', marginTop: 24, fontFamily: 'Tajawal', fontWeight: 800, fontSize: 15, color: '#3a2200', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', border: 'none', borderRadius: 11, padding: 13, boxShadow: '0 12px 26px rgba(212,175,55,.36)', textAlign: 'center', textDecoration: 'none', cursor: 'pointer', transition: 'transform .25s, box-shadow .25s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-              >ابدأ الآن</Link>
-            </div>
-
-            {/* مميز */}
-            <PriceCard name="مميز" sub="لتقدم أسرع" price={price('prem', period)} featured={false}
-              features={['حصص يومية', 'معلم مخصص', 'تقارير تفصيلية', 'جلسات مراجعة']}
-              checkColor="#6D34D6" btnStyle={{ background: 'linear-gradient(135deg,#5b2bc4,#3d1894)', color: '#fff' }}
-            />
-
-            {/* عائلي */}
-            <PriceCard name="عائلي" sub="لجميع أفراد العائلة" price={price('fam', period)} featured={false}
-              features={['حتى 5 أفراد', 'معلم لكل فرد', 'تقارير عائلية', 'دعم خاص']}
-              checkColor="#6D34D6" btnStyle={{ background: 'linear-gradient(135deg,#5b2bc4,#3d1894)', color: '#fff' }}
-            />
+            ) : pkgError ? (
+              <div style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: 40, textAlign: 'center' }}>
+                <p style={{ color: '#6B7280', marginBottom: 16 }}>تعذّر تحميل الباقات حالياً</p>
+                <button
+                  onClick={() => refetchPkgs()}
+                  style={{ cursor: 'pointer', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 14, color: '#fff', background: 'linear-gradient(135deg,#6D34D6,#4B1Fb0)', border: 'none', borderRadius: 30, padding: '10px 24px' }}
+                >
+                  إعادة المحاولة
+                </button>
+              </div>
+            ) : packages.length === 0 ? (
+              <div style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: 40, textAlign: 'center' }}>
+                <p style={{ color: '#6B7280' }}>لا توجد باقات متاحة حالياً</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18, alignItems: 'start' }}>
+                {packages.slice(0, 4).map((pkg) => (
+                  pkg.isPopular ? (
+                    <div
+                      key={pkg._id}
+                      style={{ position: 'relative', background: '#fff', border: '2px solid #E8B24A', borderRadius: 20, padding: '34px 24px 30px', boxShadow: '0 24px 50px rgba(212,160,50,.2)', textAlign: 'right', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+                    >
+                      <div style={{ position: 'absolute', top: -15, insetInlineStart: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', color: '#3a2200', fontFamily: 'Cairo', fontWeight: 800, fontSize: 13, padding: '6px 18px', borderRadius: 30, whiteSpace: 'nowrap', boxShadow: '0 8px 18px rgba(212,175,55,.4)' }}>الأكثر طلباً</div>
+                      <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 22, color: '#1A0447' }}>{pkg.nameAr}</div>
+                      {pkg.descriptionAr && <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>{pkg.descriptionAr}</div>}
+                      <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
+                        <span style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 36, color: '#1A0447' }}>{formatCurrency(pkg.price, pkg.currency)}</span>
+                      </div>
+                      <div style={{ color: '#9aa0ab', fontSize: 13, marginTop: 4 }}>
+                        {pkg.sessionsPerMonth} حصة شهرياً{pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}
+                      </div>
+                      <div style={{ height: 1, background: '#f1e6cf', margin: '20px 0' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 15, color: '#4b5563' }}>
+                        {(pkg.featuresAr || []).map(f => (
+                          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, flexDirection: 'row-reverse', justifyContent: 'flex-start' }}>
+                            <CheckIcon color="#D4AF37" /><span>{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <Link to={ROUTES.REGISTER} style={{ display: 'block', width: '100%', marginTop: 24, fontFamily: 'Tajawal', fontWeight: 800, fontSize: 15, color: '#3a2200', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', border: 'none', borderRadius: 11, padding: 13, boxShadow: '0 12px 26px rgba(212,175,55,.36)', textAlign: 'center', textDecoration: 'none', cursor: 'pointer', transition: 'transform .25s, box-shadow .25s' }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+                      >ابدأ الآن</Link>
+                    </div>
+                  ) : (
+                    <PriceCard
+                      key={pkg._id}
+                      name={pkg.nameAr}
+                      sub={pkg.descriptionAr}
+                      price={formatCurrency(pkg.price, pkg.currency)}
+                      caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
+                      features={pkg.featuresAr || []}
+                      checkColor="#6D34D6" btnStyle={{ background: 'linear-gradient(135deg,#5b2bc4,#3d1894)', color: '#fff' }}
+                    />
+                  )
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Period picker + lead */}
+          {/* Lead text */}
           <div style={{ flex: '0 1 300px', minWidth: 260, order: 2, textAlign: 'right', alignSelf: 'center' }}>
             <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,3.6vw,50px)', lineHeight: 1.25, fontFamily: 'Cairo' }}>
               <span style={{ background: 'linear-gradient(120deg,#7C3AED,#9b5cf0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>اختر الخطة</span><br />
@@ -453,26 +486,14 @@ export default function HomePage() {
             <p style={{ marginTop: 18, color: '#6B7280', fontSize: 16.5, lineHeight: 1.9, maxWidth: 300, marginInlineStart: 'auto' }}>
               خطط مرنة تناسب جميع احتياجاتك وأهدافك في تعلم القرآن
             </p>
-            <div style={{ marginTop: 26, display: 'inline-flex', background: '#efeaf8', borderRadius: 40, padding: 5, gap: 4 }}>
-              {['شهري', 'فصلي', 'سنوي'].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPeriod(p)}
-                  style={{
-                    cursor: 'pointer', fontFamily: 'Tajawal', fontWeight: 600, fontSize: 14, border: 'none', borderRadius: 34, padding: '10px 20px',
-                    background: period === p ? '#ffffff' : 'transparent',
-                    color: period === p ? '#1A0447' : '#8b7fb0',
-                    boxShadow: period === p ? '0 4px 12px rgba(36,12,82,.14)' : 'none',
-                    transition: 'all .25s',
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <span style={{ display: 'inline-block', background: '#efeaf8', color: '#7c5fc0', fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 24 }}>خصم 20% —</span>
-            </div>
+            <Link
+              to={ROUTES.PRICING}
+              style={{ cursor: 'pointer', marginTop: 26, display: 'inline-block', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 15, color: '#6D34D6', background: '#efeaf8', border: 'none', borderRadius: 30, padding: '12px 26px', textDecoration: 'none', transition: 'transform .25s' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+            >
+              عرض كل الباقات
+            </Link>
           </div>
         </div>
       </section>
@@ -624,7 +645,7 @@ function WavyConnector({ color, flipEnd = false }) {
   )
 }
 
-function PriceCard({ name, sub, price, features, checkColor, btnStyle }) {
+function PriceCard({ name, sub, price, caption, features, checkColor, btnStyle }) {
   return (
     <div
       style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: '30px 24px', boxShadow: '0 14px 36px rgba(36,12,82,.06)', textAlign: 'right', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
@@ -632,11 +653,11 @@ function PriceCard({ name, sub, price, features, checkColor, btnStyle }) {
       onMouseLeave={e => { e.currentTarget.style.transform = '' }}
     >
       <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 22, color: '#1A0447' }}>{name}</div>
-      <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>{sub}</div>
+      {sub && <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>{sub}</div>}
       <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
         <span style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 36, color: '#1A0447' }}>{price}</span>
-        <span style={{ color: '#9aa0ab', fontSize: 14 }}>/الشهر</span>
       </div>
+      {caption && <div style={{ color: '#9aa0ab', fontSize: 13, marginTop: 4 }}>{caption}</div>}
       <div style={{ height: 1, background: '#eee6f6', margin: '20px 0' }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 15, color: '#4b5563' }}>
         {features.map(f => (

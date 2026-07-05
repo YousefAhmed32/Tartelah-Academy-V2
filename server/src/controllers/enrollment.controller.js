@@ -176,6 +176,7 @@ exports.reviewRequest = async (req, res, next) => {
       const subscription = await Subscription.create({
         studentId: request.studentId._id,
         packageId: pkg._id,
+        packageNameAr: pkg.nameAr,
         teacherId,
         startDate: start,
         endDate: end,

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import api from '../../utils/api.js'
@@ -7,6 +7,8 @@ import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { formatCurrency } from '../../utils/format.js'
+import { usePackages } from '../../hooks/usePackages.js'
+import { QK } from '../../services/queryKeys.js'
 
 const initialForm = {
   nameAr: '', name: '', descriptionAr: '', price: '', durationDays: 30,
@@ -132,9 +134,8 @@ function PackageCard({ pkg, onEdit, onToggle, onDuplicate }) {
         <div className="mb-4">
           <div className="flex items-baseline gap-1">
             <span className="font-heading font-extrabold text-3xl text-violet-700">
-              {formatCurrency(pkg.price)}
+              {formatCurrency(pkg.price, pkg.currency)}
             </span>
-            <span className="text-sm text-gray-400 font-medium">ريال</span>
           </div>
           <div className="text-xs text-gray-400 mt-1">
             {pkg.durationDays} يوم • {pkg.sessionsPerMonth} حصة/شهر
@@ -272,10 +273,7 @@ export default function AdminPackagesPage() {
   const [editPkg, setEditPkg] = useState(null)
   const qc = useQueryClient()
 
-  const { data: packages = [], isLoading } = useQuery({
-    queryKey: ['packages'],
-    queryFn: () => api.get('/packages').then(r => r.data.data),
-  })
+  const { packages, isLoading } = usePackages({ activeOnly: false })
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/packages', {
@@ -287,7 +285,7 @@ export default function AdminPackagesPage() {
     }),
     onSuccess: () => {
       toast.success('تم إنشاء الباقة')
-      qc.invalidateQueries({ queryKey: ['packages'] })
+      qc.invalidateQueries({ queryKey: QK.PACKAGES })
       setShowCreate(false)
     },
     onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
@@ -307,7 +305,7 @@ export default function AdminPackagesPage() {
     }),
     onSuccess: () => {
       toast.success('تم تحديث الباقة')
-      qc.invalidateQueries({ queryKey: ['packages'] })
+      qc.invalidateQueries({ queryKey: QK.PACKAGES })
       setEditPkg(null)
     },
     onError: () => toast.error('حدث خطأ'),
@@ -377,12 +375,17 @@ export default function AdminPackagesPage() {
               {packages.filter(p => !p.isActive).length} باقة موقوفة
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-violet-500" />
-            <span className="text-sm font-semibold text-gray-700">
-              يبدأ من {Math.min(...packages.map(p => p.price || 0))} ريال
-            </span>
-          </div>
+          {packages.some(p => p.isActive) && (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-violet-500" />
+              <span className="text-sm font-semibold text-gray-700">
+                يبدأ من {formatCurrency(
+                  Math.min(...packages.filter(p => p.isActive).map(p => p.price || 0)),
+                  packages.find(p => p.isActive)?.currency
+                )}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

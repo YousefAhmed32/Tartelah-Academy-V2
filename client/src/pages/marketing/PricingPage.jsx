@@ -3,70 +3,29 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion'
 import {
   Check, ChevronDown, Shield, Clock, Award, Users, Headphones,
-  Sparkles, Star, ArrowLeft, BookOpen, Video, TrendingUp,
-  MessageCircle, BarChart3, Zap,
+  Sparkles, Star, ArrowLeft, BarChart3,
 } from 'lucide-react'
 import { ROUTES } from '../../config/constants.js'
+import { usePackages } from '../../hooks/usePackages.js'
+import { formatCurrency } from '../../utils/format.js'
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Real-package helpers ────────────────────────────────────────────────────
 
-const PACKAGES = [
-  {
-    id: 'basic',
-    nameEn: 'Starter',
-    name: 'الباقة الأساسية',
-    sessions: 4,
-    duration: 60,
-    monthlyPrice: 80,
-    yearlyPrice: 64,
-    badge: null,
-    popular: false,
-    features: [
-      { icon: BookOpen,      title: '٤ حصص شهرياً',       desc: 'حصة أسبوعية منتظمة' },
-      { icon: Clock,         title: '٦٠ دقيقة / حصة',      desc: 'جلسة تعلم مكثفة' },
-      { icon: BarChart3,     title: 'تقارير أسبوعية',      desc: 'متابعة تقدمك أولاً بأول' },
-      { icon: MessageCircle, title: 'دعم واتساب',           desc: 'تواصل مباشر مع المعلم' },
-    ],
-  },
-  {
-    id: 'popular',
-    nameEn: 'Pro',
-    name: 'الباقة المميزة',
-    sessions: 8,
-    duration: 60,
-    monthlyPrice: 140,
-    yearlyPrice: 112,
-    badge: 'الأكثر طلباً',
-    popular: true,
-    features: [
-      { icon: BookOpen,      title: '٨ حصص شهرياً',        desc: 'حصتان أسبوعياً لتقدم أسرع' },
-      { icon: Clock,         title: '٦٠ دقيقة / حصة',      desc: 'جلسة تعلم مكثفة' },
-      { icon: BarChart3,     title: 'تقارير أسبوعية',      desc: 'متابعة تقدمك أولاً بأول' },
-      { icon: MessageCircle, title: 'دعم واتساب',           desc: 'تواصل مباشر مع المعلم' },
-      { icon: Video,         title: 'تسجيل الحصص',         desc: 'راجع حصصك في أي وقت' },
-      { icon: Zap,           title: 'مساعد ذكاء اصطناعي',  desc: 'إجابات فورية ٢٤/٧' },
-    ],
-  },
-  {
-    id: 'intensive',
-    nameEn: 'Elite',
-    name: 'الباقة المكثفة',
-    sessions: 16,
-    duration: 60,
-    monthlyPrice: 240,
-    yearlyPrice: 192,
-    badge: 'الأفضل قيمةً',
-    popular: false,
-    features: [
-      { icon: BookOpen,      title: '١٦ حصة شهرياً',       desc: 'أربع حصص أسبوعياً' },
-      { icon: Clock,         title: '٦٠ دقيقة / حصة',      desc: 'جلسة تعلم مكثفة' },
-      { icon: BarChart3,     title: 'تقارير تفصيلية',      desc: 'تحليل شامل للأداء' },
-      { icon: Headphones,    title: 'دعم أولوية ٢٤/٧',     desc: 'خدمة فورية على مدار الساعة' },
-      { icon: Video,         title: 'تسجيل الحصص',         desc: 'راجع حصصك في أي وقت' },
-      { icon: TrendingUp,    title: 'مراجعة شهرية شاملة',  desc: 'تقييم معمق مع المعلم' },
-    ],
-  },
-]
+// The Package schema stores a single `price` for a `durationDays`-long cycle —
+// there is no monthly/yearly billing-period concept in the data, so we only
+// ever derive a human-readable duration label from it (never invent a second
+// price or a discount).
+function humanizeDuration(days) {
+  if (!days) return ''
+  if (days % 365 === 0) return days === 365 ? 'سنة كاملة' : `${days / 365} سنوات`
+  if (days % 30 === 0) {
+    const months = days / 30
+    if (months === 1) return 'شهر واحد'
+    if (months === 2) return 'شهرين'
+    return `${months} أشهر`
+  }
+  return `${days} يوم`
+}
 
 const WHY_FEATURES = [
   { icon: Users,         title: 'معلمون محترفون',         desc: 'نخبة من أفضل معلمي القرآن بإجازات معتمدة' },
@@ -77,20 +36,9 @@ const WHY_FEATURES = [
   { icon: Headphones,    title: 'دعم على مدار الساعة',   desc: 'فريق دعم متاح ٢٤/٧ لمساعدتك في أي استفسار' },
 ]
 
-const COMPARISON = [
-  { label: 'عدد الحصص الشهرية', basic: '٤ حصص',    popular: '٨ حصص',    intensive: '١٦ حصة' },
-  { label: 'مدة كل حصة',        basic: '٦٠ دقيقة', popular: '٦٠ دقيقة', intensive: '٦٠ دقيقة' },
-  { label: 'تسجيل الحصص',       basic: false,       popular: true,        intensive: true },
-  { label: 'تقارير الأداء',     basic: 'أسبوعية',  popular: 'أسبوعية',  intensive: 'تفصيلية' },
-  { label: 'دعم واتساب',        basic: true,        popular: true,        intensive: true },
-  { label: 'دعم أولوية',        basic: false,       popular: false,       intensive: true },
-  { label: 'مراجعة شهرية',      basic: false,       popular: false,       intensive: true },
-  { label: 'مساعد الذكاء',      basic: false,       popular: true,        intensive: true },
-]
-
 const FAQS = [
-  { q: 'هل يمكنني تغيير باقتي في أي وقت؟',       a: 'نعم، يمكنك الترقية أو تخفيض باقتك في أي وقت. التغييرات تسري من دورة الفوترة التالية.' },
-  { q: 'ما هي طرق الدفع المتاحة؟',               a: 'نقبل جميع بطاقات الائتمان الرئيسية (Visa، Mastercard)، وPayPal، وبعض طرق الدفع المحلية.' },
+  { q: 'هل يمكنني تغيير باقتي في أي وقت؟',       a: 'نعم، يمكنك تقديم طلب اشتراك في باقة جديدة في أي وقت من لوحة التحكم، وسيقوم فريقنا بمراجعته وتفعيله بعد التأكد من الدفع.' },
+  { q: 'ما هي طرق الدفع المتاحة؟',               a: 'التحويل البنكي أو الدفع النقدي حالياً — تختار الباقة وترفع إثبات الدفع، ويقوم فريقنا بمراجعة الطلب وتفعيل باقتك.' },
   { q: 'هل هناك ضمان استرداد الأموال؟',           a: 'نعم، نقدم ضمان استرداد كامل خلال ٧ أيام إذا لم تكن راضياً تماماً عن التجربة.' },
   { q: 'كيف يتم تحديد موعد الحصص؟',              a: 'بعد الاشتراك، تتواصل إدارة الأكاديمية معك لتحديد المواعيد المناسبة مع معلمك المخصص.' },
   { q: 'هل الحصص فردية أم جماعية؟',              a: 'جميع حصصنا فردية ١:١ لضمان أقصى قدر من الاهتمام والتقدم الشخصي.' },
@@ -241,53 +189,9 @@ function Particles({ count = 24 }) {
   )
 }
 
-// ─── Billing toggle ───────────────────────────────────────────────────────────
-
-function BillingToggle({ yearly, onToggle }) {
-  return (
-    <div className="inline-flex items-center gap-4 p-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(150,100,240,0.2)' }}>
-      <button
-        onClick={() => yearly && onToggle()}
-        className="px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300"
-        style={{
-          background: !yearly ? 'rgba(124,58,237,0.4)' : 'transparent',
-          color: !yearly ? '#fff' : 'rgba(179,164,208,0.7)',
-          border: !yearly ? '1px solid rgba(124,58,237,0.5)' : '1px solid transparent',
-        }}
-      >
-        شهرياً
-      </button>
-      <button
-        onClick={() => !yearly && onToggle()}
-        className="px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-2"
-        style={{
-          background: yearly ? 'linear-gradient(135deg, rgba(232,199,106,0.3), rgba(212,175,55,0.15))' : 'transparent',
-          color: yearly ? '#E8C76A' : 'rgba(179,164,208,0.7)',
-          border: yearly ? '1px solid rgba(232,199,106,0.4)' : '1px solid transparent',
-        }}
-      >
-        سنوياً
-        <AnimatePresence>
-          {yearly && (
-            <motion.span
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)' }}
-            >
-              وفر 20%
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </button>
-    </div>
-  )
-}
-
 // ─── Pricing card ─────────────────────────────────────────────────────────────
 
-function PricingCard({ pkg, yearly, index }) {
+function PricingCard({ pkg, index }) {
   const cardRef = useRef(null)
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50 })
   const [hovered, setHovered] = useState(false)
@@ -298,37 +202,34 @@ function PricingCard({ pkg, yearly, index }) {
     const r = el.getBoundingClientRect()
     const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2)
     const dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2)
-    const max = pkg.popular ? 7 : 10
+    const max = pkg.isPopular ? 7 : 10
     setTilt({
       rx: -dy * max,
       ry: dx * max,
       gx: ((e.clientX - r.left) / r.width) * 100,
       gy: ((e.clientY - r.top) / r.height) * 100,
     })
-  }, [pkg.popular])
+  }, [pkg.isPopular])
 
   const onMouseLeave = useCallback(() => {
     setHovered(false)
     setTilt({ rx: 0, ry: 0, gx: 50, gy: 50 })
   }, [])
 
-  const price = yearly ? pkg.yearlyPrice : pkg.monthlyPrice
-  const saved = pkg.monthlyPrice - pkg.yearlyPrice
-
   return (
     <motion.div
       ref={cardRef}
       className="relative"
       initial={{ opacity: 0, y: 70, scale: 0.88 }}
-      animate={{ opacity: 1, y: 0, scale: pkg.popular ? 1.06 : 1 }}
+      animate={{ opacity: 1, y: 0, scale: pkg.isPopular ? 1.06 : 1 }}
       transition={{ duration: 0.75, delay: index * 0.14, ease: [0.16, 1, 0.3, 1] }}
       onMouseMove={onMouseMove}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={onMouseLeave}
-      style={{ zIndex: pkg.popular ? 10 : 1, perspective: 1200 }}
+      style={{ zIndex: pkg.isPopular ? 10 : 1, perspective: 1200 }}
     >
       {/* Outer ambient glow */}
-      {pkg.popular && (
+      {pkg.isPopular && (
         <motion.div
           className="absolute -inset-4 rounded-[40px] pointer-events-none"
           animate={{ opacity: [0.3, 0.8, 0.3] }}
@@ -341,7 +242,7 @@ function PricingCard({ pkg, yearly, index }) {
       )}
 
       {/* Non-popular hover glow */}
-      {!pkg.popular && hovered && (
+      {!pkg.isPopular && hovered && (
         <div
           className="absolute -inset-2 rounded-[36px] pointer-events-none"
           style={{
@@ -352,7 +253,7 @@ function PricingCard({ pkg, yearly, index }) {
       )}
 
       {/* Floating particles on popular card */}
-      {pkg.popular && (
+      {pkg.isPopular && (
         <div className="absolute inset-0 rounded-[32px] overflow-hidden pointer-events-none">
           {[...Array(7)].map((_, i) => (
             <motion.div
@@ -385,11 +286,11 @@ function PricingCard({ pkg, yearly, index }) {
         <div
           className="relative rounded-[32px] overflow-hidden h-full"
           style={{
-            background: pkg.popular
+            background: pkg.isPopular
               ? 'linear-gradient(150deg, rgba(50,20,96,0.97) 0%, rgba(28,8,58,0.99) 100%)'
               : 'linear-gradient(150deg, rgba(28,10,55,0.75) 0%, rgba(14,4,30,0.88) 100%)',
             backdropFilter: 'blur(28px)',
-            boxShadow: pkg.popular
+            boxShadow: pkg.isPopular
               ? `0 0 0 1.5px rgba(232,199,106,${hovered ? 0.7 : 0.45}), 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(232,199,106,0.08)`
               : `0 0 0 1px rgba(124,58,237,${hovered ? 0.5 : 0.22}), 0 20px 50px rgba(0,0,0,0.45)`,
           }}
@@ -406,7 +307,7 @@ function PricingCard({ pkg, yearly, index }) {
           <div
             className="absolute top-0 left-6 right-6 h-px"
             style={{
-              background: pkg.popular
+              background: pkg.isPopular
                 ? 'linear-gradient(90deg, transparent, rgba(232,199,106,0.6), transparent)'
                 : 'linear-gradient(90deg, transparent, rgba(150,100,240,0.3), transparent)',
             }}
@@ -414,121 +315,85 @@ function PricingCard({ pkg, yearly, index }) {
 
           {/* Content */}
           <div className="relative z-10 p-8 flex flex-col h-full">
-            {/* Badge */}
-            {pkg.badge && (
+            {/* Badge — derived only from the real isPopular flag, no invented per-package labels */}
+            {pkg.isPopular && (
               <div className="flex justify-center mb-5">
                 <motion.span
-                  animate={pkg.popular ? { scale: [1, 1.04, 1] } : {}}
+                  animate={{ scale: [1, 1.04, 1] }}
                   transition={{ duration: 2.2, repeat: Infinity }}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide"
-                  style={pkg.popular
-                    ? { background: 'linear-gradient(135deg, #E8C76A, #D4AF37)', color: '#2a1500' }
-                    : { background: 'rgba(124,58,237,0.2)', color: '#cdbef0', border: '1px solid rgba(124,58,237,0.4)' }
-                  }
+                  style={{ background: 'linear-gradient(135deg, #E8C76A, #D4AF37)', color: '#2a1500' }}
                 >
-                  {pkg.popular && <Star size={10} fill="currentColor" />}
-                  {pkg.badge}
+                  <Star size={10} fill="currentColor" />
+                  الأكثر طلباً
                 </motion.span>
               </div>
             )}
 
             {/* Plan label */}
             <div className="text-center mb-6">
-              <p
-                className="text-[10px] font-bold tracking-[0.2em] uppercase mb-2"
-                style={{ color: pkg.popular ? 'rgba(232,199,106,0.65)' : 'rgba(150,100,240,0.65)' }}
-              >
-                {pkg.nameEn}
-              </p>
-              <h3 className="font-heading font-bold text-white text-[1.35rem]">{pkg.name}</h3>
+              {pkg.name && (
+                <p
+                  className="text-[10px] font-bold tracking-[0.2em] uppercase mb-2"
+                  style={{ color: pkg.isPopular ? 'rgba(232,199,106,0.65)' : 'rgba(150,100,240,0.65)' }}
+                >
+                  {pkg.name}
+                </p>
+              )}
+              <h3 className="font-heading font-bold text-white text-[1.35rem]">{pkg.nameAr}</h3>
             </div>
 
             {/* Price */}
             <div className="text-center mb-6">
-              <div className="flex items-start justify-center gap-1">
-                <span className="text-xl font-semibold mt-3 leading-none" style={{ color: pkg.popular ? '#E8C76A' : '#a78fd6' }}>$</span>
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={price}
-                    initial={{ opacity: 0, y: -12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 12 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className="font-heading font-extrabold text-white leading-none"
-                    style={{ fontSize: 'clamp(52px, 5vw, 66px)' }}
-                  >
-                    {price}
-                  </motion.span>
-                </AnimatePresence>
-              </div>
-              <p className="text-xs mt-2 leading-relaxed" style={{ color: '#9f8bc0' }}>
-                شهرياً · {pkg.sessions} حصص × {pkg.duration} دقيقة
+              <motion.div
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.14 + 0.2 }}
+                className="font-heading font-extrabold text-white leading-none"
+                style={{ fontSize: 'clamp(40px, 4.2vw, 52px)' }}
+              >
+                {formatCurrency(pkg.price, pkg.currency)}
+              </motion.div>
+              <p className="text-xs mt-3 leading-relaxed" style={{ color: '#9f8bc0' }}>
+                {pkg.sessionsPerMonth} حصة شهرياً
+                {pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}
               </p>
-              <AnimatePresence>
-                {yearly && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 overflow-hidden"
-                  >
-                    <span
-                      className="inline-block text-[11px] font-bold px-3 py-1 rounded-full"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.28)' }}
-                    >
-                      وفر ${saved} شهرياً مع الاشتراك السنوي
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
 
             {/* Divider */}
             <div
               className="mb-6 h-px"
               style={{
-                background: pkg.popular
+                background: pkg.isPopular
                   ? 'linear-gradient(90deg, transparent, rgba(232,199,106,0.35), transparent)'
                   : 'linear-gradient(90deg, transparent, rgba(124,58,237,0.2), transparent)',
               }}
             />
 
-            {/* Features */}
+            {/* Features — plain admin-authored strings, no invented per-feature icons */}
             <ul className="space-y-3.5 flex-1">
-              {pkg.features.map((feat, fi) => {
-                const Icon = feat.icon
-                return (
-                  <motion.li
-                    key={fi}
-                    initial={{ opacity: 0, x: 16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.14 + fi * 0.07 + 0.5 }}
-                    className="flex items-center gap-3 group/feat"
+              {(pkg.featuresAr || []).map((feat, fi) => (
+                <motion.li
+                  key={fi}
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.14 + fi * 0.07 + 0.5 }}
+                  className="flex items-center gap-3 group/feat"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{feat}</p>
+                  </div>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: index * 0.14 + fi * 0.07 + 0.6, type: 'spring', stiffness: 400 }}
+                    className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ background: pkg.isPopular ? 'rgba(232,199,106,0.15)' : 'rgba(124,58,237,0.15)' }}
                   >
-                    <div
-                      className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 group-hover/feat:scale-110"
-                      style={{
-                        background: pkg.popular ? 'rgba(232,199,106,0.1)' : 'rgba(124,58,237,0.1)',
-                      }}
-                    >
-                      <Icon size={13} style={{ color: pkg.popular ? '#E8C76A' : '#a78fd6' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{feat.title}</p>
-                      <p className="text-[11px] mt-0.5 leading-tight" style={{ color: '#7d6da0' }}>{feat.desc}</p>
-                    </div>
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: index * 0.14 + fi * 0.07 + 0.6, type: 'spring', stiffness: 400 }}
-                      className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ background: pkg.popular ? 'rgba(232,199,106,0.15)' : 'rgba(124,58,237,0.15)' }}
-                    >
-                      <Check size={9} style={{ color: pkg.popular ? '#E8C76A' : '#a78fd6' }} />
-                    </motion.div>
-                  </motion.li>
-                )
-              })}
+                    <Check size={9} style={{ color: pkg.isPopular ? '#E8C76A' : '#a78fd6' }} />
+                  </motion.div>
+                </motion.li>
+              ))}
             </ul>
 
             {/* CTA */}
@@ -581,18 +446,18 @@ function CardCTA({ pkg }) {
           position: 'relative',
           overflow: 'hidden',
           textDecoration: 'none',
-          background: pkg.popular
+          background: pkg.isPopular
             ? 'linear-gradient(135deg, #E8C76A 0%, #D4AF37 100%)'
             : 'transparent',
-          color: pkg.popular ? '#2a1500' : '#E8C76A',
-          border: pkg.popular ? 'none' : '1.5px solid rgba(232,199,106,0.35)',
-          boxShadow: pkg.popular
+          color: pkg.isPopular ? '#2a1500' : '#E8C76A',
+          border: pkg.isPopular ? 'none' : '1.5px solid rgba(232,199,106,0.35)',
+          boxShadow: pkg.isPopular
             ? hov ? '0 8px 30px rgba(212,175,55,0.55)' : '0 4px 20px rgba(212,175,55,0.3)'
             : hov ? '0 4px 20px rgba(124,58,237,0.25)' : 'none',
         }}
       >
         {/* Hover overlay for non-popular */}
-        {!pkg.popular && (
+        {!pkg.isPopular && (
           <div
             className="absolute inset-0 transition-opacity duration-300"
             style={{
@@ -701,7 +566,7 @@ function FAQItem({ item, index }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PricingPage() {
-  const [yearly, setYearly] = useState(false)
+  const { packages, isLoading, isError, refetch } = usePackages({ activeOnly: true })
   const { scrollYProgress } = useScroll()
   const heroY = useTransform(scrollYProgress, [0, 0.35], [0, -70])
   const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0.25])
@@ -760,25 +625,49 @@ export default function PricingPage() {
           <br className="hidden sm:block" />
           باقات مرنة مصممة لكل ميزانية وجدول زمني.
         </motion.p>
-
-        {/* Billing toggle */}
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.34 }}
-        >
-          <BillingToggle yearly={yearly} onToggle={() => setYearly(v => !v)} />
-        </motion.div>
       </motion.section>
 
       {/* ── Pricing cards ─────────────────────────────────────────────────── */}
       <section className="relative z-10 px-[clamp(16px,4vw,60px)] pb-28">
         <div className="max-w-[1100px] mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 items-center">
-            {PACKAGES.map((pkg, i) => (
-              <PricingCard key={pkg.id} pkg={pkg} yearly={yearly} index={i} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-[32px] animate-pulse"
+                  style={{ height: 440, background: 'rgba(24,8,48,0.55)', border: '1px solid rgba(150,100,240,0.14)' }}
+                />
+              ))}
+            </div>
+          ) : isError ? (
+            <div
+              className="rounded-[24px] p-10 text-center"
+              style={{ background: 'rgba(24,8,48,0.55)', border: '1px solid rgba(232,199,106,0.15)' }}
+            >
+              <p className="text-white font-semibold mb-4">تعذّر تحميل الباقات حالياً</p>
+              <button
+                onClick={() => refetch()}
+                className="px-6 py-2.5 rounded-full text-sm font-bold"
+                style={{ background: 'linear-gradient(135deg, #E8C76A, #D4AF37)', color: '#2a1500' }}
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          ) : packages.length === 0 ? (
+            <div
+              className="rounded-[24px] p-10 text-center"
+              style={{ background: 'rgba(24,8,48,0.55)', border: '1px solid rgba(150,100,240,0.14)' }}
+            >
+              <p style={{ color: '#b3a4d0' }}>لا توجد باقات متاحة حالياً</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 items-center">
+              {packages.map((pkg, i) => (
+                <PricingCard key={pkg._id} pkg={pkg} index={i} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -865,85 +754,96 @@ export default function PricingPage() {
       </section>
 
       {/* ── Comparison table ──────────────────────────────────────────────── */}
-      <section className="relative z-10 px-[clamp(20px,5vw,68px)] pb-28">
-        <div className="max-w-4xl mx-auto">
-          <SectionHeading
-            eyebrow="مقارنة الباقات"
-            title="قارن بين الخطط"
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="rounded-2xl overflow-hidden"
-            style={{
-              background: 'rgba(24,8,48,0.55)',
-              border: '1px solid rgba(150,100,240,0.14)',
-              backdropFilter: 'blur(18px)',
-            }}
-          >
-            {/* Header row */}
-            <div className="grid grid-cols-4">
-              <div className="p-4 border-b border-r" style={{ borderColor: 'rgba(150,100,240,0.1)' }} />
-              {[{ n: 'الأساسية', pop: false }, { n: 'المميزة', pop: true }, { n: 'المكثفة', pop: false }].map(({ n, pop }, ci) => (
-                <div
-                  key={ci}
-                  className="p-4 text-center font-heading font-bold text-sm border-b"
+      {/* Built dynamically from real packages — only structured, trustworthy
+          fields (price/sessions/duration) are compared. Feature strings are
+          free-text and admin-authored, so they're not reliable enough to turn
+          into per-package boolean capability claims — shown on the cards
+          above instead, not fabricated here as a comparison matrix. */}
+      {!isLoading && !isError && packages.length >= 2 && (
+        <section className="relative z-10 px-[clamp(20px,5vw,68px)] pb-28">
+          <div className="max-w-4xl mx-auto">
+            <SectionHeading
+              eyebrow="مقارنة الباقات"
+              title="قارن بين الخطط"
+            />
+            {(() => {
+              const cols = packages.slice(0, 4)
+              const gridStyle = { gridTemplateColumns: `1.3fr repeat(${cols.length}, 1fr)` }
+              const rows = [
+                { label: 'السعر', render: (p) => formatCurrency(p.price, p.currency) },
+                { label: 'الحصص شهرياً', render: (p) => `${p.sessionsPerMonth} حصة` },
+                { label: 'مدة الباقة', render: (p) => humanizeDuration(p.durationDays) },
+              ]
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="rounded-2xl overflow-hidden"
                   style={{
-                    borderColor: 'rgba(150,100,240,0.1)',
-                    borderRight: ci < 2 ? '1px solid rgba(150,100,240,0.1)' : 'none',
-                    color: pop ? '#E8C76A' : '#cdbef0',
-                    background: pop ? 'rgba(232,199,106,0.04)' : 'transparent',
+                    background: 'rgba(24,8,48,0.55)',
+                    border: '1px solid rgba(150,100,240,0.14)',
+                    backdropFilter: 'blur(18px)',
                   }}
                 >
-                  {n}
-                  {pop && <div className="w-1.5 h-1.5 rounded-full bg-brand-gold mx-auto mt-1.5" />}
-                </div>
-              ))}
-            </div>
-
-            {/* Data rows */}
-            {COMPARISON.map((row, ri) => (
-              <motion.div
-                key={ri}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: ri * 0.04 }}
-                className="grid grid-cols-4 group"
-                style={{
-                  borderBottom: ri < COMPARISON.length - 1 ? '1px solid rgba(150,100,240,0.07)' : 'none',
-                }}
-              >
-                <div
-                  className="p-4 text-sm font-medium border-r transition-colors duration-200 group-hover:text-white"
-                  style={{ borderColor: 'rgba(150,100,240,0.08)', color: '#b3a4d0' }}
-                >
-                  {row.label}
-                </div>
-                {(['basic', 'popular', 'intensive']).map((key, ci) => (
-                  <div
-                    key={ci}
-                    className="p-4 text-center text-sm flex items-center justify-center"
-                    style={{
-                      borderRight: ci < 2 ? '1px solid rgba(150,100,240,0.07)' : 'none',
-                      background: ci === 1 ? 'rgba(232,199,106,0.03)' : 'transparent',
-                      color: ci === 1 ? '#E8C76A' : '#cdbef0',
-                    }}
-                  >
-                    {typeof row[key] === 'boolean'
-                      ? row[key]
-                        ? <Check size={15} style={{ color: ci === 1 ? '#E8C76A' : '#7c3aed' }} />
-                        : <span style={{ color: 'rgba(150,100,200,0.28)' }}>—</span>
-                      : row[key]
-                    }
+                  {/* Header row */}
+                  <div className="grid" style={gridStyle}>
+                    <div className="p-4 border-b border-r" style={{ borderColor: 'rgba(150,100,240,0.1)' }} />
+                    {cols.map((p, ci) => (
+                      <div
+                        key={p._id}
+                        className="p-4 text-center font-heading font-bold text-sm border-b"
+                        style={{
+                          borderColor: 'rgba(150,100,240,0.1)',
+                          borderRight: ci < cols.length - 1 ? '1px solid rgba(150,100,240,0.1)' : 'none',
+                          color: p.isPopular ? '#E8C76A' : '#cdbef0',
+                          background: p.isPopular ? 'rgba(232,199,106,0.04)' : 'transparent',
+                        }}
+                      >
+                        {p.nameAr}
+                        {p.isPopular && <div className="w-1.5 h-1.5 rounded-full bg-brand-gold mx-auto mt-1.5" />}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+
+                  {/* Data rows */}
+                  {rows.map((row, ri) => (
+                    <motion.div
+                      key={row.label}
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: ri * 0.04 }}
+                      className="grid group"
+                      style={{ ...gridStyle, borderBottom: ri < rows.length - 1 ? '1px solid rgba(150,100,240,0.07)' : 'none' }}
+                    >
+                      <div
+                        className="p-4 text-sm font-medium border-r transition-colors duration-200 group-hover:text-white"
+                        style={{ borderColor: 'rgba(150,100,240,0.08)', color: '#b3a4d0' }}
+                      >
+                        {row.label}
+                      </div>
+                      {cols.map((p, ci) => (
+                        <div
+                          key={p._id}
+                          className="p-4 text-center text-sm flex items-center justify-center"
+                          style={{
+                            borderRight: ci < cols.length - 1 ? '1px solid rgba(150,100,240,0.07)' : 'none',
+                            background: p.isPopular ? 'rgba(232,199,106,0.03)' : 'transparent',
+                            color: p.isPopular ? '#E8C76A' : '#cdbef0',
+                          }}
+                        >
+                          {row.render(p)}
+                        </div>
+                      ))}
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )
+            })()}
+          </div>
+        </section>
+      )}
 
       {/* ── Trust badges ──────────────────────────────────────────────────── */}
       <section className="relative z-10 px-[clamp(20px,5vw,68px)] pb-28">

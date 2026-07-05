@@ -24,7 +24,7 @@ exports.createSubscription = async (req, res, next) => {
     const start = startDate ? new Date(startDate) : new Date()
     const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
     const sub = await Subscription.create({
-      studentId, packageId, teacherId, startDate: start, endDate: end,
+      studentId, packageId, packageNameAr: pkg.nameAr, teacherId, startDate: start, endDate: end,
       sessionsRemaining: pkg.sessionsPerMonth, totalSessions: pkg.sessionsPerMonth,
       amountPaid: pkg.price, notes, createdBy: req.user._id,
     })
@@ -93,7 +93,7 @@ exports.createSubscriptionExtra = async (req, res, next) => {
     const start = startDate ? new Date(startDate) : new Date()
     const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
     const sub = await Subscription.create({
-      studentId, packageId, teacherId, startDate: start, endDate: end,
+      studentId, packageId, packageNameAr: pkg.nameAr, teacherId, startDate: start, endDate: end,
       sessionsRemaining: sessionsRemaining !== undefined ? Number(sessionsRemaining) : pkg.sessionsPerMonth,
       totalSessions: pkg.sessionsPerMonth,
       amountPaid: amountPaid !== undefined ? Number(amountPaid) : pkg.price,
