@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../../config/constants.js'
+import HeroSection from '../../components/home/HeroSection.jsx'
 import TestimonialsSection from '../../components/home/TestimonialsSection.jsx'
 import SuccessStoriesSection from '../../components/home/SuccessStoriesSection.jsx'
 import TeachersSection from '../../components/home/TeachersSection.jsx'
@@ -17,44 +18,6 @@ function CheckIcon({ color = '#6D34D6' }) {
       <path d="M5 13l4 4 10-11" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
-}
-
-function ArrowLeft() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-/* ─────────────────────────────────────────────
-   Animated counter hook
-───────────────────────────────────────────── */
-function useCountUp(targets, duration = 1700) {
-  const [counts, setCounts] = useState({ students: 0, teachers: 0, hours: 0, rating: 0 })
-  const rafRef = useRef(null)
-  const startedRef = useRef(false)
-
-  function start() {
-    if (startedRef.current) return
-    startedRef.current = true
-    const startTime = performance.now()
-    const tick = (now) => {
-      const t = Math.min(1, (now - startTime) / duration)
-      const e = 1 - Math.pow(1 - t, 3)
-      setCounts({
-        students: Math.round(targets.students * e),
-        teachers: Math.round(targets.teachers * e),
-        hours:    Math.round(targets.hours * e),
-        rating:   parseFloat((targets.rating * e).toFixed(1)),
-      })
-      if (t < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-  }
-
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }, [])
-  return [counts, start]
 }
 
 /* ─────────────────────────────────────────────
@@ -75,19 +38,88 @@ function humanizeDuration(days) {
 }
 
 /* ─────────────────────────────────────────────
+   Journey — data-driven so the row can be recomposed into a vertical
+   timeline at narrower widths (see .journey-steps media query) instead of
+   forcing a horizontal-scroll carousel on tablet/mobile.
+───────────────────────────────────────────── */
+const JOURNEY_STEPS = [
+  {
+    num: '1', title: 'تقييم المستوى', desc: 'اختبار تحديد المستوى لتحديد نقاط القوة لديك بدقة',
+    icon: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth="1.7" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth="1.7" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth="1.7" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth="1.7" />
+      </>
+    ),
+  },
+  {
+    num: '2', title: 'خطة مخصصة', desc: 'خطة تعلم خاصة تناسب أهدافك ووقتك',
+    icon: (
+      <>
+        <path d="M12 6c-1.6-1-3.6-1.5-6-1.5v13c2.4 0 4.4.5 6 1.5 1.6-1 3.6-1.5 6-1.5v-13c-2.4 0-4.4.5-6 1.5Z" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M12 6v13" strokeWidth="1.6" />
+      </>
+    ),
+  },
+  {
+    num: '3', title: 'تعلم وتطوير', desc: 'تعلم مع معلمين متخصصين ومتابعة مستمرة', active: true,
+    icon: (
+      <>
+        <circle cx="9" cy="8" r="3" strokeWidth="1.7" />
+        <path d="M3.5 19a5.5 5.5 0 0 1 11 0" strokeWidth="1.7" strokeLinecap="round" />
+        <circle cx="17" cy="9" r="2.3" strokeWidth="1.7" />
+        <path d="M15.5 19a4 4 0 0 1 6-3.4" strokeWidth="1.7" strokeLinecap="round" />
+      </>
+    ),
+  },
+  {
+    num: '4', title: 'ممارسة وتطبيق', desc: 'تطبيق ما تعلمته من خلال أنشطة تفاعلية',
+    icon: <path d="M4 19h16M7 16l3-4 3 3 4-6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />,
+  },
+  {
+    num: '5', title: 'إتقان وتحقيق', desc: 'تقييم التقدم والاحتفال بالإنجاز بإتقان',
+    icon: (
+      <>
+        <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M17 5h2.5a2.5 2.5 0 0 1-2.5 4M7 5H4.5A2.5 2.5 0 0 0 7 9M10 14h4M9 20h6M12 14v6" strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    ),
+  },
+]
+
+const PLATFORM_FEATURES = [
+  'لوحة تحكم ذكية لمتابعتك خطوة بخطوة',
+  'دورة الحفظ بسهولة مع أفضل المعلمين',
+  'التقارير اليومية وتحليلات التطور الأسبوعية',
+  'محتوى تفاعلي واختبارات ذكية',
+]
+
+const COMMUNITY_STATS = [
+  {
+    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10Z" stroke="#D4AF37" strokeWidth="1.7" /><circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="1.7" /></svg>,
+    val: '+100', label: 'دولة',
+  },
+  {
+    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#D4AF37" strokeWidth="1.7" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /><circle cx="17" cy="9" r="2.3" stroke="#D4AF37" strokeWidth="1.7" /><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /></svg>,
+    val: '+200K', label: 'طالب وطالبة',
+  },
+  {
+    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 5h9M8.5 5v2c0 4-2 7-5 8M6 9c0 2.5 2.5 4.5 6 5.5" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><path d="M13 20l4-9 4 9M14.5 17h5" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    val: '+50', label: 'لغات مختلفة',
+  },
+  {
+    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 13v-1a7 7 0 0 1 14 0v1M5 13h2v5H5a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Zm14 0h-2v5h2a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2Z" stroke="#D4AF37" strokeWidth="1.7" strokeLinejoin="round" /><path d="M17 18a4 4 0 0 1-4 3" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /></svg>,
+    val: '24/7', label: 'دعم ومتابعة',
+  },
+]
+
+/* ─────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────── */
 export default function HomePage() {
   const { packages, isLoading: pkgLoading, isError: pkgError, refetch: refetchPkgs } = usePackages({ activeOnly: true })
-  const [counts, startCount] = useCountUp({ students: 20, teachers: 120, hours: 10, rating: 4.9 })
-
-  // Trigger counter when hero is visible
-  const heroRef = useRef(null)
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) startCount() }, { threshold: 0.3 })
-    if (heroRef.current) obs.observe(heroRef.current)
-    return () => obs.disconnect()
-  }, [])
 
   return (
     <div style={{ background: '#0f0226', width: '100%', overflowX: 'hidden' }}>
@@ -95,183 +127,41 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           HERO
       ════════════════════════════════════════ */}
-      <section
-        id="top"
-        ref={heroRef}
-        style={{
-          position: 'relative',
-          minHeight: '780px',
-          padding: '120px clamp(20px,5vw,68px) 36px',
-          background: "#150232 url('/images/hero_bg-3.png') center/cover no-repeat",
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Overlay gradient */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(270deg,rgba(15,2,38,.72) 0%,rgba(15,2,38,.32) 38%,rgba(15,2,38,0) 60%)' }} />
-
-        {/* Listen widget */}
-        <div
-          className="listen-widget"
-          style={{ position: 'absolute', insetInlineEnd: 'clamp(18px,5vw,70px)', top: '42%', zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 }}
-        >
-          <button style={{ cursor: 'pointer', width: 62, height: 62, borderRadius: '50%', border: '2px solid rgba(232,199,106,.7)', background: 'rgba(20,4,46,.35)', display: 'grid', placeItems: 'center', backdropFilter: 'blur(4px)', transition: 'transform .25s, box-shadow .25s' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#E8C76A"><path d="M8 5v14l11-7z" /></svg>
-          </button>
-          <div style={{ lineHeight: 1.5 }}>
-            <div style={{ color: '#cdbfe8', fontSize: 14, fontWeight: 500 }}>استمع لتلاوة</div>
-            <div style={{ color: '#fff', fontSize: 17, fontWeight: 700, fontFamily: 'Cairo' }}>سورة الرحمن</div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ position: 'relative', zIndex: 4, maxWidth: 1340, margin: '0 auto', width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
-          <div style={{ width: 'min(620px,100%)', textAlign: 'right' }}>
-            <h1 style={{ fontWeight: 900, lineHeight: 1.12, fontSize: 'clamp(40px,5.8vw,82px)', color: '#fff', letterSpacing: '-1px', fontFamily: 'Cairo' }}>
-              تعلم{' '}
-              <span style={{ background: 'linear-gradient(120deg,#E8C76A,#D4AF37)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>القرآن</span>
-              <br />
-              كما لم تتخيل من قبل
-            </h1>
-
-            <p style={{ marginTop: 22, fontSize: 'clamp(17px,1.5vw,21px)', lineHeight: 1.85, color: '#cfc3e8', fontWeight: 400, maxWidth: 540, marginInlineEnd: 'auto' }}>
-              منصة تربوية أونلاين تجمع بين{' '}
-              <span style={{ color: '#E8C76A' }}>أصالة العلم</span>
-              {' '}وقوة التقنية لتمنحك{' '}
-              <span style={{ color: '#E8C76A' }}>تجربة تعلم فريدة</span>
-              {' '}وملهمة.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="hero-cta" style={{ marginTop: 32, display: 'flex', gap: 16, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <Link
-                to={ROUTES.PROGRAMS}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 17, color: '#fff', background: 'rgba(255,255,255,.04)', border: '1.5px solid rgba(255,255,255,.22)', borderRadius: 38, padding: '16px 32px', textDecoration: 'none', transition: 'transform .25s, border-color .25s, background .25s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#E8C76A'; e.currentTarget.style.background = 'rgba(232,199,106,.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,.22)'; e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
-              >
-                استكشف المسارات
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </Link>
-              <Link
-                to={ROUTES.REGISTER}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'Tajawal', fontWeight: 800, fontSize: 17, color: '#2a1500', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', border: 'none', borderRadius: 38, padding: '16px 36px', boxShadow: '0 14px 34px rgba(212,175,55,.42)', textDecoration: 'none', transition: 'transform .25s, box-shadow .25s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 14px 34px rgba(212,175,55,.65)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 14px 34px rgba(212,175,55,.42)' }}
-              >
-                ابدأ رحلتك الآن
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </Link>
-            </div>
-
-            {/* Stats */}
-            <div className="hero-stats" style={{ marginTop: 48, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'clamp(18px,2.6vw,40px)' }}>
-              <div style={{ textAlign: 'center' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 8px', display: 'block' }}><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0" stroke="#E8C76A" strokeWidth="1.7" strokeLinecap="round" /></svg>
-                <div style={{ color: '#fff', fontFamily: 'Cairo', fontWeight: 800, fontSize: 'clamp(22px,2.2vw,28px)' }}>+{counts.students}K</div>
-                <div style={{ color: '#b3a4d0', fontSize: 14, marginTop: 2 }}>طالب وطالبة</div>
-              </div>
-              <div className="stat-div" style={{ width: 1, height: 52, background: 'rgba(255,255,255,.16)' }} />
-              <div style={{ textAlign: 'center' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 8px', display: 'block' }}><path d="m12 4 10 5-10 5L2 9l10-5Z" stroke="#E8C76A" strokeWidth="1.7" strokeLinejoin="round" /><path d="M6 11v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" stroke="#E8C76A" strokeWidth="1.7" strokeLinecap="round" /></svg>
-                <div style={{ color: '#fff', fontFamily: 'Cairo', fontWeight: 800, fontSize: 'clamp(22px,2.2vw,28px)' }}>+{counts.teachers}</div>
-                <div style={{ color: '#b3a4d0', fontSize: 14, marginTop: 2 }}>معلم متخصص</div>
-              </div>
-              <div className="stat-div" style={{ width: 1, height: 52, background: 'rgba(255,255,255,.16)' }} />
-              <div style={{ textAlign: 'center' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 8px', display: 'block' }}><circle cx="12" cy="12" r="9" stroke="#E8C76A" strokeWidth="1.7" /><path d="M12 7v5l3 3" stroke="#E8C76A" strokeWidth="1.7" strokeLinecap="round" /></svg>
-                <div style={{ color: '#fff', fontFamily: 'Cairo', fontWeight: 800, fontSize: 'clamp(22px,2.2vw,28px)' }}>+{counts.hours}K</div>
-                <div style={{ color: '#b3a4d0', fontSize: 14, marginTop: 2 }}>ساعة تعليمية</div>
-              </div>
-              <div className="stat-div" style={{ width: 1, height: 52, background: 'rgba(255,255,255,.16)' }} />
-              <div style={{ textAlign: 'center' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="#E8C76A" style={{ margin: '0 auto 8px', display: 'block' }}><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z" /></svg>
-                <div style={{ color: '#fff', fontFamily: 'Cairo', fontWeight: 800, fontSize: 'clamp(22px,2.2vw,28px)' }}>{counts.rating.toFixed(1)}/5</div>
-                <div style={{ color: '#b3a4d0', fontSize: 14, marginTop: 2 }}>تقييم الطلاب</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div style={{ position: 'absolute', bottom: 18, insetInlineStart: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
-          <div style={{ width: 42, height: 42, borderRadius: '50%', border: '1.5px solid rgba(232,199,106,.5)', display: 'grid', placeItems: 'center', animation: 'floaty 2.4s ease-in-out infinite' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6M6 4l6 6 6-6" stroke="#E8C76A" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* ════════════════════════════════════════
           JOURNEY
       ════════════════════════════════════════ */}
-      <section id="journey" style={{ background: '#F6F4FB', padding: 'clamp(64px,8vw,110px) clamp(20px,5vw,68px)' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 'clamp(32px,5vw,72px)', flexWrap: 'wrap' }}>
+      <section id="journey" className="journey-section">
+        <div className="section-container journey-row">
 
-          {/* Steps */}
-          <div style={{ flex: '1 1 600px', minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 14, justifyContent: 'flex-start', overflowX: 'auto', paddingBottom: 8 }} dir="ltr">
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 0, flex: 1 }}>
-
-              {/* Step 1 */}
-              <JourneyStep
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#6D34D6" strokeWidth="1.7" /><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#6D34D6" strokeWidth="1.7" /><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#6D34D6" strokeWidth="1.7" /><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#6D34D6" strokeWidth="1.7" /></svg>}
-                num="1" title="تقييم المستوى" desc="اختبار تحديد المستوى لتحديد نقاط القوة لديك بدقة"
-              />
-              <WavyConnector color="#b9a4ec" />
-
-              {/* Step 2 */}
-              <JourneyStep
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 6c-1.6-1-3.6-1.5-6-1.5v13c2.4 0 4.4.5 6 1.5 1.6-1 3.6-1.5 6-1.5v-13c-2.4 0-4.4.5-6 1.5Z" stroke="#6D34D6" strokeWidth="1.6" strokeLinejoin="round" /><path d="M12 6v13" stroke="#6D34D6" strokeWidth="1.6" /></svg>}
-                num="2" title="خطة مخصصة" desc="خطة تعلم خاصة تناسب أهدافك ووقتك"
-              />
-              <WavyConnector color="#E8A23C" />
-
-              {/* Step 3 - active */}
-              <div
-                style={{ flex: 1.05, minWidth: 148, background: '#fff', borderRadius: 22, padding: '32px 16px', textAlign: 'center', boxShadow: '0 22px 50px rgba(212,150,40,.22)', border: '2px solid #E8B24A', alignSelf: 'stretch', display: 'flex', flexDirection: 'column', justifyContent: 'center', transition: 'transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s', cursor: 'default' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-              >
-                <div style={{ width: 56, height: 56, margin: '0 auto', borderRadius: '50%', background: '#fff', border: '2px solid #E8B24A', display: 'grid', placeItems: 'center' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#E29A2E" strokeWidth="1.7" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#E29A2E" strokeWidth="1.7" strokeLinecap="round" /><circle cx="17" cy="9" r="2.3" stroke="#E29A2E" strokeWidth="1.7" /><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#E29A2E" strokeWidth="1.7" strokeLinecap="round" /></svg>
-                </div>
-                <div style={{ marginTop: 14, fontFamily: 'Cairo', fontWeight: 800, color: '#E29A2E', fontSize: 18 }}>3</div>
-                <div dir="rtl" style={{ marginTop: 8, fontFamily: 'Cairo', fontWeight: 800, color: '#1A0447', fontSize: 18 }}>تعلم وتطوير</div>
-                <div dir="rtl" style={{ marginTop: 8, color: '#6B7280', fontSize: 14, lineHeight: 1.7 }}>تعلم مع معلمين متخصصين ومتابعة مستمرة</div>
-              </div>
-              <WavyConnector color="#E8A23C" flipEnd />
-
-              {/* Step 4 */}
-              <JourneyStep
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16l3-4 3 3 4-6" stroke="#6D34D6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-                num="4" title="ممارسة وتطبيق" desc="تطبيق ما تعلمته من خلال أنشطة تفاعلية"
-              />
-              <WavyConnector color="#b9a4ec" />
-
-              {/* Step 5 */}
-              <JourneyStep
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" stroke="#6D34D6" strokeWidth="1.7" strokeLinejoin="round" /><path d="M17 5h2.5a2.5 2.5 0 0 1-2.5 4M7 5H4.5A2.5 2.5 0 0 0 7 9M10 14h4M9 20h6M12 14v6" stroke="#6D34D6" strokeWidth="1.6" strokeLinecap="round" /></svg>}
-                num="5" title="إتقان وتحقيق" desc="تقييم التقدم والاحتفال بالإنجاز بإتقان"
-              />
+          {/* Steps — horizontal row on wide screens, vertical timeline below 1200px */}
+          <div className="journey-steps-wrap">
+            <div className="journey-steps">
+              {JOURNEY_STEPS.map((step, i) => (
+                <Fragment key={step.num}>
+                  {i > 0 && (
+                    <JourneyConnector
+                      color={i === 2 || i === 3 ? '#E8A23C' : '#b9a4ec'}
+                      flipEnd={i === 3}
+                    />
+                  )}
+                  <JourneyStepCard step={step} />
+                </Fragment>
+              ))}
             </div>
           </div>
 
           {/* Lead text */}
-          <div className="journey-lead" style={{ flex: '0 1 360px', minWidth: 280, textAlign: 'right' }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(34px,4vw,52px)', lineHeight: 1.2, fontFamily: 'Cairo' }}>
-              <span style={{ background: 'linear-gradient(120deg,#7C3AED,#9b5cf0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>ابدأ رحلتك</span><br />
-              <span style={{ color: '#1A0447' }}>مع القرآن</span>
+          <div className="journey-lead">
+            <h2 className="section-heading section-heading--lg">
+              <span className="text-gradient-purple">ابدأ رحلتك</span><br />
+              <span className="heading-dark">مع القرآن</span>
             </h2>
-            <p style={{ marginTop: 20, color: '#6B7280', fontSize: 17, lineHeight: 1.9, maxWidth: 380, marginInlineEnd: 0, marginInlineStart: 'auto' }}>
+            <p className="lead-copy journey-lead__copy">
               اختر المسار الذي يناسبك، وسنرشدك خطوة بخطوة حتى تحقق هدفك في تعلم كتاب الله
             </p>
-            <Link
-              to={ROUTES.PROGRAMS}
-              style={{ cursor: 'pointer', marginTop: 28, display: 'inline-flex', alignItems: 'center', gap: 12, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 17, color: '#fff', background: 'linear-gradient(135deg,#6D34D6,#4B1Fb0)', border: 'none', borderRadius: 14, padding: '16px 30px', boxShadow: '0 16px 34px rgba(75,31,176,.32)', textDecoration: 'none', transition: 'transform .25s, box-shadow .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 16px 34px rgba(75,31,176,.52)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 16px 34px rgba(75,31,176,.32)' }}
-            >
+            <Link to={ROUTES.PROGRAMS} className="btn-primary">
               اختر مسارك الآن
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></svg>
             </Link>
@@ -292,44 +182,34 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           PLATFORM
       ════════════════════════════════════════ */}
-      <section id="platform" style={{ background: '#F8F7FC', padding: 'clamp(64px,8vw,108px) clamp(20px,5vw,68px)' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 'clamp(34px,5vw,70px)', flexWrap: 'wrap' }}>
+      <section id="platform" className="platform-section">
+        <div className="section-container platform-row">
 
           {/* Lead text */}
-          <div className="platform-lead" style={{ flex: '0 1 360px', minWidth: 280, textAlign: 'right', order: 2 }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,3.6vw,50px)', lineHeight: 1.25, fontFamily: 'Cairo' }}>
-              <span style={{ background: 'linear-gradient(120deg,#7C3AED,#9b5cf0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>منصة ذكية</span><br />
-              <span style={{ color: '#1A0447' }}>لتجربة تعلم متكاملة</span>
+          <div className="platform-lead">
+            <h2 className="section-heading">
+              <span className="text-gradient-purple">منصة ذكية</span><br />
+              <span className="heading-dark">لتجربة تعلم متكاملة</span>
             </h2>
-            <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {[
-                'لوحة تحكم ذكية لمتابعتك خطوة بخطوة',
-                'دورة الحفظ بسهولة مع أفضل المعلمين',
-                'التقارير اليومية وتحليلات التطور الأسبوعية',
-                'محتوى تفاعلي واختبارات ذكية',
-              ].map((f) => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
-                  <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', background: '#E6F4EC', display: 'grid', placeItems: 'center' }}>
+            <div className="platform-features">
+              {PLATFORM_FEATURES.map((f) => (
+                <div key={f} className="platform-feature">
+                  <span className="platform-feature__icon">
                     <CheckIcon color="#1F9D57" />
                   </span>
-                  <span style={{ color: '#374151', fontSize: 16.5 }}>{f}</span>
+                  <span className="platform-feature__text">{f}</span>
                 </div>
               ))}
             </div>
-            <Link
-              to={ROUTES.PROGRAMS}
-              style={{ cursor: 'pointer', marginTop: 30, display: 'inline-flex', alignItems: 'center', gap: 12, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 17, color: '#fff', background: 'linear-gradient(135deg,#6D34D6,#4B1Fb0)', border: 'none', borderRadius: 14, padding: '16px 30px', boxShadow: '0 16px 34px rgba(75,31,176,.28)', textDecoration: 'none', transition: 'transform .25s, box-shadow .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-            >
+            <Link to={ROUTES.PROGRAMS} className="btn-primary platform-cta">
               استكشف المنصة
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </Link>
           </div>
 
           {/* Dashboard image */}
-          <div style={{ flex: '1 1 600px', minWidth: 300, order: 1 }}>
-            <img src="/images/dashboard.png" alt="لوحة التحكم الذكية" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 18, filter: 'drop-shadow(0 30px 60px rgba(36,12,82,.16))' }} />
+          <div className="platform-image">
+            <img src="/images/dashboard.png" alt="لوحة التحكم الذكية" />
           </div>
         </div>
       </section>
@@ -342,59 +222,37 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           COMMUNITY
       ════════════════════════════════════════ */}
-      <section id="community" style={{ background: '#F8F7FC', padding: 'clamp(60px,7vw,100px) clamp(20px,5vw,68px)' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 'clamp(24px,3vw,48px)', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <section id="community" className="community-section">
+        <div className="section-container community-row">
 
           {/* Stats column */}
-          <div style={{ order: 1, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 26 }}>
-            {[
-              {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 12h20M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10Z" stroke="#D4AF37" strokeWidth="1.7" /><circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="1.7" /></svg>,
-                val: '+100', label: 'دولة',
-              },
-              {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#D4AF37" strokeWidth="1.7" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /><circle cx="17" cy="9" r="2.3" stroke="#D4AF37" strokeWidth="1.7" /><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /></svg>,
-                val: '+200K', label: 'طالب وطالبة',
-              },
-              {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 5h9M8.5 5v2c0 4-2 7-5 8M6 9c0 2.5 2.5 4.5 6 5.5" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><path d="M13 20l4-9 4 9M14.5 17h5" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-                val: '+50', label: 'لغات مختلفة',
-              },
-              {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 13v-1a7 7 0 0 1 14 0v1M5 13h2v5H5a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Zm14 0h-2v5h2a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2Z" stroke="#D4AF37" strokeWidth="1.7" strokeLinejoin="round" /><path d="M17 18a4 4 0 0 1-4 3" stroke="#D4AF37" strokeWidth="1.7" strokeLinecap="round" /></svg>,
-                val: '24/7', label: 'دعم ومتابعة',
-              },
-            ].map((s) => (
-              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <span style={{ flexShrink: 0, width: 50, height: 50, borderRadius: 14, background: '#FBF3DF', display: 'grid', placeItems: 'center' }}>{s.icon}</span>
+          <div className="community-stats">
+            {COMMUNITY_STATS.map((s) => (
+              <div key={s.label} className="community-stat">
+                <span className="community-stat__icon">{s.icon}</span>
                 <div>
-                  <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 24, color: '#1A0447' }}>{s.val}</div>
-                  <div style={{ color: '#6B7280', fontSize: 14 }}>{s.label}</div>
+                  <div className="community-stat__value">{s.val}</div>
+                  <div className="community-stat__label">{s.label}</div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* World map */}
-          <div style={{ order: 2, flex: '1 1 460px', minWidth: 300, textAlign: 'center' }}>
-            <img src="/images/worldmap.png" alt="مجتمع عالمي" style={{ width: '100%', maxWidth: 640, height: 'auto', display: 'block', margin: '0 auto' }} />
+          <div className="community-map">
+            <img src="/images/worldmap.png" alt="مجتمع عالمي" />
           </div>
 
           {/* Lead text */}
-          <div style={{ order: 3, flex: '0 1 300px', minWidth: 260, textAlign: 'right' }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,3.6vw,48px)', lineHeight: 1.25, fontFamily: 'Cairo' }}>
-              <span style={{ background: 'linear-gradient(120deg,#7C3AED,#9b5cf0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>مجتمع عالمي</span><br />
-              <span style={{ color: '#1A0447' }}>يجمع القرآن</span>
+          <div className="community-lead">
+            <h2 className="section-heading">
+              <span className="text-gradient-purple">مجتمع عالمي</span><br />
+              <span className="heading-dark">يجمع القرآن</span>
             </h2>
-            <p style={{ marginTop: 18, color: '#6B7280', fontSize: 16.5, lineHeight: 1.9, maxWidth: 320, marginInlineStart: 'auto' }}>
+            <p className="lead-copy community-lead__copy">
               طلاب من أكثر من 100 دولة يتعلمون ويتواصلون في بيئة آمنة ومحفزة
             </p>
-            <Link
-              to={ROUTES.REGISTER}
-              style={{ cursor: 'pointer', marginTop: 26, display: 'inline-block', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 16, color: '#fff', background: 'linear-gradient(135deg,#6D34D6,#4B1Fb0)', border: 'none', borderRadius: 12, padding: '14px 30px', boxShadow: '0 14px 30px rgba(75,31,176,.26)', textDecoration: 'none', transition: 'transform .25s, box-shadow .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-            >
+            <Link to={ROUTES.REGISTER} className="btn-primary community-cta">
               انضم إلى مجتمعنا
             </Link>
           </div>
@@ -404,94 +262,55 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           PRICING — real, admin-managed packages (single source of truth)
       ════════════════════════════════════════ */}
-      <section id="pricing" style={{ background: '#FBFAFE', padding: 'clamp(60px,7vw,100px) clamp(20px,5vw,68px)' }}>
-        <div style={{ maxWidth: 1340, margin: '0 auto', display: 'flex', alignItems: 'stretch', gap: 'clamp(28px,4vw,56px)', flexWrap: 'wrap' }}>
+      <section id="pricing" className="pricing-section">
+        <div className="section-container pricing-row">
 
           {/* Pricing cards */}
-          <div style={{ flex: '1 1 700px', minWidth: 300, order: 1 }}>
+          <div className="pricing-cards">
             {pkgLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18 }}>
+              <div className="pricing-skeleton-grid">
                 {[0, 1, 2].map(i => (
-                  <div key={i} className="animate-pulse" style={{ height: 280, borderRadius: 20, background: '#efeaf8' }} />
+                  <div key={i} className="animate-pulse pricing-skeleton-card" />
                 ))}
               </div>
             ) : pkgError ? (
-              <div style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: 40, textAlign: 'center' }}>
-                <p style={{ color: '#6B7280', marginBottom: 16 }}>تعذّر تحميل الباقات حالياً</p>
-                <button
-                  onClick={() => refetchPkgs()}
-                  style={{ cursor: 'pointer', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 14, color: '#fff', background: 'linear-gradient(135deg,#6D34D6,#4B1Fb0)', border: 'none', borderRadius: 30, padding: '10px 24px' }}
-                >
+              <div className="pricing-empty-state">
+                <p>تعذّر تحميل الباقات حالياً</p>
+                <button onClick={() => refetchPkgs()} className="btn-gold-pill">
                   إعادة المحاولة
                 </button>
               </div>
             ) : packages.length === 0 ? (
-              <div style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: 40, textAlign: 'center' }}>
-                <p style={{ color: '#6B7280' }}>لا توجد باقات متاحة حالياً</p>
+              <div className="pricing-empty-state">
+                <p>لا توجد باقات متاحة حالياً</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18, alignItems: 'start' }}>
+              <div className="pricing-grid">
                 {packages.slice(0, 4).map((pkg) => (
-                  pkg.isPopular ? (
-                    <div
-                      key={pkg._id}
-                      style={{ position: 'relative', background: '#fff', border: '2px solid #E8B24A', borderRadius: 20, padding: '34px 24px 30px', boxShadow: '0 24px 50px rgba(212,160,50,.2)', textAlign: 'right', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-                    >
-                      <div style={{ position: 'absolute', top: -15, insetInlineStart: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', color: '#3a2200', fontFamily: 'Cairo', fontWeight: 800, fontSize: 13, padding: '6px 18px', borderRadius: 30, whiteSpace: 'nowrap', boxShadow: '0 8px 18px rgba(212,175,55,.4)' }}>الأكثر طلباً</div>
-                      <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 22, color: '#1A0447' }}>{pkg.nameAr}</div>
-                      {pkg.descriptionAr && <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>{pkg.descriptionAr}</div>}
-                      <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
-                        <span style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 36, color: '#1A0447' }}>{formatCurrency(pkg.price, pkg.currency)}</span>
-                      </div>
-                      <div style={{ color: '#9aa0ab', fontSize: 13, marginTop: 4 }}>
-                        {pkg.sessionsPerMonth} حصة شهرياً{pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}
-                      </div>
-                      <div style={{ height: 1, background: '#f1e6cf', margin: '20px 0' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 15, color: '#4b5563' }}>
-                        {(pkg.featuresAr || []).map(f => (
-                          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, flexDirection: 'row-reverse', justifyContent: 'flex-start' }}>
-                            <CheckIcon color="#D4AF37" /><span>{f}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <Link to={ROUTES.REGISTER} style={{ display: 'block', width: '100%', marginTop: 24, fontFamily: 'Tajawal', fontWeight: 800, fontSize: 15, color: '#3a2200', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', border: 'none', borderRadius: 11, padding: 13, boxShadow: '0 12px 26px rgba(212,175,55,.36)', textAlign: 'center', textDecoration: 'none', cursor: 'pointer', transition: 'transform .25s, box-shadow .25s' }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-                      >ابدأ الآن</Link>
-                    </div>
-                  ) : (
-                    <PriceCard
-                      key={pkg._id}
-                      name={pkg.nameAr}
-                      sub={pkg.descriptionAr}
-                      price={formatCurrency(pkg.price, pkg.currency)}
-                      caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
-                      features={pkg.featuresAr || []}
-                      checkColor="#6D34D6" btnStyle={{ background: 'linear-gradient(135deg,#5b2bc4,#3d1894)', color: '#fff' }}
-                    />
-                  )
+                  <PriceCard
+                    key={pkg._id}
+                    name={pkg.nameAr}
+                    sub={pkg.descriptionAr}
+                    price={formatCurrency(pkg.price, pkg.currency)}
+                    caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
+                    features={pkg.featuresAr || []}
+                    popular={pkg.isPopular}
+                  />
                 ))}
               </div>
             )}
           </div>
 
           {/* Lead text */}
-          <div style={{ flex: '0 1 300px', minWidth: 260, order: 2, textAlign: 'right', alignSelf: 'center' }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,3.6vw,50px)', lineHeight: 1.25, fontFamily: 'Cairo' }}>
-              <span style={{ background: 'linear-gradient(120deg,#7C3AED,#9b5cf0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>اختر الخطة</span><br />
-              <span style={{ color: '#1A0447' }}>المناسبة لك</span>
+          <div className="pricing-lead">
+            <h2 className="section-heading">
+              <span className="text-gradient-purple">اختر الخطة</span><br />
+              <span className="heading-dark">المناسبة لك</span>
             </h2>
-            <p style={{ marginTop: 18, color: '#6B7280', fontSize: 16.5, lineHeight: 1.9, maxWidth: 300, marginInlineStart: 'auto' }}>
+            <p className="lead-copy pricing-lead__copy">
               خطط مرنة تناسب جميع احتياجاتك وأهدافك في تعلم القرآن
             </p>
-            <Link
-              to={ROUTES.PRICING}
-              style={{ cursor: 'pointer', marginTop: 26, display: 'inline-block', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 15, color: '#6D34D6', background: '#efeaf8', border: 'none', borderRadius: 30, padding: '12px 26px', textDecoration: 'none', transition: 'transform .25s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-            >
+            <Link to={ROUTES.PRICING} className="btn-ghost-purple">
               عرض كل الباقات
             </Link>
           </div>
@@ -501,45 +320,24 @@ export default function HomePage() {
       {/* ════════════════════════════════════════
           CONTACT / CTA
       ════════════════════════════════════════ */}
-      <section
-        id="contact"
-        style={{
-          position: 'relative',
-          background: "#160734 url('/images/footer_bg.png') center/cover no-repeat",
-          minHeight: 'clamp(380px,42vw,520px)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: 'clamp(40px,6vw,72px) clamp(20px,5vw,68px)',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(270deg,rgba(22,7,52,.78) 0%,rgba(22,7,52,.4) 42%,rgba(22,7,52,0) 64%)' }} />
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: 1340, margin: '0 auto', width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
-          <div style={{ width: 'min(560px,100%)', textAlign: 'right' }}>
-            <h2 style={{ fontWeight: 800, fontSize: 'clamp(32px,4.4vw,56px)', lineHeight: 1.2, color: '#fff', fontFamily: 'Cairo' }}>
-              <span style={{ background: 'linear-gradient(120deg,#E8C76A,#D4AF37)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>ابدأ رحلتك</span>
+      <section id="contact" className="contact-section">
+        <div className="contact-overlay" />
+        <div className="section-container contact-content">
+          <div className="contact-text">
+            <h2 className="contact-heading">
+              <span className="contact-heading__gold">ابدأ رحلتك</span>
               {' '}مع كتاب الله
             </h2>
-            <div style={{ marginTop: 14, fontFamily: 'Cairo', fontWeight: 700, fontSize: 'clamp(18px,2vw,24px)', color: '#E8C76A' }}>اليوم هو أفضل يوم لتبدأ!</div>
-            <p style={{ marginTop: 14, color: '#cabfe4', fontSize: 'clamp(15px,1.4vw,18px)', lineHeight: 1.85, maxWidth: 430, marginInlineStart: 'auto' }}>
+            <div className="contact-subheading">اليوم هو أفضل يوم لتبدأ!</div>
+            <p className="contact-copy">
               انضم إلى آلاف الطلاب وابدأ رحلتك التعليمية في ترتيلة أونلاين
             </p>
-            <div style={{ marginTop: 28, display: 'flex', gap: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <Link
-                to={ROUTES.CONTACT}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 16, color: '#fff', background: 'rgba(255,255,255,.05)', border: '1.5px solid rgba(255,255,255,.28)', borderRadius: 36, padding: '15px 30px', textDecoration: 'none', transition: 'transform .25s, border-color .25s, background .25s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#E8C76A'; e.currentTarget.style.background = 'rgba(232,199,106,.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,.28)'; e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
-              >
+            <div className="contact-cta">
+              <Link to={ROUTES.CONTACT} className="contact-btn contact-btn--ghost">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.4A8 8 0 1 1 21 12Z" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round" /></svg>
                 تواصل معنا
               </Link>
-              <Link
-                to={ROUTES.REGISTER}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Tajawal', fontWeight: 800, fontSize: 16, color: '#2a1500', background: 'linear-gradient(135deg,#E8C76A,#D4AF37)', border: 'none', borderRadius: 36, padding: '15px 34px', boxShadow: '0 14px 32px rgba(212,175,55,.4)', textDecoration: 'none', transition: 'transform .25s, box-shadow .25s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 14px 32px rgba(212,175,55,.65)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 14px 32px rgba(212,175,55,.4)' }}
-              >
+              <Link to={ROUTES.REGISTER} className="contact-btn contact-btn--gold">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 ابدأ رحلتك الآن
               </Link>
@@ -587,28 +385,206 @@ export default function HomePage() {
       </footer> */}
 
       {/* ════════════════════════════════════════
-          RESPONSIVE STYLES (via <style>)
+          RESPONSIVE STYLES
       ════════════════════════════════════════ */}
       <style>{`
-        @keyframes floaty {
-          0%,100% { transform: translateY(0) }
-          50% { transform: translateY(-18px) }
+        /* ── Shared building blocks (reused across Journey/Platform/Community/Pricing) ── */
+        .section-container { max-width: 1340px; margin: 0 auto; }
+        .section-heading { font-weight: 800; font-size: clamp(32px, 3.6vw, 50px); line-height: 1.25; font-family: Cairo, sans-serif; }
+        .section-heading--lg { font-size: clamp(34px, 4vw, 52px); line-height: 1.2; }
+        .text-gradient-purple { background: linear-gradient(120deg,#7C3AED,#9b5cf0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .heading-dark { color: #1A0447; }
+        .lead-copy { margin-top: 18px; color: #6B7280; font-size: 16.5px; line-height: 1.9; }
+
+        .btn-primary {
+          cursor: pointer; display: inline-flex; align-items: center; gap: 12px;
+          font-family: Tajawal, sans-serif; font-weight: 700; font-size: 17px; color: #fff;
+          background: linear-gradient(135deg,#6D34D6,#4B1Fb0); border: none; border-radius: 14px;
+          padding: 16px 30px; box-shadow: 0 16px 34px rgba(75,31,176,.32); text-decoration: none;
+          transition: transform .25s, box-shadow .25s; min-height: 44px;
         }
-        .hero-cta button:hover, .hero-cta a:hover { filter: brightness(1.05) }
-        .hero-stats { display: flex }
-        @media (max-width: 860px) {
-          .journey-lead { order: -1 !important }
+        .btn-primary:focus-visible { outline: 2px solid #E8C76A; outline-offset: 3px; }
+        .btn-ghost-purple {
+          cursor: pointer; margin-top: 26px; display: inline-block; font-family: Tajawal, sans-serif;
+          font-weight: 700; font-size: 15px; color: #6D34D6; background: #efeaf8; border: none;
+          border-radius: 30px; padding: 12px 26px; text-decoration: none; transition: transform .25s;
         }
-        @media (max-width: 760px) {
-          .listen-widget { display: none !important }
-          .hero-stats { flex-wrap: wrap; gap: 18px 26px !important }
-          .stat-div { display: none !important }
+        .btn-ghost-purple:focus-visible { outline: 2px solid #6D34D6; outline-offset: 3px; }
+        .btn-gold-pill {
+          cursor: pointer; font-family: Tajawal, sans-serif; font-weight: 700; font-size: 14px; color: #fff;
+          background: linear-gradient(135deg,#6D34D6,#4B1Fb0); border: none; border-radius: 30px; padding: 10px 24px;
         }
-        @media (max-width: 560px) {
-          .hero-cta { flex-direction: column; align-items: stretch }
-          .hero-cta button, .hero-cta a { width: 100%; justify-content: center }
-          .hero-stats { display: grid !important; grid-template-columns: 1fr 1fr; gap: 22px 12px !important; justify-items: center }
-          .stat-div { display: none !important }
+
+        /* Hover-only lift effects — gated so touch devices never get a stuck hover state */
+        @media (hover: hover) and (pointer: fine) {
+          .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(75,31,176,.52); }
+          .btn-ghost-purple:hover { transform: translateY(-2px); }
+          .journey-step:hover, .journey-step--active:hover { transform: translateY(-8px); }
+          .price-card:hover { transform: translateY(-8px); }
+          .contact-btn--ghost:hover { transform: translateY(-2px); border-color: #E8C76A; background: rgba(232,199,106,.08); }
+          .contact-btn--gold:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(212,175,55,.65); }
+        }
+
+        /* ── Journey ── */
+        .journey-section { background: #F6F4FB; padding: clamp(64px,8vw,110px) clamp(20px,5vw,68px); }
+        .journey-row { display: flex; align-items: center; gap: clamp(32px,5vw,72px); flex-wrap: wrap; }
+        .journey-steps-wrap { flex: 1 1 600px; min-width: 0; }
+        .journey-steps { display: flex; align-items: flex-end; gap: 0; }
+        .journey-step {
+          flex: 1; min-width: 122px; background: #fff; border-radius: 20px; padding: 22px 14px;
+          text-align: center; box-shadow: 0 14px 36px rgba(36,12,82,.07); border: 1px solid #eee6f7;
+          align-self: center; transition: transform .35s cubic-bezier(.2,.7,.2,1);
+        }
+        .journey-step--active {
+          flex: 1.05; min-width: 130px; border-radius: 22px; padding: 28px 14px;
+          box-shadow: 0 22px 50px rgba(212,150,40,.22); border: 2px solid #E8B24A;
+          align-self: stretch; display: flex; flex-direction: column; justify-content: center;
+        }
+        .journey-step__icon { width: 54px; height: 54px; margin: 0 auto; border-radius: 50%; background: #F1ECFB; display: grid; place-items: center; color: #6D34D6; }
+        .journey-step--active .journey-step__icon { width: 56px; height: 56px; background: #fff; border: 2px solid #E8B24A; color: #E29A2E; }
+        .journey-step__num { margin-top: 14px; font-family: Cairo, sans-serif; font-weight: 800; color: #1A0447; font-size: 18px; }
+        .journey-step--active .journey-step__num { color: #E29A2E; }
+        .journey-step__title { margin-top: 8px; font-family: Cairo, sans-serif; font-weight: 800; color: #1A0447; font-size: 18px; }
+        .journey-step__desc { margin-top: 8px; color: #6B7280; font-size: 14px; line-height: 1.7; }
+        .journey-connector { align-self: center; flex-shrink: 0; width: 28px; height: 30px; display: grid; place-items: center; }
+        .journey-connector__v { display: none; }
+        .journey-lead { flex: 0 1 360px; min-width: 280px; text-align: right; }
+        .journey-lead__copy { max-width: 380px; margin-inline-start: auto; margin-inline-end: 0; font-size: 17px; }
+
+        /* Below 1440px a horizontal 5-card row squeezed next to a 360px text
+           column doesn't leave enough room for the icon + two-line Arabic
+           title to read comfortably, so the steps become a vertical timeline
+           instead of forcing a horizontal scroll or overlapping content. */
+        @media (max-width: 1439px) {
+          .journey-lead { order: -1; flex-basis: 100%; }
+          .journey-steps-wrap { flex-basis: 100%; }
+          .journey-steps { flex-direction: column; align-items: stretch; }
+          .journey-step, .journey-step--active { flex: none; min-width: 0; width: 100%; max-width: 560px; margin: 0 auto; }
+          .journey-connector { width: auto; height: auto; padding: 2px 0; }
+          .journey-connector__h { display: none; }
+          .journey-connector__v { display: block; margin: 0 auto; }
+        }
+        @media (max-width: 479px) {
+          .journey-step, .journey-step--active { padding: 22px 16px; }
+        }
+
+        /* ── Platform ── */
+        .platform-section { background: #F8F7FC; padding: clamp(64px,8vw,108px) clamp(20px,5vw,68px); }
+        .platform-row { display: flex; align-items: center; gap: clamp(34px,5vw,70px); flex-wrap: wrap; }
+        .platform-lead { flex: 0 1 360px; min-width: 260px; text-align: right; order: 2; }
+        .platform-features { margin-top: 28px; display: flex; flex-direction: column; gap: 18px; }
+        .platform-feature { display: flex; align-items: center; gap: 12px; justify-content: flex-start; flex-direction: row-reverse; }
+        .platform-feature__icon { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #E6F4EC; display: grid; place-items: center; }
+        .platform-feature__text { color: #374151; font-size: 16.5px; }
+        .platform-cta { margin-top: 30px; }
+        .platform-image { flex: 1 1 600px; min-width: 0; order: 1; }
+        .platform-image img { width: 100%; height: auto; display: block; border-radius: 18px; filter: drop-shadow(0 30px 60px rgba(36,12,82,.16)); }
+
+        @media (max-width: 900px) {
+          .platform-lead, .platform-image { flex-basis: 100%; }
+        }
+
+        /* ── Community ── */
+        .community-section { background: #F8F7FC; padding: clamp(60px,7vw,100px) clamp(20px,5vw,68px); }
+        .community-row { display: flex; align-items: center; gap: clamp(24px,3vw,48px); flex-wrap: wrap; justify-content: center; }
+        .community-stats { order: 1; flex-shrink: 0; display: flex; flex-direction: column; gap: 26px; }
+        .community-stat { display: flex; align-items: center; gap: 14px; }
+        .community-stat__icon { flex-shrink: 0; width: 50px; height: 50px; border-radius: 14px; background: #FBF3DF; display: grid; place-items: center; }
+        .community-stat__value { font-family: Cairo, sans-serif; font-weight: 800; font-size: 24px; color: #1A0447; }
+        .community-stat__label { color: #6B7280; font-size: 14px; }
+        .community-map { order: 2; flex: 1 1 460px; min-width: 0; text-align: center; }
+        .community-map img { width: 100%; max-width: 640px; height: auto; display: block; margin: 0 auto; }
+        .community-lead { order: 3; flex: 0 1 300px; min-width: 240px; text-align: right; }
+        .community-lead__copy { max-width: 320px; margin-inline-start: auto; margin-inline-end: 0; }
+        .community-cta { margin-top: 26px; padding: 14px 30px; border-radius: 12px; font-size: 16px; box-shadow: 0 14px 30px rgba(75,31,176,.26); }
+
+        @media (max-width: 900px) {
+          .community-lead { order: 1; flex-basis: 100%; }
+          .community-map { order: 2; flex-basis: 100%; }
+          .community-stats { order: 3; flex-basis: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px 30px; }
+        }
+
+        /* ── Pricing ── */
+        .pricing-section { background: #FBFAFE; padding: clamp(60px,7vw,100px) clamp(20px,5vw,68px); }
+        .pricing-row { display: flex; align-items: stretch; gap: clamp(28px,4vw,56px); flex-wrap: wrap; }
+        .pricing-cards { flex: 1 1 700px; min-width: 0; order: 1; }
+        .pricing-lead { flex: 0 1 300px; min-width: 240px; order: 2; text-align: right; align-self: center; }
+        .pricing-lead__copy { max-width: 300px; margin-inline-start: auto; margin-inline-end: 0; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 18px; align-items: start; }
+        .pricing-skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 18px; }
+        .pricing-skeleton-card { height: 280px; border-radius: 20px; background: #efeaf8; }
+        .pricing-empty-state { background: #fff; border: 1px solid #ece6f6; border-radius: 20px; padding: 40px; text-align: center; }
+        .pricing-empty-state p { color: #6B7280; margin-bottom: 16px; }
+
+        @media (max-width: 900px) {
+          .pricing-cards, .pricing-lead { flex-basis: 100%; }
+          .pricing-lead { align-self: auto; }
+        }
+
+        /* ── Price card ── */
+        .price-card {
+          background: #fff; border: 1px solid #ece6f6; border-radius: 20px; padding: 30px 24px;
+          box-shadow: 0 14px 36px rgba(36,12,82,.06); text-align: right;
+          transition: transform .35s cubic-bezier(.2,.7,.2,1);
+        }
+        .price-card--popular { position: relative; border: 2px solid #E8B24A; box-shadow: 0 24px 50px rgba(212,160,50,.2); }
+        .price-card__badge {
+          position: absolute; top: -15px; inset-inline-start: 50%; transform: translateX(-50%);
+          background: linear-gradient(135deg,#E8C76A,#D4AF37); color: #3a2200; font-family: Cairo, sans-serif;
+          font-weight: 800; font-size: 13px; padding: 6px 18px; border-radius: 30px; white-space: nowrap;
+          box-shadow: 0 8px 18px rgba(212,175,55,.4);
+        }
+        .price-card__name { font-family: Cairo, sans-serif; font-weight: 800; font-size: 22px; color: #1A0447; }
+        .price-card__sub { color: #9aa0ab; font-size: 14px; margin-top: 4px; }
+        .price-card__price-row { margin-top: 18px; display: flex; align-items: baseline; gap: 6px; justify-content: flex-start; flex-direction: row-reverse; }
+        .price-card__price { font-family: Cairo, sans-serif; font-weight: 800; font-size: 36px; color: #1A0447; }
+        .price-card__caption { color: #9aa0ab; font-size: 13px; margin-top: 4px; }
+        .price-card__divider { height: 1px; background: #eee6f6; margin: 20px 0; }
+        .price-card--popular .price-card__divider { background: #f1e6cf; }
+        .price-card__features { display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: #4b5563; }
+        .price-card__feature { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; justify-content: flex-start; }
+        .price-card__btn {
+          display: block; width: 100%; margin-top: 24px; font-family: Tajawal, sans-serif; font-weight: 700;
+          font-size: 15px; border: none; border-radius: 11px; padding: 13px; text-align: center;
+          text-decoration: none; cursor: pointer; transition: transform .25s, box-shadow .25s;
+          background: linear-gradient(135deg,#5b2bc4,#3d1894); color: #fff; min-height: 44px;
+        }
+        .price-card--popular .price-card__btn {
+          background: linear-gradient(135deg,#E8C76A,#D4AF37); color: #3a2200; font-weight: 800;
+          box-shadow: 0 12px 26px rgba(212,175,55,.36);
+        }
+        .price-card__btn:focus-visible { outline: 2px solid #6D34D6; outline-offset: 3px; }
+
+        /* ── Contact / CTA ── */
+        .contact-section {
+          position: relative; background: #160734 url('/images/footer_bg.png') center/cover no-repeat;
+          min-height: clamp(380px,42vw,520px); display: flex; align-items: center;
+          padding: clamp(40px,6vw,72px) clamp(20px,5vw,68px); overflow: hidden;
+        }
+        .contact-overlay { position: absolute; inset: 0; background: linear-gradient(270deg,rgba(22,7,52,.78) 0%,rgba(22,7,52,.4) 42%,rgba(22,7,52,0) 64%); }
+        .contact-content { position: relative; z-index: 2; width: 100%; display: flex; justify-content: flex-start; }
+        .contact-text { width: min(560px,100%); text-align: right; }
+        .contact-heading { font-weight: 800; font-size: clamp(32px,4.4vw,56px); line-height: 1.2; color: #fff; font-family: Cairo, sans-serif; }
+        .contact-heading__gold { background: linear-gradient(120deg,#E8C76A,#D4AF37); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .contact-subheading { margin-top: 14px; font-family: Cairo, sans-serif; font-weight: 700; font-size: clamp(18px,2vw,24px); color: #E8C76A; }
+        .contact-copy { margin-top: 14px; color: #cabfe4; font-size: clamp(15px,1.4vw,18px); line-height: 1.85; max-width: 430px; margin-inline-start: auto; margin-inline-end: 0; }
+        .contact-cta { margin-top: 28px; display: flex; gap: 14px; justify-content: flex-end; flex-wrap: wrap; }
+        .contact-btn {
+          cursor: pointer; display: flex; align-items: center; gap: 10px; font-family: Tajawal, sans-serif;
+          font-weight: 700; font-size: 16px; border-radius: 36px; padding: 15px 30px; text-decoration: none;
+          min-height: 44px; transition: transform .25s, box-shadow .25s, border-color .25s, background .25s;
+        }
+        .contact-btn--ghost { color: #fff; background: rgba(255,255,255,.05); border: 1.5px solid rgba(255,255,255,.28); }
+        .contact-btn--gold { font-weight: 800; color: #2a1500; background: linear-gradient(135deg,#E8C76A,#D4AF37); border: none; box-shadow: 0 14px 32px rgba(212,175,55,.4); }
+        .contact-btn:focus-visible { outline: 2px solid #E8C76A; outline-offset: 3px; }
+
+        @media (max-width: 479px) {
+          .contact-cta { flex-direction: column; align-items: stretch; }
+          .contact-btn { width: 100%; justify-content: center; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .journey-step, .journey-step--active, .price-card, .btn-primary, .btn-ghost-purple, .contact-btn { transition: none !important; }
         }
       `}</style>
     </div>
@@ -619,57 +595,54 @@ export default function HomePage() {
    Sub-components
 ───────────────────────────────────────────── */
 
-function JourneyStep({ icon, num, title, desc }) {
+function JourneyStepCard({ step }) {
   return (
-    <div
-      style={{ flex: 1, minWidth: 138, background: '#fff', borderRadius: 20, padding: '26px 16px', textAlign: 'center', boxShadow: '0 14px 36px rgba(36,12,82,.07)', border: '1px solid #eee6f7', alignSelf: 'center', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-    >
-      <div style={{ width: 54, height: 54, margin: '0 auto', borderRadius: '50%', background: '#F1ECFb', display: 'grid', placeItems: 'center' }}>{icon}</div>
-      <div style={{ marginTop: 14, fontFamily: 'Cairo', fontWeight: 800, color: '#1A0447', fontSize: 18 }}>{num}</div>
-      <div dir="rtl" style={{ marginTop: 8, fontFamily: 'Cairo', fontWeight: 800, color: '#1A0447', fontSize: 18 }}>{title}</div>
-      <div dir="rtl" style={{ marginTop: 8, color: '#6B7280', fontSize: 14, lineHeight: 1.7 }}>{desc}</div>
+    <div className={`journey-step${step.active ? ' journey-step--active' : ''}`}>
+      <div className="journey-step__icon">
+        <svg width={step.active ? 24 : 22} height={step.active ? 24 : 22} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          {step.icon}
+        </svg>
+      </div>
+      <div className="journey-step__num">{step.num}</div>
+      <div className="journey-step__title">{step.title}</div>
+      <div className="journey-step__desc">{step.desc}</div>
     </div>
   )
 }
 
-function WavyConnector({ color, flipEnd = false }) {
+function JourneyConnector({ color, flipEnd = false }) {
   return (
-    <div style={{ alignSelf: 'center', flexShrink: 0, width: 34, height: 30 }}>
-      <svg width="34" height="30" viewBox="0 0 34 30" fill="none">
+    <span className="journey-connector" aria-hidden="true">
+      <svg className="journey-connector__h" width="34" height="30" viewBox="0 0 34 30" fill="none">
         <path d="M2 22C10 22 9 8 17 8s7 14 15 14" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeDasharray="0.1 7" />
         <circle cx={flipEnd ? 2 : 32} cy="22" r="2.4" fill={color} />
       </svg>
-    </div>
+      <svg className="journey-connector__v" width="24" height="28" viewBox="0 0 24 28" fill="none">
+        <path d="M12 2v24" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeDasharray="0.1 6" />
+      </svg>
+    </span>
   )
 }
 
-function PriceCard({ name, sub, price, caption, features, checkColor, btnStyle }) {
+function PriceCard({ name, sub, price, caption, features, popular }) {
   return (
-    <div
-      style={{ background: '#fff', border: '1px solid #ece6f6', borderRadius: 20, padding: '30px 24px', boxShadow: '0 14px 36px rgba(36,12,82,.06)', textAlign: 'right', transition: 'transform .35s cubic-bezier(.2,.7,.2,1)' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-    >
-      <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 22, color: '#1A0447' }}>{name}</div>
-      {sub && <div style={{ color: '#9aa0ab', fontSize: 14, marginTop: 4 }}>{sub}</div>}
-      <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'flex-start', flexDirection: 'row-reverse' }}>
-        <span style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 36, color: '#1A0447' }}>{price}</span>
+    <div className={`price-card${popular ? ' price-card--popular' : ''}`}>
+      {popular && <div className="price-card__badge">الأكثر طلباً</div>}
+      <div className="price-card__name">{name}</div>
+      {sub && <div className="price-card__sub">{sub}</div>}
+      <div className="price-card__price-row">
+        <span className="price-card__price">{price}</span>
       </div>
-      {caption && <div style={{ color: '#9aa0ab', fontSize: 13, marginTop: 4 }}>{caption}</div>}
-      <div style={{ height: 1, background: '#eee6f6', margin: '20px 0' }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 15, color: '#4b5563' }}>
+      {caption && <div className="price-card__caption">{caption}</div>}
+      <div className="price-card__divider" />
+      <div className="price-card__features">
         {features.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, flexDirection: 'row-reverse', justifyContent: 'flex-start' }}>
-            <CheckIcon color={checkColor} /><span>{f}</span>
+          <div key={f} className="price-card__feature">
+            <CheckIcon color={popular ? '#D4AF37' : '#6D34D6'} /><span>{f}</span>
           </div>
         ))}
       </div>
-      <Link to={ROUTES.REGISTER} style={{ display: 'block', width: '100%', marginTop: 24, fontFamily: 'Tajawal', fontWeight: 700, fontSize: 15, border: 'none', borderRadius: 11, padding: 13, textAlign: 'center', textDecoration: 'none', cursor: 'pointer', transition: 'transform .25s, box-shadow .25s', ...btnStyle }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-      >ابدأ الآن</Link>
+      <Link to={ROUTES.REGISTER} className="price-card__btn">ابدأ الآن</Link>
     </div>
   )
 }
