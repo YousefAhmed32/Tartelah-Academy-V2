@@ -7,6 +7,7 @@ import PageHeader from '../../components/shared/PageHeader.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
+import { getFileUrl } from '../../config/constants.js'
 
 export default function StudentSettingsPage() {
   const { user, setAuth } = useAuthStore()
@@ -60,8 +61,9 @@ export default function StudentSettingsPage() {
           <h2 className="font-heading font-bold text-brand-textBody text-lg mb-5">الملف الشخصي</h2>
           <div className="flex items-center gap-4 mb-6">
             <Avatar
-              src={user?.avatar}
-              name={`${user?.firstNameAr || ''} ${user?.lastNameAr || ''}`}
+              src={getFileUrl(user?.avatar)}
+              firstName={user?.firstNameAr}
+              lastName={user?.lastNameAr}
               size="lg"
             />
             <div>

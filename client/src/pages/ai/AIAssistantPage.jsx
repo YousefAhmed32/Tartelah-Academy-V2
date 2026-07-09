@@ -6,6 +6,7 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { timeFromNow } from '../../utils/date.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const SUGGESTION_PROMPTS = [
   'ما هي أحكام التجويد الأساسية؟',
@@ -93,7 +94,7 @@ export default function AIAssistantPage() {
             {msg.role === 'assistant' ? (
               <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-none bg-purple-gradient text-white font-bold text-sm">م</div>
             ) : (
-              <Avatar src={user?.avatar} name={`${user?.firstNameAr || 'أ'}`} size="sm" />
+              <Avatar src={getFileUrl(user?.avatar)} firstName={user?.firstNameAr} lastName={user?.lastNameAr} size="sm" />
             )}
             <div className={`max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
               <div

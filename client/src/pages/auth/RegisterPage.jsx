@@ -112,7 +112,6 @@ export default function RegisterPage() {
     phone:           '',
     password:        '',
     confirmPassword: '',
-    role:            'student',
   })
   const [showPw,    setShowPw]    = useState(false)
   const [showPw2,   setShowPw2]   = useState(false)
@@ -146,7 +145,6 @@ export default function RegisterPage() {
         email:       form.email,
         phone:       form.phone,
         password:    form.password,
-        role:        form.role,
       })
       const { user, accessToken } = res.data.data
       setAuth(user, accessToken)

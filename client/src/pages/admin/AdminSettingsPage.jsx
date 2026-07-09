@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import { getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -59,7 +60,7 @@ function ProfileTab() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Section title="الملف الشخصي" icon={User}>
         <div className="flex items-center gap-4 mb-6">
-          <Avatar src={user?.avatar} firstName={user?.firstNameAr} lastName={user?.lastNameAr} size="lg" />
+          <Avatar src={getFileUrl(user?.avatar)} firstName={user?.firstNameAr} lastName={user?.lastNameAr} size="lg" />
           <div>
             <div className="font-heading font-bold text-gray-900">{user?.firstNameAr} {user?.lastNameAr}</div>
             <div className="text-sm text-gray-500">{user?.email}</div>

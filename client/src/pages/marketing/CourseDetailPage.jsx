@@ -1,24 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
-import { BookOpen, Frown, Trophy, Star, Handshake } from 'lucide-react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { BookOpen, Frown, Trophy, Star, Handshake, Play, X } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function extractYouTubeId(url) {
-  if (!url) return null
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([^&\n?#]+)/)
-  return m ? m[1] : null
-}
-
-function youtubeThumbnail(url) {
-  const id = extractYouTubeId(url)
-  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : null
-}
+import { extractYouTubeId, youtubeThumbnail, youtubeFallbackThumbnail, youtubeEmbedUrlFromId } from '../../utils/youtube.js'
 
 const CATEGORY_LABELS = {
   tajweed: 'التجويد', hifz: 'الحفظ', nazra: 'النظر',
@@ -36,31 +24,144 @@ const LANG_LABELS = { ar: 'العربية', en: 'English', both: 'عربي وإ�
 // ── Video Modal ───────────────────────────────────────────────────────────────
 
 function VideoModal({ videoId, onClose }) {
+  const reduced = useReducedMotion()
+
+  // Lock body scroll while the modal is mounted and restore it on unmount —
+  // this component only ever exists while videoOpen is true, so mount/unmount
+  // doubles as open/close for scroll-lock purposes.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKeyDown = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onClose])
+
+  const embedUrl = youtubeEmbedUrlFromId(videoId, { autoplay: true })
+  if (!embedUrl) return null
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.9)' }}
+      transition={{ duration: reduced ? 0 : 0.2 }}
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      style={{ background: 'rgba(6,2,20,0.92)' }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: reduced ? 1 : 0.94, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="w-full max-w-4xl rounded-2xl overflow-hidden"
+        exit={{ scale: reduced ? 1 : 0.94, opacity: 0 }}
+        transition={{ duration: reduced ? 0 : 0.22 }}
+        className="relative w-full max-w-4xl"
         onClick={e => e.stopPropagation()}
       >
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-          className="w-full aspect-video"
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          title="Course preview"
-        />
+        <button
+          onClick={onClose}
+          aria-label="إغلاق الفيديو"
+          className="absolute -top-12 end-0 w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors focus-visible:outline-none focus-visible:ring-2"
+          style={{ background: 'rgba(255,255,255,0.1)', '--tw-ring-color': '#E8C76A' }}
+        >
+          <X size={18} strokeWidth={2} />
+        </button>
+        <div
+          className="w-full aspect-video rounded-2xl overflow-hidden"
+          style={{ border: '1px solid rgba(232,199,106,0.25)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+        >
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            title="فيديو تعريفي بالدورة"
+          />
+        </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+// ── Course Intro Video (large main-column media anchor) ────────────────────────
+
+function CourseIntroVideo({ videoUrl, coverImage, thumbnailImage, onOpen }) {
+  const ytId = extractYouTubeId(videoUrl)
+
+  const candidates = [
+    youtubeThumbnail(videoUrl, 'maxresdefault'),
+    youtubeFallbackThumbnail(videoUrl),
+    getFileUrl(coverImage),
+    getFileUrl(thumbnailImage),
+  ].filter(Boolean)
+
+  const [stage, setStage] = useState(0)
+
+  if (!ytId) return null
+
+  const imgSrc = candidates[stage]
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="تشغيل الفيديو التعريفي للدورة"
+        className="group relative w-full aspect-video rounded-3xl overflow-hidden transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        style={{ border: '1px solid rgba(150,120,220,0.22)', '--tw-ring-color': '#E8C76A', '--tw-ring-offset-color': '#150232' }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(232,199,106,0.4)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(150,120,220,0.22)' }}
+      >
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt="معاينة الفيديو التعريفي للدورة"
+            className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+            loading="eager"
+            onError={() => setStage(s => Math.min(s + 1, candidates.length))}
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.18), rgba(21,2,50,0.9))' }}
+          >
+            <BookOpen size={40} strokeWidth={1.3} color="#a78fd6" />
+          </div>
+        )}
+
+        {/* Cinematic overlay */}
+        <div
+          className="absolute inset-0 transition-opacity duration-200 group-hover:opacity-90"
+          style={{ background: 'linear-gradient(to top, rgba(6,2,20,0.75) 0%, rgba(6,2,20,0.15) 45%, rgba(6,2,20,0.35) 100%)' }}
+        />
+
+        {/* Play button */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 ease-out group-hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #E8C76A, #D4AF37)', boxShadow: '0 10px 32px rgba(212,175,55,0.4)' }}
+          >
+            <Play size={26} strokeWidth={0} fill="#2a1500" style={{ marginInlineStart: '3px' }} />
+          </div>
+        </div>
+
+        {/* Label */}
+        <div className="absolute bottom-4 inset-x-0 flex justify-center">
+          <span
+            className="text-xs font-semibold text-white px-4 py-1.5 rounded-full"
+            style={{ background: 'rgba(6,2,20,0.6)', backdropFilter: 'blur(4px)' }}
+          >
+            ▶ شاهد نبذة تعريفية
+          </span>
+        </div>
+      </button>
+    </div>
   )
 }
 
@@ -171,7 +272,6 @@ export default function CourseDetailPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [videoOpen, setVideoOpen] = useState(false)
-  const [enrollClicked, setEnrollClicked] = useState(false)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['public', 'course', slug],
@@ -213,7 +313,6 @@ export default function CourseDetailPage() {
   const related = data.relatedCourses || []
   const diff = DIFFICULTY_LABELS[course.difficulty] || DIFFICULTY_LABELS.beginner
   const ytId = extractYouTubeId(course.introVideoUrl)
-  const ytThumb = youtubeThumbnail(course.introVideoUrl)
   const coverImg = getFileUrl(course.coverImage) || getFileUrl(course.thumbnailImage)
 
   const tabs = [
@@ -332,33 +431,34 @@ export default function CourseDetailPage() {
                   </div>
                 </div>
               )}
+
+              {/* Intro video — large media anchor for the main column */}
+              {ytId && (
+                <div className="mt-8">
+                  <CourseIntroVideo
+                    videoUrl={course.introVideoUrl}
+                    coverImage={course.coverImage}
+                    thumbnailImage={course.thumbnailImage}
+                    onOpen={() => setVideoOpen(true)}
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Right: sticky enrollment card (hero inline version) */}
+            {/* Right: enrollment card */}
             <div>
               <div className="rounded-3xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(150,120,220,0.2)', backdropFilter: 'blur(12px)' }}>
-                {/* Thumbnail or video preview */}
-                {ytThumb ? (
-                  <div className="relative cursor-pointer" style={{ height: '200px' }} onClick={() => setVideoOpen(true)}>
-                    <img src={ytThumb} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.45)' }}>
-                      <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="m5 3 14 9-14 9V3Z"/></svg>
-                      </motion.div>
-                    </div>
-                    <div className="absolute bottom-3 left-3 right-3 text-center">
-                      <span className="text-xs font-semibold text-white px-3 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.6)' }}>▶ شاهد نبذة تعريفية</span>
-                    </div>
+                {/* Real course cover image (never the intro video preview) */}
+                {coverImg && (
+                  <div className="aspect-video overflow-hidden">
+                    <img
+                      src={coverImg}
+                      alt={course.nameAr ? `غلاف دورة ${course.nameAr}` : ''}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
-                ) : getFileUrl(course.thumbnailImage) ? (
-                  <div style={{ height: '180px' }} className="overflow-hidden">
-                    <img src={getFileUrl(course.thumbnailImage)} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                ) : null}
+                )}
 
                 <div className="p-6">
                   {/* Price / Enroll */}
@@ -373,7 +473,7 @@ export default function CourseDetailPage() {
 
                   {course.enrollmentEnabled && (
                     <button
-                      onClick={() => { setEnrollClicked(true); navigate(ROUTES.LOGIN) }}
+                      onClick={() => navigate(ROUTES.LOGIN)}
                       className="w-full py-4 rounded-2xl text-base font-extrabold transition-all mb-3"
                       style={{ background: 'linear-gradient(135deg, #E8C76A, #D4AF37)', color: '#2a1500', boxShadow: '0 10px 28px rgba(212,175,55,0.35)' }}
                     >

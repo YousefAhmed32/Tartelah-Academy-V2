@@ -6,7 +6,7 @@ import api from '../utils/api.js'
 
 export function useNotificationInit() {
   const { accessToken, isAuthenticated } = useAuthStore()
-  const { addNotification, setUnreadCount, setNotifications } = useNotificationStore()
+  const { addNotification, setNotifications } = useNotificationStore()
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) return
@@ -29,7 +29,9 @@ export function useNotificationInit() {
     return () => {
       socket.off('notification:new')
     }
-  }, [isAuthenticated, accessToken])
+    // addNotification/setNotifications are stable Zustand action references
+    // (identity never changes), so this effect still only re-runs on auth change.
+  }, [isAuthenticated, accessToken, addNotification, setNotifications])
 
   useEffect(() => {
     return () => {

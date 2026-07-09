@@ -1,8 +1,11 @@
 const { sendSuccess, sendError } = require('../utils/response')
-const { askAI, hasLLM } = require('../services/ai.service')
+const { askAI, askConcierge, hasLLM, HANDOFF_MARKER, MODEL } = require('../services/ai.service')
+const { getKnowledgeStatus } = require('../services/aiKnowledge.service')
+const aiTools = require('../services/aiTools.service')
+const AIFeedback = require('../models/AIFeedback')
 const Article = require('../models/Article')
 
-// ── Rule-based fallback knowledge base ───────────────────────────────────────
+// ── Rule-based fallback knowledge base (Tutor persona) ───────────────────────
 
 const KNOWLEDGE_BASE = {
   tajweed_rules: {
@@ -51,8 +54,6 @@ function findBestMatch(question) {
   return KNOWLEDGE_BASE.default
 }
 
-// ── Ask endpoint ──────────────────────────────────────────────────────────────
-
 async function searchArticleKnowledge(question) {
   try {
     const articles = await Article.find(
@@ -63,6 +64,8 @@ async function searchArticleKnowledge(question) {
   } catch (_) { return [] }
 }
 
+// ── Tutor endpoint (existing, authenticated, AIAssistantPage.jsx) ───────────
+
 exports.ask = async (req, res, next) => {
   try {
     const { question, history } = req.body
@@ -72,13 +75,10 @@ exports.ask = async (req, res, next) => {
     let mode = 'rule-based'
     let sources = ['قواعد التجويد - منهج ترتيلة']
 
-    // Search articles knowledge base
     const relatedArticles = await searchArticleKnowledge(question)
 
-    // Try real LLM first
     if (hasLLM) {
       try {
-        // Enrich context with article excerpts if available
         let enrichedHistory = history || []
         if (relatedArticles.length > 0) {
           const articleCtx = relatedArticles.map(a =>
@@ -100,7 +100,6 @@ exports.ask = async (req, res, next) => {
       }
     }
 
-    // Fallback to rule-based + append related articles info
     if (!answer) {
       const entry = findBestMatch(question)
       answer = entry.answer
@@ -118,5 +117,201 @@ exports.ask = async (req, res, next) => {
 }
 
 exports.getStatus = async (req, res) => {
-  res.json({ success: true, data: { hasLLM, mode: hasLLM ? 'llm' : 'rule-based' } })
+  const knowledge = getKnowledgeStatus()
+  res.json({ success: true, data: { hasLLM, model: hasLLM ? MODEL : null, mode: hasLLM ? 'llm' : 'rule-based', knowledge } })
+}
+
+// ── Concierge endpoint (new, public, floating widget) ────────────────────────
+
+const CONTACT_INTENT = ['تواصل', 'دعم', 'واتساب', 'واتس', 'اتصال', 'مكالمة', 'إنسان', 'موظف', 'مسؤول']
+const PACKAGE_INTENT = ['سعر', 'اسعار', 'أسعار', 'باقة', 'باقات', 'اشتراك', 'تكلفة', 'فلوس', 'رسوم']
+const TEACHER_INTENT = ['مدرس', 'معلم', 'معلمة', 'مدرسة', 'مدرسين', 'معلمين']
+const COURSE_WORDS = ['دورة', 'دورات', 'كورس', 'كورسات']
+
+function pageContextNoteFrom(pageContext) {
+  if (!pageContext) return null
+  const parts = []
+  if (pageContext.pageType === 'course' && pageContext.courseSlug) {
+    parts.push(`المستخدم يتصفح حاليًا صفحة دورة. المعرف/الرابط المختصر لهذه الدورة: "${pageContext.courseSlug}". إن سأل عن "هذه الدورة" استخدم get_course_details بهذا المعرف أولًا.`)
+  } else if (pageContext.pageType === 'teacher' && pageContext.teacherId) {
+    parts.push(`المستخدم يتصفح حاليًا صفحة معلم. معرف هذا المعلم: "${pageContext.teacherId}". إن سأل عن "هذا المعلم" استخدم get_teacher_details بهذا المعرف أولًا.`)
+  } else if (pageContext.pageType === 'pricing') {
+    parts.push('المستخدم يتصفح حاليًا صفحة الأسعار/الباقات.')
+  } else if (pageContext.pageType === 'article' && pageContext.articleSlug) {
+    parts.push(`المستخدم يتصفح حاليًا مقالة بعنوان مختصر "${pageContext.articleSlug}".`)
+  }
+  return parts.length ? parts.join(' ') : null
+}
+
+function suggestionsFor(pageContext) {
+  if (pageContext?.pageType === 'course') {
+    return ['هل هذه الدورة مناسبة للمبتدئين؟', 'ما مدة الدورة؟', 'كيف أسجل؟']
+  }
+  if (pageContext?.pageType === 'pricing') {
+    return ['ما الفرق بين الباقات؟', 'هل يوجد خصم؟', 'أريد التحدث مع الدعم']
+  }
+  if (pageContext?.pageType === 'teacher') {
+    return ['ما تخصص هذا المعلم؟', 'ما الدورات التي يقدمها؟']
+  }
+  return ['رشّح لي دورة مناسبة', 'ما الدورات المتاحة؟', 'هل يوجد شهادة إتمام؟', 'أريد التحدث مع الدعم']
+}
+
+function dedupeEntities(list) {
+  const seen = new Set()
+  const out = []
+  for (const item of list) {
+    const key = `${item.type}:${item.id || item.key || item.name}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+  }
+  return out.slice(0, 6)
+}
+
+// Deterministic, LLM-free intent router — used only when OPENAI_API_KEY is
+// not configured or the provider call fails. Real data only, same as the
+// LLM path; just no natural-language generation on top of it.
+async function deterministicConcierge(message, pageContext) {
+  const q = message.toLowerCase()
+  let entities = []
+  let handoff = false
+  let answer
+
+  let pageCourse = null
+  if (pageContext?.pageType === 'course' && pageContext.courseSlug) {
+    pageCourse = await aiTools.getCourseDetails({ slug: pageContext.courseSlug })
+    if (pageCourse) entities.push(pageCourse)
+  }
+
+  // Answer directly from the course the visitor is already looking at
+  // before falling back to a generic catalog browse/search.
+  const refersToThisCourse = ['هذه الدورة', 'الدورة دي', 'الدوره دي', 'هل هي مناسبة', 'هل تناسب'].some(k => q.includes(k))
+    || (pageCourse && ['مناسب', 'مناسبة', 'مدة', 'مدتها', 'كيف أسجل', 'التسجيل', 'حصص', 'دروس'].some(k => q.includes(k)))
+
+  if (pageCourse && refersToThisCourse && !CONTACT_INTENT.some(k => q.includes(k)) && !PACKAGE_INTENT.some(k => q.includes(k))) {
+    const beginnerAsk = ['مبتدئ', 'مبتدئين', 'مناسب', 'مناسبة'].some(k => q.includes(k))
+    const durationAsk = ['مدة', 'مدتها', 'كام ساعة', 'وقت'].some(k => q.includes(k))
+    const enrollAsk = ['سجل', 'تسجيل', 'اشترك'].some(k => q.includes(k))
+
+    const lines = [`دورة "${pageCourse.name}" — المستوى: ${pageCourse.difficulty}.`]
+    if (beginnerAsk) {
+      lines.push(pageCourse.difficulty === 'مبتدئ'
+        ? 'نعم، هذه الدورة مصممة للمبتدئين.'
+        : `هذه الدورة بمستوى "${pageCourse.difficulty}"، فقد تحتاج أساسًا سابقًا قبل البدء بها.`)
+    }
+    if (durationAsk) lines.push(`مدتها التقديرية ${pageCourse.estimatedDurationHours} ساعة عبر ${pageCourse.lessonsCount} درسًا.`)
+    if (enrollAsk) lines.push(pageCourse.enrollmentEnabled ? 'التسجيل متاح حاليًا مباشرة من صفحة الدورة.' : 'التسجيل في هذه الدورة مغلق مؤقتًا حاليًا.')
+    answer = lines.join(' ')
+  } else if (CONTACT_INTENT.some(k => q.includes(k))) {
+    const contact = await aiTools.getPlatformContact()
+    entities.push(contact)
+    handoff = true
+    answer = 'يمكنك التواصل مع فريق الدعم مباشرة عبر واتساب وسنساعدك في أقرب وقت.'
+  } else if (PACKAGE_INTENT.some(k => q.includes(k))) {
+    const packages = await aiTools.getPackages()
+    entities = entities.concat(packages)
+    answer = packages.length
+      ? `هذه باقات الاشتراك الحالية المتاحة فعليًا على المنصة:\n\n${packages.map(p => `- ${p.name}: ${p.price} ${p.currency} / ${p.durationDays} يوم (${p.sessionsPerMonth} حصة شهريًا)`).join('\n')}`
+      : 'لا تتوفر لديّ حاليًا بيانات أسعار معتمدة لهذا السؤال.'
+    if (!packages.length) handoff = true
+  } else if (TEACHER_INTENT.some(k => q.includes(k))) {
+    const teachers = await aiTools.searchTeachers({ limit: 5 })
+    entities = entities.concat(teachers)
+    answer = teachers.length
+      ? `هؤلاء بعض المعلمين المتاحين حاليًا على المنصة:\n\n${teachers.map(t => `- ${t.name}${t.specialization ? ` (${t.specialization})` : ''}`).join('\n')}`
+      : 'لا يوجد معلمون متاحون ضمن بياناتي حاليًا.'
+  } else {
+    const knowledge = aiTools.searchAiKnowledgeTool({ query: message })
+    if (knowledge.length) {
+      entities = entities.concat(knowledge)
+      answer = knowledge[0].answer
+    } else {
+      // Generic "what courses do you have" phrasing has no topic keyword to
+      // regex-match against course names — browse all published courses
+      // instead of searching for the literal question text.
+      const isGenericBrowse = COURSE_WORDS.some(w => q.includes(w))
+      const courses = isGenericBrowse
+        ? await aiTools.searchCourses({ limit: 5 })
+        : await aiTools.searchCourses({ query: message, limit: 5 })
+      entities = entities.concat(courses)
+      answer = courses.length
+        ? `وجدت هذه الدورات:\n\n${courses.map(c => `- ${c.name} (${c.difficulty})`).join('\n')}`
+        : 'لم أجد معلومة مؤكدة لهذا السؤال ضمن بياناتي المعتمدة حاليًا. يمكنني تحويلك لفريق الدعم عبر واتساب للتأكد.'
+      if (!courses.length) handoff = true
+    }
+  }
+
+  return { answer, entities: dedupeEntities(entities), handoff }
+}
+
+exports.chat = async (req, res, next) => {
+  try {
+    const { message, history = [], pageContext, conversationId } = req.body
+    if (!message?.trim()) return sendError(res, 'يرجى إدخال رسالة', 400)
+
+    const persona = 'concierge'
+    let handoffRecommended = false
+    let entities = []
+    let answer = null
+    let degraded = false
+
+    if (hasLLM) {
+      try {
+        const usedTools = []
+        const raw = await askConcierge({
+          message,
+          history,
+          pageContextNote: pageContextNoteFrom(pageContext),
+          usedTools,
+        })
+        if (raw) {
+          handoffRecommended = raw.includes(HANDOFF_MARKER)
+          answer = raw.replace(HANDOFF_MARKER, '').trim()
+          entities = dedupeEntities(usedTools)
+        }
+      } catch (err) {
+        console.warn('[AI Concierge] provider error, falling back:', err.message)
+        degraded = true
+      }
+    }
+
+    if (!answer) {
+      const fallback = await deterministicConcierge(message, pageContext)
+      answer = fallback.answer
+      entities = fallback.entities
+      handoffRecommended = handoffRecommended || fallback.handoff || degraded
+    }
+
+    let contact = null
+    if (handoffRecommended) {
+      contact = await aiTools.getPlatformContact()
+    }
+
+    sendSuccess(res, {
+      answer,
+      entities,
+      suggestions: suggestionsFor(pageContext),
+      handoff: { recommended: handoffRecommended, contact },
+      conversationId: conversationId || null,
+      mode: hasLLM && !degraded ? 'llm' : 'rule-based',
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.submitFeedback = async (req, res, next) => {
+  try {
+    const { conversationId, responseId, value, persona } = req.body
+    await AIFeedback.create({
+      conversationId,
+      responseId,
+      value,
+      persona: persona === 'tutor' ? 'tutor' : 'concierge',
+      userId: req.user?._id,
+    })
+    sendSuccess(res, null, 'شكرًا لملاحظتك')
+  } catch (err) {
+    next(err)
+  }
 }

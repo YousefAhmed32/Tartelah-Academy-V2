@@ -192,6 +192,29 @@
   }
 }
 
+@layer components {
+  /* ===== PUBLIC HEADER — FLOATING SHELL MORPH =====
+     --mp (0 -> 1) is written directly by Framer Motion on every scroll
+     frame (no React re-render). --gap is the per-breakpoint half-inset the
+     shell detaches by once fully floating; width interpolates between
+     edge-to-edge (mp=0, hero) and inset-on-both-sides (mp=1, floating).
+     max-width is animated separately, inline, by the shell component. */
+  .public-header-shell {
+    --mp: 0;
+    --gap: 10px;
+    width: calc(100% - (var(--mp) * var(--gap) * 2));
+  }
+  @media (min-width: 640px) {
+    .public-header-shell { --gap: 16px; }
+  }
+  @media (min-width: 1024px) {
+    .public-header-shell { --gap: 24px; }
+  }
+  @media (min-width: 1280px) {
+    .public-header-shell { --gap: 32px; }
+  }
+}
+
 @layer utilities {
   .text-gold {
     color: #E8C76A;

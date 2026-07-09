@@ -8,19 +8,7 @@ import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function extractYouTubeId(url) {
-  if (!url) return null
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([^&\n?#]+)/)
-  return m ? m[1] : null
-}
-
-function youtubeThumbnail(url) {
-  const id = extractYouTubeId(url)
-  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
-}
+import { extractYouTubeId, youtubeThumbnail, youtubeEmbedUrl, isValidYouTubeUrl } from '../../utils/youtube.js'
 
 // ── Shared design-language primitives ────────────────────────────────────────
 
@@ -559,6 +547,11 @@ export default function AdminCourseFormPage() {
       setSaved(true); setUnsaved(false)
       toast.success('تم إنشاء المقرر')
       qc.invalidateQueries({ queryKey: ['admin', 'courses'] })
+      // Targeted, not app-wide: a course can be created already published
+      // (status is choosable before the first save), so the public list/
+      // detail caches may need to reflect it immediately too.
+      qc.invalidateQueries({ queryKey: ['public', 'courses'] })
+      qc.invalidateQueries({ queryKey: ['public', 'course'] })
       navigate(ROUTES.ADMIN_COURSE_EDIT.replace(':id', res.data.data._id))
     },
     onError: err => toast.error(err.response?.data?.message || 'حدث خطأ'),
@@ -571,12 +564,20 @@ export default function AdminCourseFormPage() {
       toast.success('تم الحفظ')
       qc.invalidateQueries({ queryKey: ['admin', 'courses'] })
       qc.invalidateQueries({ queryKey: ['admin', 'course', id] })
+      // Same reasoning as create — an edit (video, status, or otherwise)
+      // must not leave a stale public list/detail cache in the same session.
+      qc.invalidateQueries({ queryKey: ['public', 'courses'] })
+      qc.invalidateQueries({ queryKey: ['public', 'course'] })
     },
     onError: err => toast.error(err.response?.data?.message || 'حدث خطأ'),
   })
 
   async function handleSave() {
     if (!form.nameAr.trim()) { toast.error('اسم المقرر مطلوب'); return }
+    if (!isValidYouTubeUrl(form.introVideoUrl)) {
+      toast.error('رابط الفيديو التعريفي غير صالح. يُسمح بروابط YouTube فقط')
+      return
+    }
     setSaving(true)
     const payload = {
       ...form,
@@ -615,6 +616,7 @@ export default function AdminCourseFormPage() {
 
   const ytThumb = youtubeThumbnail(form.introVideoUrl)
   const ytId = extractYouTubeId(form.introVideoUrl)
+  const videoUrlInvalid = form.introVideoUrl.trim() !== '' && !isValidYouTubeUrl(form.introVideoUrl)
 
   if (!isNew && loadingCourse) {
     return (
@@ -914,8 +916,13 @@ export default function AdminCourseFormPage() {
                 onChange={e => { set('introVideoUrl', e.target.value); setVideoPreview(false) }}
                 placeholder="https://youtube.com/watch?v=..."
                 dir="ltr"
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-xs ${videoUrlInvalid ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {videoUrlInvalid && (
+                <p className="mt-1.5 text-[11px] font-semibold text-red-600">
+                  رابط غير صالح — يُسمح فقط بروابط YouTube (watch, youtu.be, embed, shorts)
+                </p>
+              )}
             </Field>
             {ytThumb && (
               <div className="relative rounded-xl overflow-hidden cursor-pointer border border-slate-200" style={{ height: '120px' }} onClick={() => setVideoPreview(true)}>
@@ -995,10 +1002,13 @@ export default function AdminCourseFormPage() {
               onClick={e => e.stopPropagation()}
             >
               <iframe
-                src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
+                src={youtubeEmbedUrl(form.introVideoUrl, { autoplay: true })}
                 className="w-full aspect-video"
+                title="معاينة الفيديو التعريفي"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
               />
             </motion.div>
           </motion.div>

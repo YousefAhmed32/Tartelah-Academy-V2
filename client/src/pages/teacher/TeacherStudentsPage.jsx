@@ -10,6 +10,7 @@ import EmptyState from '../../components/shared/EmptyState.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { SkeletonCardGrid } from '../../components/ui/Skeleton.jsx'
 import { toArray } from '../../utils/format.js'
+import { getFileUrl } from '../../config/constants.js'
 
 export default function TeacherStudentsPage() {
   const [search, setSearch] = useState('')
@@ -64,7 +65,7 @@ export default function TeacherStudentsPage() {
                 className="rounded-2xl p-5 transition-all bg-white border border-gray-100 shadow-sm"
               >
                 <div className="flex items-start gap-3 mb-4">
-                  <Avatar src={st.avatar} firstName={st.firstNameAr} lastName={st.lastNameAr} size="md" />
+                  <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="md" />
                   <div className="flex-1 min-w-0">
                     <div className="font-heading font-bold text-gray-900 truncate">{st.firstNameAr} {st.lastNameAr}</div>
                     <div className="text-xs mt-0.5 truncate text-gray-500">{st.email}</div>

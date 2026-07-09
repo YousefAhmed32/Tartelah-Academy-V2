@@ -14,6 +14,7 @@ import ErrorState from '../../components/shared/ErrorState.jsx'
 import { SkeletonRows } from '../../components/ui/Skeleton.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const SURAH_NAMES = ['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه']
 const qualityOptions = [
@@ -93,7 +94,7 @@ export default function TeacherProgressPage() {
               transition={{ delay: Math.min(i * 0.03, 0.3) }}
               whileHover={{ y: -2, boxShadow: '0 10px 24px rgba(15,23,42,0.06)' }}
               className="rounded-2xl p-4 flex items-center gap-4 flex-wrap transition-all bg-white border border-gray-100 shadow-sm">
-              <Avatar src={r.studentId?.avatar} firstName={r.studentId?.firstNameAr} lastName={r.studentId?.lastNameAr} size="sm" />
+              <Avatar src={getFileUrl(r.studentId?.avatar)} firstName={r.studentId?.firstNameAr} lastName={r.studentId?.lastNameAr} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="text-gray-900 font-semibold">{r.studentId?.firstNameAr} {r.studentId?.lastNameAr}</div>
                 <div className="text-xs mt-0.5 text-gray-500">

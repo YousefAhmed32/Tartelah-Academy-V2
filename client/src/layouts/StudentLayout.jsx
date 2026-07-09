@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom'
+import { Suspense, useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore.js'
@@ -7,9 +7,19 @@ import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
 import Avatar from '../components/ui/Avatar.jsx'
 import NotificationBell from '../components/ui/NotificationBell.jsx'
+import Spinner from '../components/ui/Spinner.jsx'
+import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
-import { ROUTES, ROLES } from '../config/constants.js'
+import { ROUTES, ROLES, getFileUrl } from '../config/constants.js'
 import api from '../utils/api.js'
+
+function ContentFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Spinner color="border-brand-purple" />
+    </div>
+  )
+}
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const HomeIcon    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -71,6 +81,7 @@ export default function StudentLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   useNotificationInit()
 
   const { data: subscription } = useQuery({
@@ -140,7 +151,7 @@ export default function StudentLayout() {
           >
             <div className="flex items-center gap-3 mb-3">
               <Avatar
-                src={user?.avatar}
+                src={getFileUrl(user?.avatar)}
                 firstName={user?.firstNameAr || user?.firstName}
                 lastName={user?.lastNameAr || user?.lastName}
                 size="sm"
@@ -272,7 +283,7 @@ export default function StudentLayout() {
             <NotificationBell theme="light" viewAllPath={ROUTES.STUDENT_NOTIFICATIONS} />
             <NavLink to={ROUTES.STUDENT_SETTINGS}>
               <Avatar
-                src={user?.avatar}
+                src={getFileUrl(user?.avatar)}
                 firstName={user?.firstNameAr || user?.firstName}
                 lastName={user?.lastNameAr || user?.lastName}
                 size="sm"
@@ -284,7 +295,11 @@ export default function StudentLayout() {
 
         {/* Page */}
         <div className="flex-1 p-5 lg:p-8 pb-24 lg:pb-8">
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<ContentFallback />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Mobile bottom nav */}

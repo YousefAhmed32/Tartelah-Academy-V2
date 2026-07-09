@@ -84,7 +84,6 @@ export const ROUTES = {
   ADMIN_ARTICLE_NEW: '/admin/articles/new',
   ADMIN_ARTICLE_EDIT: '/admin/articles/:id/edit',
 
-  ADMIN_COURSES: '/admin/courses',
   ADMIN_COURSE_NEW: '/admin/courses/new',
   ADMIN_COURSE_EDIT: '/admin/courses/:id/edit',
 

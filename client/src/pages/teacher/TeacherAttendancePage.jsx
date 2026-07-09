@@ -12,7 +12,7 @@ import ErrorState from '../../components/shared/ErrorState.jsx'
 import { SkeletonRows } from '../../components/ui/Skeleton.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
-import { ATTENDANCE_STATUS } from '../../config/constants.js'
+import { ATTENDANCE_STATUS, getFileUrl } from '../../config/constants.js'
 import { ROUTES } from '../../config/constants.js'
 
 export default function TeacherAttendancePage() {
@@ -107,7 +107,7 @@ export default function TeacherAttendancePage() {
               whileHover={{ y: -2, boxShadow: '0 10px 24px rgba(15,23,42,0.06)' }}
               className="rounded-2xl p-4 sm:p-5 flex items-center gap-4 flex-wrap transition-all bg-white border border-gray-100 shadow-sm"
             >
-              <Avatar src={rec.studentId?.avatar} firstName={rec.studentId?.firstNameAr} lastName={rec.studentId?.lastNameAr} size="sm" />
+              <Avatar src={getFileUrl(rec.studentId?.avatar)} firstName={rec.studentId?.firstNameAr} lastName={rec.studentId?.lastNameAr} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="text-gray-900 font-semibold text-sm">{rec.studentId?.firstNameAr} {rec.studentId?.lastNameAr}</div>
                 <div className="text-xs mt-0.5 text-gray-500">

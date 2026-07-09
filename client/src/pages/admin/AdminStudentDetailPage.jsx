@@ -10,7 +10,7 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr, formatDateTimeAr } from '../../utils/date.js'
-import { ROUTES } from '../../config/constants.js'
+import { ROUTES, getFileUrl } from '../../config/constants.js'
 
 const TAB_KEYS = ['evaluations', 'attendance', 'homework', 'memorization', 'revision']
 const TAB_LABELS = {
@@ -176,7 +176,7 @@ export default function AdminStudentDetailPage() {
       {/* Hero card */}
       <div className="card-light p-6 mb-6">
         <div className="flex flex-wrap items-start gap-5">
-          <Avatar src={student.avatar} firstName={student.firstNameAr} lastName={student.lastNameAr} size="xl" />
+          <Avatar src={getFileUrl(student.avatar)} firstName={student.firstNameAr} lastName={student.lastNameAr} size="xl" />
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-3 mb-1">
               <h1 className="font-heading font-bold text-2xl text-brand-textBody">{student.firstNameAr} {student.lastNameAr}</h1>

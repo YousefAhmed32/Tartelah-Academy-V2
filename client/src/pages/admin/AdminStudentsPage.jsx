@@ -9,6 +9,7 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -153,7 +154,7 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
         <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar src={student.avatar} firstName={student.firstNameAr} lastName={student.lastNameAr} size="md" />
+              <Avatar src={getFileUrl(student.avatar)} firstName={student.firstNameAr} lastName={student.lastNameAr} size="md" />
               <div>
                 <div className="font-heading font-bold text-gray-900 text-base">{student.firstNameAr} {student.lastNameAr}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -314,7 +315,7 @@ export default function AdminStudentsPage() {
                   onClick={() => setSelected(st)}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar src={st.avatar} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
+                      <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{st.firstNameAr} {st.lastNameAr}</div>
                         {st.bioAr && <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-[160px]">{st.bioAr}</div>}

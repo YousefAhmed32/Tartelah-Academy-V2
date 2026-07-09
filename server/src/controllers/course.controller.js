@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const Course = require('../models/Course')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
+const { isValidYouTubeUrl } = require('../utils/youtube')
 
 // ── Slug Helpers ─────────────────────────────────────────────────────────────
 
@@ -78,9 +79,12 @@ exports.getFeatured = async (req, res, next) => {
 exports.getBySlug = async (req, res, next) => {
   try {
     const { slug } = req.params
-    const filter = mongoose.Types.ObjectId.isValid(slug)
-      ? { _id: slug }
-      : { slug, status: 'published', isActive: true }
+    // This is a public, unauthenticated endpoint — the ObjectId branch exists
+    // only as a fallback for the rare course that lacks a slug (client falls
+    // back to `course.slug || course._id`), it must never be a way to bypass
+    // the published/active visibility check for draft or archived courses.
+    const identity = mongoose.Types.ObjectId.isValid(slug) ? { _id: slug } : { slug }
+    const filter = { ...identity, status: 'published', isActive: true }
 
     const course = await Course.findOne(filter)
       .populate('instructor', 'firstName lastName firstNameAr lastNameAr avatar bio bioAr gender')
@@ -194,8 +198,16 @@ exports.create = async (req, res, next) => {
       lessonsCount, durationWeeks, learningOutcomesAr, learningOutcomes,
       requirementsAr, requirements, targetAudienceAr, targetAudience,
       syllabusAr, curriculum, order, featured, status, enrollmentEnabled,
-      certificateAvailable, instructor, seo,
+      certificateAvailable, instructor, seo, introVideoUrl,
     } = req.body
+
+    // Trim before validating, not just before persisting — a copy-pasted
+    // URL with incidental leading/trailing whitespace must not be rejected
+    // as "invalid" only to become valid once trimmed.
+    const cleanIntroVideoUrl = introVideoUrl ? introVideoUrl.trim() : ''
+    if (cleanIntroVideoUrl && !isValidYouTubeUrl(cleanIntroVideoUrl)) {
+      return sendError(res, 'رابط الفيديو التعريفي غير صالح. يُسمح بروابط YouTube فقط', 400)
+    }
 
     const slug = await uniqueSlug(name, nameAr)
 
@@ -220,6 +232,7 @@ exports.create = async (req, res, next) => {
       certificateAvailable: !!certificateAvailable,
       instructor: instructor || null,
       seo: seo || {},
+      introVideoUrl: cleanIntroVideoUrl,
       createdBy: req.user._id,
     })
 
@@ -242,8 +255,18 @@ exports.update = async (req, res, next) => {
       lessonsCount, durationWeeks, learningOutcomesAr, learningOutcomes,
       requirementsAr, requirements, targetAudienceAr, targetAudience,
       syllabusAr, curriculum, order, featured, status, enrollmentEnabled,
-      certificateAvailable, instructor, seo, regenerateSlug,
+      certificateAvailable, instructor, seo, regenerateSlug, introVideoUrl,
     } = req.body
+
+    // Distinguish "field omitted" (undefined — leave untouched) from
+    // "field explicitly cleared" ('' — remove the video), and trim before
+    // validating so incidental whitespace from a copy-paste isn't rejected.
+    const cleanIntroVideoUrl = introVideoUrl !== undefined
+      ? (introVideoUrl ? introVideoUrl.trim() : '')
+      : undefined
+    if (cleanIntroVideoUrl && !isValidYouTubeUrl(cleanIntroVideoUrl)) {
+      return sendError(res, 'رابط الفيديو التعريفي غير صالح. يُسمح بروابط YouTube فقط', 400)
+    }
 
     if (nameAr !== undefined) course.nameAr = nameAr
     if (name !== undefined) course.name = name
@@ -283,6 +306,7 @@ exports.update = async (req, res, next) => {
     if (certificateAvailable !== undefined) course.certificateAvailable = !!certificateAvailable
     if (instructor !== undefined) course.instructor = instructor || null
     if (seo !== undefined) course.seo = seo
+    if (cleanIntroVideoUrl !== undefined) course.introVideoUrl = cleanIntroVideoUrl
     course.updatedBy = req.user._id
 
     await course.save()

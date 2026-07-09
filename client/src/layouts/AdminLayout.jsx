@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom'
+import { Suspense, useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore.js'
@@ -7,9 +7,19 @@ import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
 import Avatar from '../components/ui/Avatar.jsx'
 import NotificationBell from '../components/ui/NotificationBell.jsx'
+import Spinner from '../components/ui/Spinner.jsx'
+import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import api from '../utils/api.js'
-import { ROUTES, ROLES } from '../config/constants.js'
+import { ROUTES, ROLES, getFileUrl } from '../config/constants.js'
+
+function ContentFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Spinner color="border-brand-purple" />
+    </div>
+  )
+}
 
 const NAV_GROUPS = [
   {
@@ -137,6 +147,7 @@ export default function AdminLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   useNotificationInit()
 
   const { data: pendingEnrollments = 0 } = useQuery({
@@ -179,7 +190,7 @@ export default function AdminLayout() {
         {/* Admin profile card */}
         <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
           <Avatar
-            src={user?.avatar}
+            src={getFileUrl(user?.avatar)}
             firstName={user?.firstNameAr || user?.firstName}
             lastName={user?.lastNameAr || user?.lastName}
             size="sm"
@@ -315,7 +326,7 @@ export default function AdminLayout() {
             <NotificationBell theme="light" viewAllPath={ROUTES.ADMIN_NOTIFICATIONS} />
 
             <Avatar
-              src={user?.avatar}
+              src={getFileUrl(user?.avatar)}
               firstName={user?.firstNameAr || user?.firstName}
               lastName={user?.lastNameAr || user?.lastName}
               size="sm"
@@ -326,7 +337,11 @@ export default function AdminLayout() {
 
         {/* Page Content */}
         <div className="flex-1 p-5 lg:p-7 pb-24 lg:pb-8" dir="rtl">
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<ContentFallback />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Mobile Bottom Nav */}

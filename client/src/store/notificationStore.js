@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import toast from 'react-hot-toast'
 
-export const useNotificationStore = create((set, get) => ({
+export const useNotificationStore = create((set) => ({
   unreadCount: 0,
   notifications: [],
   dropdownOpen: false,

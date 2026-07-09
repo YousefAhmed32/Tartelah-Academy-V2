@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const DAY_NAMES_AR = { monday: 'الاثنين', tuesday: 'الثلاثاء', wednesday: 'الأربعاء', thursday: 'الخميس', friday: 'الجمعة', saturday: 'السبت', sunday: 'الأحد' }
 
@@ -163,7 +164,7 @@ export default function AdminScheduleRulesPage() {
               return (
                 <div key={rule._id} className="card-light p-4 flex flex-wrap items-center gap-4">
                   {/* Teacher avatar */}
-                  <Avatar src={rule.teacherId?.avatar} firstName={rule.teacherId?.firstNameAr} lastName={rule.teacherId?.lastNameAr} size="sm" />
+                  <Avatar src={getFileUrl(rule.teacherId?.avatar)} firstName={rule.teacherId?.firstNameAr} lastName={rule.teacherId?.lastNameAr} size="sm" />
 
                   {/* Main info */}
                   <div className="flex-1 min-w-0">

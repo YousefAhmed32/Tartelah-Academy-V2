@@ -4,6 +4,30 @@ const fs = require('fs')
 
 const UPLOAD_BASE = process.env.UPLOAD_PATH || 'uploads/'
 
+// Never trust the client-supplied filename's extension for what gets
+// written to disk. `file.mimetype` is client-controlled too, but by the
+// time `filename()` runs it has already passed a `fileFilter` allow-list —
+// mapping *through* that same allow-list to a fixed extension is safe.
+// Using `path.extname(file.originalname)` directly let an attacker upload
+// e.g. `x.html` with a spoofed `image/png` mimetype and have it saved (and
+// then served back, cross-origin, from the static /uploads route) as HTML.
+const MIME_EXTENSIONS = {
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+  'audio/mpeg': '.mp3',
+  'audio/wav': '.wav',
+  'audio/ogg': '.ogg',
+  'audio/mp4': '.m4a',
+  'video/mp4': '.mp4',
+}
+
+function safeExtension(mimetype) {
+  return MIME_EXTENSIONS[mimetype] || ''
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 }
@@ -15,8 +39,7 @@ const avatarStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `avatar_${req.user._id}_${Date.now()}${ext}`)
+    cb(null, `avatar_${req.user._id}_${Date.now()}${safeExtension(file.mimetype)}`)
   },
 })
 
@@ -27,8 +50,7 @@ const paymentProofStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `proof_${req.user._id}_${Date.now()}${ext}`)
+    cb(null, `proof_${req.user._id}_${Date.now()}${safeExtension(file.mimetype)}`)
   },
 })
 
@@ -62,9 +84,12 @@ const homeworkStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
-    const safe = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_').slice(0, 40)
-    cb(null, `hw_${req.user._id}_${Date.now()}_${safe}`)
+    const ext = safeExtension(file.mimetype)
+    const base = path
+      .basename(file.originalname, path.extname(file.originalname))
+      .replace(/[^a-zA-Z0-9؀-ۿ]/g, '_')
+      .slice(0, 40)
+    cb(null, `hw_${req.user._id}_${Date.now()}_${base}${ext}`)
   },
 })
 
@@ -92,8 +117,7 @@ const articleCoverStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `article_cover_${req.user._id}_${Date.now()}${ext}`)
+    cb(null, `article_cover_${req.user._id}_${Date.now()}${safeExtension(file.mimetype)}`)
   },
 })
 
@@ -110,9 +134,8 @@ const courseImageStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
     const type = req.path.includes('cover') ? 'cover' : 'thumb'
-    cb(null, `course_${type}_${req.params.id || 'new'}_${Date.now()}${ext}`)
+    cb(null, `course_${type}_${req.params.id || 'new'}_${Date.now()}${safeExtension(file.mimetype)}`)
   },
 })
 
@@ -135,9 +158,8 @@ const successStoryStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
     const slot = req.params.role || 'banner'
-    cb(null, `story_${slot}_${Date.now()}${ext}`)
+    cb(null, `story_${slot}_${Date.now()}${safeExtension(file.mimetype)}`)
   },
 })
 

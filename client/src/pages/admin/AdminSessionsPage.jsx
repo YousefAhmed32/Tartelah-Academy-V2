@@ -9,7 +9,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
-import { PAYROLL_STATUS } from '../../config/constants.js'
+import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',   bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -336,13 +336,13 @@ function SessionRow({ session, onEdit, onReschedule, onCancel, onCorrect }) {
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2">
-          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="xs" />
+          <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="xs" />
           <span className="text-sm text-gray-600">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</span>
         </div>
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2">
-          <Avatar src={session.teacherId?.avatar} firstName={session.teacherId?.firstNameAr} lastName={session.teacherId?.lastNameAr} size="xs" />
+          <Avatar src={getFileUrl(session.teacherId?.avatar)} firstName={session.teacherId?.firstNameAr} lastName={session.teacherId?.lastNameAr} size="xs" />
           <span className="text-sm text-gray-600">{session.teacherId?.firstNameAr} {session.teacherId?.lastNameAr}</span>
         </div>
       </td>

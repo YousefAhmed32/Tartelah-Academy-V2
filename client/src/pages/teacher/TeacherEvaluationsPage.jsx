@@ -11,6 +11,7 @@ import EmptyState from '../../components/shared/EmptyState.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { scoreToGrade, toArray } from '../../utils/format.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const LABEL = 'block text-sm font-semibold text-brand-textBody mb-1.5'
 
@@ -93,7 +94,7 @@ export default function TeacherEvaluationsPage() {
               >
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar
-                    src={ev.studentId?.avatar}
+                    src={getFileUrl(ev.studentId?.avatar)}
                     firstName={ev.studentId?.firstNameAr}
                     lastName={ev.studentId?.lastNameAr}
                     size="sm"

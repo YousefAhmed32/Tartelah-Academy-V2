@@ -20,7 +20,7 @@ import { SkeletonStatRow, SkeletonChart, SkeletonRows } from '../../components/u
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency, toArray } from '../../utils/format.js'
 import { exportRowsToCSV, exportReportToPDF } from '../../utils/exportUtils.js'
-import { PAYROLL_STATUS } from '../../config/constants.js'
+import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
 
 // ── Period presets ──────────────────────────────────────────────────────────
 
@@ -266,7 +266,7 @@ function AttendanceHistoryTab({ periodRange }) {
         <div className="space-y-2">
           {sessions.map(s => (
             <div key={s._id} className="rounded-xl p-4 flex items-center gap-3 flex-wrap bg-white border border-gray-100 shadow-sm">
-              <Avatar src={s.studentId?.avatar} firstName={s.studentId?.firstNameAr} lastName={s.studentId?.lastNameAr} size="sm" />
+              <Avatar src={getFileUrl(s.studentId?.avatar)} firstName={s.studentId?.firstNameAr} lastName={s.studentId?.lastNameAr} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="text-gray-900 font-semibold text-sm truncate">{s.titleAr}</div>
                 <div className="text-[11px] mt-0.5 text-gray-500">

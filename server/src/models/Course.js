@@ -29,7 +29,7 @@ const CourseSchema = new mongoose.Schema({
   // ── Media ─────────────────────────────────────────────────────────────────────
   thumbnailImage: { type: String },
   coverImage:     { type: String },
-  introVideoUrl:  { type: String }, // YouTube URL
+  introVideoUrl:  { type: String, trim: true, default: '' }, // YouTube URL
 
   // ── Classification ────────────────────────────────────────────────────────────
   category:    { type: String, enum: ['tajweed', 'hifz', 'nazra', 'arabic', 'quran', 'other'], default: 'other' },

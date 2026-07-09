@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -178,7 +179,7 @@ export default function AdminSubscriptionsPage() {
                     <tr key={sub._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <Avatar src={sub.studentId?.avatar} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="xs" />
+                          <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="xs" />
                           <span className="text-sm font-semibold text-brand-textBody">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
                         </div>
                       </td>

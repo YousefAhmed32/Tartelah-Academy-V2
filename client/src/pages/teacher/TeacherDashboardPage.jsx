@@ -11,7 +11,7 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
-import { ROUTES } from '../../config/constants.js'
+import { ROUTES, getFileUrl } from '../../config/constants.js'
 
 const DEFAULT_STATS = {
   totalStudents: 0, sessionsToday: 0, pendingEvaluations: 0, completedThisMonth: 0,
@@ -104,7 +104,7 @@ function NextSessionCard({ session }) {
       <div className="absolute top-0 end-0 w-32 h-32 rounded-full opacity-[0.06]" style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', transform: 'translate(30%, -30%)' }} />
 
       <div className="flex items-start gap-4 mb-5 relative">
-        <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="md" />
+        <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="md" />
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-bold mb-1 text-violet-600">الحصة القادمة</div>
           <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
@@ -377,7 +377,7 @@ export default function TeacherDashboardPage() {
                     transition={{ delay: i * 0.05 }}
                     className="flex items-center gap-3.5 p-3.5 rounded-xl transition-all bg-gray-50 border border-gray-100 hover:bg-gray-100/70"
                   >
-                    <Avatar src={s.studentId?.avatar} firstName={s.studentId?.firstNameAr} lastName={s.studentId?.lastNameAr} size="sm" />
+                    <Avatar src={getFileUrl(s.studentId?.avatar)} firstName={s.studentId?.firstNameAr} lastName={s.studentId?.lastNameAr} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="text-gray-900 font-semibold text-sm truncate">{s.titleAr}</div>
                       <div className="text-xs mt-0.5 flex items-center gap-2 text-gray-500">
@@ -411,7 +411,7 @@ export default function TeacherDashboardPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {stats.recentStudents.slice(0, 6).map((st) => (
                   <div key={st._id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                    <Avatar src={st.avatar} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
+                    <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="text-gray-900 text-xs font-semibold truncate">{st.firstNameAr}</div>
                       <div className="text-[10px] truncate text-gray-400">{st.courseLevel || 'مبتدئ'}</div>

@@ -14,7 +14,7 @@ import ErrorState from '../../components/shared/ErrorState.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import { formatDateAr, formatTimeAr, formatDateTimeAr } from '../../utils/date.js'
-import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL } from '../../config/constants.js'
+import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'h-9 bg-gray-50 border border-gray-200 rounded-xl px-3 text-sm text-gray-700 outline-none focus:border-violet-400 cursor-pointer'
 
@@ -41,7 +41,7 @@ function StatTile({ label, value, Icon, color, onClick, muted }) {
 function PersonPair({ session }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <Avatar src={session.teacherId?.avatar} firstName={session.teacherId?.firstNameAr} lastName={session.teacherId?.lastNameAr} size="xs" />
+      <Avatar src={getFileUrl(session.teacherId?.avatar)} firstName={session.teacherId?.firstNameAr} lastName={session.teacherId?.lastNameAr} size="xs" />
       <div className="min-w-0">
         <div className="text-sm font-semibold text-gray-900 truncate">{session.teacherId?.firstNameAr} {session.teacherId?.lastNameAr}</div>
         <div className="text-xs text-gray-400 truncate">مع {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>

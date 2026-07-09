@@ -9,7 +9,7 @@ import NotificationBell from '../components/ui/NotificationBell.jsx'
 import Spinner from '../components/ui/Spinner.jsx'
 import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
-import { ROUTES, ROLES } from '../config/constants.js'
+import { ROUTES, ROLES, getFileUrl } from '../config/constants.js'
 
 function ContentFallback() {
   return (
@@ -128,7 +128,7 @@ export default function TeacherLayout() {
         {/* Teacher Profile Card */}
         <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <Avatar
-            src={user?.avatar}
+            src={getFileUrl(user?.avatar)}
             firstName={user?.firstNameAr || user?.firstName}
             lastName={user?.lastNameAr || user?.lastName}
             size="sm"
@@ -253,7 +253,7 @@ export default function TeacherLayout() {
           <div className="flex items-center gap-2.5">
             <NotificationBell theme="light" viewAllPath={ROUTES.TEACHER_NOTIFICATIONS} />
             <Avatar
-              src={user?.avatar}
+              src={getFileUrl(user?.avatar)}
               firstName={user?.firstNameAr || user?.firstName}
               lastName={user?.lastNameAr || user?.lastName}
               size="sm"

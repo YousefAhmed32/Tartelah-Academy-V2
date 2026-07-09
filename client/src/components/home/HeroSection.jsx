@@ -51,7 +51,7 @@ export default function HeroSection() {
           alt="أسرة تستخدم منصة ترتيلة أونلاين لتعلم القرآن الكريم عبر الهاتف والتابلت"
           width="1829"
           height="860"
-          fetchpriority="high"
+          fetchPriority="high"
           decoding="async"
         />
         <div className="hero__photo-blend" aria-hidden="true" />

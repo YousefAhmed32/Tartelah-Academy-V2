@@ -7,6 +7,9 @@ import SuccessStoriesSection from '../../components/home/SuccessStoriesSection.j
 import TeachersSection from '../../components/home/TeachersSection.jsx'
 import { usePackages } from '../../hooks/usePackages.js'
 import { formatCurrency } from '../../utils/format.js'
+import useHomepageInteractionAudio from '../../hooks/useHomepageInteractionAudio.js'
+
+const HERO_AUDIO_SRC = encodeURI('/audio/hero section.mp3')
 
 /* ─────────────────────────────────────────────
    Shared micro-components
@@ -120,6 +123,11 @@ const COMMUNITY_STATS = [
 ───────────────────────────────────────────── */
 export default function HomePage() {
   const { packages, isLoading: pkgLoading, isError: pkgError, refetch: refetchPkgs } = usePackages({ activeOnly: true })
+
+  // Starts on the first user interaction anywhere on the homepage (click,
+  // scroll, touch, key, wheel) and stops the moment this page unmounts —
+  // i.e. as soon as the user navigates to any other route.
+  useHomepageInteractionAudio(HERO_AUDIO_SRC, { volume: 0.7, loop: false })
 
   return (
     <div style={{ background: '#0f0226', width: '100%', overflowX: 'hidden' }}>

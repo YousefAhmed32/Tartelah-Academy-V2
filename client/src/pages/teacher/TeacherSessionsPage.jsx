@@ -16,7 +16,7 @@ import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
-import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATTENDANCE_STATUS, SESSION_OUTCOME, DELAY_REASON } from '../../config/constants.js'
+import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATTENDANCE_STATUS, SESSION_OUTCOME, DELAY_REASON, getFileUrl } from '../../config/constants.js'
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
 const AR_MONTHS = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
@@ -67,7 +67,7 @@ function QuickEvalModal({ session, onClose }) {
     >
       <div className="space-y-4" dir="rtl">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-[#f8f5ff]">
-          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
+          <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div>
             <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
             <div className="text-xs text-[#9b7fd6]">{session.titleAr}</div>
@@ -132,7 +132,7 @@ function QuickHomeworkModal({ session, onClose }) {
     >
       <div className="space-y-4" dir="rtl">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-[#f8f5ff]">
-          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
+          <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
         </div>
         <div>
@@ -338,7 +338,7 @@ function SessionCard({ session, onEval, onHomework }) {
           className="w-full flex items-center gap-3 p-4 text-start"
           onClick={() => setExpanded(p => !p)}
         >
-          <Avatar src={session.studentId?.avatar} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
+          <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="text-gray-900 font-semibold text-sm truncate">{session.titleAr}</div>
             <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap text-gray-500">
@@ -694,7 +694,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                       border: form.studentId === s._id ? '1.5px solid #7c3aed' : '1.5px solid transparent',
                     }}
                   >
-                    <Avatar src={s.avatar} firstName={s.firstNameAr} lastName={s.lastNameAr} size="sm" />
+                    <Avatar src={getFileUrl(s.avatar)} firstName={s.firstNameAr} lastName={s.lastNameAr} size="sm" />
                     <div className="text-start">
                       <div className="font-semibold text-sm text-brand-textBody">{s.firstNameAr} {s.lastNameAr}</div>
                       <div className="text-xs text-[#9b7fd6]">{s.email}</div>
@@ -841,7 +841,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
           <div className="space-y-4">
             {selectedStudent && (
               <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
-                <Avatar src={selectedStudent.avatar} firstName={selectedStudent.firstNameAr} lastName={selectedStudent.lastNameAr} size="sm" />
+                <Avatar src={getFileUrl(selectedStudent.avatar)} firstName={selectedStudent.firstNameAr} lastName={selectedStudent.lastNameAr} size="sm" />
                 <div>
                   <div className="font-bold text-sm text-brand-textBody">{selectedStudent.firstNameAr} {selectedStudent.lastNameAr}</div>
                   <div className="text-xs text-[#9b7fd6]">
@@ -909,7 +909,7 @@ function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
       {rules.map(rule => (
         <div key={rule._id} className="rounded-2xl p-4 bg-white border border-gray-100 shadow-sm">
           <div className="flex items-start gap-3">
-            <Avatar src={rule.studentId?.avatar} firstName={rule.studentId?.firstNameAr} lastName={rule.studentId?.lastNameAr} size="md" />
+            <Avatar src={getFileUrl(rule.studentId?.avatar)} firstName={rule.studentId?.firstNameAr} lastName={rule.studentId?.lastNameAr} size="md" />
             <div className="flex-1 min-w-0">
               <div className="text-gray-900 font-bold truncate">{rule.studentId?.firstNameAr} {rule.studentId?.lastNameAr}</div>
               <div className="text-xs mt-1 flex flex-wrap gap-2 text-gray-500">

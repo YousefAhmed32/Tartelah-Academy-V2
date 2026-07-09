@@ -132,7 +132,7 @@ export default function AdminEnrollmentsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   {/* Student info */}
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar src={req.studentId?.avatar} name={req.studentId?.firstNameAr} size="md" />
+                    <Avatar src={getFileUrl(req.studentId?.avatar)} firstName={req.studentId?.firstNameAr} lastName={req.studentId?.lastNameAr} size="md" />
                     <div className="min-w-0">
                       <div className="font-bold text-brand-textBody truncate">{req.studentId?.firstNameAr} {req.studentId?.lastNameAr}</div>
                       <div className="text-xs text-[#9b7fd6] truncate">{req.studentId?.email}</div>
@@ -234,7 +234,7 @@ export default function AdminEnrollmentsPage() {
           <div className="space-y-5">
             {/* Student summary */}
             <div className="flex items-center gap-3 p-4 rounded-xl bg-[#f8f5ff]">
-              <Avatar src={selectedRequest.studentId?.avatar} name={selectedRequest.studentId?.firstNameAr} size="md" />
+              <Avatar src={getFileUrl(selectedRequest.studentId?.avatar)} firstName={selectedRequest.studentId?.firstNameAr} lastName={selectedRequest.studentId?.lastNameAr} size="md" />
               <div>
                 <div className="font-bold text-brand-textBody">{selectedRequest.studentId?.firstNameAr} {selectedRequest.studentId?.lastNameAr}</div>
                 <div className="text-sm text-[#9b7fd6]">{selectedRequest.studentId?.email} {selectedRequest.studentId?.phone && `| ${selectedRequest.studentId.phone}`}</div>

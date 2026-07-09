@@ -6,7 +6,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatNumber, formatCurrency } from '../../utils/format.js'
-import { ROUTES } from '../../config/constants.js'
+import { ROUTES, getFileUrl } from '../../config/constants.js'
 import { useAuthStore } from '../../store/authStore.js'
 
 function getArabicDate() {
@@ -75,7 +75,12 @@ function SessionRow({ session, index }) {
       transition={{ delay: index * 0.04 }}
       className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
     >
-      <Avatar src={session.studentId?.avatar} name={session.studentId?.firstNameAr || '؟'} size="sm" />
+      <Avatar
+        src={getFileUrl(session.studentId?.avatar)}
+        firstName={session.studentId?.firstNameAr}
+        lastName={session.studentId?.lastNameAr}
+        size="sm"
+      />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-gray-800 truncate">
           {session.studentId?.firstNameAr} — {session.teacherId?.firstNameAr}
@@ -92,7 +97,7 @@ function SessionRow({ session, index }) {
 function RegistrationRow({ user: u, index }) {
   return (
     <div className="flex items-center gap-3 py-2.5">
-      <Avatar src={u.avatar} name={`${u.firstNameAr} ${u.lastNameAr}`} size="sm" />
+      <Avatar src={getFileUrl(u.avatar)} firstName={u.firstNameAr} lastName={u.lastNameAr} size="sm" />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-gray-800 truncate">{u.firstNameAr} {u.lastNameAr}</div>
         <div className="text-xs text-gray-400">{formatDateAr(u.createdAt)}</div>
