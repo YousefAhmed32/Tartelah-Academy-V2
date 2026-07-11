@@ -148,13 +148,13 @@ function CategoryModal({ open, onClose, refetch }) {
       </div>
 
       <ConfirmDialog
-        isOpen={!!confirmDel}
+        open={!!confirmDel}
         onClose={() => setConfirmDel(null)}
         onConfirm={() => delMut.mutate(confirmDel?._id)}
         title="حذف الفئة"
         message={`هل تريد حذف فئة "${confirmDel?.nameAr || confirmDel?.name}"؟ لا يمكن التراجع عن هذا الإجراء.`}
-        confirmText="حذف"
-        isDangerous
+        confirmLabel="حذف"
+        variant="danger"
       />
     </Modal>
   )
@@ -512,13 +512,13 @@ export default function AdminArticlesPage() {
 
       {/* Confirm Delete */}
       <ConfirmDialog
-        isOpen={!!confirmDel}
+        open={!!confirmDel}
         onClose={() => setConfirmDel(null)}
         onConfirm={() => deleteMut.mutate(confirmDel?._id)}
         title="حذف المقال"
         message={`هل تريد حذف مقال "${confirmDel?.titleAr || confirmDel?.title}"؟ يمكن استعادته لاحقاً من تبويب "محذوفة".`}
-        confirmText="حذف"
-        isDangerous
+        confirmLabel="حذف"
+        variant="danger"
       />
     </div>
   )

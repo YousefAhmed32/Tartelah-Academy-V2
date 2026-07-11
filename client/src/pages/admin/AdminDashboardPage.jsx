@@ -38,31 +38,60 @@ function KPICard({ label, value, sub, icon, color = '#7c3aed', trend, to }) {
   )
 }
 
-function AlertBanner({ count, to }) {
-  const navigate = useNavigate()
-  if (!count) return null
+// Consolidates every "needs an admin decision" signal into one checklist
+// instead of stacking separate full-width banners per source — replaces the
+// old AlertBanner + inline unscheduled-students banner, and adds the
+// previously-unsurfaced ungraded-homework backlog.
+function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHomeworkGrading }) {
+  const tasks = [
+    {
+      key: 'enrollments', count: pendingEnrollments, to: ROUTES.ADMIN_ENROLLMENTS, color: '#f59e0b',
+      label: (n) => `${n} ${n === 1 ? 'طلب تسجيل جديد' : 'طلبات تسجيل'} بانتظار المراجعة`,
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 13l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    },
+    {
+      key: 'unscheduled', count: unscheduledStudents, to: ROUTES.ADMIN_STUDENTS, color: '#7c3aed',
+      label: (n) => `${n} ${n === 1 ? 'طالب مشترك' : 'طلاب مشتركون'} بلا جدول دوري`,
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    },
+    {
+      key: 'homework', count: pendingHomeworkGrading, to: ROUTES.ADMIN_TEACHERS, color: '#3b82f6',
+      label: (n) => `${n} ${n === 1 ? 'واجب مسلّم' : 'واجبات مسلّمة'} بانتظار تصحيح المعلم`,
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 12h6M9 16h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    },
+  ].filter(t => t.count > 0)
+
+  if (!tasks.length) {
+    return (
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <span className="font-bold text-emerald-800 text-sm">لا توجد مهام معلقة — كل شيء تحت السيطرة ✓</span>
+      </motion.div>
+    )
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={() => navigate(to)}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
-    >
-      <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center flex-none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" fill="white"/>
-          <path d="M12 9v4M12 17h.01" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between">
+        <span className="text-xs font-bold text-gray-500">المهام المعلقة</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{tasks.length}</span>
       </div>
-      <div className="flex-1">
-        <span className="font-bold text-amber-800 text-sm">
-          {count} {count === 1 ? 'طلب تسجيل جديد' : 'طلبات تسجيل جديدة'} تنتظر مراجعتك
-        </span>
-        <span className="text-amber-600 text-xs mr-2">انقر للمراجعة</span>
+      <div className="divide-y divide-gray-50">
+        {tasks.map(t => (
+          <Link key={t.key} to={t.to}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-none" style={{ background: `${t.color}12`, color: t.color }}>
+              {t.icon}
+            </div>
+            <span className="flex-1 text-sm font-semibold text-gray-700">{t.label(t.count)}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-gray-300 flex-none"><path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </Link>
+        ))}
       </div>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-amber-500">
-        <path d="m9 18-6-6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
     </motion.div>
   )
 }
@@ -182,6 +211,7 @@ export default function AdminDashboardPage() {
     placeholderData: {
       totalStudents: 0, totalTeachers: 0, totalSessions: 0, totalRevenue: 0,
       activeSubscriptions: 0, sessionsToday: 0, pendingEnrollments: 0,
+      unscheduledStudents: 0, pendingHomeworkGrading: 0,
       recentRegistrations: [], upcomingSessions: [],
     },
   })
@@ -227,30 +257,12 @@ export default function AdminDashboardPage() {
       {/* Operations intelligence strip */}
       <OperationsIntelligenceStrip />
 
-      {/* Alert banners */}
-      <AlertBanner count={pending} to={ROUTES.ADMIN_ENROLLMENTS} />
-
-      {/* Unscheduled students alert */}
-      {stats?.unscheduledStudents > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-50 border border-purple-200"
-        >
-          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center flex-none">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="5" width="18" height="16" rx="2.5" fill="white"/>
-              <path d="M3 9h18M8 3v4M16 3v4" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <div className="flex-1">
-            <span className="font-bold text-violet-800 text-sm">
-              {stats.unscheduledStudents} {stats.unscheduledStudents === 1 ? 'طالب مشترك' : 'طلاب مشتركون'} بدون جدول دوري
-            </span>
-            <span className="text-violet-600 text-xs mr-2">— يحتاجون تعيين جدول من المعلم</span>
-          </div>
-        </motion.div>
-      )}
+      {/* Consolidated pending-tasks checklist (replaces separate per-source banners) */}
+      <PendingTasksCard
+        pendingEnrollments={pending}
+        unscheduledStudents={stats?.unscheduledStudents || 0}
+        pendingHomeworkGrading={stats?.pendingHomeworkGrading || 0}
+      />
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -50,7 +50,8 @@ router.get('/notifications', notifCtrl.getAdminNotificationLogs)
 router.post('/notifications/broadcast', notifCtrl.broadcastNotification)
 router.post('/notifications/individual', ctrl.sendIndividualNotification)
 
-// Audit logs
+// Audit logs (stats before :id-like generic route to avoid conflicts)
+router.get('/audit-logs/stats', auditCtrl.getAuditLogStats)
 router.get('/audit-logs', auditCtrl.getAuditLogs)
 
 module.exports = router

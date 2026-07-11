@@ -1,3 +1,6 @@
+import { motion } from 'framer-motion'
+import { EASE_CINEMATIC } from '../motion/motion.constants.js'
+
 const STEPS = [
   {
     num: '01',
@@ -25,18 +28,59 @@ const STEPS = [
   },
 ]
 
-export default function HeroJourneyStrip() {
+// Choreography: the strip itself expands horizontally from a compressed
+// state while a gold sweep travels across it once, then each step (icon +
+// number + text) and its divider cascade in — reads as a timeline switching
+// on, not a block fading upward.
+export default function HeroJourneyStrip({ startDelay = 0, reducedMotion = false }) {
+  const containerVariants = reducedMotion
+    ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }
+    : {
+      hidden: { opacity: 0, scaleX: 0.82 },
+      show: {
+        opacity: 1, scaleX: 1,
+        transition: { duration: 0.85, ease: EASE_CINEMATIC, delay: startDelay, staggerChildren: 0.09, delayChildren: startDelay + 0.35 },
+      },
+    }
+
+  const stepVariants = reducedMotion
+    ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
+    : {
+      hidden: { opacity: 0, y: 14 },
+      show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_CINEMATIC } },
+    }
+
+  const sweepVariants = {
+    hidden: { x: '-120%', opacity: 0 },
+    show: { x: '120%', opacity: [0, 1, 0], transition: { duration: 1.1, ease: 'easeInOut', delay: startDelay + 0.1 } },
+  }
+
   return (
-    <div className="hero-journey" aria-label="رحلتك التعليمية في 4 خطوات">
-      <div className="hero-journey__head">
+    <motion.div
+      className="hero-journey"
+      style={{ transformOrigin: 'center' }}
+      initial="hidden"
+      animate="show"
+      variants={containerVariants}
+      aria-label="رحلتك التعليمية في 4 خطوات"
+    >
+      {!reducedMotion && <motion.div className="hero-journey__sweep" variants={sweepVariants} aria-hidden="true" />}
+
+      <motion.div className="hero-journey__head" variants={stepVariants}>
         <span className="hero-journey__eyebrow">رحلتك التعليمية</span>
         <span className="hero-journey__title">في 4 خطوات</span>
-      </div>
+      </motion.div>
 
       <div className="hero-journey__steps">
         {STEPS.map((step, i) => (
-          <div key={step.num} className="hero-journey__step">
-            {i > 0 && <span className="hero-journey__divider" aria-hidden="true" />}
+          <motion.div key={step.num} className="hero-journey__step" variants={stepVariants}>
+            {i > 0 && (
+              <motion.span
+                className="hero-journey__divider"
+                aria-hidden="true"
+                variants={reducedMotion ? undefined : { hidden: { scaleY: 0 }, show: { scaleY: 1, transition: { duration: 0.4, ease: EASE_CINEMATIC } } }}
+              />
+            )}
             <span className="hero-journey__num" aria-hidden="true">{step.num}</span>
             <span className="hero-journey__icon" aria-hidden="true">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">{step.icon}</svg>
@@ -45,9 +89,9 @@ export default function HeroJourneyStrip() {
               <div className="hero-journey__step-title">{step.title}</div>
               <div className="hero-journey__step-desc">{step.desc}</div>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -2,6 +2,7 @@ const Testimonial = require('../models/Testimonial')
 const FAQ = require('../models/FAQ')
 const AcademySettings = require('../models/AcademySettings')
 const ContactMessage = require('../models/ContactMessage')
+const NewsletterSubscriber = require('../models/NewsletterSubscriber')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 
@@ -72,7 +73,7 @@ const SETTINGS_ALLOWED = [
   'phone', 'whatsapp', 'email', 'address',
   'facebook', 'instagram', 'twitter', 'youtube', 'linkedin',
   'workingHours', 'supportText', 'emergencyContact',
-  'googleMapsUrl', 'googleMapsEmbed',
+  'googleMapsEmbed',
   'footerDescription', 'footerCopyright',
   'privacyPolicyUrl', 'termsUrl', 'cookiesPolicyUrl',
   'newsletterEnabled', 'newsletterText',
@@ -81,10 +82,21 @@ const SETTINGS_ALLOWED = [
   'maintenanceMode', 'maintenanceMessage',
 ]
 
+// Admins typically paste Google's "Embed a map" output, which is a full
+// <iframe> tag, not a bare URL. Extract the src so SupportPanel.jsx can
+// safely use it as the iframe's src attribute.
+function normalizeMapEmbed(value) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  const match = trimmed.match(/src=["']([^"']+)["']/i)
+  return match ? match[1] : trimmed
+}
+
 exports.updateSettings = async (req, res, next) => {
   try {
     const updates = {}
     SETTINGS_ALLOWED.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    if (updates.googleMapsEmbed !== undefined) updates.googleMapsEmbed = normalizeMapEmbed(updates.googleMapsEmbed)
     const settings = await AcademySettings.findOneAndUpdate({}, updates, { new: true, upsert: true })
     sendSuccess(res, settings, 'تم حفظ الإعدادات')
   } catch (err) { next(err) }
@@ -118,6 +130,25 @@ exports.submitContactForm = async (req, res, next) => {
     } catch (_) { /* non-critical */ }
 
     sendSuccess(res, { id: msg._id }, 'تم إرسال رسالتك، سنتواصل معك قريباً')
+  } catch (err) { next(err) }
+}
+
+// ─── Newsletter (public) ─────────────────────────────────────────────────────
+
+exports.subscribeNewsletter = async (req, res, next) => {
+  try {
+    const { email } = req.body
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return sendError(res, 'يرجى إدخال بريد إلكتروني صحيح', 400)
+
+    const normalized = email.trim().toLowerCase()
+    const existing = await NewsletterSubscriber.findOne({ email: normalized })
+    if (existing) {
+      if (!existing.isActive) { existing.isActive = true; await existing.save() }
+    } else {
+      await NewsletterSubscriber.create({ email: normalized })
+    }
+
+    sendSuccess(res, null, 'تم الاشتراك بنجاح', 201)
   } catch (err) { next(err) }
 }
 

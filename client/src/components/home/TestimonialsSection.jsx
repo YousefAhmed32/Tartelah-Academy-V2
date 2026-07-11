@@ -91,6 +91,16 @@ const fadeUp = (delay = 0) => ({
   transition: { duration: 0.62, delay, ease: [0.22, 0.85, 0.22, 1] },
 })
 
+// Conversational rhythm — each message card leans slightly left/right as it
+// settles, like replies alternating sides in a chat thread, instead of every
+// card rising on the same straight vertical line.
+const slideIn = (delay = 0, side = 1) => ({
+  initial:    { opacity: 0, y: 22, x: 16 * side },
+  whileInView:{ opacity: 1, y: 0, x: 0 },
+  viewport:   { once: true, margin: '-80px' },
+  transition: { duration: 0.6, delay, ease: [0.22, 0.85, 0.22, 1] },
+})
+
 // ── Stars ─────────────────────────────────────────────────────────────────────
 
 function Stars({ n = 5, size = 15 }) {
@@ -544,10 +554,10 @@ function FeaturedCard({ data, playingId, onPlay, onImageClick }) {
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
 
-function GridCard({ data, playingId, onPlay, onImageClick, delay = 0 }) {
+function GridCard({ data, playingId, onPlay, onImageClick, delay = 0, index = 0 }) {
   return (
     <motion.div
-      {...fadeUp(delay)}
+      {...slideIn(delay, index % 2 === 0 ? 1 : -1)}
       style={{
         borderRadius: 18,
         background:   'rgba(255,255,255,0.04)',
@@ -612,10 +622,10 @@ function GridCard({ data, playingId, onPlay, onImageClick, delay = 0 }) {
 
 // ── Audio-only card ───────────────────────────────────────────────────────────
 
-function AudioCard({ data, playingId, onPlay, delay = 0 }) {
+function AudioCard({ data, playingId, onPlay, delay = 0, index = 0 }) {
   return (
     <motion.div
-      {...fadeUp(delay)}
+      {...slideIn(delay, index % 2 === 0 ? -1 : 1)}
       style={{
         borderRadius: 20,
         background:   'linear-gradient(140deg,rgba(40,15,85,0.85),rgba(18,6,40,0.90))',
@@ -624,8 +634,7 @@ function AudioCard({ data, playingId, onPlay, delay = 0 }) {
         display:      'flex', flexDirection: 'column', gap: 14,
         boxShadow:    '0 16px 40px rgba(0,0,0,0.28)',
       }}
-      whileHover={{ y: -4, boxShadow: '0 24px 52px rgba(0,0,0,0.45)' }}
-      transition={{ duration: 0.32 }}
+      whileHover={{ y: -4, boxShadow: '0 24px 52px rgba(0,0,0,0.45)', transition: { duration: 0.32 } }}
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -734,6 +743,7 @@ export default function TestimonialsSection() {
               <GridCard
                 key={card.id}
                 data={card}
+                index={i}
                 playingId={playingId}
                 onPlay={onPlay}
                 onImageClick={onImg}
@@ -750,6 +760,7 @@ export default function TestimonialsSection() {
             <AudioCard
               key={card.id}
               data={card}
+              index={i}
               playingId={playingId}
               onPlay={onPlay}
               delay={0.25 + i * 0.12}

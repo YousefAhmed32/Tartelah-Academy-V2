@@ -1,8 +1,9 @@
 const Subscription = require('../models/Subscription')
 const Package = require('../models/Package')
 const Notification = require('../models/Notification')
+const User = require('../models/User')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
-const { getPagination } = require('../utils/pagination')
+const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
 
 exports.getMySubscription = async (req, res, next) => {
@@ -47,6 +48,13 @@ exports.getAllSubscriptions = async (req, res, next) => {
     const { page, limit, skip } = getPagination(req.query)
     const filter = {}
     if (req.query.status) filter.status = req.query.status
+    if (req.query.search) {
+      // Subscriptions have no searchable text of their own — resolve the
+      // student-name/email search against User first, then filter by id.
+      const studentFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
+      const matchedStudents = await User.find({ role: 'student', ...studentFilter }).select('_id')
+      filter.studentId = { $in: matchedStudents.map(s => s._id) }
+    }
     const [data, total] = await Promise.all([
       Subscription.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
         .populate('studentId', 'firstNameAr lastNameAr avatar')

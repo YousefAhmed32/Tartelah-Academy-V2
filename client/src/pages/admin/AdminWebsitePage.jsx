@@ -14,10 +14,32 @@ const sections = [
   { key: 'website_settings', label: 'إعدادات التواصل والفوتر' },
 ]
 
+// Defined at module scope (not inside SettingsForm) so their identity stays
+// stable across renders — declaring them inside the form component made React
+// remount the whole subtree (including every <input>) on each keystroke,
+// which is what caused focus to drop after a single character.
+function Section({ title, children }) {
+  return (
+    <div className="mb-6">
+      <div className="text-xs font-bold uppercase tracking-widest text-[#9b7fd6] mb-3 pb-2 border-b border-[#ede9fe]">{title}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
+    </div>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-[#374151] mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 function SettingsForm({ settings, onSave, isPending }) {
   const [form, setForm] = useState({
     phone: '', whatsapp: '', email: '', youtube: '', instagram: '', facebook: '', twitter: '', linkedin: '',
-    workingHours: '', supportText: '', emergencyContact: '', googleMapsUrl: '', googleMapsEmbed: '',
+    workingHours: '', supportText: '', emergencyContact: '', googleMapsEmbed: '',
     footerDescription: '', footerCopyright: '', newsletterEnabled: true, newsletterText: '',
     privacyPolicyUrl: '', termsUrl: '', cookiesPolicyUrl: '',
   })
@@ -27,24 +49,6 @@ function SettingsForm({ settings, onSave, isPending }) {
   }, [settings])
 
   const f = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
-
-  function Section({ title, children }) {
-    return (
-      <div className="mb-6">
-        <div className="text-xs font-bold uppercase tracking-widest text-[#9b7fd6] mb-3 pb-2 border-b border-[#ede9fe]">{title}</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
-      </div>
-    )
-  }
-
-  function Field({ label, children }) {
-    return (
-      <div>
-        <label className="block text-xs font-semibold text-[#374151] mb-1.5">{label}</label>
-        {children}
-      </div>
-    )
-  }
 
   return (
     <div>
@@ -79,12 +83,9 @@ function SettingsForm({ settings, onSave, isPending }) {
         <Field label="جهة اتصال الطوارئ">
           <input value={form.emergencyContact} onChange={f('emergencyContact')} className="field-light w-full" placeholder="+966 XX XXX XXXX" dir="ltr" />
         </Field>
-        <Field label="رابط Google Maps">
-          <input value={form.googleMapsUrl} onChange={f('googleMapsUrl')} className="field-light w-full" placeholder="https://maps.google.com/..." dir="ltr" />
-        </Field>
         <div className="md:col-span-2">
-          <Field label="رابط تضمين خريطة Google (iframe src)">
-            <input value={form.googleMapsEmbed} onChange={f('googleMapsEmbed')} className="field-light w-full" placeholder="https://www.google.com/maps/embed?pb=..." dir="ltr" />
+          <Field label="تضمين خريطة Google — الصق كود الـ iframe الكامل من Google Maps أو رابط src مباشرة">
+            <input value={form.googleMapsEmbed} onChange={f('googleMapsEmbed')} className="field-light w-full" placeholder='<iframe src="https://www.google.com/maps/embed?pb=..."></iframe>' dir="ltr" />
           </Field>
         </div>
       </Section>
@@ -157,6 +158,13 @@ export default function AdminWebsitePage() {
     onSuccess: () => { toast.success('تم الحذف'); qc.invalidateQueries({ queryKey: ['admin', 'website', activeSection] }) },
   })
 
+  function requestDelete(id) {
+    const label = activeSection === 'testimonials' ? 'الشهادة' : 'السؤال'
+    if (window.confirm(`هل تريد حذف ${label}؟ هذا المحتوى ظاهر للزوار ولا يمكن التراجع عن الحذف.`)) {
+      deleteMutation.mutate(id)
+    }
+  }
+
   const updateSettingsMutation = useMutation({
     mutationFn: (data) => api.patch('/website/settings', data),
     onSuccess: () => { toast.success('تم حفظ الإعدادات'); qc.invalidateQueries({ queryKey: ['admin', 'website', 'website_settings'] }); qc.invalidateQueries({ queryKey: ['public', 'settings'] }) },
@@ -187,7 +195,7 @@ export default function AdminWebsitePage() {
                 <div key={t._id} className="card-light p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div className="font-semibold text-brand-textBody">{t.nameAr}</div>
-                    <button onClick={() => deleteMutation.mutate(t._id)} className="text-red-400 text-xs hover:text-red-600">حذف</button>
+                    <button onClick={() => requestDelete(t._id)} className="text-red-400 text-xs hover:text-red-600">حذف</button>
                   </div>
                   <p className="text-sm text-[#9b7fd6]">{t.bodyAr}</p>
                   <div className="flex gap-0.5 mt-2">
@@ -216,7 +224,7 @@ export default function AdminWebsitePage() {
                       <div className="font-semibold text-brand-textBody mb-2">{f.questionAr}</div>
                       <p className="text-sm text-[#9b7fd6]">{f.answerAr}</p>
                     </div>
-                    <button onClick={() => deleteMutation.mutate(f._id)} className="text-red-400 text-xs hover:text-red-600 flex-none">حذف</button>
+                    <button onClick={() => requestDelete(f._id)} className="text-red-400 text-xs hover:text-red-600 flex-none">حذف</button>
                   </div>
                 </div>
               ))}

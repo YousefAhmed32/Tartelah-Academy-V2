@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { Mail, Phone, MessageCircle, Play, CircleCheck } from 'lucide-react'
 import api from '../../utils/api.js'
 import { ROUTES } from '../../config/constants.js'
@@ -14,36 +14,6 @@ const QUICK_LINKS = [
   { label: 'الأسئلة الشائعة', to: ROUTES.FAQ },
   { label: 'تواصل معنا', to: ROUTES.CONTACT },
 ]
-
-function BackToTop() {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 400)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-  if (!visible) return null
-  return (
-    <button
-      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      style={{
-        position: 'fixed', bottom: 28, insetInlineEnd: 28, zIndex: 999,
-        width: 46, height: 46, borderRadius: '50%', border: 'none', cursor: 'pointer',
-        background: 'linear-gradient(135deg, #7C3AED, #9b5cf0)',
-        boxShadow: '0 8px 24px rgba(124,58,237,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'transform 0.2s',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = '' }}
-      title="العودة للأعلى"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path d="m18 15-6-6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    </button>
-  )
-}
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -68,16 +38,19 @@ export default function Footer() {
   const termsUrl     = s.termsUrl          || '#'
   const newsletterEnabled = s.newsletterEnabled !== false
 
+  const subscribeMutation = useMutation({
+    mutationFn: (data) => api.post('/website/newsletter', data),
+    onSuccess: () => { setSubscribed(true); setEmail('') },
+  })
+
   function handleSubscribe(e) {
     e.preventDefault()
-    if (!email) return
-    setSubscribed(true)
-    setEmail('')
+    if (!email || subscribeMutation.isPending) return
+    subscribeMutation.mutate({ email })
   }
 
   return (
-    <>
-      <footer dir="rtl" style={{ background: '#0c0220', borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 'clamp(48px,5vw,72px)', paddingBottom: 0 }}>
+    <footer dir="rtl" style={{ background: '#0c0220', borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 'clamp(48px,5vw,72px)', paddingBottom: 0 }}>
         <div style={{ maxWidth: 1340, margin: '0 auto', padding: '0 clamp(20px,5vw,68px)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '48px 36px', paddingBottom: 48 }}>
 
@@ -164,18 +137,25 @@ export default function Footer() {
                     />
                     <button
                       type="submit"
+                      disabled={subscribeMutation.isPending}
                       style={{
                         padding: '11px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
                         background: 'linear-gradient(135deg, #7C3AED, #5b21b6)',
                         color: '#fff', fontFamily: 'Tajawal', fontWeight: 700, fontSize: 14,
                         boxShadow: '0 6px 20px rgba(124,58,237,.4)',
                         transition: 'transform .2s',
+                        opacity: subscribeMutation.isPending ? 0.7 : 1,
                       }}
                       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
                       onMouseLeave={e => { e.currentTarget.style.transform = '' }}
                     >
-                      اشتراك
+                      {subscribeMutation.isPending ? 'جارِ الاشتراك...' : 'اشتراك'}
                     </button>
+                    {subscribeMutation.isError && (
+                      <div style={{ color: '#f87171', fontSize: 12.5 }}>
+                        {subscribeMutation.error?.response?.data?.message || 'حدث خطأ، حاول مرة أخرى'}
+                      </div>
+                    )}
                   </form>
                 )}
               </div>
@@ -201,11 +181,9 @@ export default function Footer() {
           </div>
         </div>
       </footer>
-
-      <BackToTop />
-    </>
   )
 }
+
 
 function ContactItem({ Icon, label, href }) {
   return (

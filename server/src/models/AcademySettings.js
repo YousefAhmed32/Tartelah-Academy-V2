@@ -19,7 +19,6 @@ const AcademySettingsSchema = new mongoose.Schema({
   workingHours:    { type: String, default: 'السبت – الخميس: 9:00 ص – 9:00 م' },
   supportText:     { type: String, default: 'نحن هنا لمساعدتك في أي وقت' },
   emergencyContact:{ type: String },
-  googleMapsUrl:   { type: String },
   googleMapsEmbed: { type: String },
 
   // Footer

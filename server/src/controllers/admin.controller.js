@@ -25,7 +25,7 @@ exports.getDashboardStats = async (req, res, next) => {
     const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [totalStudents, totalTeachers, activeSubscriptions, pendingEnrollments, sessionStats, recentRegistrations, upcomingSessions] = await Promise.all([
+    const [totalStudents, totalTeachers, activeSubscriptions, pendingEnrollments, sessionStats, recentRegistrations, upcomingSessions, pendingHomeworkGrading] = await Promise.all([
       User.countDocuments({ role: 'student', isActive: true }),
       User.countDocuments({ role: 'teacher', isActive: true }),
       Subscription.countDocuments({ status: 'active' }),
@@ -37,6 +37,13 @@ exports.getDashboardStats = async (req, res, next) => {
       Session.find({ scheduledAt: { $gte: today, $lte: todayEnd }, status: { $in: ['scheduled', 'ongoing'] } })
         .sort({ scheduledAt: 1 }).limit(10)
         .populate('studentId teacherId', 'firstNameAr lastNameAr avatar'),
+      // Ungraded homework submissions across all assignments — a teacher-grading
+      // backlog signal that previously had no admin-visible surface at all.
+      Homework.aggregate([
+        { $unwind: '$submissions' },
+        { $match: { 'submissions.status': 'submitted' } },
+        { $count: 'count' },
+      ]),
     ])
 
     const revenue = await Subscription.aggregate([
@@ -52,6 +59,7 @@ exports.getDashboardStats = async (req, res, next) => {
     sendSuccess(res, {
       totalStudents, totalTeachers, activeSubscriptions, pendingEnrollments,
       unscheduledStudents: unscheduledCount,
+      pendingHomeworkGrading: pendingHomeworkGrading[0]?.count || 0,
       totalRevenue: revenue[0]?.total || 0,
       totalSessions: sessionStats[0]?.total || 0,
       sessionsToday: sessionStats[0]?.todayCount || 0,
@@ -287,6 +295,7 @@ exports.adminResetPassword = async (req, res, next) => {
       bodyAr: 'قام المسؤول بإعادة تعيين كلمة مرورك. يرجى تسجيل الدخول بالكلمة الجديدة.',
       type: 'system', priority: 'high',
     })
+    logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'reset_password', entity: 'User', entityId: user._id, changes: { field: 'password' }, ip: req.ip })
     sendSuccess(res, null, 'تم إعادة تعيين كلمة المرور')
   } catch (err) { next(err) }
 }

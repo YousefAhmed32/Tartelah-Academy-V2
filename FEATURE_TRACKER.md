@@ -2,6 +2,83 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## Operations Center Full Audit & Rebuild — 2026-07-11
+
+Full detail in `docs/OPERATIONS_CENTER_AUDIT.md`.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Root-cause "most stats show 0" | ✅ | Seeder never generated day-offset-0 (today) sessions — confirmed against live MongoDB, not a backend/aggregation bug |
+| Verify every stat's Mongo query correctness | ✅ | All 10 live-tab metrics + review queue + payroll review manually traced and confirmed correct |
+| Fix: 14-scenario "today" seeder generator | ✅ | Live/starting-soon/missing-checkin/missing-link/late/completed/cancelled/no-show/student-absent/payroll-review/critical-contradiction |
+| Fix: local-midnight timezone clamp (`pastToday()`) | ✅ | Second bug found while fixing the first — naive offsets could cross local midnight (server is UTC+3); verified by re-seeding at 2:40 AM |
+| Densify historical seed spread (3-day → daily) | ✅ | Timeline ±3-day and Review Queue 14-day windows now have real daily coverage |
+| New metric: No-Show count | ✅ | Existed as a status value with no dedicated bucket before |
+| New metric: Student Absences Today | ✅ | New bounded Attendance aggregation |
+| New metric: Attendance Rate Today / Teacher On-Time Rate Today | ✅ | Computed from real today-scoped records |
+| New metric: Revenue Today | ✅ | Subscription aggregation bounded to today |
+| New metric: Online Now (teachers/students) | ✅ | New in-memory socket presence tracking — only possible after this session's earlier real-time fix |
+| Redesigned Live tab (critical banner, health strip, severity-tinted grid, unified attention feed, quick actions) | ✅ | Replaced 6 redundant boxed lists with one deduplicated severity-sorted feed |
+| Live verification: every metric vs. direct MongoDB query | ✅ | Exact match confirmed for every stat |
+| Live browser verification: all interactions/filters/navigation | ✅ | Zero console errors |
+| `npm run build` + `npx jest` | ✅ | Zero errors, 96/96 passing |
+
+### Known limitations
+- Online-presence has a ~60s detection window for abrupt disconnects (standard heartbeat behavior) and is per-process (would need Redis for multi-instance deployment).
+
+---
+
+## Notification Center Redesign & UX/Product Audit — 2026-07-11
+
+Full detail in `UX_IMPROVEMENTS.md`.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Fixed real-time notifications (were completely non-functional) | ✅ | `socket.service.js` verified against nonexistent `JWT_SECRET` — every handshake silently failed |
+| Notification archive (model + endpoints + UI) | ✅ | `isArchived`/`archivedAt` additive fields, archive/unarchive per-item + bulk, dedicated archive view |
+| Real bulk notification endpoints | ✅ | `PATCH/DELETE /notifications/bulk` replace N-sequential-request loops |
+| Fixed dead "select all" control | ✅ | Function existed but was never wired to any UI element |
+| Group-by day/category toggle | ✅ | Previously day-only |
+| Priority-aware sort within groups | ✅ | Urgent/high unread surface first |
+| Fixed silently-wrong unread badge count | ✅ | Was capped/derived from last-30-fetched list; now from dedicated unbounded count endpoint, polled + socket-reconciled |
+| Fixed broken `ConfirmDialog` (prop-name mismatch, never rendered) | ✅ | Found in `AdminArticlesPage.jsx`'s 2 existing usages; fixed + used correctly in all new dialogs |
+| Added missing deactivate/delete confirmations | ✅ | Student/teacher deactivation, teacher meeting-link delete, website testimonial/FAQ delete |
+| Admin dashboard `PendingTasksCard` | ✅ | Consolidates 2 separate banners + new ungraded-homework signal |
+| New `pendingHomeworkGrading` admin stat | ✅ | Bounded aggregation, previously no admin visibility into grading backlog |
+| Subscriptions page search | ✅ | Backend `search` param (resolves via User) + frontend search box + shared EmptyState |
+| Live verification: 41 pages × 3 roles | ✅ | Zero errors; `npm run build` clean; `npx jest` 96/96 |
+
+### Known limitations / follow-ups
+- Notification pagination beyond 100-item fetch still deferred (documented, adequate at current volume).
+- No dedicated admin homework-oversight page (count + link to teacher exists; per-item drill-down would be a new page, not a widget fix).
+- `AdminEnrollmentsPage` still has no search (lower priority — naturally bounded volume, has status-tab triage).
+
+---
+
+## Full-Platform Seeder, Live Audit & Documentation Pass — 2026-07-11
+
+Full detail in `FINAL_REPORT.md`.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Audit seeder request against real schema + SCOPE_OF_WORK.md | ✅ | Found 8 requested entities (Wallet, Payments, Certificates, Quizzes, Support Tickets, Parent role, Achievements, Classrooms) with no backing model — user chose to seed only what's real |
+| Comprehensive seeder covering all 22 real models | ✅ | `server/src/seed/seed.js` — 26 users, 8 courses, 18 subscriptions (all statuses), ~100 sessions with full payroll/attendance fields, articles, notifications, audit logs, etc. |
+| Run seeder, verify DB population | ✅ | `npm run seed` clean run against real MongoDB |
+| Live headless-browser audit, all 3 roles, all sidebar pages | ✅ | Playwright, real client-side navigation (not reloads) to avoid false positives from in-memory-token loss |
+| Refresh-token/reload resilience check | ✅ | Confirmed a hard reload while authenticated correctly recovers session via httpOnly cookie |
+| Fixed real bug: `AdminSubscriptionsPage` crash | ✅ | Shared React Query cache key unwrapped inconsistently across 5 admin pages — standardized to array shape everywhere |
+| `npm run build` verification after fix | ✅ | Zero errors |
+| `docs/` folder — 11 new files | ✅ | SYSTEM_OVERVIEW, FEATURES, WORKFLOW, PERMISSIONS, API_REFERENCE, ATTENDANCE_SYSTEM, ADMIN/TEACHER/STUDENT_GUIDE, SEEDER_GUIDE, DEPLOYMENT, KNOWN_LIMITATIONS |
+| Arabic client manual | ✅ | `دليل استخدام المنصة.md` — honest about what's built vs. not (no certificates/chat yet) |
+| `FINAL_REPORT.md` | ✅ | Full session summary |
+
+### Known limitations carried forward / newly documented
+- Out-of-scope entities (Wallet, Payments, Certificates, Quizzes, Support Tickets, Parent role, Achievements, Classrooms) remain a business decision, not a gap in this pass.
+- Open business-policy question (does student absence affect teacher pay?) — unchanged, still deliberately open.
+- Query-key hygiene is now a documented convention (`API_REFERENCE.md`) to prevent this bug class from recurring.
+
+---
+
 ## Teacher Identity System & Teachers Page Refactor — 2026-07-04
 
 Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
@@ -606,4 +683,7 @@ Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
 | **Success Stories Homepage Section** | **13** | **13** | **0** |
 | **Intelligent Attendance / Payroll-Ready Operations** | **19** | **19** | **0** |
 | **Admin Operations Center + Review Queue + Dedupe** | **19** | **19** | **0** |
-| **TOTAL** | **280** | **280** | **0** |
+| **Full-Platform Seeder, Live Audit & Documentation Pass** | **10** | **10** | **0** |
+| **Notification Center Redesign & UX/Product Audit** | **13** | **13** | **0** |
+| **Operations Center Full Audit & Rebuild** | **14** | **14** | **0** |
+| **TOTAL** | **317** | **317** | **0** |

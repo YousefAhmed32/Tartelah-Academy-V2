@@ -8,6 +8,7 @@ router.get('/testimonials', ctrl.getTestimonials)
 router.get('/faqs', ctrl.getFAQs)
 router.get('/settings', ctrl.getSettings)
 router.post('/contact', ctrl.submitContactForm)
+router.post('/newsletter', ctrl.subscribeNewsletter)
 
 // Admin-only routes
 router.use(authenticate, isAdmin)

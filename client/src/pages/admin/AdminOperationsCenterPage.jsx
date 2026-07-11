@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Radio, Clock, UserX, Link2Off, Timer, ClipboardCheck, CheckCircle2, Ban,
-  ShieldAlert, ChevronDown, RefreshCw, Eye, Check, X,
+  ShieldAlert, ChevronDown, RefreshCw, Eye, Check, X, AlertTriangle, Wifi,
+  TrendingUp, Users, Wallet, ArrowLeft, Send, ListChecks, CalendarClock,
 } from 'lucide-react'
+import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
@@ -14,27 +17,86 @@ import ErrorState from '../../components/shared/ErrorState.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import { formatDateAr, formatTimeAr, formatDateTimeAr } from '../../utils/date.js'
-import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, getFileUrl } from '../../config/constants.js'
+import { formatCurrency } from '../../utils/format.js'
+import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, ROUTES, getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'h-9 bg-gray-50 border border-gray-200 rounded-xl px-3 text-sm text-gray-700 outline-none focus:border-violet-400 cursor-pointer'
 
 // ── Small building blocks ──────────────────────────────────────────────────
 
-function StatTile({ label, value, Icon, color, onClick, muted }) {
+function StatTile({ label, value, Icon, color, onClick, tone = 'neutral' }) {
+  // `tone` drives a subtle left-edge accent so the grid reads by urgency at a
+  // glance (critical/warning/info/positive/neutral) instead of every tile
+  // looking equally important.
+  const toneBorder = {
+    critical: value > 0 ? '#ef444440' : '#f3f4f6',
+    warning: value > 0 ? '#f59e0b40' : '#f3f4f6',
+    info: '#e5e7eb',
+    positive: '#e5e7eb',
+    neutral: '#f3f4f6',
+  }[tone]
   return (
     <button onClick={onClick} disabled={!onClick}
-      className={`text-start bg-white rounded-2xl p-4 border border-gray-100 shadow-sm transition-all ${onClick ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'cursor-default'}`}>
+      className={`text-start bg-white rounded-2xl p-3.5 border shadow-sm transition-all ${onClick ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'cursor-default'}`}
+      style={{ borderColor: toneBorder }}>
       <div className="flex items-center justify-between mb-2">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
-          <Icon size={17} style={{ color }} strokeWidth={2} />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}>
+          <Icon size={15} style={{ color }} strokeWidth={2} />
         </div>
-        {!!value && !muted && value > 0 && (
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+        {(tone === 'critical' || tone === 'warning') && value > 0 && (
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
         )}
       </div>
-      <div className="font-heading font-extrabold text-2xl text-gray-900">{value ?? 0}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+      <div className="font-heading font-extrabold text-xl text-gray-900">{value ?? 0}</div>
+      <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">{label}</div>
     </button>
+  )
+}
+
+function HealthCard({ label, value, Icon, color, sub, rateBased }) {
+  // For rate-based metrics (percentages), color reflects whether the number
+  // itself is good/borderline/bad — not a fixed brand color — so a 30%
+  // attendance rate reads as alarming even though the card layout is calm.
+  let displayColor = color
+  if (rateBased && typeof value === 'number') {
+    displayColor = value >= 80 ? '#22c55e' : value >= 50 ? '#f59e0b' : '#ef4444'
+  }
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-none" style={{ background: `${displayColor}15` }}>
+        <Icon size={18} style={{ color: displayColor }} strokeWidth={2} />
+      </div>
+      <div className="min-w-0">
+        <div className="font-heading font-extrabold text-lg text-gray-900 leading-none" style={{ color: rateBased ? displayColor : undefined }}>
+          {value === null || value === undefined ? '—' : rateBased ? `${value}%` : value}
+        </div>
+        <div className="text-[11px] text-gray-500 mt-1 truncate">{label}</div>
+        {sub && <div className="text-[10px] text-gray-400 mt-0.5">{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
+function CriticalAlertBanner({ count, onClick }) {
+  if (!count) return null
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-start transition-all hover:shadow-md"
+      style={{ background: 'linear-gradient(90deg, #fef2f2, #fff)', border: '1px solid #fecaca' }}
+    >
+      <div className="w-9 h-9 rounded-xl bg-red-500 flex items-center justify-center flex-none">
+        <AlertTriangle size={17} className="text-white" />
+      </div>
+      <div className="flex-1">
+        <div className="font-bold text-red-800 text-sm">
+          {count} {count === 1 ? 'حصة تحتاج تدخلاً فورياً' : 'حصص تحتاج تدخلاً فورياً'}
+        </div>
+        <div className="text-xs text-red-500 mt-0.5">بيانات متعارضة تحتاج مراجعة الإدارة مباشرة — لا تنتظر</div>
+      </div>
+      <ArrowLeft size={16} className="text-red-400 flex-none" />
+    </motion.button>
   )
 }
 
@@ -50,37 +112,61 @@ function PersonPair({ session }) {
   )
 }
 
-function MiniSessionCard({ session }) {
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
-      <PersonPair session={session} />
-      <div className="ms-auto text-end flex-none">
-        <div className="text-xs font-semibold text-gray-700">{formatTimeAr(session.scheduledAt)}</div>
-        <div className="text-[10px] text-gray-400">{session.titleAr}</div>
-      </div>
-    </div>
-  )
+// One reason config per source bucket in the "needs attention" feed —
+// severity drives sort order (higher first) when a session is only in one
+// bucket; sessions in multiple buckets show every relevant badge on one row.
+const ATTENTION_REASONS = {
+  missingCheckIn: { label: 'لم يسجّل المعلم حضوره', color: '#ef4444', Icon: UserX, severity: 3 },
+  noShow: { label: 'المعلم لم يحضر الحصة', color: '#ef4444', Icon: UserX, severity: 3 },
+  lateTeachers: { label: 'تأخر المعلم عن الموعد', color: '#f59e0b', Icon: Timer, severity: 2 },
+  missingLink: { label: 'بلا رابط اجتماع', color: '#f59e0b', Icon: Link2Off, severity: 2 },
+  attendancePending: { label: 'حضور بانتظار الاعتماد', color: '#0ea5e9', Icon: ClipboardCheck, severity: 1 },
 }
 
-function LiveSection({ title, Icon, color, items }) {
-  if (!items?.length) return null
+function buildAttentionFeed(sections) {
+  const map = new Map()
+  for (const [bucketKey, reason] of Object.entries(ATTENTION_REASONS)) {
+    for (const s of sections[bucketKey] || []) {
+      const entry = map.get(s._id) || { session: s, reasons: [] }
+      entry.reasons.push(reason)
+      map.set(s._id, entry)
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    const maxA = Math.max(...a.reasons.map(r => r.severity))
+    const maxB = Math.max(...b.reasons.map(r => r.severity))
+    if (maxA !== maxB) return maxB - maxA
+    return new Date(a.session.scheduledAt) - new Date(b.session.scheduledAt)
+  })
+}
+
+function AttentionFeedRow({ entry, onOpenReview }) {
+  const { session, reasons } = entry
   return (
-    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon size={15} style={{ color }} />
-        <span className="text-sm font-bold text-gray-800">{title}</span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{items.length}</span>
+    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition-colors">
+      <PersonPair session={session} />
+      <div className="flex-1 flex flex-wrap gap-1.5 justify-end">
+        {reasons.map((r, i) => (
+          <span key={i} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full flex-none"
+            style={{ background: `${r.color}15`, color: r.color }}>
+            <r.Icon size={10} /> {r.label}
+          </span>
+        ))}
       </div>
-      <div className="space-y-2">
-        {items.map(s => <MiniSessionCard key={s._id} session={s} />)}
+      <div className="text-end flex-none w-16">
+        <div className="text-xs font-bold text-gray-700">{formatTimeAr(session.scheduledAt)}</div>
       </div>
+      <button onClick={() => onOpenReview(session)} title="مراجعة"
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-none bg-white border border-gray-200 hover:border-violet-300 hover:bg-violet-50 transition-colors">
+        <Eye size={13} className="text-gray-400" />
+      </button>
     </div>
   )
 }
 
 // ── Live Now tab ────────────────────────────────────────────────────────────
 
-function LiveTab({ onGoToTimeline }) {
+function LiveTab({ onGoToTimeline, onGoToReview }) {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['admin', 'operations', 'live'],
     queryFn: () => api.get('/operations/live').then(r => r.data.data),
@@ -90,49 +176,94 @@ function LiveTab({ onGoToTimeline }) {
     refetchInterval: 60000,
   })
 
+  const attentionFeed = useMemo(() => data ? buildAttentionFeed(data.sections) : [], [data])
+
   if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-violet-600" /></div>
   if (isError) return <ErrorState onRetry={refetch} isRetrying={isFetching} />
 
   const c = data.counts
-  const s = data.sections
+  const h = data.health
 
   return (
     <div className="space-y-5">
+      <CriticalAlertBanner count={c.criticalReviewCount} onClick={onGoToReview} />
+
+      {/* Operational health — "is the platform healthy right now", not just "what's broken" */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="جارية الآن" value={c.liveNow} Icon={Radio} color="#22c55e" onClick={() => onGoToTimeline({ status: 'ongoing' })} />
-        <StatTile label="تبدأ قريباً" value={c.startingSoon} Icon={Clock} color="#7c3aed" onClick={() => onGoToTimeline({ status: 'scheduled' })} />
-        <StatTile label="لم يسجّل المعلم حضوره" value={c.missingCheckIn} Icon={UserX} color="#ef4444" onClick={() => onGoToTimeline({ needsReview: true })} />
-        <StatTile label="بلا رابط اجتماع" value={c.missingLink} Icon={Link2Off} color="#f59e0b" onClick={() => onGoToTimeline({ needsReview: true })} />
-        <StatTile label="معلمون متأخرون" value={c.lateTeachers} Icon={Timer} color="#f59e0b" onClick={() => onGoToTimeline({})} />
-        <StatTile label="حضور بانتظار الاعتماد" value={c.attendancePending} Icon={ClipboardCheck} color="#0ea5e9" onClick={() => onGoToTimeline({ status: 'completed' })} />
-        <StatTile label="اكتملت اليوم" value={c.recentlyCompleted} Icon={CheckCircle2} color="#22c55e" muted onClick={() => onGoToTimeline({ status: 'completed' })} />
-        <StatTile label="ملغاة / معاد جدولتها" value={c.cancelledOrRescheduled} Icon={Ban} color="#6b7280" muted onClick={() => onGoToTimeline({ status: 'cancelled' })} />
+        <HealthCard label="نسبة حضور الطلاب اليوم" value={h.attendanceRateToday} Icon={TrendingUp} color="#22c55e" rateBased
+          sub={h.attendanceRateToday === null ? 'لا بيانات بعد' : undefined} />
+        <HealthCard label="التزام المعلمين بالموعد" value={h.teacherOnTimeRateToday} Icon={CheckCircle2} color="#7c3aed" rateBased
+          sub={h.teacherOnTimeRateToday === null ? 'لا بيانات بعد' : undefined} />
+        <HealthCard label="إيرادات اليوم" value={formatCurrency(h.revenueToday, 'SAR')} Icon={Wallet} color="#0ea5e9" />
+        <HealthCard label="متصل الآن" value={h.onlineNow.teacher + h.onlineNow.student} Icon={Wifi} color="#f59e0b"
+          sub={`${h.onlineNow.teacher} معلم · ${h.onlineNow.student} طالب`} />
+      </div>
+
+      {/* Stat grid — colored by urgency (critical → warning → info → positive/neutral) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <StatTile label="جارية الآن" value={c.liveNow} Icon={Radio} color="#22c55e" tone="positive" onClick={() => onGoToTimeline({ status: 'ongoing' })} />
+        <StatTile label="تبدأ قريباً" value={c.startingSoon} Icon={Clock} color="#7c3aed" tone="info" onClick={() => onGoToTimeline({ status: 'scheduled' })} />
+        <StatTile label="لم يسجّل المعلم حضوره" value={c.missingCheckIn} Icon={UserX} color="#ef4444" tone="critical" onClick={onGoToReview} />
+        <StatTile label="المعلم لم يحضر" value={c.noShow} Icon={UserX} color="#ef4444" tone="critical" onClick={() => onGoToTimeline({ status: 'no_show' })} />
+        <StatTile label="بلا رابط اجتماع" value={c.missingLink} Icon={Link2Off} color="#f59e0b" tone="warning" onClick={onGoToReview} />
+        <StatTile label="معلمون متأخرون" value={c.lateTeachers} Icon={Timer} color="#f59e0b" tone="warning" onClick={() => onGoToTimeline({})} />
+        <StatTile label="حضور بانتظار الاعتماد" value={c.attendancePending} Icon={ClipboardCheck} color="#0ea5e9" tone="warning" onClick={() => onGoToTimeline({ status: 'completed' })} />
+        <StatTile label="غياب طلاب اليوم" value={c.studentAbsencesToday} Icon={UserX} color="#f59e0b" tone="warning" onClick={() => onGoToTimeline({ status: 'completed' })} />
+        <StatTile label="اكتملت اليوم" value={c.recentlyCompleted} Icon={CheckCircle2} color="#22c55e" tone="positive" onClick={() => onGoToTimeline({ status: 'completed' })} />
+        <StatTile label="ملغاة / معاد جدولتها" value={c.cancelledOrRescheduled} Icon={Ban} color="#6b7280" tone="neutral" onClick={() => onGoToTimeline({ status: 'cancelled' })} />
       </div>
 
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">
         <ShieldAlert size={16} className="text-amber-500 flex-none" />
         <span className="text-sm text-gray-700">
-          <b className="text-gray-900">{c.needsReviewCount}</b> حصة بحاجة مراجعة
+          <b className="text-gray-900">{c.needsReviewCount}</b> حصة بحاجة مراجعة (آخر 14 يوماً)
           {c.criticalReviewCount > 0 && <span className="text-red-600"> — {c.criticalReviewCount} حرجة</span>}
           {c.highReviewCount > 0 && <span className="text-orange-600"> — {c.highReviewCount} عالية الأولوية</span>}
         </span>
         <span className="text-sm text-gray-500 me-auto">
           <b className="text-gray-900">{c.payrollReviewCount}</b> حصة تنتظر قرار الإدارة بشأن الراتب
         </span>
+        <button onClick={onGoToReview} className="text-xs font-bold text-violet-600 hover:text-violet-800 flex items-center gap-1">
+          فتح قائمة المراجعة <ArrowLeft size={12} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <LiveSection title="جارية الآن" Icon={Radio} color="#22c55e" items={s.liveNow} />
-        <LiveSection title="تبدأ قريباً" Icon={Clock} color="#7c3aed" items={s.startingSoon} />
-        <LiveSection title="لم يسجّل المعلم حضوره" Icon={UserX} color="#ef4444" items={s.missingCheckIn} />
-        <LiveSection title="بلا رابط اجتماع" Icon={Link2Off} color="#f59e0b" items={s.missingLink} />
-        <LiveSection title="معلمون متأخرون اليوم" Icon={Timer} color="#f59e0b" items={s.lateTeachers} />
-        <LiveSection title="حضور بانتظار الاعتماد" Icon={ClipboardCheck} color="#0ea5e9" items={s.attendancePending} />
+      {/* Quick actions — the "what should I do next" surface */}
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onGoToTimeline({})} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-700 transition-colors">
+          <CalendarClock size={13} /> الجدول الزمني الكامل
+        </button>
+        <button onClick={onGoToReview} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-700 transition-colors">
+          <ListChecks size={13} /> قائمة المراجعة الكاملة
+        </button>
+        <RouterLink to={ROUTES.ADMIN_NOTIFICATIONS} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-700 transition-colors">
+          <Send size={13} /> إرسال إشعار جماعي
+        </RouterLink>
       </div>
 
-      {!c.liveNow && !c.startingSoon && !c.missingCheckIn && !c.missingLink && !c.lateTeachers && !c.attendancePending && (
-        <EmptyState icon={<CheckCircle2 size={28} strokeWidth={1.6} />} title="لا شيء يحتاج انتباهك الآن" description="جميع حصص اليوم إما مكتملة أو ما زالت ضمن الجدول الطبيعي" />
-      )}
+      {/* Unified "needs attention" feed — one sorted list instead of 5 boxes repeating the same sessions */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <ShieldAlert size={15} className="text-gray-400" />
+          <span className="text-sm font-bold text-gray-800">يحتاج انتباهك الآن</span>
+          {attentionFeed.length > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{attentionFeed.length}</span>
+          )}
+        </div>
+        {attentionFeed.length ? (
+          <div className="space-y-2">
+            <AnimatePresence>
+              {attentionFeed.map(entry => (
+                <motion.div key={entry.session._id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <AttentionFeedRow entry={entry} onOpenReview={onGoToReview} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <EmptyState icon={<CheckCircle2 size={26} strokeWidth={1.6} />} title="لا شيء يحتاج انتباهك الآن" description="جميع حصص اليوم إما مكتملة أو ما زالت ضمن الجدول الطبيعي" />
+        )}
+      </div>
     </div>
   )
 }
@@ -210,12 +341,11 @@ function TimelineTab({ initialFilters = {} }) {
   const [needsReview, setNeedsReview] = useState(!!initialFilters.needsReview)
   const [page, setPage] = useState(1)
 
-  const { data: teachersData } = useQuery({
+  const { data: teachers = [] } = useQuery({
     queryKey: ['admin', 'teachers', 'all'],
-    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data),
+    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data),
     staleTime: 5 * 60 * 1000,
   })
-  const teachers = teachersData?.data || []
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['admin', 'operations', 'timeline', date, teacherId, status, payrollStatus, needsReview, page],
@@ -451,6 +581,10 @@ export default function AdminOperationsCenterPage() {
     setTab('timeline')
   }
 
+  function goToReview() {
+    setTab('review')
+  }
+
   return (
     <div dir="rtl" className="space-y-5 max-w-[1400px]">
       <PageHeader title="مركز العمليات" subtitle="نظرة تشغيلية فورية على الأكاديمية — ما يحدث الآن وما يحتاج إجراءً" />
@@ -464,7 +598,7 @@ export default function AdminOperationsCenterPage() {
         ))}
       </div>
 
-      {tab === 'live' && <LiveTab onGoToTimeline={goToTimeline} />}
+      {tab === 'live' && <LiveTab onGoToTimeline={goToTimeline} onGoToReview={goToReview} />}
       {tab === 'timeline' && <TimelineTab key={timelineKey} initialFilters={timelineFilters} />}
       {tab === 'review' && <ReviewQueueTab />}
     </div>

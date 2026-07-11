@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save } from 'lucide-react'
@@ -121,7 +121,7 @@ function AcademyTab() {
   })
 
   // Fill form when data loads
-  useState(() => {
+  useEffect(() => {
     if (data) setForm(f => ({ ...f, ...data }))
   }, [data])
 

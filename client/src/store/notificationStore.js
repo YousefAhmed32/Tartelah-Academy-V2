@@ -8,10 +8,12 @@ export const useNotificationStore = create((set) => ({
 
   setUnreadCount: (count) => set({ unreadCount: count }),
 
-  setNotifications: (notifications) => set({
-    notifications,
-    unreadCount: notifications.filter(n => !n.isRead).length,
-  }),
+  // Does NOT derive unreadCount from this list — the list is capped (last ~30
+  // fetched) so counting within it would silently undercount whenever a user
+  // has more unread notifications than that cap. unreadCount is kept in sync
+  // separately from the dedicated /notifications/unread-count endpoint (see
+  // useNotificationInit.js), which is the only authoritative source.
+  setNotifications: (notifications) => set({ notifications }),
 
   prependNotifications: (list) => set((s) => {
     const existing = new Set(s.notifications.map(n => n._id))

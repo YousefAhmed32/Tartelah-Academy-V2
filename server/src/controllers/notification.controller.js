@@ -6,11 +6,14 @@ const socketService = require('../services/socket.service')
 
 exports.getMyNotifications = async (req, res, next) => {
   try {
-    const { page = 1, limit = 30, type, isRead } = req.query
+    const { page = 1, limit = 30, type, isRead, isArchived } = req.query
     const filter = { userId: req.user._id }
     if (type && type !== 'all') filter.type = type
     if (isRead === 'true') filter.isRead = true
     if (isRead === 'false') filter.isRead = false
+    // Archived notifications are hidden from the default/inbox view unless explicitly requested —
+    // mirrors the "archive" mental model (out of the way, not deleted, still reachable).
+    filter.isArchived = isArchived === 'true'
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
     const [notifications, total] = await Promise.all([
@@ -25,7 +28,7 @@ exports.getMyNotifications = async (req, res, next) => {
 
 exports.getUnreadCount = async (req, res, next) => {
   try {
-    const count = await Notification.countDocuments({ userId: req.user._id, isRead: false })
+    const count = await Notification.countDocuments({ userId: req.user._id, isRead: false, isArchived: false })
     sendSuccess(res, { count })
   } catch (err) {
     next(err)
@@ -86,6 +89,72 @@ exports.deleteAllRead = async (req, res, next) => {
   try {
     const result = await Notification.deleteMany({ userId: req.user._id, isRead: true })
     sendSuccess(res, { deleted: result.deletedCount }, 'تم حذف الإشعارات المقروءة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.archiveOne = async (req, res, next) => {
+  try {
+    const notif = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { isArchived: true, archivedAt: new Date() },
+      { new: true }
+    )
+    if (!notif) return res.status(404).json({ success: false, message: 'الإشعار غير موجود' })
+    sendSuccess(res, notif, 'تمت أرشفة الإشعار')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.unarchiveOne = async (req, res, next) => {
+  try {
+    const notif = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { isArchived: false, $unset: { archivedAt: 1 } },
+      { new: true }
+    )
+    if (!notif) return res.status(404).json({ success: false, message: 'الإشعار غير موجود' })
+    sendSuccess(res, notif, 'تمت إعادة الإشعار من الأرشيف')
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Bulk actions operate only on the requesting user's own notifications — the
+// id list is client-supplied, so every write is still scoped by `userId` to
+// prevent one user from touching another's notifications by guessing ids.
+const BULK_ACTIONS = {
+  read:      { isRead: true, readAt: new Date() },
+  unread:    { isRead: false, $unset: { readAt: 1 } },
+  archive:   { isArchived: true, archivedAt: new Date() },
+  unarchive: { isArchived: false, $unset: { archivedAt: 1 } },
+}
+
+exports.bulkUpdate = async (req, res, next) => {
+  try {
+    const { ids, action } = req.body
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ success: false, message: 'لم يتم تحديد أي إشعار' })
+    const update = BULK_ACTIONS[action]
+    if (!update) return res.status(400).json({ success: false, message: 'إجراء غير صالح' })
+
+    const result = await Notification.updateMany(
+      { _id: { $in: ids }, userId: req.user._id },
+      update
+    )
+    sendSuccess(res, { matched: result.matchedCount, modified: result.modifiedCount }, 'تم تحديث الإشعارات المحددة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.bulkDelete = async (req, res, next) => {
+  try {
+    const { ids } = req.body
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ success: false, message: 'لم يتم تحديد أي إشعار' })
+    const result = await Notification.deleteMany({ _id: { $in: ids }, userId: req.user._id })
+    sendSuccess(res, { deleted: result.deletedCount }, 'تم حذف الإشعارات المحددة')
   } catch (err) {
     next(err)
   }

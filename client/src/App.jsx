@@ -1,9 +1,12 @@
-import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useInitAuth } from './hooks/useAuth.js'
 import { useAuthStore } from './store/authStore.js'
 import { ROUTES } from './config/constants.js'
 import LoadingPage from './components/shared/LoadingPage.jsx'
+import { queryClient } from './config/queryClient.js'
+import api from './utils/api.js'
+import { QK } from './services/queryKeys.js'
 
 // Layouts
 import PublicLayout from './layouts/PublicLayout.jsx'
@@ -105,8 +108,27 @@ function RootRedirect() {
   return <Navigate to={ROUTES.HOME} replace />
 }
 
+// The homepage's HomePage.jsx (and every section inside it, including
+// SuccessStoriesSection) sits behind a lazy() route chunk — its useQuery
+// calls can't fire until that chunk downloads, parses, and mounts. Firing
+// the same request here, from App.jsx (never lazy-loaded), lets it race
+// the chunk download over the network instead of waiting for it: by the
+// time SuccessStoriesSection mounts and calls useQuery with the identical
+// key, the cache is usually already warm and it renders immediately.
+function useHomepagePrefetch() {
+  const location = useLocation()
+  useEffect(() => {
+    if (location.pathname !== ROUTES.HOME) return
+    queryClient.prefetchQuery({
+      queryKey: QK.SUCCESS_STORIES,
+      queryFn: () => api.get('/success-stories').then(r => r.data.data),
+    })
+  }, [location.pathname])
+}
+
 export default function App() {
   useInitAuth()
+  useHomepagePrefetch()
   const { isLoading } = useAuthStore()
 
   if (isLoading) return <LoadingPage dark />

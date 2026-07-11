@@ -6,9 +6,11 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import api from '../../utils/api.js'
 import { getFileUrl } from '../../config/constants.js'
+import { QK } from '../../services/queryKeys.js'
+import RevealSection from '../motion/RevealSection.jsx'
 
 // ── Animation preset (matches TestimonialsSection.jsx) ────────────────────────
 
@@ -183,13 +185,15 @@ function StoryBanner({ banner }) {
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function Skeleton() {
+  // Rendered inside the same maxWidth/padding container as the real content
+  // (no wrapper of its own) so the skeleton occupies the identical width —
+  // otherwise an extra padding layer here would make it narrower than the
+  // real grid and cause a horizontal shift the moment content resolves.
   return (
-    <div style={{ maxWidth: 1340, margin: '0 auto', padding: '0 clamp(20px,5vw,68px)' }}>
-      <div className="success-story-skel-row">
-        {[0, 1, 2].map(i => (
-          <div key={i} className="success-story-skel-card" />
-        ))}
-      </div>
+    <div className="success-story-skel-row">
+      {[0, 1, 2].map(i => (
+        <div key={i} className="success-story-skel-card" />
+      ))}
     </div>
   )
 }
@@ -197,30 +201,28 @@ function Skeleton() {
 // ── Main section ──────────────────────────────────────────────────────────────
 
 export default function SuccessStoriesSection() {
+  const reducedMotion = !!useReducedMotion()
+  // No local staleTime override — this is admin-managed content that rarely
+  // changes, so it should ride the app's global 5min staleTime/10min gcTime
+  // (config/queryClient.js) rather than the shorter one this used to set
+  // locally. Combined with the prefetch fired from App.jsx on route match
+  // (before the HomePage route chunk even downloads), this query is almost
+  // always already resolved in cache by the time this component mounts.
   const { data, isLoading } = useQuery({
-    queryKey: ['success-stories'],
+    queryKey: QK.SUCCESS_STORIES,
     queryFn: () => api.get('/success-stories').then(r => r.data.data),
-    staleTime: 60_000,
   })
 
-  if (isLoading) {
-    return (
-      <section dir="rtl" style={{ background: '#150636', padding: 'clamp(64px,8vw,100px) 0', overflow: 'hidden' }}>
-        <Skeleton />
-      </section>
-    )
-  }
+  if (!isLoading && (!data || !data.isActive)) return null
 
-  if (!data || !data.isActive) return null
-
-  const activeCards = (data.cards || [])
+  const activeCards = (data?.cards || [])
     .filter(c => c.isActive && (c.image || c.nameAr))
     .sort((a, b) => a.order - b.order)
 
-  const bannerReady = data.banner?.isActive && data.banner?.image
+  const bannerReady = data?.banner?.isActive && data?.banner?.image
 
-  if (data.displayMode === 'cards' && activeCards.length === 0) return null
-  if (data.displayMode === 'banner' && !bannerReady) return null
+  if (!isLoading && data.displayMode === 'cards' && activeCards.length === 0) return null
+  if (!isLoading && data.displayMode === 'banner' && !bannerReady) return null
 
   return (
     <section
@@ -239,7 +241,8 @@ export default function SuccessStoriesSection() {
 
       <div style={{ maxWidth: 1340, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
-        {/* Header */}
+        {/* Header — always rendered, loading or not, so the section never
+            swaps its entire shell/height once data resolves. */}
         <motion.div {...fadeUp(0)} style={{ textAlign: 'center', marginBottom: 'clamp(40px,5vw,64px)' }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 18,
@@ -260,15 +263,26 @@ export default function SuccessStoriesSection() {
           </p>
         </motion.div>
 
-        {/* Content */}
-        {data.displayMode === 'banner' ? (
-          <StoryBanner banner={data.banner} />
+        {/* Content — only THIS part swaps between skeleton and real cards,
+            with a fast, early-triggering fade (not the previous circular
+            clip-path reveal, which held already-loaded content fully
+            invisible for over a second — exactly the "empty purple void"
+            this was built to prevent). viewportMargin is positive so it
+            starts revealing before the section is even fully in view. */}
+        {isLoading ? (
+          <Skeleton />
         ) : (
-          <div className="success-story-grid">
-            {activeCards.map((card, i) => (
-              <StoryCard key={card.role} card={card} delay={0.12 + i * 0.1} />
-            ))}
-          </div>
+          <RevealSection from="up" distance={16} duration={0.45} viewportMargin="200px" reducedMotion={reducedMotion}>
+            {data.displayMode === 'banner' ? (
+              <StoryBanner banner={data.banner} />
+            ) : (
+              <div className="success-story-grid">
+                {activeCards.map((card, i) => (
+                  <StoryCard key={card.role} card={card} delay={reducedMotion ? 0 : 0.05 + i * 0.06} />
+                ))}
+              </div>
+            )}
+          </RevealSection>
         )}
       </div>
 

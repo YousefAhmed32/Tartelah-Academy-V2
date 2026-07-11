@@ -10,9 +10,12 @@
 // that bounded, already-fetched set — never as a second per-row query.
 
 const Session = require('../models/Session')
+const Attendance = require('../models/Attendance')
+const Subscription = require('../models/Subscription')
 const { getSessionWindow } = require('../config/attendancePolicy')
 const { assessSessionReview, computeConfidence, SEVERITY_RANK } = require('../services/sessionIntelligence.service')
 const { logAction } = require('../services/audit.service')
+const { getOnlineCounts } = require('../services/socket.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 
@@ -50,7 +53,13 @@ exports.getLiveSummary = async (req, res, next) => {
     const buckets = {
       liveNow: [], startingSoon: [], missingCheckIn: [], missingLink: [],
       lateTeachers: [], attendancePending: [], recentlyCompleted: [], cancelledOrRescheduled: [],
+      noShow: [],
     }
+
+    // Teacher on-time rate — computed only over today's sessions where the
+    // teacher's attendance has actually been resolved one way or another
+    // (pending check-ins are excluded, not counted as "late").
+    let teacherResolvedCount = 0, teacherOnTimeCount = 0
 
     for (const s of today) {
       const window = getSessionWindow(s.scheduledAt, s.durationMinutes, now)
@@ -67,15 +76,30 @@ exports.getLiveSummary = async (req, res, next) => {
       if (s.status === 'completed' && !s.attendanceFinalizedAt) buckets.attendancePending.push(s)
       if (s.status === 'completed') buckets.recentlyCompleted.push(s)
       if (['cancelled', 'rescheduled'].includes(s.status)) buckets.cancelledOrRescheduled.push(s)
+      if (s.status === 'no_show') buckets.noShow.push(s)
+
+      if (['on_time', 'late', 'absent'].includes(s.teacherAttendanceStatus)) {
+        teacherResolvedCount++
+        if (s.teacherAttendanceStatus === 'on_time') teacherOnTimeCount++
+      }
     }
+
+    const todaySessionIds = today.map(s => s._id)
 
     // Payroll/review counts intentionally look a bit further back than
     // "today" — a session flagged three days ago still needs attention.
     const reviewFrom = new Date(now.getTime() - DEFAULT_REVIEW_WINDOW_DAYS * 86400000)
-    const [payrollReviewCount, reviewCandidates] = await Promise.all([
+    const [payrollReviewCount, reviewCandidates, todayAttendance, revenueTodayAgg] = await Promise.all([
       Session.countDocuments({ payrollStatus: 'pending_review' }),
       Session.find({ scheduledAt: { $gte: reviewFrom, $lte: now }, reviewState: { $nin: ['resolved', 'dismissed'] } })
         .select(TIMELINE_SELECT).limit(CANDIDATE_HARD_CAP),
+      // Today's finalized student attendance — powers both the absence count
+      // and the attendance-rate metric from real records, not an assumption.
+      Attendance.find({ sessionId: { $in: todaySessionIds } }).select('status'),
+      Subscription.aggregate([
+        { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
+        { $group: { _id: null, sum: { $sum: '$amountPaid' } } },
+      ]),
     ])
 
     let criticalCount = 0, highCount = 0, needsReviewCount = 0
@@ -87,6 +111,12 @@ exports.getLiveSummary = async (req, res, next) => {
       else if (assessment.severity === 'high') highCount++
     }
 
+    const studentAbsencesToday = todayAttendance.filter(a => a.status === 'absent').length
+    const attendedToday = todayAttendance.filter(a => ['present', 'late'].includes(a.status)).length
+    const attendanceRateToday = todayAttendance.length ? Math.round((attendedToday / todayAttendance.length) * 100) : null
+    const teacherOnTimeRateToday = teacherResolvedCount ? Math.round((teacherOnTimeCount / teacherResolvedCount) * 100) : null
+    const onlineNow = getOnlineCounts()
+
     sendSuccess(res, {
       counts: {
         liveNow: buckets.liveNow.length,
@@ -97,10 +127,18 @@ exports.getLiveSummary = async (req, res, next) => {
         attendancePending: buckets.attendancePending.length,
         recentlyCompleted: buckets.recentlyCompleted.length,
         cancelledOrRescheduled: buckets.cancelledOrRescheduled.length,
+        noShow: buckets.noShow.length,
         payrollReviewCount,
         needsReviewCount,
         criticalReviewCount: criticalCount,
         highReviewCount: highCount,
+        studentAbsencesToday,
+      },
+      health: {
+        attendanceRateToday,
+        teacherOnTimeRateToday,
+        revenueToday: revenueTodayAgg[0]?.sum || 0,
+        onlineNow,
       },
       sections: {
         liveNow: buckets.liveNow.slice(0, 10),
@@ -109,6 +147,7 @@ exports.getLiveSummary = async (req, res, next) => {
         missingLink: buckets.missingLink.slice(0, 10),
         lateTeachers: buckets.lateTeachers.slice(0, 10),
         attendancePending: buckets.attendancePending.slice(0, 10),
+        noShow: buckets.noShow.slice(0, 10),
       },
     })
   } catch (err) { next(err) }

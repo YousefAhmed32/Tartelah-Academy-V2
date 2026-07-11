@@ -19,6 +19,7 @@ export const QK = {
   MEMORIZATION: (studentId) => ['memorization', studentId],
   REVISION: (studentId) => ['revision', studentId],
   PACKAGES: ['packages'],
+  SUCCESS_STORIES: ['success-stories'],
   PACKAGE: (id) => ['packages', id],
   SUBSCRIPTIONS: (params) => ['subscriptions', params],
   MY_SUBSCRIPTION: ['subscriptions', 'me'],

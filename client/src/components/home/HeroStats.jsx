@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { EASE_CINEMATIC } from '../motion/motion.constants.js'
 
 // Same public metrics the old hero showed, just re-presented. Count-up is
 // self-contained here (triggers once this rail scrolls into view) so
@@ -40,7 +42,13 @@ const STAT_ICONS = {
 export default function HeroStats() {
   const [counts, startCount] = useCountUp({ students: 20, teachers: 120, hours: 10, rating: 4.9 })
   const railRef = useRef(null)
+  const reducedMotion = !!useReducedMotion()
 
+  // Only drives the numeric count-up. Visual reveal is handled by
+  // whileInView below (same mechanism as the rest of the homepage) so a
+  // missed/late observer attach here can never leave the stats permanently
+  // at opacity:0 — previously this gated `animate` itself and, if the
+  // observer never fired, the whole row stayed invisible forever.
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) startCount() }, { threshold: 0.3 })
     if (railRef.current) obs.observe(railRef.current)
@@ -58,7 +66,15 @@ export default function HeroStats() {
   return (
     <div ref={railRef} className="hero-stats" role="list" aria-label="إحصائيات المنصة">
       {items.map((item, i) => (
-        <div key={item.key} className="hero-stats__item" role="listitem">
+        <motion.div
+          key={item.key}
+          className="hero-stats__item"
+          role="listitem"
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8, y: 10 }}
+          whileInView={{ opacity: 1, scale: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: reducedMotion ? 0.3 : 0.55, delay: reducedMotion ? 0 : i * 0.09, ease: EASE_CINEMATIC }}
+        >
           {i > 0 && <span className="hero-stats__sep" aria-hidden="true" />}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="hero-stats__icon">
             {STAT_ICONS[item.key]}
@@ -67,7 +83,7 @@ export default function HeroStats() {
             <div className="hero-stats__value">{item.value}</div>
             <div className="hero-stats__label">{item.label}</div>
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   )

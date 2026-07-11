@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Edit2, Plus, Calendar, RefreshCw } from 'lucide-react'
+import { Edit2, Plus, Calendar, RefreshCw, Search } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
+import EmptyState from '../../components/shared/EmptyState.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
 
@@ -105,6 +106,7 @@ function AdjustModal({ sub, onClose }) {
 
 export default function AdminSubscriptionsPage() {
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [adjustSub, setAdjustSub] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
@@ -112,13 +114,16 @@ export default function AdminSubscriptionsPage() {
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'subscriptions', page, statusFilter],
-    queryFn: () => api.get(`/subscriptions?page=${page}&limit=20${statusFilter ? `&status=${statusFilter}` : ''}`).then(r => r.data),
+    queryKey: ['admin', 'subscriptions', page, statusFilter, search],
+    queryFn: () => api.get(`/subscriptions?page=${page}&limit=20${statusFilter ? `&status=${statusFilter}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then(r => r.data),
     placeholderData: (prev) => prev,
   })
 
-  const { data: students = [] } = useQuery({ queryKey: ['admin', 'students', 'all'], queryFn: () => api.get('/admin/students?limit=200').then(r => r.data.data) })
-  const { data: teachers = [] } = useQuery({ queryKey: ['admin', 'teachers', 'all'], queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data) })
+  // Distinct query keys from AdminSessionsPage's ['admin','students'/'teachers','all'] — that page's
+  // queryFn caches the full paginated envelope, not the array; sharing a key across differently-shaped
+  // queryFns caused this page's `.map()` to crash whenever the sessions page's cache entry won the race.
+  const { data: students = [] } = useQuery({ queryKey: ['admin', 'students', 'forSubscriptionForm'], queryFn: () => api.get('/admin/students?limit=200').then(r => r.data.data) })
+  const { data: teachers = [] } = useQuery({ queryKey: ['admin', 'teachers', 'forSubscriptionForm'], queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data) })
   const { data: packages = [] } = useQuery({ queryKey: ['packages'], queryFn: () => api.get('/packages').then(r => r.data.data) })
 
   const createMutation = useMutation({
@@ -147,14 +152,22 @@ export default function AdminSubscriptionsPage() {
       <PageHeader title="الاشتراكات" subtitle={`${data?.total || 0} اشتراك`}
         actions={<Button variant="purple" onClick={() => setShowCreate(true)}><Plus size={14} className="ml-1" /> اشتراك جديد</Button>} />
 
-      {/* Status tabs */}
-      <div className="flex gap-1 p-1 bg-[#f0ecf8] rounded-xl w-fit mb-5">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => { setStatusFilter(t.key); setPage(1) }}
-            className={`px-4 py-1.5 rounded-[10px] text-sm font-semibold transition-all ${statusFilter === t.key ? 'bg-white text-brand-textBody shadow-sm' : 'text-[#9b7fd6] hover:text-brand-textBody'}`}>
-            {t.label}
-          </button>
-        ))}
+      {/* Search + Status tabs */}
+      <div className="flex items-center gap-3 flex-wrap mb-5">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#c0b4de]" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="بحث باسم الطالب أو بريده..."
+            className="w-full h-9 bg-white border border-[#e8e0f5] rounded-xl pr-9 pl-3 text-sm text-brand-textBody placeholder-[#c0b4de] outline-none focus:border-brand-purple/40 transition-all" dir="rtl" />
+        </div>
+        <div className="flex gap-1 p-1 bg-[#f0ecf8] rounded-xl w-fit">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => { setStatusFilter(t.key); setPage(1) }}
+              className={`px-4 py-1.5 rounded-[10px] text-sm font-semibold transition-all ${statusFilter === t.key ? 'bg-white text-brand-textBody shadow-sm' : 'text-[#9b7fd6] hover:text-brand-textBody'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -211,7 +224,13 @@ export default function AdminSubscriptionsPage() {
                 })}
               </tbody>
             </table>
-            {!subs.length && <div className="text-center py-12 text-[#9b7fd6]">لا توجد اشتراكات</div>}
+            {!subs.length && (
+              <EmptyState
+                icon={<RefreshCw size={26} strokeWidth={1.6} />}
+                title={search || statusFilter ? 'لا توجد نتائج مطابقة' : 'لا توجد اشتراكات بعد'}
+                description={search || statusFilter ? 'جرّب تعديل البحث أو الفلتر' : 'ستظهر هنا الاشتراكات فور إنشائها'}
+              />
+            )}
           </div>
           {data?.totalPages > 1 && <div className="mt-4 flex justify-center"><Pagination current={page} total={data.totalPages} onChange={setPage} /></div>}
         </>

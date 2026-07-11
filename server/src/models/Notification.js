@@ -10,12 +10,15 @@ const NotificationSchema = new mongoose.Schema({
   priority:  { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
   isRead:    { type: Boolean, default: false },
   readAt:    { type: Date },
+  isArchived:  { type: Boolean, default: false },
+  archivedAt:  { type: Date },
   relatedId: { type: mongoose.Schema.Types.ObjectId },
   actionUrl: { type: String },
   metadata:  { type: mongoose.Schema.Types.Mixed },
 }, { timestamps: true })
 
-NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 })
+NotificationSchema.index({ userId: 1, isRead: 1, isArchived: 1, createdAt: -1 })
 NotificationSchema.index({ userId: 1, type: 1, createdAt: -1 })
+NotificationSchema.index({ userId: 1, isArchived: 1, createdAt: -1 })
 
 module.exports = mongoose.model('Notification', NotificationSchema)

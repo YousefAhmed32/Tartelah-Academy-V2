@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../../utils/api.js'
 import { useAiPageContext } from '../../../hooks/useAiPageContext.js'
@@ -16,7 +15,13 @@ function WhatsAppIcon(props) {
 
 const APP_MESSAGE_PREFIX = 'السلام عليكم، أحتاج مساعدة بخصوص'
 
-export default function WhatsAppFloatingButton() {
+// A menu item inside the unified FloatingActionStack — this component owns
+// only the WhatsApp-specific data (phone number, contextual prefilled
+// message); positioning, sizing, the icon-circle/label-pill chrome, and the
+// entrance animation all live in the parent stack so every action shares
+// one visual language. Preserves the exact existing number/message-building
+// behavior and the safe `target="_blank" rel="noopener noreferrer"` link.
+export default function WhatsAppFloatingButton({ onNavigate }) {
   const pageContext = useAiPageContext()
 
   const { data: settings } = useQuery({
@@ -55,27 +60,22 @@ export default function WhatsAppFloatingButton() {
   const href = `https://api.whatsapp.com/send/?phone=${whatsapp}&text=${encodeURIComponent(text)}`
 
   return (
-    <motion.a
+    <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={onNavigate}
       aria-label="تواصل معنا عبر واتساب"
       title="تواصل معنا عبر واتساب"
-      initial={{ opacity: 0, scale: 0.85, y: 12 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: 0.15 }}
-      whileHover={{ scale: 1.06 }}
-      whileTap={{ scale: 0.96 }}
-      className="group relative flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full text-white shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={{ background: '#25D366', '--tw-ring-color': '#25D366', '--tw-ring-offset-color': '#0f0226' }}
+      className="group flex items-center gap-3 outline-none"
     >
-      <WhatsAppIcon className="h-6 w-6 md:h-7 md:w-7" />
       <span
-        className="pointer-events-none absolute end-full me-3 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-        style={{ background: 'rgba(15,2,38,0.92)', color: '#E7E0F5', border: '1px solid rgba(150,120,220,0.2)' }}
+        className="fab-item-icon flex h-11 w-11 md:h-12 md:w-12 items-center justify-center rounded-full text-white shadow-lg ring-1 ring-white/10 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:scale-[1.05] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-offset-2"
+        style={{ background: 'linear-gradient(135deg, #25D366, #128C4A)', boxShadow: '0 8px 22px rgba(37,211,102,0.4)', '--tw-ring-color': '#25D366', '--tw-ring-offset-color': '#0f0226' }}
       >
-        تواصل معنا عبر واتساب
+        <WhatsAppIcon className="h-5 w-5 md:h-6 md:w-6" />
       </span>
-    </motion.a>
+      <span className="fab-item-label hidden md:inline-flex">واتساب</span>
+    </a>
   )
 }

@@ -13,7 +13,9 @@ async function getOrCreate() {
 
 exports.getPublic = async (req, res, next) => {
   try {
-    const doc = await SuccessStory.findOne()
+    // .lean() — this is a read-only public response; skip Mongoose document
+    // hydration/getters and hand back the plain object directly.
+    const doc = await SuccessStory.findOne().lean()
     if (!doc || !doc.isActive) return sendSuccess(res, null)
     sendSuccess(res, doc)
   } catch (err) { next(err) }

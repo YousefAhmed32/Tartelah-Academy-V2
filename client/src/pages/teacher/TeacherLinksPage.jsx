@@ -82,7 +82,10 @@ export default function TeacherLinksPage() {
                 <div className="flex items-center gap-2">
                   <a href={link.link} target="_blank" rel="noopener noreferrer"
                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors">فتح</a>
-                  <button onClick={() => deleteMutation.mutate(link._id)} className="text-red-500 hover:text-red-600 text-xs transition-colors font-semibold">حذف</button>
+                  <button
+                    onClick={() => { if (window.confirm(`هل تريد حذف رابط "${link.label || link.provider}"؟ قد يكون مستخدماً في حصص مجدولة.`)) deleteMutation.mutate(link._id) }}
+                    className="text-red-500 hover:text-red-600 text-xs transition-colors font-semibold"
+                  >حذف</button>
                 </div>
               </motion.div>
             )

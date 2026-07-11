@@ -1,7 +1,78 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
-2026-07-04 (latest) — Teacher Identity System & Teachers Page Refactor, + Female Teacher Quick Login follow-up
+2026-07-11 (latest) — Operations Center Full Audit & Rebuild
+
+## Status
+User reported the Admin Operations Center showing mostly-zero statistics and asked for a full investigation (not an assumption the frontend was wrong) plus a production-grade redesign. Full detail in `docs/OPERATIONS_CENTER_AUDIT.md` — summary here.
+
+**Root cause:** 100% the seeder, not backend/aggregation logic. Read `operations.controller.js` end-to-end first — `getLiveSummary` correctly, strictly bounds "Live Now" to today's exact calendar date, which is the right design. But `seed.js`'s session-generation loop used `daysFromNow(-p*3)` for past sessions and `daysFromNow(1,3,7)` for future ones — day-offset 0 (today) was **never generated, structurally, even on a fresh seed**. Confirmed directly against MongoDB (11 distinct session dates, none matching "today"). Fixed by adding a dedicated 14-scenario "today" generator to the seeder, covering every real operational state (live/starting-soon/missing-checkin/missing-link/late-teacher/completed/cancelled/no-show/student-absent/payroll-review/2 deliberate critical contradictions for the review queue).
+
+**Second bug found while fixing the first:** the backend computes "today" via **local-timezone** midnight (`Date.setHours(0,0,0,0)`), and the server's local timezone is UTC+3. Naive `now - X minutes` scenario offsets could cross that local-midnight boundary and silently land in "yesterday" depending on what wall-clock time the seeder happens to run at — caught live (re-seeded at 02:40 AM local time, `recentlyCompleted` read 2 instead of the expected 5). Fixed with a `pastToday()` clamp in the seeder that pins any offset crossing local midnight to shortly after it, re-verified correct at that same inconvenient hour.
+
+Also added real new metrics that genuinely didn't exist anywhere before (not cosmetic): No-Show count, Student Absences Today (new bounded Attendance aggregation), Attendance Rate Today / Teacher On-Time Rate Today (computed from real today-scoped records), Revenue Today (Subscription aggregation), and **Online Now** (teachers/students currently connected) — the last one only became buildable because this session's earlier real-time-notifications fix (see prior entry below) made sockets actually work; added a lightweight in-memory presence map to `socket.service.js`.
+
+**Frontend redesign** (`AdminOperationsCenterPage.jsx`'s Live tab): the old page had 8 equally-weighted stat tiles plus 6 separate boxed list sections that mostly duplicated the same sessions the tiles already counted. Rebuilt as: a critical-alert banner (only shown when a data-contradiction review item exists), a 4-card operational-health strip (color-graded by actual rate, not brand color), a 10-tile stat grid tinted by urgency (critical/warning/info/positive/neutral), one unified deduplicated "needs attention now" feed (a session in multiple buckets shows one row with multiple reason badges instead of duplicate cards across boxes), and a quick-actions row.
+
+### Verification
+Every metric hand-cross-checked: live API response vs. direct MongoDB query, exact match confirmed (e.g. `recentlyCompleted: 5` = the 5 seeded completed-today scenarios by id, `attendanceRateToday: 50%` = 3/6 hand-counted attendance records). Live headless-browser pass confirmed every new UI element renders and both new interactions (critical-banner → review tab, stat-tile → filtered timeline) work correctly, zero console errors. `npm run build` zero errors, `npx jest` 96/96 passing, full 41-page/3-role regression pass clean (only this session's own rate-limit self-testing artifacts, not app bugs).
+
+### Not done / follow-ups
+- Online-presence has a standard ~60s detection window for abrupt disconnects (heartbeat-based, not instant) and is per-process — would need Redis if the backend is ever horizontally scaled.
+- Did not touch Timeline tab or Review Queue tab UI (only the Live tab) — their underlying logic was already verified correct and their UI was already reasonably dense; redesign effort went where the actual complaint and the actual gaps were.
+
+---
+
+## Notification Center Redesign & UX/Product Audit (2026-07-11, earlier session)
+
+## Status
+User asked for a full UX/product audit and improvement pass (not analysis), focused on the Notification Center and Admin Dashboard, working autonomously. Full detail in `UX_IMPROVEMENTS.md` — this is a summary for continuity.
+
+**The single most important finding:** real-time notifications had never actually worked, for any user, ever — `server/src/services/socket.service.js` verified every Socket.io connection's JWT against `process.env.JWT_SECRET`, an env var that doesn't exist anywhere in this project (access tokens are signed with `JWT_ACCESS_SECRET`). Every socket handshake silently failed auth and was rejected; the toast-on-new-notification and live badge-update features were fully built and looked correct in code review but had zero real users ever receiving a live push. Fixed to use the existing `verifyAccessToken()` helper. Verified live: triggered a real admin broadcast via the API while a student session was open in a headless browser — the toast appeared with zero page reload.
+
+**Second real bug found (not introduced by this session):** `ConfirmDialog.jsx`'s actual prop API is `open`/`confirmLabel`/`cancelLabel`/`variant`, but `AdminArticlesPage.jsx`'s two existing delete-confirmation dialogs passed `isOpen`/`confirmText`/`isDangerous` — none of which the component reads. The dialogs never rendered; clicking delete on an article or category appeared to silently do nothing. Fixed both call sites, and used the correct API when adding new confirmations elsewhere (see below). Caught by actually clicking the buttons in a live browser, not by reading the code.
+
+**Notification Center** (`client/src/components/notifications/NotificationCenter.jsx` + backend): added an archive system (new `isArchived`/`archivedAt` fields, per-item + bulk archive/unarchive, dedicated archive view), replaced N-sequential-request bulk actions with real `PATCH/DELETE /notifications/bulk` endpoints, fixed a dead "select all" control (function existed, was never wired to a UI element), added a day/category grouping toggle, made priority sort urgent items first within each group, and fixed the unread badge — it was silently undercounting for any user with more than 30 unread notifications (derived from the capped preview-list fetch instead of the dedicated unbounded `/notifications/unread-count` endpoint, which now drives it via a 60s poll + socket-reconnect resync).
+
+**Missing confirmations added** (none existed before): student/teacher account deactivation (`ConfirmDialog`), teacher meeting-link deletion, admin website testimonial/FAQ deletion (`window.confirm`, matching the codebase's existing lightweight-action convention). Reactivating an account deliberately stayed frictionless — it's safe/reversible.
+
+**Admin Dashboard**: replaced two separate stacked banners (pending enrollments, unscheduled students) with one consolidated `PendingTasksCard`, and added a new `pendingHomeworkGrading` stat (bounded Homework-submissions aggregation) — the first time ungraded-homework backlog has been visible to admin at all.
+
+**Subscriptions page**: added student-name search (new backend `search` param on `GET /subscriptions`, resolved via `User` first since `Subscription` has no denormalized text) and swapped a plain-text empty state for the shared `EmptyState` component.
+
+### Verification
+Live headless-browser pass across all 41 sidebar-linked pages, all 3 roles, using real client-side navigation — zero console errors, zero blank pages, zero failed requests (excluding this session's own rate-limit self-inflicted 429s during repeated testing, confirmed not application bugs). Functional click-through of: real-time toast delivery, notification archive/select-all/bulk/group-by, the fixed confirm dialogs (open → correct render → cancel closes cleanly), the Pending Tasks card, and subscriptions search. `npm run build` (client) zero errors. `npx jest` (server) 96/96 passing, no regressions.
+
+### Not done / follow-ups
+- Notification pagination beyond the 100-item fetch cap — deferred, adequate at current volume.
+- No dedicated admin homework-oversight page for per-item drill-down (count + teacher link exists; a full cross-teacher table would be a new page).
+- `AdminEnrollmentsPage` still has no search (lower priority, naturally bounded volume + status tabs).
+- Recommend grepping the rest of the codebase for any other stray `process.env.JWT_SECRET`-style references before considering the JWT config fully audited.
+
+---
+
+## Status
+User requested a full platform audit + complete data seeder + full documentation set + Arabic client manual, working autonomously. Clarified up front (real ambiguity, not a routine call) that the seeder spec listed 8 entities (Wallet, Payments/Invoices, Certificates, Quizzes, Support Tickets, Parent role, Achievements, Classrooms) with no backing model or `SCOPE_OF_WORK.md` mention — user chose "seed only what exists," so no speculative subsystems were built.
+
+Given `SESSION_HANDOFF.md`/`FEATURE_TRACKER.md` already showed 5 prior deep audit/hardening passes (2026-06-24 through 2026-07-04), did **not** repeat a blind full-repo re-audit. Instead focused on the genuinely new ground: the seeder was thin (6 users, ~13 records total) and a `docs/` folder barely existed (3 files). Rewrote `server/src/seed/seed.js` to populate all 22 real collections realistically (26 users, 8 courses, 18 subscriptions across every status, ~100 sessions with full attendance/payroll-intelligence fields, articles, notifications, audit logs, etc. — see `docs/SEEDER_GUIDE.md`), ran it against the real MongoDB, then drove the **actual running app** (dev servers were already up) with a headless Playwright browser across every sidebar page in all three role dashboards using real client-side navigation.
+
+**This caught a genuine bug that pure code review had missed across 5 prior audit passes:** `AdminSubscriptionsPage` crashed (`students.map is not a function`) only when reached after visiting `/admin/sessions` in the same browser session. Root cause: `AdminSessionsPage`, `AdminEnrollmentsPage`, `AdminScheduleRulesPage`, `AdminOperationsCenterPage`, and `AdminSubscriptionsPage` all shared the TanStack Query cache key `['admin','teachers'/'students','all']` but two of them cached the full paginated envelope while three expected the bare array — whichever query's result won the race silently corrupted the others. Fixed by standardizing every consumer to the array shape (majority convention) and giving `AdminSubscriptionsPage` its own distinct key. This class of bug is now documented in `API_REFERENCE.md` as a query-key-hygiene convention to prevent recurrence. Verified via a re-run of the same browser pass (crash gone, dropdowns populate with 34 real options) and `npm run build` (zero errors).
+
+Also confirmed (not previously verified live): refresh-token/reload resilience actually works — a hard page reload while authenticated correctly recovers the session via the httpOnly refresh cookie rather than logging the user out.
+
+Added `docs/SYSTEM_OVERVIEW.md`, `FEATURES.md`, `WORKFLOW.md`, `PERMISSIONS.md`, `API_REFERENCE.md`, `ATTENDANCE_SYSTEM.md` (condensed pointer to the existing detailed doc), `ADMIN_GUIDE.md`, `TEACHER_GUIDE.md`, `STUDENT_GUIDE.md`, `SEEDER_GUIDE.md`, `DEPLOYMENT.md`, `KNOWN_LIMITATIONS.md`, plus a root-level Arabic non-technical client manual `دليل استخدام المنصة.md` (explicitly honest that certificates and in-app chat aren't built yet, rather than describing them as if they existed). Full narrative in `FINAL_REPORT.md`.
+
+**Note:** during verification, the already-running backend dev server (port 5000, not started by this session) was restarted twice to reset its in-memory rate-limiter counters after automated testing exhausted them — safe/reversible for a local dev process, no data affected, flagged here for transparency since this session didn't originally own that process.
+
+### Not done / follow-ups
+- Did not repeat a ground-up audit of already-hardened areas (attendance/payroll/teacher-identity) — re-verified them live instead, found them clean.
+- Out-of-scope entities from the seeder request remain a business decision, not implemented.
+- Three duplicate attendance-correction UI entry points still unconsolidated (pre-existing, noted again).
+- No frontend test runner / ESLint config — still absent, pre-existing.
+
+---
+
+## Teacher Identity System & Teachers Page Refactor, + Female Teacher Quick Login follow-up (2026-07-04)
 
 ## Status
 Full cross-stack refactor of teacher gender identity and the public Teachers page, executed autonomously per explicit instruction (no intermediate approval checkpoints). Verified via `npm test` (server, 68/68 passing), `npm run build` (client, zero errors), and a live Playwright browser pass against the real seeded dev DB (filters, profile page, admin create modal, teacher self-settings persistence). Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md` — this is a summary for continuity.

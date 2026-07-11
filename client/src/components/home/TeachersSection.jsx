@@ -17,6 +17,9 @@ import { Link } from 'react-router-dom'
 import { motion, useMotionValue, useMotionValueEvent, animate, useReducedMotion } from 'framer-motion'
 import { ROUTES } from '../../config/constants.js'
 import { handleAvatarError } from '../../utils/teacherIdentity.js'
+import useMotionCapabilities from '../../hooks/useMotionCapabilities.js'
+import { EASE_CINEMATIC } from '../motion/motion.constants.js'
+import MaskReveal from '../motion/MaskReveal.jsx'
 
 const ILLUSTRATED_AVATARS = ['/images/avter man.png', '/images/avter woman.png']
 function fallbackAvatarFor(teacher) {
@@ -72,7 +75,7 @@ function WaveformIcon({ size = 10, color = '#e8ddff' }) {
 
 // ── Teacher card (carousel — no audio controls here) ─────────────────────────
 
-const TeacherCard = memo(function TeacherCard({ teacher, onJumpToAudio, setCardRef }) {
+const TeacherCard = memo(function TeacherCard({ teacher, onJumpToAudio, setCardRef, index = 0, finePointer = false, reducedMotion = false }) {
   const badgeLabel = teacher.gender === 'female' ? 'معلمة' : 'معلم'
   // The two illustrated fallback avatars are square badge art (a circular
   // ring baked into a transparent 1:1 PNG) — cropping them with `cover` to
@@ -80,8 +83,40 @@ const TeacherCard = memo(function TeacherCard({ teacher, onJumpToAudio, setCardR
   // full via `contain` instead. Real uploaded/photographed portraits keep
   // `cover` so they fill the frame edge-to-edge as before.
   const isIllustrated = ILLUSTRATED_AVATARS.includes(teacher.img)
+
+  // Depth-oriented stagger (not left/right) — this is a horizontally
+  // draggable carousel, so a horizontal entrance offset would fight the
+  // drag gesture visually; alternating vertical depth reads as "stagger"
+  // without implying a competing horizontal direction.
+  const rotateX = useMotionValue(0)
+  const rotateY = useMotionValue(0)
+
+  function onPointerMove(e) {
+    if (!finePointer || reducedMotion) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / rect.width - 0.5
+    const py = (e.clientY - rect.top) / rect.height - 0.5
+    rotateY.set(px * 6)
+    rotateX.set(py * -6)
+  }
+  function onPointerLeave() {
+    rotateX.set(0)
+    rotateY.set(0)
+  }
+
   return (
-    <div ref={setCardRef} className="th-card">
+    <motion.div
+      ref={setCardRef}
+      className="th-card-slot"
+      style={finePointer && !reducedMotion ? { rotateX, rotateY, transformPerspective: 800 } : undefined}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: index % 2 === 0 ? 26 : -14, scale: 0.94 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, margin: '-60px', amount: 0.3 }}
+      transition={{ duration: reducedMotion ? 0.4 : 0.6, delay: reducedMotion ? 0 : (index % 4) * 0.08, ease: EASE_CINEMATIC }}
+    >
+    <div className="th-card">
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <img
           src={teacher.img}
@@ -138,6 +173,7 @@ const TeacherCard = memo(function TeacherCard({ teacher, onJumpToAudio, setCardR
         </div>
       </div>
     </div>
+    </motion.div>
   )
 })
 
@@ -364,6 +400,7 @@ export default function TeachersSection() {
   const [highlightedId, setHighlightedId] = useState(null)
 
   const prefersReducedMotion = useReducedMotion()
+  const { finePointer } = useMotionCapabilities()
   const x = useMotionValue(0)
 
   const onPlay = useCallback((id) => setPlayingId(id), [])
@@ -475,9 +512,8 @@ export default function TeachersSection() {
               color: '#fff', fontFamily: 'Cairo', margin: '0 auto 18px', maxWidth: 640,
             }}
           >
-            تعرّف على معلمك
-            <br />
-            قبل أن تبدأ رحلتك
+            <MaskReveal as="span" viewport reducedMotion={!!prefersReducedMotion}>تعرّف على معلمك</MaskReveal>
+            <MaskReveal as="span" viewport reducedMotion={!!prefersReducedMotion} delay={0.1}>قبل أن تبدأ رحلتك</MaskReveal>
           </h2>
 
           <p style={{ color: '#c4b6e0', fontSize: 'clamp(15px,1.5vw,17.5px)', lineHeight: 1.9, maxWidth: 620, margin: '0 auto' }}>
@@ -524,6 +560,9 @@ export default function TeachersSection() {
               <TeacherCard
                 key={teacher.id}
                 teacher={teacher}
+                index={i}
+                finePointer={finePointer}
+                reducedMotion={!!prefersReducedMotion}
                 onJumpToAudio={onJumpToAudio}
                 setCardRef={(el) => { cardRefs.current[i] = el }}
               />
@@ -567,8 +606,12 @@ export default function TeachersSection() {
       <style>{`
         .th-track { gap: 22px; }
 
+        /* Flex-slot sizing lives on the reveal/tilt wrapper (the real flex
+           item) so its entrance + pointer-tilt transform never fights the
+           hover-lift transform below, which stays on the inner visual card. */
+        .th-card-slot { flex: 0 0 23%; }
         .th-card {
-          flex: 0 0 23%;
+          height: 100%;
           background: #1d0c40;
           border: 1px solid rgba(255,255,255,.07);
           border-radius: 20px;
@@ -634,10 +677,10 @@ export default function TeachersSection() {
           .th-audio-grid { grid-template-columns: repeat(3, 1fr); }
         }
 
-        @media (max-width: 1279px) { .th-card { flex: 0 0 31%; } }
-        @media (max-width: 1023px) { .th-card { flex: 0 0 46%; } }
+        @media (max-width: 1279px) { .th-card-slot { flex: 0 0 31%; } }
+        @media (max-width: 1023px) { .th-card-slot { flex: 0 0 46%; } }
         @media (max-width: 639px) {
-          .th-card { flex: 0 0 84%; }
+          .th-card-slot { flex: 0 0 84%; }
           .th-track { gap: 14px; }
         }
 

@@ -17,6 +17,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
+import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { exportReportToPDF } from '../../utils/exportUtils.js'
@@ -291,6 +292,7 @@ function TeacherPerformanceTab({ teacherId }) {
 
 function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
   const [tab, setTab] = useState(initialTab)
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const qc = useQueryClient()
 
   const updateMut = useMutation({
@@ -313,6 +315,14 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
     },
     onError: () => toast.error('حدث خطأ'),
   })
+
+  // Deactivating a teacher immediately blocks their access and effectively
+  // pauses every one of their assigned students, so it gets a confirm step;
+  // reactivating is safe/reversible and stays a single click.
+  function requestToggle() {
+    if (teacher.isActive) setConfirmDeactivate(true)
+    else toggleMut.mutate(true)
+  }
 
   const sc = teacher.isActive ? '#10b981' : '#ef4444'
 
@@ -424,7 +434,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <button onClick={() => toggleMut.mutate(!teacher.isActive)} disabled={toggleMut.isPending}
+                <button onClick={requestToggle} disabled={toggleMut.isPending}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${teacher.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                   {toggleMut.isPending && <Spinner size="sm" color={teacher.isActive ? 'border-red-500' : 'border-emerald-600'} />}
                   {teacher.isActive ? 'إيقاف حساب المعلم' : 'تفعيل حساب المعلم'}
@@ -446,6 +456,16 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
           )}
         </div>
       </motion.aside>
+
+      <ConfirmDialog
+        open={confirmDeactivate}
+        onClose={() => setConfirmDeactivate(false)}
+        onConfirm={() => { toggleMut.mutate(false); setConfirmDeactivate(false) }}
+        title="إيقاف حساب المعلم"
+        message={`سيتم إيقاف حساب "${teacher.firstNameAr} ${teacher.lastNameAr}" فوراً، ولن يتمكن من الدخول أو إدارة حصصه حتى يُعاد تفعيله. هل تريد المتابعة؟`}
+        confirmLabel="إيقاف الحساب"
+        variant="danger"
+      />
     </>
   )
 }

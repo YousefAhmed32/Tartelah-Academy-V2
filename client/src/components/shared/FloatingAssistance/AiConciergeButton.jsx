@@ -1,29 +1,32 @@
-import { motion } from 'framer-motion'
-import { Sparkles, X } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 
-export default function AiConciergeButton({ open, onToggle }) {
+// A menu item inside the unified FloatingActionStack. `open` reflects
+// whether the AI chat panel is currently open (the launcher's active state
+// must be visible per spec) — the parent stack decides what "click" means
+// (open the panel and collapse the menu), this component only renders.
+export default function AiConciergeButton({ open, onClick }) {
   return (
-    <motion.button
+    <button
       type="button"
-      onClick={onToggle}
+      onClick={onClick}
       data-ai-cluster-trigger
-      aria-label={open ? 'إغلاق مساعد ترتيلة الذكي' : 'اسأل مساعد ترتيلة'}
-      title={open ? 'إغلاق المساعد' : 'اسأل مساعد ترتيلة'}
+      aria-label={open ? 'إغلاق مساعد ترتيلة الذكي' : 'فتح المساعد الذكي'}
       aria-expanded={open}
-      initial={{ opacity: 0, scale: 0.85, y: 12 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.22 }}
-      whileHover={{ scale: 1.06 }}
-      whileTap={{ scale: 0.96 }}
-      className="relative flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full text-white shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={{
-        background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
-        boxShadow: '0 10px 30px rgba(124,58,237,0.45)',
-        '--tw-ring-color': '#E8C76A',
-        '--tw-ring-offset-color': '#0f0226',
-      }}
+      title="المساعد الذكي"
+      className="group flex items-center gap-3 outline-none"
     >
-      {open ? <X size={22} strokeWidth={2} /> : <Sparkles size={22} strokeWidth={1.8} />}
-    </motion.button>
+      <span
+        className={`fab-item-icon flex h-11 w-11 md:h-12 md:w-12 items-center justify-center rounded-full text-white shadow-lg transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:scale-[1.05] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-offset-2 ${open ? 'ring-2' : 'ring-1 ring-white/10'}`}
+        style={{
+          background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+          boxShadow: open ? '0 0 0 4px rgba(232,199,106,0.25), 0 8px 22px rgba(124,58,237,0.5)' : '0 8px 22px rgba(124,58,237,0.4)',
+          '--tw-ring-color': '#E8C76A',
+          '--tw-ring-offset-color': '#0f0226',
+        }}
+      >
+        <Sparkles size={20} strokeWidth={1.8} />
+      </span>
+      <span className="fab-item-label hidden md:inline-flex">المساعد الذكي</span>
+    </button>
   )
 }

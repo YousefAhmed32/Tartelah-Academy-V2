@@ -191,7 +191,7 @@ export default function AiConciergePanel({ onClose, conversationId }) {
         exit={{ opacity: 0, y: reduced ? 0 : 16, scale: reduced ? 1 : 0.97 }}
         transition={{ duration: reduced ? 0 : 0.2 }}
         onClick={e => e.stopPropagation()}
-        className="fixed inset-x-0 bottom-0 z-[65] flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl md:inset-x-auto md:bottom-24 md:end-6 md:w-[400px] md:max-h-[600px] md:rounded-3xl"
+        className="fixed inset-x-0 bottom-0 z-[65] flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl md:inset-x-auto md:bottom-24 md:right-6 md:w-[400px] md:max-h-[600px] md:rounded-3xl"
         style={{
           background: '#150232',
           border: '1px solid rgba(150,120,220,0.22)',

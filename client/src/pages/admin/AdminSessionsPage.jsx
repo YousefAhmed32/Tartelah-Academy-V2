@@ -415,15 +415,15 @@ export default function AdminSessionsPage() {
     placeholderData: (prev) => prev,
   })
 
-  const { data: teachersData } = useQuery({
+  const { data: teachers = [] } = useQuery({
     queryKey: ['admin', 'teachers', 'all'],
-    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data),
+    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data),
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: studentsData } = useQuery({
+  const { data: students = [] } = useQuery({
     queryKey: ['admin', 'students', 'all'],
-    queryFn: () => api.get('/admin/students?limit=200').then(r => r.data),
+    queryFn: () => api.get('/admin/students?limit=200').then(r => r.data.data),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -443,8 +443,6 @@ export default function AdminSessionsPage() {
   }
 
   const sessions = data?.data || []
-  const teachers = teachersData?.data || []
-  const students = studentsData?.data || []
 
   const statusOptions = [
     { key: '', label: 'الكل' },

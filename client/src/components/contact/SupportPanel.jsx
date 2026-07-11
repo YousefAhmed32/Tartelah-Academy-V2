@@ -1,6 +1,15 @@
 import { Clock, MessageCircle, Globe2, ArrowLeft, AlertTriangle } from 'lucide-react'
 
+// Defensive: older/unsaved records may still hold a full <iframe> tag
+// (Google's "Embed a map" copy-paste output) instead of a bare src URL.
+function extractEmbedSrc(value) {
+  if (!value) return value
+  const match = value.match(/src=["']([^"']+)["']/i)
+  return match ? match[1] : value
+}
+
 export default function SupportPanel({ workingHours, emergencyContact, whatsappHref, mapEmbedUrl }) {
+  mapEmbedUrl = extractEmbedSrc(mapEmbedUrl)
   return (
     <aside className="flex flex-col gap-5">
 

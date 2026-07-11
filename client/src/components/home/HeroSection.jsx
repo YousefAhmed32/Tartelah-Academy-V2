@@ -1,9 +1,13 @@
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import { ROUTES } from '../../config/constants.js'
 import HeroStats from './HeroStats.jsx'
 import RecitationWidget from './RecitationWidget.jsx'
 import HeroJourneyStrip from './HeroJourneyStrip.jsx'
+import MaskReveal from '../motion/MaskReveal.jsx'
+import useMotionCapabilities from '../../hooks/useMotionCapabilities.js'
+import { EASE_CINEMATIC, EASE_SOFT, SPRING_SOFT } from '../motion/motion.constants.js'
 
 // Cinematic hero — single art-directed canvas, not an image-column + text-column
 // template. Structure:
@@ -24,26 +28,53 @@ import HeroJourneyStrip from './HeroJourneyStrip.jsx'
 // CTAs, photo, audio, stats, journey) be reordered directly via `order` —
 // one coherent recomposition instead of stacked breakpoint patches.
 
-const fadeUp = (reduced, delay = 0, y = 22) => ({
-  initial: { opacity: 0, y: reduced ? 0 : y },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: reduced ? 0 : 0.7, delay: reduced ? 0 : delay, ease: [0.16, 1, 0.3, 1] },
-})
+// ── Opening timeline — a single, tunable schedule instead of scattered
+// per-element delays, so the mount sequence reads as one directed shot list.
+const STAGE = {
+  badge: 0.15,
+  titleLine1: 0.32,
+  titleLine2: 0.46,
+  titleLine3: 0.58,
+  copy: 0.78,
+  ctaPrimary: 0.94,
+  ctaSecondary: 1.04,
+  stats: 1.18,
+  journey: 1.05,
+}
 
 export default function HeroSection() {
-  const reduced = useReducedMotion()
+  const { reducedMotion, narrow } = useMotionCapabilities()
+  const heroRef = useRef(null)
+
+  // Scroll-linked depth: background drifts slower than content, content
+  // eases up faster — classic parallax read without hijacking native scroll
+  // (pure transform mapping off scrollYProgress, no wheel/scroll listeners).
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
+  const photoYRaw = useTransform(scrollYProgress, [0, 1], [0, narrow ? 24 : 70])
+  const contentYRaw = useTransform(scrollYProgress, [0, 1], [0, narrow ? -14 : -46])
+  const glowYRaw = useTransform(scrollYProgress, [0, 1], [0, 34])
+  const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.14], [1, 0])
+
+  const photoY = useSpring(photoYRaw, { stiffness: 90, damping: 26, mass: 0.5 })
+  const contentY = useSpring(contentYRaw, { stiffness: 90, damping: 26, mass: 0.5 })
+  const glowY = useSpring(glowYRaw, { stiffness: 90, damping: 26, mass: 0.5 })
+
+  const parallaxStyle = reducedMotion ? {} : { y: photoY }
+  const contentParallaxStyle = reducedMotion ? {} : { y: contentY }
+  const glowParallaxStyle = reducedMotion ? {} : { y: glowY }
 
   return (
-    <section id="top" className="hero" aria-label="ترتيلة أونلاين — تعلم القرآن الكريم">
+    <section id="top" ref={heroRef} className="hero" aria-label="ترتيلة أونلاين — تعلم القرآن الكريم">
       {/* ── Base atmosphere (shows through the photo's feathered edges) ── */}
       <div className="hero__bg-base" aria-hidden="true" />
 
       {/* ── Photographic foundation: full-bleed, feathered, not a column ── */}
       <motion.div
         className="hero__photo-layer"
-        initial={{ opacity: 0, scale: reduced ? 1 : 1.04 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: reduced ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0, scale: reducedMotion ? 1 : 1.06, filter: reducedMotion ? 'none' : 'blur(6px)' }}
+        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+        transition={{ duration: reducedMotion ? 0 : 1.2, ease: EASE_CINEMATIC }}
+        style={parallaxStyle}
       >
         <img
           className="hero__photo"
@@ -58,71 +89,101 @@ export default function HeroSection() {
       </motion.div>
 
       {/* ── Ambient gold glow + geometric texture, above the photo so they read on the dark side ── */}
-      <div className="hero__bg-glow" aria-hidden="true" />
+      <motion.div className="hero__bg-glow" aria-hidden="true" style={glowParallaxStyle} />
       <div className="hero__bg-pattern" aria-hidden="true" />
 
       {/* ── Recitation widget: floats over the photo's own empty region ── */}
       {/* <RecitationWidget className="hero__audio" /> */}
 
       {/* ── Primary content zone ── */}
-      <div className="hero__container">
+      <motion.div className="hero__container" style={contentParallaxStyle}>
         <div className="hero__main">
-          <motion.div {...fadeUp(reduced, 0)} className="hero__badge">
+          <motion.div
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ ...SPRING_SOFT, delay: reducedMotion ? 0 : STAGE.badge }}
+            className="hero__badge"
+          >
             <span className="hero__badge-dot" aria-hidden="true" />
             <span>+20K طالب يتعلمون معنا الآن</span>
           </motion.div>
 
-          <motion.h1 {...fadeUp(reduced, 0.12)} className="hero__title">
-            تعلم <span className="hero__title-gold">القرآن</span>
-            <br />
-            كما لم تتخيل
-            <br />
-            من قبل
-          </motion.h1>
+          <h1 className="hero__title">
+            <MaskReveal as="span" className="hero__title-line" delay={STAGE.titleLine1} reducedMotion={reducedMotion}>
+              تعلم <span className="hero__title-gold">القرآن</span>
+            </MaskReveal>
+            <MaskReveal as="span" className="hero__title-line" delay={STAGE.titleLine2} reducedMotion={reducedMotion}>
+              كما لم تتخيل
+            </MaskReveal>
+            <MaskReveal as="span" className="hero__title-line" delay={STAGE.titleLine3} reducedMotion={reducedMotion}>
+              من قبل
+            </MaskReveal>
+          </h1>
 
-          <motion.p {...fadeUp(reduced, 0.24)} className="hero__copy">
+          <motion.p
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ duration: reducedMotion ? 0.4 : 0.8, delay: reducedMotion ? 0 : STAGE.copy, ease: EASE_SOFT }}
+            className="hero__copy"
+          >
             منصة تربوية أونلاين تجمع بين <span className="hero__copy-gold">أصالة العلم</span> وقوة التقنية
             لتمنحك <span className="hero__copy-gold">تجربة تعلم فريدة</span> وملهمة.
           </motion.p>
 
-          <motion.div {...fadeUp(reduced, 0.36)} className="hero__cta-row">
-            <Link to={ROUTES.REGISTER} className="hero__cta hero__cta--primary">
-              ابدأ رحلتك الآن
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="hero__cta-arrow">
-                <path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
-            <Link to={ROUTES.PROGRAMS} className="hero__cta hero__cta--secondary">
-              استكشف المسارات
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
-          </motion.div>
+          <div className="hero__cta-row">
+            <motion.div
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 22, y: 14 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ ...SPRING_SOFT, delay: reducedMotion ? 0 : STAGE.ctaPrimary }}
+            >
+              <Link to={ROUTES.REGISTER} className="hero__cta hero__cta--primary">
+                ابدأ رحلتك الآن
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="hero__cta-arrow">
+                  <path d="M19 12H5M11 6l-6 6 6 6" stroke="#2a1500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </motion.div>
+            <motion.div
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: -22, y: 14 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ ...SPRING_SOFT, delay: reducedMotion ? 0 : STAGE.ctaSecondary }}
+            >
+              <Link to={ROUTES.PROGRAMS} className="hero__cta hero__cta--secondary">
+                استكشف المسارات
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </motion.div>
+          </div>
 
-          <motion.div {...fadeUp(reduced, 0.48)} className="hero__stats-wrap">
+          <motion.div
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reducedMotion ? 0.4 : 0.7, delay: reducedMotion ? 0 : STAGE.stats, ease: EASE_CINEMATIC }}
+            className="hero__stats-wrap"
+          >
             <HeroStats />
           </motion.div>
         </div>
-      </div>
-
-      {/* ── Journey strip — normal flow, hero reserves height for it ── */}
-      <motion.div
-        className="hero__journey-wrap"
-        initial={{ opacity: 0, y: reduced ? 0 : 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-40px' }}
-        transition={{ duration: reduced ? 0 : 0.7, delay: reduced ? 0 : 0.15, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <HeroJourneyStrip />
       </motion.div>
 
+      {/* ── Journey strip — normal flow, hero reserves height for it ── */}
+      <div className="hero__journey-wrap">
+        <HeroJourneyStrip startDelay={reducedMotion ? 0 : STAGE.journey} reducedMotion={reducedMotion} />
+      </div>
+
       {/* ── Scroll indicator ── */}
-      <a href="#journey" className="hero__scroll" aria-label="تابع التمرير لأسفل">
+      <motion.a
+        href="#journey"
+        className="hero__scroll"
+        aria-label="تابع التمرير لأسفل"
+        style={reducedMotion ? {} : { opacity: scrollIndicatorOpacity }}
+      >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="m6 9 6 6 6-6M6 4l6 6 6-6" stroke="#E8C76A" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </a>
+      </motion.a>
 
       <style>{`
         .hero {
@@ -171,7 +232,9 @@ export default function HeroSection() {
             linear-gradient(to left, rgba(7,6,17,0.96) 0%, rgba(7,6,17,0.84) 22%, rgba(9,6,20,0.5) 44%, rgba(9,6,20,0.14) 64%, transparent 84%);
         }
 
-        /* Ambient glowing-Qur'an art — screen-blended on the dark content side */
+        /* Ambient glowing-Qur'an art — screen-blended on the dark content side.
+           Breathes gently (opacity) and drifts (transform) so the backdrop
+           reads as alive/depth rather than a static poster behind the text. */
         .hero__bg-glow {
           position: absolute; inset: 0; z-index: 2;
           background-image: url('/images/hero_bg.png');
@@ -182,13 +245,23 @@ export default function HeroSection() {
           mix-blend-mode: screen;
           -webkit-mask-image: radial-gradient(50% 55% at 78% 40%, rgba(0,0,0,0.85) 0%, transparent 78%);
           mask-image: radial-gradient(50% 55% at 78% 40%, rgba(0,0,0,0.85) 0%, transparent 78%);
+          animation: heroGlowBreathe 9s ease-in-out infinite;
+        }
+        @keyframes heroGlowBreathe {
+          0%, 100% { opacity: 0.20; transform: scale(1); }
+          50% { opacity: 0.32; transform: scale(1.035); }
         }
 
-        /* Restrained Islamic geometric texture */
+        /* Restrained Islamic geometric texture — slow independent drift for depth */
         .hero__bg-pattern {
-          position: absolute; inset: 0; z-index: 2; opacity: 0.02;
+          position: absolute; inset: -40px; z-index: 2; opacity: 0.02;
           background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M40 0L50 14H30L40 0zm0 80L30 66h20L40 80zM0 40L14 30v20L0 40zm80 0L66 50V30L80 40zM40 25l8 8-8 8-8-8 8-8z'/%3E%3C/g%3E%3C/svg%3E");
           background-size: 80px 80px;
+          animation: heroPatternDrift 40s linear infinite;
+        }
+        @keyframes heroPatternDrift {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(-80px, -80px); }
         }
 
         /* Recitation widget — floats over the photo's own plain-background
@@ -235,9 +308,16 @@ export default function HeroSection() {
           letter-spacing: -1.5px;
           color: #F7F3E8;
         }
+        .hero__title-line { padding-bottom: 0.08em; }
         .hero__title-gold {
-          background: linear-gradient(120deg, #E8C76A, #D4AF37);
+          background: linear-gradient(120deg, #E8C76A, #F7E7A8, #D4AF37, #E8C76A);
+          background-size: 260% 100%;
           -webkit-background-clip: text; background-clip: text; color: transparent;
+          animation: heroGoldSweep 1.8s ease-in-out 1.15s 1 both;
+        }
+        @keyframes heroGoldSweep {
+          0% { background-position: 100% 0; }
+          100% { background-position: 0% 0; }
         }
 
         .hero__copy {
@@ -319,6 +399,7 @@ export default function HeroSection() {
           max-width: 1520px; margin: clamp(32px, 4vw, 48px) auto 0; width: 100%;
         }
         .hero-journey {
+          position: relative;
           background: rgba(11,7,24,0.68);
           border: 1px solid rgba(232,199,106,0.28);
           border-radius: 26px;
@@ -327,13 +408,18 @@ export default function HeroSection() {
           -webkit-backdrop-filter: blur(16px);
           box-shadow: 0 30px 70px rgba(0,0,0,0.45);
           display: flex; align-items: center; gap: clamp(20px, 3vw, 44px); flex-wrap: wrap;
+          overflow: hidden;
         }
-        .hero-journey__head { flex-shrink: 0; display: flex; flex-direction: column; }
+        .hero-journey__sweep {
+          position: absolute; inset: 0; z-index: 0; pointer-events: none;
+          background: linear-gradient(100deg, transparent 40%, rgba(232,199,106,0.16) 50%, transparent 60%);
+        }
+        .hero-journey__head { position: relative; z-index: 1; flex-shrink: 0; display: flex; flex-direction: column; }
         .hero-journey__eyebrow { font-family: Cairo, sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
         .hero-journey__title { font-size: 13px; color: #E8C76A; font-weight: 700; margin-top: 2px; }
-        .hero-journey__steps { flex: 1; display: flex; align-items: center; gap: clamp(14px, 2.2vw, 30px); min-width: 0; }
+        .hero-journey__steps { position: relative; z-index: 1; flex: 1; display: flex; align-items: center; gap: clamp(14px, 2.2vw, 30px); min-width: 0; }
         .hero-journey__step { display: flex; align-items: center; gap: 12px; min-width: 0; }
-        .hero-journey__divider { width: 1px; align-self: stretch; background: rgba(255,255,255,0.12); flex-shrink: 0; margin-inline-end: clamp(6px, 1vw, 14px); }
+        .hero-journey__divider { width: 1px; align-self: stretch; background: rgba(255,255,255,0.12); flex-shrink: 0; margin-inline-end: clamp(6px, 1vw, 14px); transform-origin: center; }
         .hero-journey__num { font-family: Amiri, serif; font-weight: 700; font-size: 20px; color: rgba(232,199,106,0.45); flex-shrink: 0; }
         .hero-journey__icon { flex-shrink: 0; width: 38px; height: 38px; border-radius: 12px; background: rgba(232,199,106,0.1); display: grid; place-items: center; }
         .hero-journey__text { min-width: 0; }
@@ -443,6 +529,9 @@ export default function HeroSection() {
         @media (prefers-reduced-motion: reduce) {
           .hero__scroll { animation: none; }
           .hero__badge-dot { animation: none; }
+          .hero__bg-glow { animation: none; opacity: 0.26; }
+          .hero__bg-pattern { animation: none; }
+          .hero__title-gold { animation: none; background-position: 0 0; }
           .hero__cta, .hero-recitation__play, .hero-journey { transition: none !important; }
         }
       `}</style>

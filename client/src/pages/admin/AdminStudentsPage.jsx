@@ -8,6 +8,7 @@ import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
+import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
 
@@ -109,6 +110,7 @@ function ResetPasswordForm({ studentId, onDone }) {
 
 function StudentCRMPanel({ student, onClose, onUpdate }) {
   const [tab, setTab] = useState('info') // info | edit | reset
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const qc = useQueryClient()
 
   const updateMut = useMutation({
@@ -131,6 +133,13 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
     },
     onError: () => toast.error('حدث خطأ'),
   })
+
+  // Deactivating immediately blocks the student's access, so it gets a confirm
+  // step; reactivating is safe/reversible and stays a single click.
+  function requestToggle() {
+    if (student.isActive) setConfirmDeactivate(true)
+    else toggleMut.mutate(true)
+  }
 
   const sc = student.isActive ? '#10b981' : '#ef4444'
 
@@ -198,7 +207,7 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
                       : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="m10 8 6 4-6 4V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>}
                     label={student.isActive ? 'إيقاف' : 'تفعيل'}
                     color={student.isActive ? '#ef4444' : '#10b981'}
-                    onClick={() => toggleMut.mutate(!student.isActive)}
+                    onClick={requestToggle}
                   />
                 </div>
               </div>
@@ -222,7 +231,7 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
                   className="w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 bg-violet-50 text-violet-700 hover:bg-violet-100">
                   <ExternalLink size={14} /> السجل الأكاديمي الكامل
                 </Link>
-                <button onClick={() => toggleMut.mutate(!student.isActive)} disabled={toggleMut.isPending}
+                <button onClick={requestToggle} disabled={toggleMut.isPending}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${student.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                   {toggleMut.isPending && <Spinner size="sm" color={student.isActive ? 'border-red-500' : 'border-emerald-600'} />}
                   {student.isActive ? 'إيقاف حساب الطالب' : 'تفعيل حساب الطالب'}
@@ -240,6 +249,16 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
           )}
         </div>
       </motion.aside>
+
+      <ConfirmDialog
+        open={confirmDeactivate}
+        onClose={() => setConfirmDeactivate(false)}
+        onConfirm={() => { toggleMut.mutate(false); setConfirmDeactivate(false) }}
+        title="إيقاف حساب الطالب"
+        message={`سيتم إيقاف حساب "${student.firstNameAr} ${student.lastNameAr}" فوراً ولن يتمكن من تسجيل الدخول حتى يُعاد تفعيله. هل تريد المتابعة؟`}
+        confirmLabel="إيقاف الحساب"
+        variant="danger"
+      />
     </>
   )
 }
