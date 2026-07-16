@@ -4,7 +4,9 @@ const AcademySettingsSchema = new mongoose.Schema({
   academyNameAr: { type: String, default: 'ترتيلة للتعليم الإسلامي' },
   academyNameEn: { type: String, default: 'Tartelah Academy' },
   taglineAr: { type: String, default: 'تعلم القرآن الكريم بأيسر الطرق' },
-  logoUrl: { type: String },
+  // GridFS file _id — new field (no prior logo upload existed), so a clean
+  // *Id name is used with no legacy compatibility constraint.
+  logoId: { type: mongoose.Schema.Types.ObjectId, default: null },
   phone: { type: String, default: '+20 105 040 0096' },
   whatsapp: { type: String, default: '966567443805' },
   email: { type: String, default: 'tartela.online@gmail.com' },
@@ -20,6 +22,12 @@ const AcademySettingsSchema = new mongoose.Schema({
   supportText:     { type: String, default: 'نحن هنا لمساعدتك في أي وقت' },
   emergencyContact:{ type: String },
   googleMapsEmbed: { type: String },
+
+  // Identity — Mission / Vision / About (public "من نحن" content, admin-editable)
+  missionQuoteAr: { type: String, default: 'سُئلت السيدة عائشة (رضي الله عنها) عن خلق النبي صلى الله عليه وسلم فقالت: (( كان خلقه القرآن ))' },
+  visionAr:       { type: String, default: 'إعداد جيل قرآني متميز — كان صلى الله عليه وسلم: قرآنا يمشي على الأرض' },
+  aboutHeadlineAr:{ type: String, default: 'ترتيـلة Online' },
+  aboutBodyAr:    { type: String, default: 'أكاديمية قرآنية متخصصة في تعليم القرآن الكريم وأحكام التجويد واللغة العربية والعلوم الشرعية عن بُعد، بمنهجية علمية وإشراف أكاديمي متميز 🤍📖\n\n✨ نؤمن أن القرآن منهج حياة ونسعى إلى غرسه حفظًا وتلاوةً وفهمًا في نفوس طلابنا\n\n🤍 ترتيـلة Online ... حيث يبدأ الإتقان وتزدهر صحبة القرآن' },
 
   // Footer
   footerDescription:   { type: String, default: 'منصة ترتيلة أونلاين — وجهتك الأولى لتعلم القرآن الكريم بإتقان مع أفضل المعلمين' },

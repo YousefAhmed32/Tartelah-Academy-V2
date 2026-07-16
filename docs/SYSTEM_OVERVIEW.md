@@ -11,7 +11,7 @@ Tartelah Online is a production Quran-learning academy platform connecting stude
 | Auth | Dual-token JWT — 15-minute access token held in memory, 7-day refresh token in an httpOnly cookie |
 | Realtime | Socket.io (notifications) |
 | AI Assistant | OpenAI (when `OPENAI_API_KEY` is set) with a deterministic rule-based fallback — never hard-fails if the key is absent |
-| File storage | Local disk (`server/uploads/`), served statically — see `KNOWN_LIMITATIONS.md` for the cloud-storage migration note |
+| File storage | MongoDB GridFS (bucket `media`), served via the unified `GET /api/v1/media/:id` endpoint — see `docs/MEDIA_SYSTEM.md` |
 
 ## High-Level Architecture
 

@@ -6,7 +6,7 @@ const { createNotification, createNotifications } = require('../services/notific
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
-const path = require('path')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
 
 // Student: Submit enrollment request
 exports.submitRequest = async (req, res, next) => {
@@ -67,10 +67,18 @@ exports.uploadPaymentProof = async (req, res, next) => {
       return sendError(res, 'لا يمكن تحديث هذا الطلب', 400)
     }
 
-    const fileUrl = `/uploads/payment-proofs/${req.file.filename}`
-    request.paymentProofUrl = fileUrl
+    const oldProofId = request.paymentProofId
+    request.paymentProofId = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `proof_${req.user._id}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      // Private: bank/transaction details. Only the uploading student and
+      // admins (who review enrollment requests) may ever view this.
+      metadata: { category: 'payment-proof', uploadedBy: req.user._id, private: true },
+    })
     if (request.status === 'pending') request.status = 'under_review'
     await request.save()
+    if (oldProofId) await deleteFile(oldProofId)
 
     // Notify admins of proof upload
     const admins = await User.find({ role: 'admin', isActive: true }).select('_id')
@@ -83,7 +91,7 @@ exports.uploadPaymentProof = async (req, res, next) => {
     }))
     if (notifs.length) await createNotifications(notifs)
 
-    sendSuccess(res, { paymentProofUrl: fileUrl }, 'تم رفع إثبات الدفع بنجاح')
+    sendSuccess(res, { paymentProofId: request.paymentProofId }, 'تم رفع إثبات الدفع بنجاح')
   } catch (err) {
     next(err)
   }

@@ -1,64 +1,37 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../../config/constants.js'
-import { BookOpen, Moon, Sparkles, Languages, ArrowRight, Layers, Calendar } from 'lucide-react'
+import { Sparkles, GraduationCap, Crown, ArrowRight, Layers, Users } from 'lucide-react'
 
+// Real age-tier program groups, exactly as structured in the academy's
+// official content (datatoadd.md) — not a generic invented program list.
 const programs = [
-  { 
-    id: 'tajweed',
-    title: 'تجويد القرآن الكريم', 
-    desc: 'تعلم أحكام التلوة والترتيل الصحيح من المقدمة الجزرية وغيرها من المتون المعتمدة، مع تطبيق عملي مباشر ومستمر.', 
-    level: 'جميع المستويات', 
-    levelKey: 'all',
-    sessions: '٨ حصص / الشهر', 
-    icon: BookOpen,
-    isGoldTag: false
-  },
-  { 
-    id: 'memorization',
-    title: 'حفظ القرآن الكريم', 
-    desc: 'منهج مدروس للحفظ والمراجعة مع متابعة يومية دقيقة من معلم متخصص، وتقارير دورية تقيس وتضمن تقدمك.', 
-    level: 'متوسط - متقدم', 
-    levelKey: 'advanced',
-    sessions: '١٢ حصة / الشهر', 
-    icon: Moon,
-    isGoldTag: true
-  },
-  { 
-    id: 'beginners',
-    title: 'قراءة القرآن للمبتدئين', 
-    desc: 'التأسيس السليم من القاعدة النورانية والبغدادية حتى الوصول إلى الطلاقة التامة في القراءة. مناسب لكافة الأعمار.', 
-    level: 'مبتدئ', 
-    levelKey: 'beginner',
-    sessions: '٨ حصص / الشهر', 
+  {
+    id: 'kids',
+    title: 'كورسات الأطفال',
+    desc: 'نور البيان لتأسيس القراءة، الكورس المتكامل (قرآن، تجويد، تفسير، سيرة، آداب)، تدبر وحفظ جزء النبأ، والسيرة النبوية للأطفال.',
+    ageRange: 'من 4 سنوات فما فوق',
     icon: Sparkles,
-    isGoldTag: false
+    isGoldTag: false,
   },
-  { 
-    id: 'arabic',
-    title: 'اللغة العربية للقرآن', 
-    desc: 'عمق فهمك للآيات والتدبر الإيماني من خلال تعلم مبادئ وقواعد اللغة العربية البسيطة والنحو والصرف.', 
-    level: 'جميع المستويات', 
-    levelKey: 'all',
-    sessions: '١٠ حصص / الشهر', 
-    icon: Languages,
-    isGoldTag: false
+  {
+    id: 'rising-generation',
+    title: 'كورسات الجيل الصاعد',
+    desc: 'التأسيس المكثف في القراءة والقرآن، القرآن الكريم والتجويد، والعلوم الشرعية للناشئة والشباب.',
+    ageRange: 'من 9 إلى 18 عامًا',
+    icon: GraduationCap,
+    isGoldTag: true,
   },
-]
-
-const FILTER_TABS = [
-  { key: 'any', label: 'جميع المسارات' },
-  { key: 'beginner', label: 'المسارات المبتدئة' },
-  { key: 'advanced', label: 'المتقدمة والمتوسطة' },
+  {
+    id: 'elite',
+    title: 'كورسات الصفوة',
+    desc: 'حفظ القرآن الكريم للكبار، التجويد للكبار، والفقه الإسلامي للكبار — لأن العمر لا يقف حائلًا بينك وبين حفظ كتاب الله.',
+    ageRange: '20 سنة فأكثر',
+    icon: Crown,
+    isGoldTag: false,
+  },
 ]
 
 export default function ProgramsPage() {
-  const [activeFilter, setActiveFilter] = useState('any')
-
-  const filteredPrograms = programs.filter(p => 
-    activeFilter === 'any' ? true : p.levelKey === activeFilter || p.levelKey === 'all'
-  )
-
   return (
     /* تدرج الموجة الخطي الاحترافي لحماية النيفبار وإبراز الجزء السفلي */
     <div className="min-h-screen pt-36 pb-28 px-[clamp(24px,6vw,80px)] relative bg-gradient-to-b from-[#11052c] via-[#1a0b3e] via-25% to-white to-55% font-sans antialiased text-gray-800" dir="rtl">
@@ -86,28 +59,9 @@ export default function ProgramsPage() {
           </p>
         </div>
 
-        {/* أزرار الفلترة بنظام زجاجي عصري (Glassmorphism Tabs) */}
-        <div className="flex justify-center mb-20">
-          <div className="flex p-1.5 rounded-2xl bg-purple-950/40 border border-purple-800/20 backdrop-blur-md shadow-2xl">
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveFilter(tab.key)}
-                className={`px-6 py-3 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${
-                  activeFilter === tab.key
-                    ? 'bg-[#E8C76A] text-[#11052c] shadow-lg shadow-[#E8C76A]/10'
-                    : 'text-purple-200/70 hover:text-white'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* شبكة البطاقات المصممة بنظافة فائقة لتبدو بارزة على المساحة البيضاء */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-          {filteredPrograms.map((p) => {
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch mt-10">
+          {programs.map((p) => {
             const IconComponent = p.icon
             return (
               <div 
@@ -121,23 +75,18 @@ export default function ProgramsPage() {
                       <IconComponent className="w-6 h-6" />
                     </div>
                     
-                    {/* شارات الكبسولات في الأعلى لعدم تشتيت الزر السفلي */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500">
-                        {p.level}
-                      </span>
-                      <span 
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1"
-                        style={{ 
-                          backgroundColor: p.isGoldTag ? 'rgba(232,199,106,0.08)' : 'rgba(147,51,234,0.05)',
-                          borderColor: p.isGoldTag ? 'rgba(232,199,106,0.2)' : 'rgba(147,51,234,0.1)',
-                          color: p.isGoldTag ? '#b58e1d' : '#6b21a8'
-                        }}
-                      >
-                        <Calendar className="w-3 h-3 opacity-70" />
-                        {p.sessions}
-                      </span>
-                    </div>
+                    {/* شارة الفئة العمرية — بيانات حقيقية من محتوى الأكاديمية */}
+                    <span
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1"
+                      style={{
+                        backgroundColor: p.isGoldTag ? 'rgba(232,199,106,0.08)' : 'rgba(147,51,234,0.05)',
+                        borderColor: p.isGoldTag ? 'rgba(232,199,106,0.2)' : 'rgba(147,51,234,0.1)',
+                        color: p.isGoldTag ? '#b58e1d' : '#6b21a8'
+                      }}
+                    >
+                      <Users className="w-3 h-3 opacity-70" />
+                      {p.ageRange}
+                    </span>
                   </div>
 
                   {/* النصوص منسقة تماماً بـ line-height مريح */}
@@ -153,11 +102,11 @@ export default function ProgramsPage() {
 
                 {/* زر الانضمام المودرن الفخم */}
                 <div className="mt-8">
-                  <Link 
-                    to={ROUTES.REGISTER} 
+                  <Link
+                    to={ROUTES.COURSES}
                     className="w-full flex items-center justify-center gap-2 text-center text-sm font-black py-4 rounded-xl transition-all duration-300 border border-purple-600 bg-transparent text-purple-600 hover:bg-purple-600 hover:text-white"
                   >
-                    <span>ابدأ رحلتك في هذا المسار</span>
+                    <span>استكشف كورسات هذا المسار</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>

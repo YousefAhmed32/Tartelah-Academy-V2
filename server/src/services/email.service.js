@@ -83,7 +83,7 @@ exports.sendWelcomeEmail = async ({ to, name }) => {
     </div>
     <p style="color:#1f1147;font-size:15px;line-height:1.8;margin:0 0 28px;">يمكنك الآن تسجيل الدخول والبدء برحلتك مع القرآن الكريم.</p>
     <div style="text-align:center;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login"
+      <a href="${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/login"
          style="display:inline-block;background:#E8C76A;color:#0f0226;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;">
         الدخول إلى حسابي
       </a>
@@ -124,7 +124,7 @@ exports.sendPasswordChangedEmail = async ({ to, name }) => {
       <p style="color:#155724;font-size:13px;margin:0;">إذا لم تقم أنت بهذا التغيير، يرجى التواصل مع الدعم فوراً.</p>
     </div>
     <div style="text-align:center;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login"
+      <a href="${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/login"
          style="display:inline-block;background:#E8C76A;color:#0f0226;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;">
         تسجيل الدخول
       </a>

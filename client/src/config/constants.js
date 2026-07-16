@@ -3,11 +3,23 @@ export const BACKEND_URL = API_URL.replace('/api/v1', '')
 export const APP_NAME = 'ترتيلة أونلاين'
 export const APP_NAME_EN = 'Tartelah Online'
 
-// Converts a relative server path like /uploads/... to a full URL
-export function getFileUrl(path) {
-  if (!path) return null
-  if (path.startsWith('http')) return path
-  return `${BACKEND_URL}${path}`
+// Image/file fields across the API now hold a bare MongoDB GridFS ObjectId
+// (24 hex chars) rather than a disk path — every upload is stored in
+// GridFS, never on local disk (see server/src/config/gridfs.js). This is the
+// single place that turns either shape into a full URL, so every existing
+// getFileUrl(course.thumbnailImage) call site across the app keeps working
+// unchanged. A bare id always resolves through the unified media endpoint;
+// changing BACKEND_URL (i.e. VITE_API_URL) is the only thing ever needed to
+// point every already-stored id at a new domain — nothing in the database
+// ever needs to change.
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i
+
+export function getFileUrl(value) {
+  if (!value) return null
+  const str = typeof value === 'string' ? value : String(value)
+  if (str.startsWith('http')) return str
+  if (OBJECT_ID_RE.test(str)) return `${BACKEND_URL}/api/v1/media/${str}`
+  return `${BACKEND_URL}${str}` // legacy "/uploads/..." path, if any pre-migration value slips through
 }
 
 export const ROLES = {

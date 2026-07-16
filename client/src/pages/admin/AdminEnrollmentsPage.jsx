@@ -12,6 +12,7 @@ import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
+import PrivateImage from '../../components/ui/PrivateImage.jsx'
 
 const STATUS_CONFIG = {
   pending: { label: 'قيد الانتظار', variant: 'warning' },
@@ -157,7 +158,7 @@ export default function AdminEnrollmentsPage() {
 
                   {/* Actions */}
                   <div className="flex-none flex items-center gap-2">
-                    {req.paymentProofUrl && (
+                    {req.paymentProofId && (
                       <button
                         onClick={() => { setSelectedRequest(req); setShowProof(true) }}
                         className="text-xs text-brand-purple hover:underline font-semibold flex items-center gap-1"
@@ -197,14 +198,14 @@ export default function AdminEnrollmentsPage() {
 
       {/* Payment proof modal */}
       <Modal
-        open={showProof && !!selectedRequest?.paymentProofUrl}
+        open={showProof && !!selectedRequest?.paymentProofId}
         onClose={() => { setShowProof(false); setSelectedRequest(null) }}
         title="إثبات الدفع"
         size="md"
         footer={<Button variant="ghost" onClick={() => { setShowProof(false); setSelectedRequest(null) }}>إغلاق</Button>}
       >
         <div className="text-center">
-          <img src={getFileUrl(selectedRequest?.paymentProofUrl)} alt="إثبات الدفع" className="max-w-full max-h-[70vh] object-contain rounded-xl mx-auto border border-[#e8e0f5]" />
+          <PrivateImage src={selectedRequest?.paymentProofId} alt="إثبات الدفع" className="max-w-full max-h-[70vh] object-contain rounded-xl mx-auto border border-[#e8e0f5]" />
           <div className="mt-3 text-sm text-[#9b7fd6]">
             رُفع بواسطة: {selectedRequest?.studentId?.firstNameAr} — {formatDateAr(selectedRequest?.updatedAt)}
           </div>

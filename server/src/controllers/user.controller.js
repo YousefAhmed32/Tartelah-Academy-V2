@@ -1,8 +1,7 @@
-const path = require('path')
-const fs = require('fs')
 const User = require('../models/User')
 const { sendSuccess, sendError } = require('../utils/response')
 const { isValidGender } = require('../config/teacherIdentity')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
 
 exports.updateMe = async (req, res, next) => {
   try {
@@ -27,17 +26,21 @@ exports.updateMe = async (req, res, next) => {
 exports.uploadAvatar = async (req, res, next) => {
   try {
     if (!req.file) return sendError(res, 'لم يتم اختيار صورة', 400)
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`
 
-    // Delete old avatar file if it was locally stored
     const existing = await User.findById(req.user._id)
-    if (existing.avatar && existing.avatar.startsWith('/uploads/')) {
-      const oldPath = path.join(process.cwd(), existing.avatar)
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
-    }
+    const oldAvatarId = existing.avatar
 
-    const user = await User.findByIdAndUpdate(req.user._id, { avatar: avatarUrl }, { new: true })
-    sendSuccess(res, { avatar: avatarUrl, user: user.toPublic() }, 'تم تحديث الصورة الشخصية')
+    const newId = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `avatar_${req.user._id}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'avatar', uploadedBy: req.user._id, private: false },
+    })
+
+    const user = await User.findByIdAndUpdate(req.user._id, { avatar: newId }, { new: true })
+    if (oldAvatarId) await deleteFile(oldAvatarId)
+
+    sendSuccess(res, { avatar: user.avatar, user: user.toPublic() }, 'تم تحديث الصورة الشخصية')
   } catch (err) {
     next(err)
   }

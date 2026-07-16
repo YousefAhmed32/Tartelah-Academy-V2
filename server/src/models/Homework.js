@@ -3,9 +3,10 @@ const mongoose = require('mongoose')
 const SubmissionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String },
-  attachmentUrl: { type: String },
   attachments: [{
-    url: String,
+    // GridFS file _id — private (see media.controller.js): only the
+    // submitting student, the homework's teacher, and admins may view it.
+    fileId: mongoose.Schema.Types.ObjectId,
     originalName: String,
     mimetype: String,
     size: Number,

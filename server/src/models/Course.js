@@ -27,8 +27,13 @@ const CourseSchema = new mongoose.Schema({
   description:        { type: String },
 
   // ── Media ─────────────────────────────────────────────────────────────────────
-  thumbnailImage: { type: String },
-  coverImage:     { type: String },
+  // GridFS file _ids (server/src/config/gridfs.js), NOT paths/URLs. Field
+  // names kept as-is (not renamed to *Id) — many existing .select()
+  // projections already name these fields, and an ObjectId serializes to a
+  // plain hex string that client getFileUrl() already resolves to
+  // `${BACKEND_URL}/api/v1/media/<id>`.
+  thumbnailImage: { type: mongoose.Schema.Types.ObjectId, default: null },
+  coverImage:     { type: mongoose.Schema.Types.ObjectId, default: null },
   introVideoUrl:  { type: String, trim: true, default: '' }, // YouTube URL
 
   // ── Classification ────────────────────────────────────────────────────────────

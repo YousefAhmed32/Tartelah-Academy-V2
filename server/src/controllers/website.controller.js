@@ -5,6 +5,7 @@ const ContactMessage = require('../models/ContactMessage')
 const NewsletterSubscriber = require('../models/NewsletterSubscriber')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
 
 exports.getTestimonials = async (req, res, next) => {
   try {
@@ -70,6 +71,7 @@ exports.getSettings = async (req, res, next) => {
 
 const SETTINGS_ALLOWED = [
   'academyNameAr', 'academyNameEn', 'taglineAr',
+  'missionQuoteAr', 'visionAr', 'aboutHeadlineAr', 'aboutBodyAr',
   'phone', 'whatsapp', 'email', 'address',
   'facebook', 'instagram', 'twitter', 'youtube', 'linkedin',
   'workingHours', 'supportText', 'emergencyContact',
@@ -99,6 +101,25 @@ exports.updateSettings = async (req, res, next) => {
     if (updates.googleMapsEmbed !== undefined) updates.googleMapsEmbed = normalizeMapEmbed(updates.googleMapsEmbed)
     const settings = await AcademySettings.findOneAndUpdate({}, updates, { new: true, upsert: true })
     sendSuccess(res, settings, 'تم حفظ الإعدادات')
+  } catch (err) { next(err) }
+}
+
+exports.uploadLogo = async (req, res, next) => {
+  try {
+    if (!req.file) return sendError(res, 'لم يتم رفع أي صورة', 400)
+    const existing = await AcademySettings.findOne()
+    const oldLogoId = existing?.logoId
+
+    const newId = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `logo_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'academy-logo', uploadedBy: req.user._id, private: false },
+    })
+    const settings = await AcademySettings.findOneAndUpdate({}, { logoId: newId }, { new: true, upsert: true })
+    if (oldLogoId) await deleteFile(oldLogoId)
+
+    sendSuccess(res, settings, 'تم رفع الشعار')
   } catch (err) { next(err) }
 }
 

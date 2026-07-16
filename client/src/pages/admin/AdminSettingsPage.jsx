@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save } from 'lucide-react'
+import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Button from '../../components/ui/Button.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import ImageUploadField from '../../components/ui/ImageUploadField.jsx'
 import { getFileUrl } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
@@ -102,9 +103,14 @@ function AcademyTab() {
   })
 
   const [form, setForm] = useState({
+    logoId: '',
     academyNameAr: '',
     academyNameEn: '',
     taglineAr: '',
+    missionQuoteAr: '',
+    visionAr: '',
+    aboutHeadlineAr: '',
+    aboutBodyAr: '',
     phone: '',
     whatsapp: '',
     email: '',
@@ -127,6 +133,20 @@ function AcademyTab() {
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
+  const logoMut = useMutation({
+    mutationFn: (file) => {
+      const fd = new FormData()
+      fd.append('logo', file)
+      return api.post('/website/settings/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+    },
+    onSuccess: (res) => {
+      set('logoId', res.data.logoId)
+      toast.success('تم رفع الشعار')
+      qc.invalidateQueries({ queryKey: ['academy-settings'] })
+    },
+    onError: () => toast.error('تعذّر رفع الشعار'),
+  })
+
   const mut = useMutation({
     mutationFn: (data) => api.patch('/website/settings', data).then(r => r.data),
     onSuccess: () => {
@@ -142,6 +162,15 @@ function AcademyTab() {
     <div className="space-y-6">
       {/* Academy Info */}
       <Section title="معلومات الأكاديمية" icon={Building2}>
+        <div className="mb-5 max-w-xs">
+          <ImageUploadField
+            label="شعار الأكاديمية"
+            currentUrl={form.logoId}
+            aspect={1}
+            recommendedSizeText="مربع، 512×512 بكسل يفضّل"
+            onUpload={(file) => logoMut.mutateAsync(file)}
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-bold text-gray-500 mb-1.5 block">اسم الأكاديمية (عربي)</label>
@@ -154,6 +183,28 @@ function AcademyTab() {
           <div className="md:col-span-2">
             <label className="text-xs font-bold text-gray-500 mb-1.5 block">الشعار الفرعي</label>
             <input className={inputCls} value={form.taglineAr} onChange={e => set('taglineAr', e.target.value)} placeholder="تعلم القرآن الكريم بأيسر الطرق..." />
+          </div>
+        </div>
+      </Section>
+
+      {/* Mission / Vision / About — public "من نحن" content shown on the About page */}
+      <Section title="الرسالة والرؤية ومن نحن" icon={Heart}>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">رسالتنا</label>
+            <textarea className={`${inputCls} h-20 py-2 resize-y`} value={form.missionQuoteAr} onChange={e => set('missionQuoteAr', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">رؤيتنا</label>
+            <textarea className={`${inputCls} h-20 py-2 resize-y`} value={form.visionAr} onChange={e => set('visionAr', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">عنوان "من نحن"</label>
+            <input className={inputCls} value={form.aboutHeadlineAr} onChange={e => set('aboutHeadlineAr', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">نص "من نحن"</label>
+            <textarea className={`${inputCls} h-32 py-2 resize-y`} value={form.aboutBodyAr} onChange={e => set('aboutBodyAr', e.target.value)} />
           </div>
         </div>
       </Section>

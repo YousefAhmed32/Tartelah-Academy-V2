@@ -1,5 +1,6 @@
 const SuccessStory = require('../models/SuccessStory')
 const { sendSuccess, sendError } = require('../utils/response')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
 
 const ROLES = ['teacher', 'student', 'achievement']
 
@@ -70,9 +71,16 @@ exports.uploadCardImage = async (req, res, next) => {
     const doc = await getOrCreate()
     const target = doc.cards.find(c => c.role === role)
     if (!target) return sendError(res, 'البطاقة غير موجودة', 404)
+    const oldImage = target.image
 
-    target.image = `/uploads/success-stories/${req.file.filename}`
+    target.image = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `story_${role}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'success-story-card', uploadedBy: req.user._id, private: false },
+    })
     await doc.save()
+    if (oldImage) await deleteFile(oldImage)
     sendSuccess(res, doc, 'تم رفع الصورة')
   } catch (err) { next(err) }
 }
@@ -85,9 +93,11 @@ exports.removeCardImage = async (req, res, next) => {
     const doc = await getOrCreate()
     const target = doc.cards.find(c => c.role === role)
     if (!target) return sendError(res, 'البطاقة غير موجودة', 404)
+    const oldImage = target.image
 
     target.image = undefined
     await doc.save()
+    if (oldImage) await deleteFile(oldImage)
     sendSuccess(res, doc, 'تم حذف الصورة')
   } catch (err) { next(err) }
 }
@@ -97,8 +107,16 @@ exports.uploadBannerImage = async (req, res, next) => {
     if (!req.file) return sendError(res, 'لم يتم رفع أي صورة', 400)
 
     const doc = await getOrCreate()
-    doc.banner.image = `/uploads/success-stories/${req.file.filename}`
+    const oldImage = doc.banner.image
+
+    doc.banner.image = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `story_banner_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'success-story-banner', uploadedBy: req.user._id, private: false },
+    })
     await doc.save()
+    if (oldImage) await deleteFile(oldImage)
     sendSuccess(res, doc, 'تم رفع الصورة')
   } catch (err) { next(err) }
 }
@@ -106,8 +124,10 @@ exports.uploadBannerImage = async (req, res, next) => {
 exports.removeBannerImage = async (req, res, next) => {
   try {
     const doc = await getOrCreate()
+    const oldImage = doc.banner.image
     doc.banner.image = undefined
     await doc.save()
+    if (oldImage) await deleteFile(oldImage)
     sendSuccess(res, doc, 'تم حذف الصورة')
   } catch (err) { next(err) }
 }

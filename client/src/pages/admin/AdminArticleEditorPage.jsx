@@ -651,15 +651,6 @@ export default function AdminArticleEditorPage() {
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">صورة الغلاف *</label>
                 <CoverUpload value={form.coverImage} onChange={val => setForm(f => ({...f, coverImage: val}))} />
               </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">رابط صورة الغلاف (بديل)</label>
-                <input
-                  value={form.coverImage || ''}
-                  onChange={e => setForm(f => ({...f, coverImage: e.target.value}))}
-                  placeholder="https://... أو /uploads/articles/..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
             </div>
           )}
         </div>

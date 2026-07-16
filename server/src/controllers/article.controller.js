@@ -3,6 +3,8 @@ const ArticleCategory = require('../models/ArticleCategory')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
+const { extractMediaId } = require('../utils/media')
 
 // audit.service's logAction takes a single object; wrap it so call sites
 // below can pass just (req, action, entityId, changes) without repeating
@@ -276,7 +278,7 @@ exports.createArticle = async (req, res, next) => {
 
     const article = await Article.create({
       title, titleAr, slug, excerpt, excerptAr,
-      content, contentAr, coverImage, gallery: gallery || [],
+      content, contentAr, coverImage: extractMediaId(coverImage), gallery: gallery || [],
       author: req.user._id,
       category: category || null,
       tags: tags || [],
@@ -303,12 +305,19 @@ exports.updateArticle = async (req, res, next) => {
 
     const allowed = [
       'title', 'titleAr', 'excerpt', 'excerptAr', 'content', 'contentAr',
-      'coverImage', 'gallery', 'category', 'tags', 'status', 'scheduledAt',
+      'gallery', 'category', 'tags', 'status', 'scheduledAt',
       'featured', 'featuredOrder', 'pinned', 'seo',
     ]
 
     for (const key of allowed) {
       if (key in req.body) article[key] = req.body[key]
+    }
+
+    // Normalized separately: the client may send either a bare GridFS id or
+    // the "/api/v1/media/<id>" path the upload endpoint returned.
+    const oldCoverImage = article.coverImage
+    if ('coverImage' in req.body) {
+      article.coverImage = extractMediaId(req.body.coverImage)
     }
 
     if (req.body.slug && req.body.slug !== article.slug) {
@@ -322,6 +331,10 @@ exports.updateArticle = async (req, res, next) => {
     article.updatedBy = req.user._id
     await article.save()
 
+    if (oldCoverImage && String(oldCoverImage) !== String(article.coverImage || '')) {
+      await deleteFile(oldCoverImage)
+    }
+
     await auditArticle(req, 'article.update', article._id, {})
     sendSuccess(res, article, 'تم تحديث المقال بنجاح')
   } catch (err) { next(err) }
@@ -330,8 +343,13 @@ exports.updateArticle = async (req, res, next) => {
 exports.uploadCoverImage = async (req, res, next) => {
   try {
     if (!req.file) return sendError(res, 'لم يتم اختيار صورة', 400)
-    const url = `/uploads/articles/${req.file.filename}`
-    sendSuccess(res, { url }, 'تم رفع الصورة بنجاح')
+    const id = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `article_cover_${req.user._id}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'article-cover', uploadedBy: req.user._id, private: false },
+    })
+    sendSuccess(res, { id, url: `/api/v1/media/${id}` }, 'تم رفع الصورة بنجاح')
   } catch (err) { next(err) }
 }
 
@@ -398,7 +416,10 @@ exports.duplicateArticle = async (req, res, next) => {
       excerptAr: source.excerptAr,
       content: source.content,
       contentAr: source.contentAr,
-      coverImage: source.coverImage,
+      // Not carried over — GridFS files aren't reference-counted, so sharing
+      // the source article's id would mean deleting/replacing either
+      // article's cover silently breaks the other's.
+      coverImage: null,
       gallery: source.gallery,
       author: req.user._id,
       category: source.category,

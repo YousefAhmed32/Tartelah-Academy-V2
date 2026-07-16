@@ -18,7 +18,11 @@ const ArticleSchema = new mongoose.Schema({
   excerptAr:  { type: String, trim: true, maxlength: 600 },
   content:    { type: String },
   contentAr:  { type: String },
-  coverImage: { type: String },
+  // GridFS file _id — kept as `coverImage` (not renamed) since existing
+  // .populate()/.select() projections elsewhere don't touch this field, but
+  // this specific field is read directly all over article.controller.js;
+  // ObjectId serializes to a hex string that client getFileUrl() resolves.
+  coverImage: { type: mongoose.Schema.Types.ObjectId, default: null },
   gallery:    [{ type: String }],
 
   author:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

@@ -12,7 +12,7 @@ function toPublicTeacher(teacher) {
     firstNameAr: teacher.firstNameAr,
     lastNameAr: teacher.lastNameAr,
     gender: teacher.gender || null,
-    avatar: teacher.avatar || null,
+    avatar: teacher.avatar || null, // GridFS ObjectId — client getFileUrl() resolves it
     specialization: teacher.specialization || null,
     bioAr: teacher.bioAr || null,
     createdAt: teacher.createdAt,

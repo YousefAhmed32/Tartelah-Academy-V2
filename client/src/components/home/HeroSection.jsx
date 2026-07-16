@@ -78,7 +78,7 @@ export default function HeroSection() {
       >
         <img
           className="hero__photo"
-          src="/images/hero_bg-3.png"
+          src="/images/hero_bg-4.png"
           alt="أسرة تستخدم منصة ترتيلة أونلاين لتعلم القرآن الكريم عبر الهاتف والتابلت"
           width="1829"
           height="860"

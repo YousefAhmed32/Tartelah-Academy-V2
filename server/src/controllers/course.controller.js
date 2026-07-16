@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Course = require('../models/Course')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { isValidYouTubeUrl } = require('../utils/youtube')
+const { uploadBuffer, deleteFile } = require('../services/media.service')
 
 // ── Slug Helpers ─────────────────────────────────────────────────────────────
 
@@ -319,12 +320,18 @@ exports.update = async (req, res, next) => {
 exports.uploadThumbnail = async (req, res, next) => {
   try {
     if (!req.file) return sendError(res, 'لم يتم رفع ملف', 400)
-    const course = await Course.findByIdAndUpdate(
-      req.params.id,
-      { thumbnailImage: `/${req.file.path.replace(/\\/g, '/')}` },
-      { new: true }
-    )
-    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    const existing = await Course.findById(req.params.id).select('thumbnailImage')
+    if (!existing) return sendError(res, 'المقرر غير موجود', 404)
+
+    const newId = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `course_thumb_${req.params.id}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'course-thumbnail', uploadedBy: req.user._id, private: false },
+    })
+    const course = await Course.findByIdAndUpdate(req.params.id, { thumbnailImage: newId }, { new: true })
+    if (existing.thumbnailImage) await deleteFile(existing.thumbnailImage)
+
     sendSuccess(res, { thumbnailImage: course.thumbnailImage }, 'تم رفع الصورة المصغرة')
   } catch (err) {
     next(err)
@@ -334,12 +341,18 @@ exports.uploadThumbnail = async (req, res, next) => {
 exports.uploadCover = async (req, res, next) => {
   try {
     if (!req.file) return sendError(res, 'لم يتم رفع ملف', 400)
-    const course = await Course.findByIdAndUpdate(
-      req.params.id,
-      { coverImage: `/${req.file.path.replace(/\\/g, '/')}` },
-      { new: true }
-    )
-    if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    const existing = await Course.findById(req.params.id).select('coverImage')
+    if (!existing) return sendError(res, 'المقرر غير موجود', 404)
+
+    const newId = await uploadBuffer({
+      buffer: req.file.buffer,
+      filename: `course_cover_${req.params.id}_${Date.now()}`,
+      mimetype: req.file.mimetype,
+      metadata: { category: 'course-cover', uploadedBy: req.user._id, private: false },
+    })
+    const course = await Course.findByIdAndUpdate(req.params.id, { coverImage: newId }, { new: true })
+    if (existing.coverImage) await deleteFile(existing.coverImage)
+
     sendSuccess(res, { coverImage: course.coverImage }, 'تم رفع صورة الغلاف')
   } catch (err) {
     next(err)
@@ -394,6 +407,11 @@ exports.duplicate = async (req, res, next) => {
       featured: false,
       studentsCount: 0,
       enrollmentCount: 0,
+      // GridFS files aren't reference-counted here — sharing the original's
+      // ids would mean deleting/replacing either course's image silently
+      // breaks the other. The copy starts with no image; re-upload if needed.
+      thumbnailImage: null,
+      coverImage: null,
       createdBy: req.user._id,
     })
 
@@ -407,6 +425,7 @@ exports.remove = async (req, res, next) => {
   try {
     const course = await Course.findByIdAndDelete(req.params.id)
     if (!course) return sendError(res, 'المقرر غير موجود', 404)
+    await Promise.all([deleteFile(course.thumbnailImage), deleteFile(course.coverImage)])
     sendSuccess(res, null, 'تم حذف المقرر')
   } catch (err) {
     next(err)
@@ -442,9 +461,12 @@ exports.bulkAction = async (req, res, next) => {
         updateData = { status: 'archived', isActive: false }
         message = `تم أرشفة ${ids.length} مقرر`
         break
-      case 'delete':
+      case 'delete': {
+        const toDelete = await Course.find({ _id: { $in: ids } }).select('thumbnailImage coverImage')
         await Course.deleteMany({ _id: { $in: ids } })
+        await Promise.all(toDelete.flatMap(c => [deleteFile(c.thumbnailImage), deleteFile(c.coverImage)]))
         return sendSuccess(res, null, `تم حذف ${ids.length} مقرر`)
+      }
       default:
         return sendError(res, 'إجراء غير معروف', 400)
     }

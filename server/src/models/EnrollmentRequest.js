@@ -15,7 +15,10 @@ const EnrollmentRequestSchema = new mongoose.Schema({
     default: 'bank_transfer',
   },
   paymentReference: { type: String, trim: true },
-  paymentProofUrl: { type: String },
+  // GridFS file _id — private (see media.controller.js): only the owning
+  // student and admins may view it. Renamed from paymentProofUrl since this
+  // field has few, easily-audited read sites (unlike User.avatar).
+  paymentProofId: { type: mongoose.Schema.Types.ObjectId, default: null },
   amount: { type: Number, default: 0 },
   studentNotes: { type: String, trim: true, maxlength: 500 },
   adminNotes: { type: String, trim: true, maxlength: 500 },

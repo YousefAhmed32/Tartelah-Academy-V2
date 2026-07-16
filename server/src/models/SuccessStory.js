@@ -2,7 +2,9 @@ const mongoose = require('mongoose')
 
 const CardSchema = new mongoose.Schema({
   role: { type: String, enum: ['teacher', 'student', 'achievement'], required: true },
-  image: { type: String },
+  // GridFS file _id — see Course.thumbnailImage comment for why the field
+  // keeps its name despite now holding an ObjectId, not a path string.
+  image: { type: mongoose.Schema.Types.ObjectId, default: null },
   nameAr: { type: String, default: '' },
   titleAr: { type: String, default: '' },
   descriptionAr: { type: String, default: '' },
@@ -14,7 +16,7 @@ const CardSchema = new mongoose.Schema({
 }, { _id: false })
 
 const BannerSchema = new mongoose.Schema({
-  image: { type: String },
+  image: { type: mongoose.Schema.Types.ObjectId, default: null },
   titleAr: { type: String, default: '' },
   subtitleAr: { type: String, default: '' },
   buttonText: { type: String, default: '' },

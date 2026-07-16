@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { CheckSquare, Users, Clock, Star } from 'lucide-react'
+import { CheckSquare, Users, Clock, Star, Paperclip } from 'lucide-react'
 import api from '../../utils/api.js'
+import { downloadPrivateFile } from '../../utils/privateMedia.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
@@ -98,6 +99,22 @@ function GradeSubmissionsModal({ hw, students, onClose }) {
                   {sub.content && (
                     <div className="text-sm text-gray-600 bg-white rounded-lg p-3 mb-3 border border-gray-100">
                       {sub.content}
+                    </div>
+                  )}
+
+                  {/* Attachments — private files, downloaded with an authenticated request */}
+                  {sub.attachments?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {sub.attachments.map((att, i) => (
+                        <button
+                          key={i}
+                          onClick={() => downloadPrivateFile(att.fileId, att.originalName)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg px-2.5 py-1.5 transition-colors"
+                        >
+                          <Paperclip size={12} />
+                          {att.originalName || `ملف ${i + 1}`}
+                        </button>
+                      ))}
                     </div>
                   )}
 

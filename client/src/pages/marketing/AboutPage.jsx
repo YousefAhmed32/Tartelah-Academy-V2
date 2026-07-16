@@ -1,17 +1,24 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ROUTES } from '../../config/constants.js'
-import { 
-  Users, 
-  Globe, 
-  BookOpen, 
-  CheckCircle2, 
-  ArrowLeft, 
+import api from '../../utils/api.js'
+import {
+  Users,
+  Globe,
+  BookOpen,
+  CheckCircle2,
+  ArrowLeft,
   Sparkles,
   Trophy,
   HeartHandshake
 } from 'lucide-react'
 
 export default function AboutPage() {
+  const { data: settings } = useQuery({
+    queryKey: ['academy-settings'],
+    queryFn: () => api.get('/website/settings').then(r => r.data?.data || {}),
+  })
+
   return (
     <div className="bg-[#0b031e] min-h-screen pt-36 pb-24 px-[clamp(20px,5vw,68px)] font-sans antialiased text-slate-200 selection:bg-purple-500/30" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-32">
@@ -31,8 +38,10 @@ export default function AboutPage() {
                 بمعايير عالمية رصينة
               </span>
             </h1>
-            <p className="text-base sm:text-lg leading-relaxed text-slate-400 max-w-xl">
-              انطلقت <span className="text-white font-semibold">ترتيلة أونلاين</span> لتجسر الفجوة بين التقنيات الرقمية المتطورة والأصالة العلمية، لتقدم تجربة فريدة تخاطب العقل وتلامس الوجدان.
+            <p className="text-base sm:text-lg leading-relaxed text-slate-400 max-w-xl whitespace-pre-line">
+              {settings?.aboutBodyAr || (
+                <>أكاديمية قرآنية متخصصة في تعليم القرآن الكريم وأحكام التجويد واللغة العربية والعلوم الشرعية عن بُعد، بمنهجية علمية وإشراف أكاديمي متميز 🤍📖</>
+              )}
             </p>
           </div>
 
@@ -84,10 +93,10 @@ export default function AboutPage() {
           {/* البطاقة الرئيسية الكبيرة (الرسالة والمهمة مجتمعة) */}
           <div className="lg:col-span-5 p-10 rounded-2xl bg-gradient-to-b from-[#14073c] to-[#0e042a] border border-purple-900/30 flex flex-col justify-between space-y-8">
             <div className="space-y-4">
-              <span className="text-xs font-bold px-3 py-1 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/10">رسالتنا الأسمى</span>
-              <h3 className="text-2xl font-bold text-white font-heading">تأصيل وتيسير</h3>
+              <span className="text-xs font-bold px-3 py-1 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/10">رسالتنا</span>
+              <h3 className="text-2xl font-bold text-white font-heading">كان خلقه القرآن</h3>
               <p className="text-sm leading-relaxed text-slate-400">
-                نهدف إلى فتح آفاق جديدة لنشر علوم التنزيل الحكيم، متجاوزين حدود الجغرافيا والمكان لتصل الهوية القرآنية النقية لكل بيت مسلم.
+                {settings?.missionQuoteAr || 'سُئلت السيدة عائشة (رضي الله عنها) عن خلق النبي صلى الله عليه وسلم فقالت: (( كان خلقه القرآن ))'}
               </p>
             </div>
             <div className="border-t border-purple-950/60 pt-4 text-xs font-mono text-[#e3be5a] tracking-wider">
@@ -102,10 +111,10 @@ export default function AboutPage() {
                 <div className="p-2 rounded-lg bg-amber-500/10 text-[#e3be5a]">
                   <Trophy className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-bold text-white font-heading">رؤيتنا المستقبلية</h3>
+                <h3 className="text-xl font-bold text-white font-heading">رؤيتنا</h3>
               </div>
               <p className="text-sm sm:text-base leading-relaxed text-slate-400">
-                نطمح لأن نكون المنظومة المرجعية الذكية الأولى عالمياً في منح الإجازات والأسانيد القرآنية المتصلة، مع تطوير أدوات قياس ذكاء اصطناعي تدعم دقة تصحيح التلاوة وتراعي الفروق الفردية للطلاب.
+                {settings?.visionAr || 'إعداد جيل قرآني متميز — كان صلى الله عليه وسلم: قرآنا يمشي على الأرض'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4 mt-8 border-t border-purple-950/40 pt-6">

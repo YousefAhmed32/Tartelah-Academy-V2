@@ -10,7 +10,13 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true, select: false, minlength: 8 },
   role: { type: String, enum: ['admin', 'teacher', 'student'], default: 'student' },
   phone: { type: String, trim: true },
-  avatar: { type: String },
+  // GridFS file _id (server/src/config/gridfs.js), NOT a path or URL — kept as
+  // `avatar` (not renamed to avatarId) deliberately: dozens of existing
+  // .select()/.populate(path, '...avatar...') projections across the
+  // codebase already name this exact field, and Mongoose ObjectIds
+  // serialize to their plain hex string in JSON, which client getFileUrl()
+  // already recognizes and turns into `${BACKEND_URL}/api/v1/media/<id>`.
+  avatar: { type: mongoose.Schema.Types.ObjectId, default: null },
   bioAr: { type: String },
   specialization: { type: String },
   // Canonical teacher identity (see server/src/config/teacherIdentity.js). Not

@@ -2,6 +2,7 @@ const router = require('express').Router()
 const ctrl = require('../controllers/website.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { isAdmin } = require('../middleware/rbac.middleware')
+const { uploadLogo, handleUploadError } = require('../middleware/upload.middleware')
 
 // Public routes
 router.get('/testimonials', ctrl.getTestimonials)
@@ -13,6 +14,7 @@ router.post('/newsletter', ctrl.subscribeNewsletter)
 // Admin-only routes
 router.use(authenticate, isAdmin)
 router.patch('/settings', ctrl.updateSettings)
+router.post('/settings/logo', uploadLogo, handleUploadError, ctrl.uploadLogo)
 router.post('/testimonials', ctrl.createTestimonial)
 router.delete('/testimonials/:id', ctrl.deleteTestimonial)
 router.post('/faqs', ctrl.createFAQ)

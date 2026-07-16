@@ -6,8 +6,6 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 const cookieParser = require('cookie-parser')
 const rateLimit = require('express-rate-limit')
-const fs = require('fs')
-const path = require('path')
 const connectDB = require('./src/config/database')
 const routes = require('./src/routes/index')
 const { errorHandler, notFound } = require('./src/middleware/errorHandler.middleware')
@@ -18,10 +16,15 @@ const app = express()
 const httpServer = http.createServer(app)
 const PORT = process.env.PORT || 5000
 
-// Ensure upload directories exist
-;['uploads/avatars', 'uploads/payment-proofs', 'uploads/homework', 'uploads/articles', 'uploads/courses', 'uploads/success-stories'].forEach(dir => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-})
+// The single client origin — CLIENT_URL is the preferred name (matches
+// DOMAIN/API_URL/CLIENT_URL used across deployment docs); FRONTEND_URL is
+// kept as a fallback so any already-configured deployment keeps working
+// unchanged. Drives CORS here, email links (auth.controller.js,
+// email.service.js), and the Socket.io CORS origin (socket.service.js).
+const CLIENT_URL = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173'
+
+// No local uploads/ directory to create — every uploaded file goes straight
+// into MongoDB GridFS (see src/config/gridfs.js), never local disk.
 
 // Connect to MongoDB and start cron jobs after connection
 connectDB().then(async () => {
@@ -55,7 +58,7 @@ app.use(helmet({
 
 // CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: CLIENT_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -102,9 +105,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 }
-
-// Static files (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // Apply rate limits — optionalAuth first so the limiter can read req.user.role
 app.use('/api/v1/auth', authLimiter)

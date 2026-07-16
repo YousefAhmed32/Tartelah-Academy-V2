@@ -97,7 +97,7 @@ exports.forgotPassword = async (req, res, next) => {
     user.passwordResetToken = crypto.createHash('sha256').update(token).digest('hex')
     user.passwordResetExpires = Date.now() + 30 * 60 * 1000
     await user.save({ validateBeforeSave: false })
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
+    const resetUrl = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
     if (process.env.NODE_ENV !== 'production') console.log(`[DEV] Reset link: ${resetUrl}`)
     sendPasswordResetEmail({ to: user.email, name: user.firstNameAr, resetUrl }).catch(() => {})
     sendSuccess(res, null, 'إذا كان البريد مسجلاً، ستصلك رسالة')

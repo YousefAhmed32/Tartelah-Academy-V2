@@ -23,7 +23,7 @@ If any of these become real requirements, they need their own scoped design pass
 
 ## Infrastructure
 
-- **File storage is local disk**, not S3/Cloudinary — will not survive a redeploy on most PaaS platforms and does not scale across multiple server instances. See `DEPLOYMENT.md`.
+- ~~File storage is local disk~~ — resolved 2026-07-16: all uploads now live in MongoDB GridFS (`server/src/config/gridfs.js`), served via `GET /api/v1/media/:id`. Survives redeploys and scales across instances since it's part of the same MongoDB (Atlas) connection. See `docs/MEDIA_SYSTEM.md`.
 - **No real payment gateway** — enrollment payment is manual proof-upload + admin verification.
 - **Meeting links are external** — no Zoom/Meet API integration for auto-generated, platform-managed meeting rooms; teachers paste their own persistent links.
 - **Cron jobs run in-process** — fine for a single instance; needs a distributed-scheduler strategy before horizontally scaling the backend.

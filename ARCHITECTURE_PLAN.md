@@ -383,7 +383,7 @@ packageId: ObjectId (ref: Package)
 status: Enum ['pending', 'under_review', 'approved', 'rejected'] (indexed)
 paymentMethod: Enum ['bank_transfer', 'cash', 'card', 'other']
 paymentReference: String
-paymentProofUrl: String (file path: /uploads/payment-proofs/)
+paymentProofId: ObjectId (GridFS file id, private — see docs/MEDIA_SYSTEM.md)
 amount: Number
 studentNotes: String (max 500)
 adminNotes: String (max 500)
@@ -1245,7 +1245,6 @@ EMAIL_PORT=587
 EMAIL_USER=
 EMAIL_PASS=
 CLIENT_URL=http://localhost:5173
-UPLOAD_DIR=uploads/
 MAX_FILE_SIZE=5242880
 ```
 

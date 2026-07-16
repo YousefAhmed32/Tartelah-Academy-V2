@@ -1,6 +1,7 @@
 const Homework = require('../models/Homework')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError } = require('../utils/response')
+const { uploadBuffer } = require('../services/media.service')
 
 exports.create = async (req, res, next) => {
   try {
@@ -83,12 +84,19 @@ exports.submit = async (req, res, next) => {
     const alreadySubmitted = hw.submissions?.some(s => s.studentId?.toString() === req.user._id.toString())
     if (alreadySubmitted) return sendError(res, 'لقد سلّمت هذا الواجب مسبقاً', 400)
 
-    const attachments = (req.files || []).map(f => ({
-      url: `/uploads/homework/${f.filename}`,
+    const attachments = await Promise.all((req.files || []).map(async (f) => ({
+      fileId: await uploadBuffer({
+        buffer: f.buffer,
+        filename: `hw_${req.user._id}_${Date.now()}_${f.originalname}`.slice(0, 120),
+        mimetype: f.mimetype,
+        // Private: a student's own submitted work. Only the submitting
+        // student, this homework's teacher, and admins may view it.
+        metadata: { category: 'homework', uploadedBy: req.user._id, private: true, allowedUserIds: [hw.teacherId] },
+      }),
       originalName: f.originalname,
       mimetype: f.mimetype,
       size: f.size,
-    }))
+    })))
 
     hw.submissions.push({
       studentId: req.user._id,
