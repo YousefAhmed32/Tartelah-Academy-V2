@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Calendar, FileText, Star, CreditCard, UserRound, CalendarDays,
-  Wallet, Bell, LayoutGrid, Inbox, Search, CircleCheck, Clock3,
+  Calendar, FileText, Star, CreditCard, UserRound,
+  Bell, LayoutGrid, Inbox, Search, CircleCheck, Clock3,
   Archive, ArchiveRestore, CalendarClock, Tag, ChevronDown,
 } from 'lucide-react'
 import api from '../../utils/api.js'
@@ -11,25 +11,10 @@ import PageHeader from '../shared/PageHeader.jsx'
 import Spinner from '../ui/Spinner.jsx'
 import { timeFromNow } from '../../utils/date.js'
 import { useNotificationStore } from '../../store/notificationStore.js'
-
-const TYPE_CONFIG = {
-  session:      { label: 'حصة',    color: '#7c3aed', bg: 'rgba(124,58,237,0.13)', Icon: Calendar      },
-  homework:     { label: 'واجب',   color: '#3b82f6', bg: 'rgba(59,130,246,0.13)', Icon: FileText      },
-  evaluation:   { label: 'تقييم',  color: '#d97706', bg: 'rgba(217,119,6,0.13)',  Icon: Star          },
-  subscription: { label: 'اشتراك', color: '#059669', bg: 'rgba(5,150,105,0.13)',  Icon: CreditCard    },
-  enrollment:   { label: 'تسجيل',  color: '#b45309', bg: 'rgba(180,83,9,0.13)',   Icon: UserRound     },
-  schedule:     { label: 'جدول',   color: '#0891b2', bg: 'rgba(8,145,178,0.13)',  Icon: CalendarDays  },
-  payment:      { label: 'دفع',    color: '#059669', bg: 'rgba(5,150,105,0.13)',  Icon: Wallet        },
-  attendance:   { label: 'حضور',   color: '#f59e0b', bg: 'rgba(245,158,11,0.13)', Icon: Clock3        },
-  system:       { label: 'نظام',   color: '#7c6aaa', bg: 'rgba(124,106,170,0.1)', Icon: Bell          },
-}
-
-const PRIORITY_CONFIG = {
-  urgent: { label: 'عاجل',    color: '#ef4444', bg: 'rgba(239,68,68,0.12)', rank: 0 },
-  high:   { label: 'مهم',     color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', rank: 1 },
-  medium: { label: 'عادي',    color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', rank: 2 },
-  low:    { label: 'منخفض',   color: '#9ca3af', bg: 'rgba(156,163,175,0.12)', rank: 3 },
-}
+import {
+  NOTIFICATION_TYPE_CONFIG as TYPE_CONFIG,
+  NOTIFICATION_PRIORITY_CONFIG as PRIORITY_CONFIG,
+} from '../../config/notificationTypes.js'
 
 const FILTER_TABS = [
   { key: 'all',          label: 'الكل',        Icon: LayoutGrid  },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -14,18 +14,16 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
+import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
+import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
-import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATTENDANCE_STATUS, SESSION_OUTCOME, DELAY_REASON, getFileUrl } from '../../config/constants.js'
+import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATT_OPTIONS, DELAY_REASON, getFileUrl } from '../../config/constants.js'
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
 const AR_MONTHS = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 const HOURS_LIST = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINS_LIST = ['00', '15', '30', '45']
-
-const ATT_OPTIONS = Object.entries(ATTENDANCE_STATUS).map(([value, { label, color }]) => ({
-  value, label, color, bg: `${color}2e`,
-}))
 
 const DELAY_REASON_OPTIONS = Object.entries(DELAY_REASON).map(([value, label]) => ({ value, label }))
 
@@ -229,64 +227,74 @@ function DelayModal({ session, onClose, qc }) {
   )
 }
 
+// ─── Cancel Modal ──────────────────────────────────────────────────────────────
+// Official cancellation — only available before a session starts. Requires
+// an explicit reason (business rule: cancellation reason, who cancelled,
+// and when must all be recorded).
+function CancelModal({ session, onClose, qc }) {
+  const [reason, setReason] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => api.patch(`/sessions/${session._id}/cancel`, { reason }),
+    onSuccess: () => {
+      toast.success('تم إلغاء الحصة')
+      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
+      onClose()
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="إلغاء الحصة" size="sm"
+      footer={
+        <>
+          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>تراجع</Button>
+          <Button variant="danger" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!reason.trim()}>تأكيد الإلغاء</Button>
+        </>
+      }
+    >
+      <div className="space-y-3" dir="rtl">
+        <p className="text-sm text-[#9b7fd6]">لن تُحتسب هذه الحصة على الطالب ولا يُصرف عنها أجر — يرجى توضيح السبب.</p>
+        <div>
+          <label className={LBL}>سبب الإلغاء *</label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className="field-light resize-none w-full" placeholder="مثال: ظرف طارئ للطالب..." />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Session Card ─────────────────────────────────────────────────────────────
+// Three states only, matching the teacher's actual mental model:
+//   1. Not started  → single "▶ بدء الحصة" button
+//   2. In progress   → live "🟢 الحصة جارية" state + single "✅ إنهاء الحصة" button
+//   3. Completed     → read-only summary (+ optional post-hoc تقييم/واجب, for History)
+// Reschedule/delay/cancel remain available but de-emphasized as secondary actions.
 function SessionCard({ session, onEval, onHomework }) {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
-  const [attStatus, setAttStatus] = useState('')
-  const [attNotes, setAttNotes] = useState('')
-  const [arrivalTime, setArrivalTime] = useState('')
   const [showReschedule, setShowReschedule] = useState(false)
   const [showDelay, setShowDelay] = useState(false)
-  const [showOutcomePicker, setShowOutcomePicker] = useState(false)
-  const [outcome, setOutcome] = useState('delivered')
+  const [showFinish, setShowFinish] = useState(false)
+  const [showCancel, setShowCancel] = useState(false)
 
-  const isPast = new Date(session.scheduledAt) < new Date()
-  const isScheduled = ['scheduled', 'missed', 'no_show'].includes(session.status)
-  const canCheckIn = ['scheduled', 'missed', 'no_show'].includes(session.status)
-  const canComplete = session.status !== 'completed' && session.status !== 'cancelled'
+  const isOngoing = session.status === 'ongoing'
+  const isDone = session.status === 'completed'
+  const isCancelled = session.status === 'cancelled'
+  const canStart = ['scheduled', 'missed', 'no_show'].includes(session.status)
   const window_ = session.window || null
+  const elapsed = useElapsed(isOngoing ? session.teacherStartedAt : null)
 
   const { data: existingAtt } = useQuery({
     queryKey: ['attendance', 'session', session._id],
     queryFn: () => api.get(`/attendance/session/${session._id}`).then(r => r.data.data),
-    enabled: expanded && isPast,
-  })
-
-  useEffect(() => {
-    if (existingAtt) {
-      setAttStatus(existingAtt.status || '')
-      setAttNotes(existingAtt.notes || '')
-      setArrivalTime(existingAtt.arrivalTime ? new Date(existingAtt.arrivalTime).toISOString().slice(0, 16) : '')
-    }
-  }, [existingAtt])
-
-  const saveAttMutation = useMutation({
-    mutationFn: (finalize) => api.post(`/attendance/session/${session._id}`, {
-      status: attStatus, notes: attNotes,
-      arrivalTime: attStatus === 'late' && arrivalTime ? arrivalTime : undefined,
-      finalize,
-    }),
-    onSuccess: (_res, finalize) => {
-      toast.success(finalize ? 'تم اعتماد الحضور نهائياً' : 'تم حفظ الحضور')
-      qc.invalidateQueries({ queryKey: ['attendance', 'session', session._id] })
-    },
-    onError: () => toast.error('حدث خطأ في الحفظ'),
-  })
-
-  const completeMutation = useMutation({
-    mutationFn: (outcomeValue) => api.patch(`/sessions/${session._id}/complete`, { outcome: outcomeValue }),
-    onSuccess: () => {
-      toast.success('تم إكمال الحصة')
-      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
-      setShowOutcomePicker(false)
-    },
-    onError: () => toast.error('حدث خطأ'),
+    enabled: expanded && isDone,
   })
 
   // Platform check-in — captures teacher punctuality (on_time/late) against
-  // the scheduled time. This is a declaration of readiness through the
-  // academy, NOT proof the teacher actually joined the external meeting.
+  // the scheduled time, and flips the session into the "in progress" state.
+  // This is a declaration of readiness through the academy, NOT proof the
+  // teacher actually joined the external meeting.
   const startMutation = useMutation({
     mutationFn: () => api.patch(`/sessions/${session._id}/start`),
     onSuccess: (res) => {
@@ -303,35 +311,30 @@ function SessionCard({ session, onEval, onHomework }) {
     mutationFn: () => api.post(`/sessions/${session._id}/link-opened`),
   })
 
-  function handleJoin() {
-    if (canCheckIn) startMutation.mutate()
+  function handleStart() {
+    if (canStart) startMutation.mutate()
     linkOpenMutation.mutate()
-    window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+    if (session.meetingLink) window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
   }
 
-  const cancelMutation = useMutation({
-    mutationFn: () => api.patch(`/sessions/${session._id}/cancel`, { reason: '' }),
-    onSuccess: () => {
-      toast.success('تم إلغاء الحصة')
-      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
-    },
-    onError: () => toast.error('حدث خطأ'),
-  })
+  function handleOpenLink() {
+    linkOpenMutation.mutate()
+    if (session.meetingLink) window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+  }
 
   const statusInfo = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled
-  const attOpt = ATT_OPTIONS.find(o => o.value === attStatus)
   const windowNote = window_?.phase === 'grace_period'
-    ? 'يمكنك إكمال الحصة أو تسجيل الحضور الآن بشكل طبيعي.'
+    ? 'يمكنك إنهاء الحصة الآن بشكل طبيعي.'
     : window_?.phase === 'extended_completion'
       ? 'تجاوزنا وقت الحصة بقليل — لا مشكلة، يمكنك المتابعة وسيُحفظ ذلك كإكمال متأخر.'
       : window_?.phase === 'overdue'
-        ? 'مضى وقت طويل على هذه الحصة — يمكنك إكمالها الآن، وسيظهر ذلك للإدارة كتحديث متأخر.'
+        ? 'مضى وقت طويل على هذه الحصة — يمكنك إنهاءها الآن، وسيظهر ذلك للإدارة كتحديث متأخر.'
         : null
 
   return (
     <>
       <motion.div layout className="rounded-2xl overflow-hidden transition-all bg-white shadow-sm"
-        style={{ border: expanded ? '1px solid rgba(124,58,237,0.3)' : '1px solid #f3f4f6' }}
+        style={{ border: isOngoing ? '1.5px solid #22c55e' : expanded ? '1px solid rgba(124,58,237,0.3)' : '1px solid #f3f4f6' }}
       >
         {/* Main row */}
         <button
@@ -351,7 +354,7 @@ function SessionCard({ session, onEval, onHomework }) {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-none">
-            {existingAtt && isPast && (
+            {existingAtt && isDone && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.bg || '#f3f4f6', color: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.color || '#6b7280' }}>
                 {ATT_OPTIONS.find(o => o.value === existingAtt.status)?.label || ''}
@@ -361,8 +364,8 @@ function SessionCard({ session, onEval, onHomework }) {
               <AttendanceStatusBadge status={session.teacherAttendanceStatus} size="sm" />
             )}
             <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: statusInfo.bg, color: statusInfo.color }}>
-              {statusInfo.label}
+              style={{ background: isOngoing ? 'rgba(34,197,94,0.15)' : statusInfo.bg, color: isOngoing ? '#16a34a' : statusInfo.color }}>
+              {isOngoing ? '🟢 جارية الآن' : statusInfo.label}
             </span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-none transition-transform text-gray-400"
               style={{ transform: expanded ? 'rotate(180deg)' : '' }}>
@@ -383,164 +386,98 @@ function SessionCard({ session, onEval, onHomework }) {
             >
               <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
 
-                {windowNote && (
-                  <div className="pt-3 flex items-start gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(245,158,11,0.08)', color: '#b45309' }}>
-                    <Clock size={13} strokeWidth={2} className="flex-none mt-0.5" />
-                    <span>{windowNote}</span>
-                  </div>
-                )}
-
-                {/* Check-in (platform declaration, not proof of external attendance)
-                    + open external meeting — one click does both. */}
-                {session.meetingLink && (
+                {/* ── State 2: In progress ─────────────────────────────────── */}
+                {isOngoing && (
                   <div className="pt-3">
-                    <button onClick={handleJoin} disabled={startMutation.isPending}
-                      className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold disabled:opacity-60">
-                      <ExternalLink size={15} strokeWidth={1.8} />
-                      {canCheckIn ? 'تسجيل الحضور وفتح الفصل الخارجي' : 'فتح الفصل الخارجي'}
+                    <div className="rounded-2xl p-4 text-center" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                      <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-emerald-700 mb-3">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> الحصة جارية
+                      </div>
+                      <div className="flex items-center justify-center gap-6 mb-1">
+                        <div>
+                          <div className="text-[10px] text-gray-500 mb-0.5">بدأت الساعة</div>
+                          <div className="font-heading font-bold text-gray-900">{formatTimeAr(session.teacherStartedAt)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-gray-500 mb-0.5">المدة الحالية</div>
+                          <div className="font-heading font-extrabold text-lg text-emerald-700 tabular-nums">{elapsed}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {session.meetingLink && (
+                      <button onClick={handleOpenLink}
+                        className="w-full mt-2 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1.5">
+                        <ExternalLink size={13} strokeWidth={1.8} /> فتح الفصل الخارجي مرة أخرى
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowFinish(true)}
+                      className="w-full mt-3 py-3 rounded-xl text-sm font-extrabold text-white transition-all flex items-center justify-center gap-2"
+                      style={{ background: '#16a34a' }}
+                    >
+                      <Check size={16} strokeWidth={2.5} /> إنهاء الحصة
                     </button>
-                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">فتح الرابط لا يُثبت الحضور الفعلي داخل الاجتماع — هو تسجيل حضورك على المنصة فقط.</p>
                   </div>
                 )}
 
-                {/* Attendance section — only for past/actionable sessions */}
-                {(isPast || window_?.isActionable) && (
+                {/* ── State 1: Not started yet ─────────────────────────────── */}
+                {canStart && (
                   <div className="pt-3">
-                    <div className="text-xs font-bold mb-2.5 text-gray-700 flex items-center justify-between">
-                      <span>سجّل حضور الطالب</span>
-                      {existingAtt?.isFinalized && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">مُعتمد نهائياً</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mb-2.5">
-                      {ATT_OPTIONS.map(opt => (
-                        <button key={opt.value} onClick={() => setAttStatus(opt.value)}
-                          className="py-2 rounded-xl text-xs font-bold transition-all"
-                          style={{
-                            background: attStatus === opt.value ? opt.bg : '#f9fafb',
-                            color: attStatus === opt.value ? opt.color : '#9ca3af',
-                            border: attStatus === opt.value ? `1.5px solid ${opt.color}` : '1.5px solid transparent',
-                          }}>
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                    {attStatus === 'late' && (
-                      <div className="mb-2">
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">وقت الوصول (اختياري)</label>
-                        <input type="datetime-local" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)}
-                          className="w-full rounded-xl px-3 py-2 text-xs bg-gray-50 text-gray-700 border border-gray-200 outline-none focus:border-violet-400" />
+                    {windowNote && (
+                      <div className="mb-3 flex items-start gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(245,158,11,0.08)', color: '#b45309' }}>
+                        <Clock size={13} strokeWidth={2} className="flex-none mt-0.5" />
+                        <span>{windowNote}</span>
                       </div>
                     )}
-                    <textarea
-                      value={attNotes}
-                      onChange={e => setAttNotes(e.target.value)}
-                      rows={1}
-                      placeholder="ملاحظات الحضور..."
-                      className="w-full rounded-xl px-3 py-2 text-xs resize-none mb-2 bg-gray-50 text-gray-700 border border-gray-200 outline-none focus:border-violet-400"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => saveAttMutation.mutate(false)}
-                        disabled={!attStatus || saveAttMutation.isPending}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                        style={{ background: '#f3f4f6', color: '#6b7280' }}
-                      >
-                        {saveAttMutation.isPending ? '...' : 'حفظ كمسودة'}
+                    <button onClick={handleStart} disabled={startMutation.isPending}
+                      className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold disabled:opacity-60">
+                      {startMutation.isPending ? '...' : <>▶ بدء الحصة</>}
+                    </button>
+                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">سيتم تسجيل وقت بدئك وفتح الفصل الخارجي تلقائياً.</p>
+
+                    {/* Secondary actions — de-emphasized on purpose */}
+                    <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
+                      <button onClick={() => setShowDelay(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-sky-600 transition-all flex items-center gap-1">
+                        <AlertTriangle size={12} strokeWidth={2} /> تأخرت الحصة
                       </button>
-                      <button
-                        onClick={() => saveAttMutation.mutate(true)}
-                        disabled={!attStatus || saveAttMutation.isPending}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
-                        style={{ background: attOpt ? attOpt.bg : 'rgba(124,58,237,0.12)', color: attOpt ? attOpt.color : '#7c3aed' }}
-                      >
-                        {saveAttMutation.isPending ? '...' : 'اعتماد نهائي'}
+                      <button onClick={() => setShowReschedule(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-amber-600 transition-all">
+                        ↺ إعادة جدولة
+                      </button>
+                      <button onClick={() => setShowCancel(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-all flex items-center gap-1">
+                        <X size={12} strokeWidth={2.5} /> إلغاء
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Quick actions */}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {canComplete && !showOutcomePicker && (
-                    <button
-                      onClick={() => completeMutation.mutate('delivered')}
-                      disabled={completeMutation.isPending}
-                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
-                      style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }}
-                    >
-                      {completeMutation.isPending ? '...' : <span className="flex items-center justify-center gap-1"><Check size={13} strokeWidth={2.5} /> اكتملت</span>}
-                    </button>
-                  )}
-                  {canComplete && !showOutcomePicker && (
-                    <button
-                      onClick={() => setShowOutcomePicker(true)}
-                      className="py-2 px-3 rounded-xl text-[11px] font-semibold text-gray-400 hover:text-gray-600 transition-all"
-                    >
-                      نتيجة مختلفة؟
-                    </button>
-                  )}
-                  {isScheduled && (
-                    <button
-                      onClick={() => setShowDelay(true)}
-                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                      style={{ background: 'rgba(14,165,233,0.1)', color: '#0ea5e9', border: '1px solid rgba(14,165,233,0.2)' }}
-                    >
-                      <AlertTriangle size={13} strokeWidth={2} /> تأخرت الحصة
-                    </button>
-                  )}
-                  {isScheduled && (
-                    <button
-                      onClick={() => setShowReschedule(true)}
-                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all"
-                      style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
-                    >
-                      ↺ إعادة جدولة
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onEval(session)}
-                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                    style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', border: '1px solid rgba(217,119,6,0.2)' }}
-                  >
-                    <Star size={13} strokeWidth={2} /> تقييم
-                  </button>
-                  <button
-                    onClick={() => onHomework(session)}
-                    className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                    style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)' }}
-                  >
-                    <FileText size={13} strokeWidth={2} /> واجب
-                  </button>
-                  {isScheduled && (
-                    <button
-                      onClick={() => cancelMutation.mutate()}
-                      disabled={cancelMutation.isPending}
-                      className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
-                    >
-                      {cancelMutation.isPending ? '...' : <><X size={13} strokeWidth={2.5} /> إلغاء</>}
-                    </button>
-                  )}
-                </div>
-
-                {/* Outcome picker — only surfaced when the happy-path "اكتملت" isn't the right call */}
-                {showOutcomePicker && (
-                  <div className="rounded-xl p-3 bg-gray-50 border border-gray-100 space-y-2">
-                    <div className="text-xs font-bold text-gray-700">ما نتيجة الحصة فعلياً؟</div>
-                    <select value={outcome} onChange={e => setOutcome(e.target.value)} className={FIELD}>
-                      {Object.entries(SESSION_OUTCOME).filter(([k]) => k !== 'pending_review').map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <button onClick={() => setShowOutcomePicker(false)} className="flex-1 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600">إلغاء</button>
-                      <button onClick={() => completeMutation.mutate(outcome)} disabled={completeMutation.isPending}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold bg-violet-600 text-white">
-                        {completeMutation.isPending ? '...' : 'تأكيد'}
+                {/* ── State 3: Completed — read-only summary + post-hoc actions ── */}
+                {isDone && (
+                  <div className="pt-3 space-y-3">
+                    <div className="rounded-xl p-3 bg-gray-50 border border-gray-100 text-xs text-gray-600 space-y-1">
+                      <div>اكتملت الساعة {formatTimeAr(session.completedAt)}</div>
+                      {session.teacherNotes && <div className="text-gray-700">ملاحظات المعلم: {session.teacherNotes}</div>}
+                      {existingAtt?.notes && <div>ملاحظات الحضور: {existingAtt.notes}</div>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => onEval(session)}
+                        className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                        style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', border: '1px solid rgba(217,119,6,0.2)' }}>
+                        <Star size={13} strokeWidth={2} /> تقييم
+                      </button>
+                      <button onClick={() => onHomework(session)}
+                        className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                        style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)' }}>
+                        <FileText size={13} strokeWidth={2} /> واجب
                       </button>
                     </div>
                   </div>
+                )}
+
+                {isCancelled && session.cancelReason && (
+                  <div className="pt-3 text-xs text-gray-500">سبب الإلغاء: {session.cancelReason}</div>
                 )}
               </div>
             </motion.div>
@@ -553,6 +490,12 @@ function SessionCard({ session, onEval, onHomework }) {
       )}
       {showDelay && (
         <DelayModal session={session} onClose={() => setShowDelay(false)} qc={qc} />
+      )}
+      {showFinish && (
+        <FinishSessionModal session={session} onClose={() => setShowFinish(false)} qc={qc} />
+      )}
+      {showCancel && (
+        <CancelModal session={session} onClose={() => setShowCancel(false)} qc={qc} />
       )}
     </>
   )

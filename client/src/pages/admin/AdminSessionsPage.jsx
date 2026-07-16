@@ -428,7 +428,7 @@ export default function AdminSessionsPage() {
   })
 
   const cancelMut = useMutation({
-    mutationFn: (id) => api.patch(`/sessions/${id}/cancel`).then(r => r.data),
+    mutationFn: ({ id, reason }) => api.patch(`/sessions/${id}/cancel`, { reason }).then(r => r.data),
     onSuccess: () => {
       toast.success('تم إلغاء الحصة')
       qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
@@ -436,9 +436,13 @@ export default function AdminSessionsPage() {
     onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
   })
 
+  // Cancellation requires an explicit reason (business rule) and is only
+  // possible before a session starts — the backend enforces both; the
+  // reason prompt here just collects it.
   const handleCancel = (session) => {
-    if (window.confirm(`هل أنت متأكد من إلغاء حصة "${session.titleAr}"؟`)) {
-      cancelMut.mutate(session._id)
+    const reason = window.prompt(`سبب إلغاء حصة "${session.titleAr}"؟`)
+    if (reason && reason.trim()) {
+      cancelMut.mutate({ id: session._id, reason: reason.trim() })
     }
   }
 

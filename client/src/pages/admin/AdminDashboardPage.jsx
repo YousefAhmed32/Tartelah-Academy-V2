@@ -42,7 +42,7 @@ function KPICard({ label, value, sub, icon, color = '#7c3aed', trend, to }) {
 // instead of stacking separate full-width banners per source — replaces the
 // old AlertBanner + inline unscheduled-students banner, and adds the
 // previously-unsurfaced ungraded-homework backlog.
-function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHomeworkGrading }) {
+function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHomeworkGrading, studentsClosingPackage }) {
   const tasks = [
     {
       key: 'enrollments', count: pendingEnrollments, to: ROUTES.ADMIN_ENROLLMENTS, color: '#f59e0b',
@@ -58,6 +58,11 @@ function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHome
       key: 'homework', count: pendingHomeworkGrading, to: ROUTES.ADMIN_TEACHERS, color: '#3b82f6',
       label: (n) => `${n} ${n === 1 ? 'واجب مسلّم' : 'واجبات مسلّمة'} بانتظار تصحيح المعلم`,
       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 12h6M9 16h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    },
+    {
+      key: 'closing-package', count: studentsClosingPackage, to: ROUTES.ADMIN_SUBSCRIPTIONS, color: '#ec4899',
+      label: (n) => `${n} ${n === 1 ? 'طالب اقترب' : 'طلاب اقتربوا'} من انتهاء باقة حصصهم`,
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/></svg>,
     },
   ].filter(t => t.count > 0)
 
@@ -213,6 +218,8 @@ export default function AdminDashboardPage() {
       activeSubscriptions: 0, sessionsToday: 0, pendingEnrollments: 0,
       unscheduledStudents: 0, pendingHomeworkGrading: 0,
       recentRegistrations: [], upcomingSessions: [],
+      studentsClosingPackage: [], studentsClosingPackageCount: 0,
+      thisMonth: { completedSessions: 0, cancelledSessions: 0, payableSessions: 0, lateTeacherSessions: 0 },
     },
   })
 
@@ -262,6 +269,7 @@ export default function AdminDashboardPage() {
         pendingEnrollments={pending}
         unscheduledStudents={stats?.unscheduledStudents || 0}
         pendingHomeworkGrading={stats?.pendingHomeworkGrading || 0}
+        studentsClosingPackage={stats?.studentsClosingPackageCount || 0}
       />
 
       {/* KPI Row */}
@@ -447,6 +455,53 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* This month's session/payroll operational snapshot */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <h2 className="font-heading font-bold text-gray-900 mb-4 text-base">هذا الشهر</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'حصص مكتملة', value: formatNumber(stats?.thisMonth?.completedSessions), color: '#10b981' },
+            { label: 'حصص ملغاة', value: formatNumber(stats?.thisMonth?.cancelledSessions), color: '#ef4444' },
+            { label: 'حصص مستحقة الدفع للمعلمين', value: formatNumber(stats?.thisMonth?.payableSessions), color: '#7c3aed' },
+            { label: 'تأخّر المعلمين', value: formatNumber(stats?.thisMonth?.lateTeacherSessions), color: '#f59e0b' },
+          ].map((m, i) => (
+            <div key={i} className="p-3 rounded-xl bg-gray-50 text-center">
+              <div className="font-heading font-extrabold text-xl" style={{ color: m.color }}>{m.value}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Students close to finishing their session package */}
+      {!!stats?.studentsClosingPackage?.length && (
+        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-heading font-bold text-gray-900 text-base">طلاب قريبون من انتهاء الباقة</h2>
+              <p className="text-xs text-gray-400 mt-0.5">3 حصص أو أقل متبقية</p>
+            </div>
+            <Link to={ROUTES.ADMIN_SUBSCRIPTIONS} className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+              عرض الكل
+            </Link>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {stats.studentsClosingPackage.map((sub, i) => (
+              <div key={sub._id || i} className="flex items-center gap-3 py-2.5">
+                <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 truncate">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</div>
+                  <div className="text-xs text-gray-400">{sub.packageId?.nameAr}</div>
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700">
+                  {sub.sessionsRemaining} متبقية
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   )

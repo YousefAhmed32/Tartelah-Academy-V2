@@ -27,8 +27,9 @@ const POLICY = {
   EXTENDED_COMPLETION_MINUTES: 180,
 
   // A teacher checking in within this many minutes of scheduledAt is
-  // considered on_time rather than late.
-  LATE_TOLERANCE_MINUTES: 15,
+  // considered on_time rather than late (business rule: 0-5min = on time,
+  // >5min = late).
+  LATE_TOLERANCE_MINUTES: 5,
 
   // How long after the extended window closes (i.e. how long after
   // scheduled end + grace + extended) an untouched session gets softly

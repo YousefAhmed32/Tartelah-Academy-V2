@@ -2,6 +2,7 @@ const Attendance = require('../models/Attendance')
 const Session = require('../models/Session')
 const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
+const { syncSubscriptionConsumption } = require('./session.controller')
 
 exports.getTeacherAttendance = async (req, res, next) => {
   try {
@@ -33,6 +34,17 @@ exports.updateAttendance = async (req, res, next) => {
     if (req.body.notes !== undefined) record.notes = req.body.notes
     if (req.body.arrivalTime !== undefined) record.arrivalTime = req.body.arrivalTime ? new Date(req.body.arrivalTime) : null
     await record.save()
+
+    // A correction to a completed session's attendance must resync session
+    // consumption the exact same way completion itself does (present/late
+    // consumes a purchased session, everything else gives it back).
+    if (req.body.status !== undefined && req.body.status !== before.status) {
+      const session = await Session.findById(record.sessionId).select('status subscriptionId studentId subscriptionConsumed')
+      if (session && session.status === 'completed') {
+        await syncSubscriptionConsumption(session, record.status)
+        await session.save()
+      }
+    }
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'attendance.update',
@@ -69,7 +81,8 @@ exports.getSessionAttendance = async (req, res, next) => {
 // mirrors onto the parent Session for admin visibility/confidence scoring.
 exports.saveSessionAttendance = async (req, res, next) => {
   try {
-    const session = await Session.findById(req.params.sessionId).select('studentId teacherId attendanceFinalizedAt')
+    const session = await Session.findById(req.params.sessionId)
+      .select('studentId teacherId attendanceFinalizedAt status subscriptionId subscriptionConsumed')
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
 
     if (req.user.role === 'teacher' && session.teacherId.toString() !== req.user._id.toString()) {
@@ -101,11 +114,16 @@ exports.saveSessionAttendance = async (req, res, next) => {
     ).populate('studentId', 'firstNameAr lastNameAr')
 
     if (finalize) {
-      await Session.findByIdAndUpdate(session._id, {
-        attendanceFinalizedAt: update.finalizedAt,
-        attendanceFinalizedBy: req.user._id,
-      })
+      session.attendanceFinalizedAt = update.finalizedAt
+      session.attendanceFinalizedBy = req.user._id
     }
+
+    // Resync session consumption if this session was already completed —
+    // present/late consumes a purchased session, everything else gives it back.
+    if (session.status === 'completed') {
+      await syncSubscriptionConsumption(session, status)
+    }
+    if (finalize || session.status === 'completed') await session.save()
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: finalize ? 'attendance.finalize' : 'attendance.save',

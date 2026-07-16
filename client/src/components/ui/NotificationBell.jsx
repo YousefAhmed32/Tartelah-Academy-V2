@@ -2,31 +2,10 @@ import { useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  Calendar, FileText, Star, CreditCard, UserRound,
-  CalendarDays, Wallet, Bell,
-} from 'lucide-react'
 import { useNotificationStore } from '../../store/notificationStore.js'
 import { timeFromNow } from '../../utils/date.js'
+import { NOTIFICATION_TYPE_CONFIG as TYPE_CONFIG } from '../../config/notificationTypes.js'
 import api from '../../utils/api.js'
-
-const TYPE_CONFIG = {
-  session:      { color: '#7c3aed', bg: 'rgba(124,58,237,0.15)', dot: '#7c3aed',  label: 'حصة',    Icon: Calendar      },
-  homework:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)',  dot: '#3b82f6',  label: 'واجب',   Icon: FileText      },
-  evaluation:   { color: '#d97706', bg: 'rgba(217,119,6,0.15)',   dot: '#d97706',  label: 'تقييم',  Icon: Star          },
-  subscription: { color: '#059669', bg: 'rgba(5,150,105,0.15)',   dot: '#059669',  label: 'اشتراك', Icon: CreditCard    },
-  enrollment:   { color: '#b45309', bg: 'rgba(180,83,9,0.15)',    dot: '#f59e0b',  label: 'تسجيل',  Icon: UserRound     },
-  schedule:     { color: '#0891b2', bg: 'rgba(8,145,178,0.15)',   dot: '#0891b2',  label: 'جدول',   Icon: CalendarDays  },
-  payment:      { color: '#059669', bg: 'rgba(5,150,105,0.15)',   dot: '#059669',  label: 'دفع',    Icon: Wallet        },
-  system:       { color: '#7c6aaa', bg: 'rgba(124,106,170,0.12)', dot: '#9b7fd6',  label: 'نظام',   Icon: Bell          },
-}
-
-const PRIORITY_COLORS = {
-  urgent: '#ef4444',
-  high:   '#f59e0b',
-  medium: '#7c3aed',
-  low:    '#9ca3af',
-}
 
 export default function NotificationBell({ theme = 'light', viewAllPath }) {
   const navigate = useNavigate()

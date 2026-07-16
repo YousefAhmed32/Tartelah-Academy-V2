@@ -3,12 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, AlertCircle } from 'lucide-react'
+import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink, Check, AlertCircle } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
+import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
+import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
+import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
@@ -16,6 +19,7 @@ import { ROUTES, getFileUrl } from '../../config/constants.js'
 const DEFAULT_STATS = {
   totalStudents: 0, sessionsToday: 0, pendingEvaluations: 0, completedThisMonth: 0,
   upcomingSessions: [], recentStudents: [], needsAttention: 0,
+  currentSession: null, ongoingCount: 0,
 }
 
 function useCountdown(targetDate) {
@@ -150,6 +154,92 @@ function NextSessionCard({ session }) {
   )
 }
 
+// Replaces NextSessionCard the moment a session is `ongoing` — same slot on
+// the Home Dashboard, so the teacher never has to leave the page to manage a
+// live lesson. Reuses the exact same /sessions/:id/finish workflow (via the
+// shared FinishSessionModal) as the Sessions page — no duplicated logic.
+function CurrentSessionCard({ session, ongoingCount }) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const [showFinish, setShowFinish] = useState(false)
+  const elapsed = useElapsed(session.teacherStartedAt)
+
+  const linkOpenMutation = useMutation({
+    mutationFn: () => api.post(`/sessions/${session._id}/link-opened`),
+  })
+
+  function handleOpenLink() {
+    linkOpenMutation.mutate()
+    if (session.meetingLink) window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl p-6 relative overflow-hidden bg-white shadow-sm" style={{ border: '1.5px solid #22c55e' }}>
+        <div className="absolute top-0 end-0 w-32 h-32 rounded-full opacity-[0.08]" style={{ background: 'radial-gradient(circle, #22c55e, transparent)', transform: 'translate(30%, -30%)' }} />
+
+        <div className="flex items-start gap-4 mb-4 relative">
+          <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="md" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold mb-1 text-emerald-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> الحصة جارية الآن
+            </div>
+            <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
+            <div className="text-sm mt-0.5 text-gray-500">
+              {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}
+            </div>
+            <div className="text-xs mt-1 text-gray-400">
+              الموعد: {formatTimeAr(session.scheduledAt)}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl p-4 mb-4 flex items-center justify-center gap-8" style={{ background: 'rgba(34,197,94,0.08)' }}>
+          <div className="text-center">
+            <div className="text-[10px] text-gray-500 mb-0.5">بدأت الساعة</div>
+            <div className="font-heading font-bold text-gray-900">{formatTimeAr(session.teacherStartedAt)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[10px] text-gray-500 mb-0.5">المدة الحالية</div>
+            <div className="font-heading font-extrabold text-lg text-emerald-700 tabular-nums">{elapsed}</div>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowFinish(true)}
+            className="flex-1 py-3 rounded-xl text-sm font-extrabold text-white transition-all flex items-center justify-center gap-2"
+            style={{ background: '#16a34a' }}
+          >
+            <Check size={16} strokeWidth={2.5} /> إنهاء الحصة
+          </button>
+          {session.meetingLink && (
+            <button
+              onClick={handleOpenLink}
+              className="py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
+            >
+              <ExternalLink size={15} strokeWidth={1.8} /> فتح رابط الحصة
+            </button>
+          )}
+        </div>
+
+        {ongoingCount > 1 && (
+          <button
+            onClick={() => navigate(ROUTES.TEACHER_SESSIONS)}
+            className="w-full mt-3 text-center text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
+          >
+            عرض كل الحصص الجارية ({ongoingCount})
+          </button>
+        )}
+      </div>
+
+      {showFinish && (
+        <FinishSessionModal session={session} onClose={() => setShowFinish(false)} qc={qc} />
+      )}
+    </>
+  )
+}
+
 function ActionItem({ icon, title, count, color, onClick }) {
   if (!count) return null
   return (
@@ -188,6 +278,8 @@ export default function TeacherDashboardPage() {
         upcomingSessions: toArray(d.upcomingSessions),
         recentStudents: toArray(d.recentStudents),
         needsAttention: d.needsAttention || 0,
+        currentSession: d.currentSession || null,
+        ongoingCount: d.ongoingCount || 0,
       }
     }),
     placeholderData: DEFAULT_STATS,
@@ -200,6 +292,7 @@ export default function TeacherDashboardPage() {
   })
 
   const nextSession = stats?.upcomingSessions?.[0] || null
+  const currentSession = stats?.currentSession || null
   const hasActions = stats?.pendingEvaluations > 0 || stats?.sessionsToday > 0 || stats?.needsAttention > 0
 
   // Students without a schedule rule
@@ -251,12 +344,16 @@ export default function TeacherDashboardPage() {
         <div className="lg:col-span-1 flex flex-col gap-5">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-heading font-bold text-gray-900 text-base">الحصة القادمة</h2>
+              <h2 className="font-heading font-bold text-gray-900 text-base">{currentSession ? 'الحصة الجارية' : 'الحصة القادمة'}</h2>
               <button onClick={() => navigate(ROUTES.TEACHER_SESSIONS)} className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
                 كل الحصص <ChevronLeft size={12} />
               </button>
             </div>
-            <NextSessionCard session={nextSession} />
+            {currentSession ? (
+              <CurrentSessionCard session={currentSession} ongoingCount={stats.ongoingCount} />
+            ) : (
+              <NextSessionCard session={nextSession} />
+            )}
           </div>
 
           {/* Quick Actions */}
@@ -289,6 +386,11 @@ export default function TeacherDashboardPage() {
               />
             </div>
           </div>
+
+          {/* Latest Notifications */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <LatestNotificationsWidget role="teacher" viewAllPath={ROUTES.TEACHER_NOTIFICATIONS} />
+          </motion.div>
 
           {/* Action Queue */}
           {(hasActions || unscheduledCount > 0) && (

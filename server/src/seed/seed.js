@@ -12,7 +12,6 @@ const Homework = require('../models/Homework')
 const Memorization = require('../models/Memorization')
 const Revision = require('../models/Revision')
 const Notification = require('../models/Notification')
-const Enrollment = require('../models/Enrollment')
 const EnrollmentRequest = require('../models/EnrollmentRequest')
 const ScheduleRule = require('../models/ScheduleRule')
 const Testimonial = require('../models/Testimonial')
@@ -61,7 +60,7 @@ async function seed() {
 
   // ── Clear existing data ──────────────────────────────────────────────────────
   const collections = [User, Course, Package, Subscription, Session, Attendance,
-    Evaluation, Homework, Memorization, Revision, Notification, Enrollment, EnrollmentRequest,
+    Evaluation, Homework, Memorization, Revision, Notification, EnrollmentRequest,
     ScheduleRule, Testimonial, FAQ, Article, ArticleCategory, AcademySettings, SuccessStory,
     ContactMessage, AuditLog]
   for (const Model of collections) await Model.deleteMany({})
@@ -116,7 +115,24 @@ async function seed() {
   // (before falling back to any active teacher/student). Credentials here must
   // stay identical to devSeed.js so the quick-login buttons keep working — only
   // profile/enrichment fields are added on top.
-  const demoTeacherMale = await User.create({
+  //
+  // Upsert, not create: ensureDevAccounts() runs on every dev-server (re)start
+  // (see server.js), independently of this script. If a nodemon restart lands
+  // in the gap between this script's deleteMany({}) and this point, it will
+  // have already recreated a bare version of these exact accounts — a plain
+  // User.create() would then fail on the unique email index. find-then-save
+  // instead absorbs that race and still applies the full enrichment below.
+  async function upsertDemoAccount(fields) {
+    let user = await User.findOne({ email: fields.email })
+    if (user) {
+      Object.assign(user, fields)
+      await user.save()
+      return user
+    }
+    return User.create(fields)
+  }
+
+  const demoTeacherMale = await upsertDemoAccount({
     email: 'teacher@tartelah.com', password: 'Teacher123!', role: 'teacher', gender: 'male',
     firstNameAr: 'معلم', lastNameAr: 'تجريبي', firstName: 'Dev', lastName: 'Teacher',
     phone: '+966500000001', specialization: 'تجويد وحفظ',
@@ -124,7 +140,7 @@ async function seed() {
     salaryPerSession: 45, isEmailVerified: true, isActive: true,
     meetingLinks: [{ provider: 'zoom', label: 'الرابط الرئيسي', link: 'https://zoom.us/j/1112223333' }],
   })
-  const demoTeacherFemale = await User.create({
+  const demoTeacherFemale = await upsertDemoAccount({
     email: 'teacher.female@tartelah.com', password: 'Teacher123!', role: 'teacher', gender: 'female',
     firstNameAr: 'معلمة', lastNameAr: 'تجريبية', firstName: 'Dev', lastName: 'Teacher Female',
     phone: '+966500000002', specialization: 'تحفيظ الأطفال والنساء',
@@ -132,7 +148,7 @@ async function seed() {
     salaryPerSession: 40, isEmailVerified: true, isActive: true,
     meetingLinks: [{ provider: 'meet', label: 'حصص الأطفال والنساء', link: 'https://meet.google.com/dev-demo-fem' }],
   })
-  const demoStudent = await User.create({
+  const demoStudent = await upsertDemoAccount({
     email: 'student@tartelah.com', password: 'Student123!', role: 'student',
     firstNameAr: 'طالب', lastNameAr: 'تجريبي', firstName: 'Dev', lastName: 'Student',
     phone: '+966500000003', isEmailVerified: true, isActive: true,
@@ -337,6 +353,11 @@ async function seed() {
         outcome, payrollStatus, payrollStatusSetBy: 'system', payrollStatusSetAt: new Date(),
         attendanceFinalizedAt: status === 'completed' && payrollStatus !== 'pending_review' ? new Date(scheduledAt.getTime() + 65 * 60 * 1000) : undefined,
         attendanceFinalizedBy: status === 'completed' && payrollStatus !== 'pending_review' ? teacher._id : undefined,
+        // Every completed session consumed a purchased session (see
+        // migrations/backfillSubscriptionConsumed.js) — cancelled/missed
+        // sessions never do.
+        subscriptionConsumed: status === 'completed',
+        subscriptionConsumedAt: status === 'completed' ? new Date(scheduledAt.getTime() + 60 * 60 * 1000) : undefined,
       })
       generatedSessions.push(s)
 
@@ -540,6 +561,12 @@ async function seed() {
       outcome: sc.outcome, payrollStatus: sc.payrollStatus, payrollStatusReason: sc.payrollStatusReason,
       payrollStatusSetBy: 'system', payrollStatusSetAt: new Date(),
       attendanceFinalizedAt: sc.finalizeAt, attendanceFinalizedBy: sc.finalizeAt ? sc.teacher._id : undefined,
+      // A completed session always consumed a purchased session under both
+      // the old (unconditional) and new (attendance-based, since these demo
+      // scenarios' `attendance` sub-objects are present/absent as designed)
+      // logic — mirrors migrations/backfillSubscriptionConsumed.js.
+      subscriptionConsumed: sc.status === 'completed',
+      subscriptionConsumedAt: sc.status === 'completed' ? sc.completedAt : undefined,
     })
     sessions.push(s)
 
@@ -687,22 +714,6 @@ async function seed() {
   await Notification.insertMany(demoNotifications)
   const demoPairsRevisionCount = demoPairs.reduce((n, p) => n + p.students.length, 0)
   console.log(`✅ Enriched demo accounts (teacher1/teacher2/student1/teacher@/teacher.female@/student@): ${demoEvaluations.length} evaluations, ${demoPairs.length * 2} homework assignments, ${demoNotifications.length} notifications, ${demoPairsRevisionCount} revision records`)
-
-  // ── Course Enrollments ───────────────────────────────────────────────────────
-  const enrollDocs = []
-  const seenPairs = new Set()
-  for (const student of students) {
-    const count = randInt(1, 2)
-    for (let i = 0; i < count; i++) {
-      const course = rand(courses.filter((c) => c.status === 'published'))
-      const key = `${student._id}-${course._id}`
-      if (seenPairs.has(key)) continue
-      seenPairs.add(key)
-      enrollDocs.push({ studentId: student._id, courseId: course._id, teacherId: course.instructor, status: rand(['active', 'active', 'active', 'completed', 'dropped']), progressPercent: randInt(5, 100) })
-    }
-  }
-  await Enrollment.insertMany(enrollDocs)
-  console.log(`✅ Created ${enrollDocs.length} course enrollments`)
 
   // ── Testimonials ─────────────────────────────────────────────────────────────
   await Testimonial.insertMany([

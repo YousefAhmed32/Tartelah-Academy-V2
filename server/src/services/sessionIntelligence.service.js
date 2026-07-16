@@ -62,17 +62,18 @@ function computeConfidence(session, attendance) {
  * never re-applied against a session once that flag is set (see
  * session.controller.js's applySystemPayrollStatus).
  *
- * Current default policy (see docs/PLATFORM_FLOW_AND_TEACHER_ATTENDANCE_PLAN.md
- * §37 and docs/INTELLIGENT_ATTENDANCE_SYSTEM.md): teacher payability depends
- * on the TEACHER's own check-in/outcome evidence. Student attendance is
- * surfaced for admin visibility but does not automatically flip payability —
- * that is an open business decision, not something this function should
- * decide silently.
+ * Business policy (explicit, non-negotiable — see PLATFORM business rules):
+ * teacher pay depends ONLY on whether the TEACHER attended (checked in
+ * on_time/late) and completed the session. Student attendance — present,
+ * absent, or excused — never reduces the teacher's pay: the teacher is
+ * compensated for holding the slot. The teacher only loses the session if
+ * they never started it, or it was cancelled before it started (see the
+ * `excluded`/`non_payable` branches below).
  */
 function computePayrollStatus(session) {
   const cancelledOutcomes = ['cancelled_by_teacher', 'cancelled_by_admin', 'cancelled_by_student', 'rescheduled']
   if (['cancelled', 'rescheduled'].includes(session.status) || cancelledOutcomes.includes(session.outcome)) {
-    return { payrollStatus: 'excluded', reason: 'الحصة ملغاة أو معاد جدولتها' }
+    return { payrollStatus: 'excluded', reason: 'الحصة ملغاة أو معاد جدولتها — لا يُحتسب أجر' }
   }
 
   if (!RESOLVED_SESSION_STATUSES.includes(session.status)) {
@@ -83,9 +84,11 @@ function computePayrollStatus(session) {
     return { payrollStatus: 'pending_review', reason: 'تم الإبلاغ عن مشكلة تقنية — يحتاج مراجعة الإدارة' }
   }
 
+  // Teacher checked in (on_time/late) and completed the session — payable
+  // regardless of student attendance, per business policy.
   if (PAYABLE_CHECKIN_STATUSES.includes(session.teacherAttendanceStatus)) {
     if (session.outcome === 'no_students_attended') {
-      return { payrollStatus: 'pending_review', reason: 'حضر المعلم لكن لم يحضر الطالب — يحتاج قرار الإدارة' }
+      return { payrollStatus: 'payable', reason: 'حضر المعلم في موعده لكن لم يحضر الطالب — يُصرف أجر المعلم' }
     }
     return { payrollStatus: 'payable', reason: 'حضر المعلم في الوقت المحدد أو متأخراً وأكمل الحصة' }
   }
@@ -94,7 +97,7 @@ function computePayrollStatus(session) {
     return { payrollStatus: 'pending_review', reason: 'غياب المعلم معذور — يحتاج قرار الإدارة' }
   }
 
-  return { payrollStatus: 'non_payable', reason: 'المعلم لم يحضر الحصة' }
+  return { payrollStatus: 'non_payable', reason: 'المعلم لم يبدأ الحصة' }
 }
 
 const SIGNIFICANT_LATE_MINUTES = 30 // beyond ordinary lateness — worth a human glance, not just a badge
@@ -157,6 +160,13 @@ function assessSessionReview(session, attendance = null) {
   if (session.status === 'scheduled' && session.teacherAttendanceStatus === 'pending' &&
       ['grace_period', 'extended_completion', 'overdue'].includes(window.phase)) {
     flag('missing_checkin', 'لم يسجّل المعلم حضوره رغم تجاوز موعد الحصة', 'high')
+  }
+  // Teacher started the session (platform check-in recorded) but never
+  // finished it — attendance/outcome/payroll all stay stuck in limbo
+  // otherwise, with nothing in the sweep job catching it (that job only
+  // scans status:'scheduled'). Caught here instead of silently left inconsistent.
+  if (session.status === 'ongoing' && ['extended_completion', 'overdue'].includes(window.phase)) {
+    flag('unfinished_session', 'بدأ المعلم الحصة ولم يُنهِها بعد رغم مرور وقت طويل عليها', 'high')
   }
   if (session.status === 'completed' && !isFinalized) {
     flag('delivered_no_attendance', 'الحصة مكتملة لكن لم يُعتمد حضور الطالب نهائياً بعد', 'high')

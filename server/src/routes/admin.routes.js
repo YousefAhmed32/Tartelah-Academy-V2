@@ -41,9 +41,11 @@ router.delete('/evaluations/:id', ctrl.deleteEvaluation)
 router.patch('/attendance/:id', ctrl.updateAttendanceRecord)
 router.patch('/homework/:id', ctrl.updateHomework)
 
-// Schedule rules overview
+// Schedule rules — admin has full authority over any teacher's schedule
 router.get('/schedule-rules', ctrl.getAllScheduleRules)
 router.patch('/schedule-rules/:id', ctrl.updateScheduleRule)
+router.delete('/schedule-rules/:id', ctrl.deleteScheduleRule)
+router.post('/schedule-rules/:id/generate-more', ctrl.generateMoreScheduleRule)
 
 // Notifications
 router.get('/notifications', notifCtrl.getAdminNotificationLogs)

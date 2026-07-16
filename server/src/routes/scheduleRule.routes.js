@@ -10,6 +10,7 @@ router.post('/', ctrl.createRule)
 router.get('/my', ctrl.getMyRules)
 router.get('/:id', ctrl.getRule)
 router.patch('/:id', ctrl.updateRule)
+router.delete('/:id', ctrl.deleteRule)
 router.post('/:id/generate-more', ctrl.generateMore)
 
 module.exports = router

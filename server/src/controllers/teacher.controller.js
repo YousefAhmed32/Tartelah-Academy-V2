@@ -44,9 +44,28 @@ exports.getMyStudents = async (req, res, next) => {
   try {
     const teacherId = req.user._id
     const subs = await Subscription.find({ teacherId, status: 'active' }).populate('studentId')
+    const studentIds = subs.map(s => s.studentId?._id).filter(Boolean)
+
+    // Attendance rate = completed / (all non-cancelled sessions) with THIS
+    // teacher, mirroring the same completed-vs-total definition student.controller.js
+    // uses for the student's own dashboard — computed here via aggregation
+    // (not per-student queries) to stay O(1) round-trips regardless of roster size.
+    const attendanceAgg = await Session.aggregate([
+      { $match: { teacherId, studentId: { $in: studentIds }, status: { $ne: 'cancelled' } } },
+      { $group: {
+        _id: '$studentId',
+        total: { $sum: 1 },
+        completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+      } },
+    ])
+    const attendanceRateByStudent = new Map(
+      attendanceAgg.map(a => [a._id.toString(), a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0])
+    )
+
     const students = subs.map(s => {
       const st = s.studentId?.toPublic ? s.studentId.toPublic() : s.studentId
-      return { ...st, subscriptionId: s._id }
+      if (!st) return null
+      return { ...st, subscriptionId: s._id, attendanceRate: attendanceRateByStudent.get(st._id.toString()) || 0 }
     }).filter(Boolean)
     sendSuccess(res, students)
   } catch (err) {
@@ -67,7 +86,7 @@ exports.getMyStats = async (req, res, next) => {
     // nagging the teacher about indefinitely on their own dashboard.
     const attentionWindowStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
 
-    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention] = await Promise.all([
+    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention, ongoingSessions] = await Promise.all([
       Subscription.countDocuments({ teacherId, status: 'active' }),
       Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lte: todayEnd } }),
       Evaluation.countDocuments({ teacherId, createdAt: { $gte: monthStart } }),
@@ -84,11 +103,17 @@ exports.getMyStats = async (req, res, next) => {
           { status: 'completed', attendanceFinalizedAt: null },
         ],
       }),
+      // Sessions the teacher has already started (platform check-in) but not
+      // yet finished — surfaced so the Home Dashboard can swap the "upcoming
+      // session" card for a live "current session" card without a page nav.
+      Session.find({ teacherId, status: 'ongoing' })
+        .sort({ scheduledAt: 1 }).populate('studentId', 'firstNameAr lastNameAr avatar'),
     ])
 
     sendSuccess(res, {
       totalStudents, sessionsToday, pendingEvaluations: pendingEvals, completedThisMonth: completedMonth,
       upcomingSessions, recentStudents, needsAttention,
+      currentSession: ongoingSessions[0] || null, ongoingCount: ongoingSessions.length,
     })
   } catch (err) {
     next(err)

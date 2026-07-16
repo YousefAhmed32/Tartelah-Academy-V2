@@ -6,6 +6,7 @@ import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, ROUTES } from '../../config/constants.js'
 // greeting uses no emoji — wave removed
@@ -54,7 +55,9 @@ function useStudentStats() {
     queryKey: ['student', 'dashboard'],
     queryFn: () => api.get('/students/me/stats').then(r => r.data.data),
     placeholderData: {
-      attendanceRate: 0, completedSessions: 0, pendingHomework: 0, subscriptionDaysLeft: 0,
+      attendanceRate: 0, completedSessions: 0, cancelledSessions: 0, lateCount: 0, absentCount: 0,
+      pendingHomework: 0, subscriptionDaysLeft: 0,
+      purchasedSessions: 0, consumedSessions: 0, remainingSessions: 0,
       upcomingSessions: [], recentEvaluations: [],
       memorization: { surahsCompleted: 0, ayahsTotal: 0 },
     },
@@ -138,8 +141,9 @@ export default function StudentDashboardPage() {
       </motion.div>
 
       {/* ═══ QUICK STATS ═══ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
+          { label: 'الحصص المتبقية', value: stats?.remainingSessions || 0,    color: '#16a34a', icon: <SessIcon />, },
           { label: 'نسبة الحضور',     value: `${stats?.attendanceRate || 0}%`, color: '#22c55e', icon: <AttIcon />, },
           { label: 'حصص مكتملة',     value: stats?.completedSessions || 0,    color: '#7c3aed', icon: <ChkIcon />, },
           { label: 'واجبات معلقة',   value: stats?.pendingHomework || 0,      color: '#f59e0b', icon: <HwIcon />,  },
@@ -164,8 +168,14 @@ export default function StudentDashboardPage() {
           </motion.div>
         </div>
 
-        {/* RIGHT: Tasks + Evaluations */}
+        {/* RIGHT: Notifications + Tasks + Evaluations */}
         <div className="flex flex-col gap-5">
+          <motion.div {...fadeUp(0.22)}>
+            <LatestNotificationsWidget role="student" viewAllPath={ROUTES.STUDENT_NOTIFICATIONS} />
+          </motion.div>
+          <motion.div {...fadeUp(0.28)}>
+            <SessionPackageCard stats={stats} />
+          </motion.div>
           <motion.div {...fadeUp(0.32)}>
             <TodayTasksCard stats={stats} />
           </motion.div>
@@ -492,6 +502,56 @@ function SessionRow({ session }) {
             انضم ←
           </a>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SESSION PACKAGE — purchased / consumed / remaining (session-based subscription)
+// ══════════════════════════════════════════════════════════════════════════
+function SessionPackageCard({ stats }) {
+  const purchased = stats?.purchasedSessions || 0
+  const consumed = stats?.consumedSessions || 0
+  const remaining = stats?.remainingSessions || 0
+  const pct = purchased > 0 ? Math.round((consumed / purchased) * 100) : 0
+
+  return (
+    <div className="card-light p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-heading font-bold text-base text-brand-textBody">رصيد الحصص</h2>
+        <Link to={ROUTES.STUDENT_SUBSCRIPTION} className="text-sm font-semibold text-brand-purple">التفاصيل ←</Link>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="text-center">
+          <div className="font-heading font-extrabold text-2xl text-brand-textBody">{purchased}</div>
+          <div className="text-[11px] text-[#9b7fd6] mt-0.5">مُشتراة</div>
+        </div>
+        <div className="text-center">
+          <div className="font-heading font-extrabold text-2xl text-gray-400">{consumed}</div>
+          <div className="text-[11px] text-[#9b7fd6] mt-0.5">مُستهلكة</div>
+        </div>
+        <div className="text-center">
+          <div className="font-heading font-extrabold text-2xl text-emerald-600">{remaining}</div>
+          <div className="text-[11px] text-[#9b7fd6] mt-0.5">متبقية</div>
+        </div>
+      </div>
+
+      <div className="w-full bg-[#f0ecf8] rounded-full h-2 overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: 'linear-gradient(90deg, #7c3aed, #a855f7)' }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+        />
+      </div>
+
+      <div className="flex gap-4 mt-3.5 text-[12px] text-[#9b7fd6]">
+        <span>تأخّر: <b className="text-amber-600">{stats?.lateCount || 0}</b></span>
+        <span>غياب: <b className="text-red-500">{stats?.absentCount || 0}</b></span>
+        <span>إلغاء: <b className="text-gray-500">{stats?.cancelledSessions || 0}</b></span>
       </div>
     </div>
   )

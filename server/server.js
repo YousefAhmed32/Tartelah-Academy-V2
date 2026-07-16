@@ -24,7 +24,10 @@ const PORT = process.env.PORT || 5000
 })
 
 // Connect to MongoDB and start cron jobs after connection
-connectDB().then(() => {
+connectDB().then(async () => {
+  const { backfillSubscriptionConsumed } = require('./src/migrations/backfillSubscriptionConsumed')
+  await backfillSubscriptionConsumed().catch(err => console.warn('[migration] backfillSubscriptionConsumed warning:', err.message))
+
   if (process.env.NODE_ENV !== 'test') {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')

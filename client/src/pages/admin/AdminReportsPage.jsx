@@ -212,9 +212,10 @@ export default function AdminReportsPage() {
     queryFn: () => api.get('/admin/reports').then(r => r.data.data),
     placeholderData: {
       revenue:     { total: 0, thisMonth: 0, lastMonth: 0, growth: 0 },
-      sessions:    { total: 0, thisMonth: 0, completionRate: 0 },
+      sessions:    { total: 0, thisMonth: 0, completionRate: 0, cancelled: 0 },
       students:    { total: 0, active: 0, new: 0 },
-      attendance:  { rate: 0 },
+      attendance:  { rate: 0, present: 0, late: 0, absent: 0, excused: 0 },
+      teacherPayroll: { payableSessions: 0, nonPayableSessions: 0, lateTeacherSessions: 0 },
       topTeachers: [],
     },
   })
@@ -332,10 +333,11 @@ export default function AdminReportsPage() {
           subtitle="إحصاءات الحصص والإكمال"
           icon={CalendarDays} color="#E8C76A"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           <KpiCard label="إجمالي الحصص"   value={formatNumber(data?.sessions?.total)}          icon={CalendarDays} color="#E8C76A" bg="#fffbeb" sparkData={SPARK.rising}  delay={0} />
           <KpiCard label="حصص هذا الشهر"  value={formatNumber(data?.sessions?.thisMonth)}      icon={Clock3}       color="#f97316" bg="#fff7ed"                           delay={0.06} />
           <KpiCard label="نسبة الإكمال"   value={`${data?.sessions?.completionRate || 0}%`}    icon={CheckCircle}  color="#22c55e" bg="#f0fdf4"                           delay={0.12} />
+          <KpiCard label="حصص ملغاة"      value={formatNumber(data?.sessions?.cancelled)}      icon={CalendarDays} color="#ef4444" bg="#fef2f2"                           delay={0.18} />
         </div>
         <ChartCard title="الحصص الشهرية" subtitle="توزيع الحصص على مدار العام">
           <ResponsiveContainer width="100%" height={240}>
@@ -348,6 +350,35 @@ export default function AdminReportsPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
+      </section>
+
+      {/* ── Teacher payroll & attendance ─────────────────────── */}
+      <section>
+        <SectionHeading
+          title="رواتب وحضور المعلمين"
+          subtitle="حصص المعلمين المستحقة للدفع وإحصاءات التأخر — يعتمد المعلم راتبه على حضوره هو، بصرف النظر عن حضور الطالب"
+          icon={GraduationCap} color="#7c3aed"
+        />
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <KpiCard label="حصص مستحقة الدفع"  value={formatNumber(data?.teacherPayroll?.payableSessions)}    icon={CheckCircle} color="#22c55e" bg="#f0fdf4" delay={0} />
+          <KpiCard label="حصص غير مستحقة"    value={formatNumber(data?.teacherPayroll?.nonPayableSessions)} icon={Clock3}      color="#ef4444" bg="#fef2f2" delay={0.06} />
+          <KpiCard label="حصص تأخّر بها المعلم" value={formatNumber(data?.teacherPayroll?.lateTeacherSessions)} icon={Clock3}   color="#f59e0b" bg="#fffbeb" delay={0.12} />
+        </div>
+      </section>
+
+      {/* ── Student attendance breakdown ──────────────────────── */}
+      <section>
+        <SectionHeading
+          title="تفاصيل حضور الطلاب"
+          subtitle="توزيع سجلات الحضور حسب الحالة"
+          icon={CheckCircle} color="#22c55e"
+        />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard label="حاضر"  value={formatNumber(data?.attendance?.present)} icon={CheckCircle} color="#22c55e" bg="#f0fdf4" delay={0} />
+          <KpiCard label="متأخر" value={formatNumber(data?.attendance?.late)}    icon={Clock3}       color="#f59e0b" bg="#fffbeb" delay={0.06} />
+          <KpiCard label="غائب"  value={formatNumber(data?.attendance?.absent)}  icon={Clock3}       color="#ef4444" bg="#fef2f2" delay={0.12} />
+          <KpiCard label="معذور" value={formatNumber(data?.attendance?.excused)} icon={Clock3}       color="#7c3aed" bg="#f5f3ff" delay={0.18} />
+        </div>
       </section>
 
       {/* ── Students ─────────────────────────────────────────── */}

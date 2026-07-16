@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Edit2, Pause, Play, Link2 } from 'lucide-react'
+import { Calendar, Clock, Edit2, Pause, Play, Link2, Trash2, PlusCircle } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -10,29 +10,38 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
+import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import { formatDateAr } from '../../utils/date.js'
-import { getFileUrl } from '../../config/constants.js'
-
-const DAY_NAMES_AR = { monday: 'الاثنين', tuesday: 'الثلاثاء', wednesday: 'الأربعاء', thursday: 'الخميس', friday: 'الجمعة', saturday: 'السبت', sunday: 'الأحد' }
+import { getFileUrl, DAYS_OF_WEEK, SCHEDULE_FREQUENCY } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
-  active:    { label: 'نشط',    badge: 'success' },
-  paused:    { label: 'موقوف',  badge: 'warning' },
-  cancelled: { label: 'ملغى',   badge: 'danger' },
-  completed: { label: 'مكتمل',  badge: 'gray' },
+  active: { label: 'نشط', badge: 'success' },
+  paused: { label: 'موقوف', badge: 'warning' },
+  ended: { label: 'منتهٍ', badge: 'gray' },
 }
 
-// ── Edit Modal ────────────────────────────────────────────────────────────────
+const FIELD = 'field-light w-full'
 
-function EditRuleModal({ rule, onClose }) {
+// ── Edit Modal — full admin authority: recurrence, reassignment, link, status ──
+
+function EditRuleModal({ rule, teachers, students, onClose }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({
     status: rule.status,
     meetingLink: rule.meetingLink || '',
     endDate: rule.endDate ? rule.endDate.slice(0, 10) : '',
     notes: rule.notes || '',
+    frequency: rule.frequency || 'weekly',
+    daysOfWeek: rule.daysOfWeek || [],
+    timeOfDay: rule.timeOfDay || '18:00',
+    durationMinutes: rule.durationMinutes || 60,
+    teacherId: rule.teacherId?._id || '',
+    studentId: rule.studentId?._id || '',
   })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const toggleDay = (d) => setForm(p => ({
+    ...p, daysOfWeek: p.daysOfWeek.includes(d) ? p.daysOfWeek.filter(x => x !== d) : [...p.daysOfWeek, d].sort(),
+  }))
 
   const mut = useMutation({
     mutationFn: (data) => api.patch(`/admin/schedule-rules/${rule._id}`, data).then(r => r.data),
@@ -51,38 +60,118 @@ function EditRuleModal({ rule, onClose }) {
         <Button variant="purple" onClick={() => mut.mutate(form)} loading={mut.isPending}>حفظ</Button>
       </>}>
       <div className="space-y-4" dir="rtl">
-        {/* Rule summary */}
-        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
-          <div className="font-semibold text-gray-800">{rule.teacherId?.firstNameAr} {rule.teacherId?.lastNameAr}</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            {rule.studentId?.firstNameAr} {rule.studentId?.lastNameAr} ·{' '}
-            {rule.dayOfWeek?.map(d => DAY_NAMES_AR[d]).join(', ')} ·{' '}
-            {rule.startTime} – {rule.endTime}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">المعلم</label>
+            <select value={form.teacherId} onChange={e => set('teacherId', e.target.value)} className={FIELD}>
+              {teachers.map(t => <option key={t._id} value={t._id}>{t.firstNameAr} {t.lastNameAr}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">الطالب</label>
+            <select value={form.studentId} onChange={e => set('studentId', e.target.value)} className={FIELD}>
+              {students.map(s => <option key={s._id} value={s._id}>{s.firstNameAr} {s.lastNameAr}</option>)}
+            </select>
           </div>
         </div>
 
         <div>
           <label className="text-xs font-bold text-gray-500 mb-1.5 block">الحالة</label>
-          <select value={form.status} onChange={e => set('status', e.target.value)} className="field-light w-full">
+          <select value={form.status} onChange={e => set('status', e.target.value)} className={FIELD}>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label className="text-xs font-bold text-gray-500 mb-1.5 block">رابط الاجتماع</label>
-          <input type="url" value={form.meetingLink} onChange={e => set('meetingLink', e.target.value)} className="field-light w-full" placeholder="https://zoom.us/j/..." />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">التكرار</label>
+            <select value={form.frequency} onChange={e => set('frequency', e.target.value)} className={FIELD}>
+              {Object.entries(SCHEDULE_FREQUENCY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">مدة الحصة (دقيقة)</label>
+            <input type="number" min={15} step={15} value={form.durationMinutes}
+              onChange={e => set('durationMinutes', Number(e.target.value))} className={FIELD} />
+          </div>
         </div>
 
         <div>
-          <label className="text-xs font-bold text-gray-500 mb-1.5 block">تاريخ الانتهاء</label>
-          <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} className="field-light w-full" />
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">أيام الأسبوع</label>
+          <div className="flex flex-wrap gap-1.5">
+            {DAYS_OF_WEEK.map(d => (
+              <button key={d.value} type="button" onClick={() => toggleDay(d.value)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={form.daysOfWeek.includes(d.value)
+                  ? { background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1.5px solid #7c3aed' }
+                  : { background: '#f9fafb', color: '#9ca3af', border: '1.5px solid transparent' }}>
+                {d.short}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">وقت الحصة</label>
+            <input type="time" value={form.timeOfDay} onChange={e => set('timeOfDay', e.target.value)} className={FIELD} />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">تاريخ الانتهاء</label>
+            <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} className={FIELD} />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">رابط الاجتماع</label>
+          <input type="url" value={form.meetingLink} onChange={e => set('meetingLink', e.target.value)} className={FIELD} placeholder="https://zoom.us/j/..." />
         </div>
 
         <div>
           <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظات</label>
-          <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className="field-light w-full h-16 resize-none py-2" placeholder="ملاحظات..." />
+          <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className={`${FIELD} h-16 resize-none py-2`} placeholder="ملاحظات..." />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Generate More Modal ──────────────────────────────────────────────────────
+
+function GenerateMoreModal({ rule, onClose }) {
+  const qc = useQueryClient()
+  const [sessionsTotal, setSessionsTotal] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  const mut = useMutation({
+    mutationFn: () => api.post(`/admin/schedule-rules/${rule._id}/generate-more`, {
+      sessionsTotal: sessionsTotal || undefined,
+      endDate: endDate || undefined,
+    }).then(r => r.data),
+    onSuccess: (res) => {
+      toast.success(res.message || 'تم توليد حصص إضافية')
+      qc.invalidateQueries({ queryKey: ['admin', 'schedule-rules'] })
+      onClose()
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="توليد حصص إضافية" size="sm"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="purple" onClick={() => mut.mutate()} loading={mut.isPending}>توليد</Button>
+      </>}>
+      <div className="space-y-4" dir="rtl">
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">إجمالي عدد الحصص (اختياري)</label>
+          <input type="number" min={1} value={sessionsTotal} onChange={e => setSessionsTotal(e.target.value)} className={FIELD} placeholder="مثال: 32" />
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">تاريخ انتهاء جديد (اختياري)</label>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={FIELD} />
         </div>
       </div>
     </Modal>
@@ -96,6 +185,8 @@ export default function AdminScheduleRulesPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [teacherFilter, setTeacherFilter] = useState('')
   const [editRule, setEditRule] = useState(null)
+  const [generateRule, setGenerateRule] = useState(null)
+  const [deleteRule, setDeleteRule] = useState(null)
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -114,10 +205,21 @@ export default function AdminScheduleRulesPage() {
     queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data),
   })
 
+  const { data: students = [] } = useQuery({
+    queryKey: ['admin', 'students', 'all'],
+    queryFn: () => api.get('/admin/students?limit=200').then(r => r.data.data),
+  })
+
   const toggleMut = useMutation({
     mutationFn: ({ id, status }) => api.patch(`/admin/schedule-rules/${id}`, { status }).then(r => r.data),
     onSuccess: () => { toast.success('تم تحديث الحالة'); qc.invalidateQueries({ queryKey: ['admin', 'schedule-rules'] }) },
     onError: () => toast.error('حدث خطأ'),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id) => api.delete(`/admin/schedule-rules/${id}`).then(r => r.data),
+    onSuccess: () => { toast.success('تم حذف الجدول'); qc.invalidateQueries({ queryKey: ['admin', 'schedule-rules'] }); setDeleteRule(null) },
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
   })
 
   const rules = data?.data || []
@@ -126,8 +228,7 @@ export default function AdminScheduleRulesPage() {
     { key: '', label: 'الكل' },
     { key: 'active', label: 'نشط' },
     { key: 'paused', label: 'موقوف' },
-    { key: 'completed', label: 'مكتمل' },
-    { key: 'cancelled', label: 'ملغى' },
+    { key: 'ended', label: 'منتهٍ' },
   ]
 
   return (
@@ -158,7 +259,7 @@ export default function AdminScheduleRulesPage() {
           <div className="space-y-3">
             {rules.map((rule) => {
               const sc = STATUS_CONFIG[rule.status] || { label: rule.status, badge: 'gray' }
-              const days = rule.dayOfWeek?.map(d => DAY_NAMES_AR[d] || d).join('، ')
+              const days = rule.daysOfWeek?.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label || d).join('، ')
               const isActive = rule.status === 'active'
 
               return (
@@ -180,9 +281,10 @@ export default function AdminScheduleRulesPage() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#9b7fd6]">
                       <span className="flex items-center gap-1"><Calendar size={11} /> {days}</span>
-                      <span className="flex items-center gap-1"><Clock size={11} /> {rule.startTime} – {rule.endTime}</span>
+                      <span className="flex items-center gap-1"><Clock size={11} /> {rule.timeOfDay}</span>
                       {rule.endDate && <span>حتى: {formatDateAr(rule.endDate)}</span>}
-                      {rule.duration && <span>{rule.duration} دقيقة</span>}
+                      {rule.durationMinutes && <span>{rule.durationMinutes} دقيقة</span>}
+                      {rule.stats && <span>{rule.stats.completed}/{rule.stats.total} حصة مكتملة</span>}
                     </div>
                     {rule.meetingLink && (
                       <a href={rule.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-500 hover:underline mt-1 block truncate max-w-xs">
@@ -199,9 +301,17 @@ export default function AdminScheduleRulesPage() {
                       className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isActive ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
                       {isActive ? <><Pause size={11} /> إيقاف</> : <><Play size={11} /> تفعيل</>}
                     </button>
+                    <button onClick={() => setGenerateRule(rule)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors">
+                      <PlusCircle size={11} /> توليد
+                    </button>
                     <button onClick={() => setEditRule(rule)}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors">
                       <Edit2 size={11} /> تعديل
+                    </button>
+                    <button onClick={() => setDeleteRule(rule)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
+                      <Trash2 size={11} /> حذف
                     </button>
                   </div>
                 </div>
@@ -225,7 +335,18 @@ export default function AdminScheduleRulesPage() {
         </>
       )}
 
-      {editRule && <EditRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
+      {editRule && <EditRuleModal rule={editRule} teachers={teachers} students={students} onClose={() => setEditRule(null)} />}
+      {generateRule && <GenerateMoreModal rule={generateRule} onClose={() => setGenerateRule(null)} />}
+      <ConfirmDialog
+        open={!!deleteRule}
+        onClose={() => setDeleteRule(null)}
+        onConfirm={() => deleteMut.mutate(deleteRule._id)}
+        loading={deleteMut.isPending}
+        title="حذف قاعدة الجدول"
+        message="سيتم حذف هذا الجدول وكل الحصص القادمة غير المكتملة المرتبطة به. الحصص السابقة تبقى محفوظة في السجل. هل أنت متأكد؟"
+        confirmLabel="حذف"
+        variant="danger"
+      />
     </div>
   )
 }

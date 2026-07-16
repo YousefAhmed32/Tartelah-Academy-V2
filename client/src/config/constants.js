@@ -143,6 +143,13 @@ export const ATTENDANCE_STATUS = {
   technical_issue: { label: 'مشكلة تقنية', color: '#64748b' },
 }
 
+// Shared UI-ready derivation of ATTENDANCE_STATUS — used by both the Sessions
+// page and the Finish Session modal (dashboard + sessions page) so the two
+// never drift into slightly different option lists/colors.
+export const ATT_OPTIONS = Object.entries(ATTENDANCE_STATUS).map(([value, { label, color }]) => ({
+  value, label, color, bg: `${color}2e`,
+}))
+
 // Explicit session-outcome confirmation — distinct from the coarse
 // scheduled/ongoing/completed/... status lifecycle in SESSION_STATUS.
 export const SESSION_OUTCOME = {
@@ -184,7 +191,7 @@ export const ATTENDANCE_POLICY = {
   PRE_SESSION_ACCESS_MINUTES: 60,
   POST_SESSION_GRACE_MINUTES: 60,
   EXTENDED_COMPLETION_MINUTES: 180,
-  LATE_TOLERANCE_MINUTES: 15,
+  LATE_TOLERANCE_MINUTES: 5,
 }
 
 // Needs-Review queue severity — computed deterministically by

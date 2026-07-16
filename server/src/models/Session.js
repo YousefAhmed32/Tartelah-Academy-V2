@@ -22,6 +22,7 @@ const SessionSchema = new mongoose.Schema({
   completedAt: { type: Date },
   cancelledAt: { type: Date },
   cancelReason: { type: String },
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isException: { type: Boolean, default: false },
   isMakeup: { type: Boolean, default: false },
   rescheduledFrom: { type: Date },
@@ -72,6 +73,16 @@ const SessionSchema = new mongoose.Schema({
   // Attendance finalization (distinct from the auto-created draft on complete).
   attendanceFinalizedAt: { type: Date },
   attendanceFinalizedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+  // Whether this session has actually decremented Subscription.sessionsRemaining.
+  // Tracked explicitly (not inferred from status) so a purchased session is
+  // consumed exactly once, and the decrement can be safely reversed if the
+  // student's attendance is later corrected (e.g. present -> absent) or the
+  // session is cancelled after being marked complete. Business rule: only
+  // present/late attendance consumes a session — absent/excused/cancelled
+  // never do (see session.controller.js syncSubscriptionConsumption).
+  subscriptionConsumed: { type: Boolean, default: false },
+  subscriptionConsumedAt: { type: Date },
 
   // Payroll-readiness — computed by default via sessionIntelligence.service.js,
   // but stored (not purely live-computed) so an admin correction is durable,
