@@ -211,7 +211,7 @@ async function deterministicConcierge(message, pageContext) {
     const packages = await aiTools.getPackages()
     entities = entities.concat(packages)
     answer = packages.length
-      ? `هذه باقات الاشتراك الحالية المتاحة فعليًا على المنصة:\n\n${packages.map(p => `- ${p.name}: ${p.price} ${p.currency} / ${p.durationDays} يوم (${p.sessionsPerMonth} حصة شهريًا)`).join('\n')}`
+      ? `هذه باقات الاشتراك الحالية المتاحة فعليًا على المنصة:\n\n${packages.map(p => `- ${p.name}: ${p.price} ${p.currency === 'EGP' ? 'جنيه' : p.currency} / ${p.durationDays} يوم (${p.sessionsPerMonth} حصة شهريًا)`).join('\n')}`
       : 'لا تتوفر لديّ حاليًا بيانات أسعار معتمدة لهذا السؤال.'
     if (!packages.length) handoff = true
   } else if (TEACHER_INTENT.some(k => q.includes(k))) {
