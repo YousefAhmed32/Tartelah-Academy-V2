@@ -36,7 +36,7 @@ function EntityCard({ entity }) {
     >
       <span style={{ color: '#a78fd6' }}>{entityIcon(entity.type)}</span>
       <span className="line-clamp-1">{entity.name}</span>
-      {entity.price != null && <span style={{ color: '#E8C76A' }}>· {entity.price} {entity.currency}</span>}
+      {entity.price != null && <span style={{ color: '#E8C76A' }}>· {entity.price} {entity.currency === 'EGP' ? 'جنيه' : entity.currency}</span>}
     </Link>
   )
 }

@@ -13,6 +13,12 @@ const BIDI_MARKS_RE = new RegExp(
 )
 
 export function formatCurrency(amount, currency = 'EGP') {
+  // EGP renders as a fixed "جنيه" suffix instead of Intl's currency symbol
+  // (ar-EG's Intl symbol is "ج.م." with a trailing period) so every EGP
+  // amount across the app reads identically regardless of formatter quirks.
+  if (currency === 'EGP') {
+    return `${formatNumber(amount)} جنيه`
+  }
   const formatted = new Intl.NumberFormat('ar-EG', {
     style: 'currency',
     currency,

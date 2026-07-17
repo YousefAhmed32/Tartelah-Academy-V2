@@ -77,7 +77,7 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
           <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} dir="ltr" />
         </div>
         <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">الراتب / الحصة (EGP)</label>
+          <label className="text-xs font-bold text-gray-400 mb-1 block">الراتب / الحصة (جنيه)</label>
           <input type="number" className={inputCls} value={form.salaryPerSession} onChange={e => set('salaryPerSession', e.target.value)} placeholder="0" />
         </div>
       </div>
@@ -394,7 +394,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
                     <div className="font-heading font-extrabold text-xl" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>
                       {teacher.salaryPerSession ? `${teacher.salaryPerSession}` : '—'}
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>EGP/حصة</div>
+                    <div className="text-xs mt-0.5" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>جنيه/حصة</div>
                   </div>
                 </div>
               </div>

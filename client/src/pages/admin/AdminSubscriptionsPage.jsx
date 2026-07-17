@@ -273,7 +273,7 @@ export default function AdminSubscriptionsPage() {
               <input type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="field-light w-full" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-brand-textBody mb-1">المبلغ المدفوع (EGP)</label>
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">المبلغ المدفوع (جنيه)</label>
               <input type="number" value={form.amountPaid} onChange={e => setForm(p => ({ ...p, amountPaid: e.target.value }))} className="field-light w-full" placeholder="0" />
             </div>
           </div>
