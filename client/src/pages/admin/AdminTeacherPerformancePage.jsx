@@ -115,11 +115,11 @@ export default function AdminTeacherPerformancePage() {
           { key: 'teacherName', label: 'المعلم' },
           { key: 'payableSessions', label: 'حصص مدفوعة' },
           { key: 'unpaidAbsences', label: 'غياب' },
-          { key: 'salaryPerSession', label: 'سعر الحصة', format: v => formatCurrency(v, 'SAR') },
-          { key: 'totalAmount', label: 'الإجمالي', format: v => formatCurrency(v, 'SAR') },
+          { key: 'salaryPerSession', label: 'سعر الحصة', format: v => formatCurrency(v, 'EGP') },
+          { key: 'totalAmount', label: 'الإجمالي', format: v => formatCurrency(v, 'EGP') },
         ],
         rows: rowsData,
-        summary: `إجمالي الرواتب المستحقة: ${formatCurrency(report.data.totalPayroll, 'SAR')}`,
+        summary: `إجمالي الرواتب المستحقة: ${formatCurrency(report.data.totalPayroll, 'EGP')}`,
         filename: 'تقرير-رواتب-المعلمين',
       })
       toast.success('تم إنشاء ملف PDF')
@@ -176,7 +176,7 @@ export default function AdminTeacherPerformancePage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="عدد المعلمين" value={formatNumber(data?.total || 0)} Icon={Users} color="#7c3aed" bg="#f5f3ff" />
         <StatCard label="متوسط الالتزام بالمواعيد" value={`${totals.avgPunctuality}%`} Icon={TrendingUp} color="#22c55e" bg="#f0fdf4" />
-        <StatCard label="إجمالي الرواتب المستحقة" value={formatCurrency(totals.totalPayroll, 'SAR')} Icon={Wallet} color="#3b82f6" bg="#eff6ff" />
+        <StatCard label="إجمالي الرواتب المستحقة" value={formatCurrency(totals.totalPayroll, 'EGP')} Icon={Wallet} color="#3b82f6" bg="#eff6ff" />
         <StatCard label="الأفضل التزاماً" value={totals.topPerformer ? `${totals.topPerformer.firstNameAr} ${totals.topPerformer.lastNameAr}` : '—'} Icon={Award} color="#E8C76A" bg="#fffbeb" />
       </div>
 
@@ -266,7 +266,7 @@ export default function AdminTeacherPerformancePage() {
                     <td className="px-5 py-3.5">
                       {t.absent > 0 ? <span className="text-xs font-bold text-red-600">{t.absent}</span> : <span className="text-xs text-gray-300">0</span>}
                     </td>
-                    <td className="px-5 py-3.5 font-heading font-bold text-gray-900 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(t.totalAmount, 'SAR')}</td>
+                    <td className="px-5 py-3.5 font-heading font-bold text-gray-900 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(t.totalAmount, 'EGP')}</td>
                     <td className="px-5 py-3.5">
                       <button onClick={() => navigate(`${ROUTES.ADMIN_TEACHERS}?teacherId=${t._id}`)}
                         className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors whitespace-nowrap">

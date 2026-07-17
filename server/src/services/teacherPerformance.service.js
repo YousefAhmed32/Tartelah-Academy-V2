@@ -67,7 +67,7 @@ async function getSalaryBreakdown(teacherId, { from, to } = {}) {
     unpaidAbsences: summary.absent,
     excusedSessions: summary.excused,
     totalAmount: payableSessions * rate,
-    currency: 'SAR',
+    currency: 'EGP',
     summary,
   }
 }
@@ -187,7 +187,7 @@ async function getSalaryReport({ from, to } = {}) {
   const rows = await Promise.all(teachers.map(t => getSalaryBreakdown(t._id, { from, to })))
   const totalPayroll = rows.reduce((sum, r) => sum + (r?.totalAmount || 0), 0)
 
-  return { rows: rows.filter(Boolean), totalPayroll, currency: 'SAR', generatedAt: new Date() }
+  return { rows: rows.filter(Boolean), totalPayroll, currency: 'EGP', generatedAt: new Date() }
 }
 
 /** Admin manual correction of a specific session's teacher-attendance status. */
@@ -237,7 +237,7 @@ async function getPayrollReadiness(teacherId, { from, to } = {}) {
     salaryPerSession: rate,
     ...counts,
     estimatedAmount: counts.payable * rate,
-    currency: 'SAR',
+    currency: 'EGP',
   }
 }
 

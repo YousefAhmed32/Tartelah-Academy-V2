@@ -194,7 +194,7 @@ function LiveTab({ onGoToTimeline, onGoToReview }) {
           sub={h.attendanceRateToday === null ? 'لا بيانات بعد' : undefined} />
         <HealthCard label="التزام المعلمين بالموعد" value={h.teacherOnTimeRateToday} Icon={CheckCircle2} color="#7c3aed" rateBased
           sub={h.teacherOnTimeRateToday === null ? 'لا بيانات بعد' : undefined} />
-        <HealthCard label="إيرادات اليوم" value={formatCurrency(h.revenueToday, 'SAR')} Icon={Wallet} color="#0ea5e9" />
+        <HealthCard label="إيرادات اليوم" value={formatCurrency(h.revenueToday, 'EGP')} Icon={Wallet} color="#0ea5e9" />
         <HealthCard label="متصل الآن" value={h.onlineNow.teacher + h.onlineNow.student} Icon={Wifi} color="#f59e0b"
           sub={`${h.onlineNow.teacher} معلم · ${h.onlineNow.student} طالب`} />
       </div>

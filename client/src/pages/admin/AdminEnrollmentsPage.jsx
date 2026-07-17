@@ -144,7 +144,7 @@ export default function AdminEnrollmentsPage() {
                   {/* Package info */}
                   <div className="flex-none sm:w-44">
                     <div className="font-semibold text-sm text-brand-textBody">{req.packageId?.nameAr}</div>
-                    <div className="text-xs text-[#9b7fd6]">{req.amount} ريال — {PAYMENT_METHOD_LABELS[req.paymentMethod] || req.paymentMethod}</div>
+                    <div className="text-xs text-[#9b7fd6]">{req.amount} جنيه — {PAYMENT_METHOD_LABELS[req.paymentMethod] || req.paymentMethod}</div>
                     {req.paymentReference && <div className="text-xs text-[#9b7fd6]">Ref: {req.paymentReference}</div>}
                   </div>
 
@@ -239,7 +239,7 @@ export default function AdminEnrollmentsPage() {
               <div>
                 <div className="font-bold text-brand-textBody">{selectedRequest.studentId?.firstNameAr} {selectedRequest.studentId?.lastNameAr}</div>
                 <div className="text-sm text-[#9b7fd6]">{selectedRequest.studentId?.email} {selectedRequest.studentId?.phone && `| ${selectedRequest.studentId.phone}`}</div>
-                <div className="text-sm text-[#9b7fd6]">الباقة: <span className="font-semibold">{selectedRequest.packageId?.nameAr}</span> — {selectedRequest.amount} ريال</div>
+                <div className="text-sm text-[#9b7fd6]">الباقة: <span className="font-semibold">{selectedRequest.packageId?.nameAr}</span> — {selectedRequest.amount} جنيه</div>
               </div>
               {selectedRequest.paymentProofUrl && (
                 <button onClick={() => setShowProof(true)} className="mr-auto text-xs text-brand-purple hover:underline font-semibold">عرض إثبات الدفع</button>

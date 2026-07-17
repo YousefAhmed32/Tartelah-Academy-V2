@@ -5,7 +5,7 @@ const PackageSchema = new mongoose.Schema({
   name: { type: String, trim: true },
   descriptionAr: { type: String },
   price: { type: Number, required: true, min: 0 },
-  currency: { type: String, default: 'SAR' },
+  currency: { type: String, default: 'EGP' },
   durationDays: { type: Number, required: true, default: 30 },
   sessionsPerMonth: { type: Number, required: true, default: 8 },
   featuresAr: [{ type: String }],

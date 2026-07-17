@@ -238,7 +238,7 @@ function PackageFormModal({ open, onClose, onSubmit, loading, initialValues, tit
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">السعر (ريال)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">السعر (جنيه)</label>
             <input type="number" name="price" value={form.price} onChange={change} className="field-light w-full" min="0" />
           </div>
           <div>

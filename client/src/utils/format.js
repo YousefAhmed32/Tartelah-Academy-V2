@@ -1,7 +1,7 @@
 export function formatNumber(n) {
   if (!n && n !== 0) return '0'
   // Western digits — see formatCurrency's numberingSystem note below.
-  return new Intl.NumberFormat('ar-SA', { numberingSystem: 'latn' }).format(n)
+  return new Intl.NumberFormat('ar-EG', { numberingSystem: 'latn' }).format(n)
 }
 
 // Intl wraps currency output in invisible LRM/RLM marks (U+200E/U+200F) for
@@ -12,8 +12,8 @@ const BIDI_MARKS_RE = new RegExp(
   `[${String.fromCharCode(0x200e)}${String.fromCharCode(0x200f)}]`, 'g'
 )
 
-export function formatCurrency(amount, currency = 'USD') {
-  const formatted = new Intl.NumberFormat('ar-SA', {
+export function formatCurrency(amount, currency = 'EGP') {
+  const formatted = new Intl.NumberFormat('ar-EG', {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,

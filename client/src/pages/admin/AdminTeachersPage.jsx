@@ -77,7 +77,7 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
           <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} dir="ltr" />
         </div>
         <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">الراتب / الحصة (SAR)</label>
+          <label className="text-xs font-bold text-gray-400 mb-1 block">الراتب / الحصة (EGP)</label>
           <input type="number" className={inputCls} value={form.salaryPerSession} onChange={e => set('salaryPerSession', e.target.value)} placeholder="0" />
         </div>
       </div>
@@ -205,9 +205,9 @@ function TeacherPerformanceTab({ teacherId }) {
         { label: 'نسبة الإكمال', value: `${summary.attendance.completionRate}%` },
         { label: 'حصص مستحقة الدفع', value: summary.salary.payableSessions },
         { label: 'غياب بدون أجر', value: summary.salary.unpaidAbsences },
-        { label: 'سعر الحصة', value: formatCurrency(summary.salary.salaryPerSession, 'SAR') },
+        { label: 'سعر الحصة', value: formatCurrency(summary.salary.salaryPerSession, 'EGP') },
       ],
-      summary: `الإجمالي المستحق: ${formatCurrency(summary.salary.totalAmount, 'SAR')}`,
+      summary: `الإجمالي المستحق: ${formatCurrency(summary.salary.totalAmount, 'EGP')}`,
       filename: 'تقرير-أداء-المعلم',
     })
     toast.success('تم إنشاء ملف PDF')
@@ -241,7 +241,7 @@ function TeacherPerformanceTab({ teacherId }) {
               <div className="text-[10px] text-violet-500 mt-0.5">الإكمال</div>
             </div>
             <div className="flex flex-col items-center p-3 rounded-xl bg-blue-50 min-w-0 w-full">
-              <div className="font-heading font-extrabold text-base text-blue-700 whitespace-nowrap" dir="ltr">{formatCurrency(summary?.salary?.totalAmount || 0, 'SAR')}</div>
+              <div className="font-heading font-extrabold text-base text-blue-700 whitespace-nowrap" dir="ltr">{formatCurrency(summary?.salary?.totalAmount || 0, 'EGP')}</div>
               <div className="text-[10px] text-blue-500 mt-0.5">الراتب المستحق</div>
             </div>
           </div>
@@ -394,7 +394,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
                     <div className="font-heading font-extrabold text-xl" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>
                       {teacher.salaryPerSession ? `${teacher.salaryPerSession}` : '—'}
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>SAR/حصة</div>
+                    <div className="text-xs mt-0.5" style={{ color: teacher.salaryPerSession ? '#16a34a' : '#9ca3af' }}>EGP/حصة</div>
                   </div>
                 </div>
               </div>
