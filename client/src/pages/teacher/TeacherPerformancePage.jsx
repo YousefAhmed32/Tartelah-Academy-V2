@@ -119,7 +119,7 @@ function OverviewTab({ periodKey, summary, summaryLoading, trend, trendLoading, 
           <KpiCard label="نسبة الالتزام بالمواعيد" value={`${attendance?.punctualityRate ?? 0}%`} Icon={Clock3} color="#22c55e" delay={0} />
           <KpiCard label="نسبة إكمال الحصص" value={`${attendance?.completionRate ?? 0}%`} Icon={CheckCircle2} color="#7c3aed" delay={0.05} />
           <KpiCard label="إجمالي الحصص" value={attendance?.totalSessions ?? 0} Icon={CalendarRange} color="#d97706" delay={0.1} />
-          <KpiCard label="الراتب المستحق" value={formatCurrency(salary?.totalAmount || 0, 'SAR')} Icon={Wallet} color="#3b82f6" delay={0.15} />
+          <KpiCard label="الراتب المستحق" value={formatCurrency(salary?.totalAmount || 0, 'EGP')} Icon={Wallet} color="#3b82f6" delay={0.15} />
         </div>
       )}
 
@@ -352,12 +352,12 @@ function SalaryTab({ periodRange, salary, isLoading }) {
         { key: 'value', label: 'القيمة' },
       ],
       rows: [
-        { label: 'سعر الحصة', value: formatCurrency(salary.salaryPerSession, 'SAR') },
+        { label: 'سعر الحصة', value: formatCurrency(salary.salaryPerSession, 'EGP') },
         { label: 'الحصص المستحقة الدفع', value: salary.payableSessions },
         { label: 'حصص الغياب غير مدفوعة', value: salary.unpaidAbsences },
         { label: 'حصص معذورة', value: salary.excusedSessions },
       ],
-      summary: `الإجمالي المستحق: ${formatCurrency(salary.totalAmount, 'SAR')}`,
+      summary: `الإجمالي المستحق: ${formatCurrency(salary.totalAmount, 'EGP')}`,
       filename: 'تقرير-الراتب',
     })
     toast.success('تم إنشاء ملف PDF')
@@ -373,9 +373,9 @@ function SalaryTab({ periodRange, salary, isLoading }) {
         <div className="absolute top-0 end-0 w-40 h-40 rounded-full opacity-[0.06]" style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', transform: 'translate(30%, -30%)' }} />
         <div className="relative">
           <div className="text-xs font-semibold mb-1 text-violet-600">الراتب المستحق — {periodRange.label}</div>
-          <div className="font-heading font-extrabold text-4xl text-gray-900 mb-1 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(salary.totalAmount, 'SAR')}</div>
+          <div className="font-heading font-extrabold text-4xl text-gray-900 mb-1 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(salary.totalAmount, 'EGP')}</div>
           <div className="text-sm text-gray-500">
-            {salary.payableSessions} حصة × <span dir="ltr">{formatCurrency(salary.salaryPerSession, 'SAR')}</span>
+            {salary.payableSessions} حصة × <span dir="ltr">{formatCurrency(salary.salaryPerSession, 'EGP')}</span>
           </div>
         </div>
       </div>

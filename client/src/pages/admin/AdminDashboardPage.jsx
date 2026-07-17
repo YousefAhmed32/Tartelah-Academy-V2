@@ -300,7 +300,7 @@ export default function AdminDashboardPage() {
         />
         <KPICard
           label="إجمالي الإيرادات"
-          value={formatCurrency(stats?.totalRevenue, 'SAR')}
+          value={formatCurrency(stats?.totalRevenue, 'EGP')}
           sub="الإيرادات الكلية للمنصة"
           icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM12 7v2.5l2 1M3 19a9 9 0 0 1 18 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>}
           color="#3b82f6"
