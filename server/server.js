@@ -40,10 +40,6 @@ connectDB().then(async () => {
     startSubscriptionExpiryJob()
     startTeacherAttendanceSweepJob()
   }
-  if (process.env.NODE_ENV !== 'production') {
-    const { ensureDevAccounts } = require('./src/seed/devSeed')
-    ensureDevAccounts().catch(err => console.warn('[DEV] devSeed warning:', err.message))
-  }
 })
 
 // Initialize Socket.io

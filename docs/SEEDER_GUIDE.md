@@ -1,6 +1,37 @@
 # Seeder Guide
 
-## Running It
+## Production Seeder (new VPS / fresh deploy)
+
+```bash
+cd server
+npm run seed:production   # or: npm run seed:host
+```
+
+`server/src/seeders/production/index.js` populates a **freshly deployed, empty
+database** with the platform's real default content — safe to run against
+production. Unlike `npm run seed` above, it is **additive only**: it never
+deletes or overwrites anything, matches existing documents by their natural
+key (`email` for users, `slug` for courses/articles/categories, `nameAr` for
+packages), and skips anything already present. Re-running it is a no-op. It
+never runs automatically — nothing in `server.js` or any request path
+requires it.
+
+It creates:
+- **3 packages** (Silver/Gold/Diamond, EGP) — the real catalog sourced from `datatoadd.md` / `server/src/scripts/seedRealContent.js`.
+- **10 courses** — the real course catalog, same source.
+- **4 article categories + 10 articles** — the platform's current blog content.
+- **4 default system accounts** (see table below), passwords hashed through the real `User` model's bcrypt pre-save hook — not inserted as plaintext.
+
+| Role | Email | Default password |
+|---|---|---|
+| Super Admin (`admin`) | `admin@tartelah.com` | `Tartelah@Admin2026` |
+| Teacher (male) | `teacher.male@tartelah.com` | `Tartelah@Teacher2026` |
+| Teacher (female) | `teacher.female@tartelah.com` | `Tartelah@Teacher2026` |
+| Student | `student@tartelah.com` | `Tartelah@Student2026` |
+
+**Change these passwords immediately after first login on a real deployment.**
+
+## Running It (dev/demo seed)
 
 ```bash
 cd server
