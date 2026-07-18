@@ -33,6 +33,11 @@ const UserSchema = new mongoose.Schema({
     link: { type: String },
   }],
   refreshToken: { type: String, select: false },
+  // Bumped on logout / password change / reset so any refresh token issued
+  // before that point (still cryptographically valid for up to
+  // JWT_REFRESH_EXPIRES) is rejected by /auth/refresh instead of silently
+  // continuing to mint new access tokens.
+  tokenVersion: { type: Number, default: 0, select: false },
   passwordResetToken: { type: String, select: false },
   passwordResetExpires: { type: Date, select: false },
 }, { timestamps: true })

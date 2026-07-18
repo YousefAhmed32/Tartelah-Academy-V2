@@ -4,15 +4,15 @@
 
 | Variable | Purpose |
 |---|---|
-| `NODE_ENV` | `production` disables dev-only routes (`/auth/dev-login`) and the Quick Login UI, and tightens rate limits |
-| `PORT` | Backend port (default 5000) |
-| `FRONTEND_URL` | Used for CORS + email links |
+| `NODE_ENV` | `production` disables dev-only routes (`/auth/dev-login`) and the Quick Login UI, and tightens error responses |
+| `PORT` | Backend port (5007 in production) |
+| `CLIENT_URL` | Frontend origin — drives CORS, email links, and Socket.io CORS (`FRONTEND_URL` is still read as a fallback for older deployments) |
 | `MONGO_URI` | MongoDB connection string — point to Atlas (or another managed cluster) in production |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Must be 32+ random characters in production, never reused from dev |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Two distinct secrets (never one shared value), 32+ random characters in production, never reused from dev |
 | `JWT_ACCESS_EXPIRES` / `JWT_REFRESH_EXPIRES` | Token lifetimes (default 15m / 7d) |
 | `SMTP_*`, `EMAIL_FROM` | Nodemailer credentials for password-reset/verification emails |
-| `MAX_FILE_SIZE`, `UPLOAD_PATH` | Local file-upload limits and directory |
-| `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX` | General API rate limit (see `API_REFERENCE.md`) |
+| `MAX_FILE_SIZE`, `UPLOAD_PATH` | File-upload size limit; `UPLOAD_PATH` is legacy and unused now that all uploads go to GridFS |
+| `RATE_LIMIT_WINDOW_MINUTES`, `RATE_LIMIT_PUBLIC`, `RATE_LIMIT_STUDENT`, `RATE_LIMIT_TEACHER`, `RATE_LIMIT_ADMIN`, `RATE_LIMIT_LOGIN` | Role-aware rate limits (see `server.js`) |
 | `OPENAI_API_KEY`, `OPENAI_CHAT_MODEL` | Optional — AI Assistant runs in rule-based fallback mode without it, never fails |
 
 Copy `server/.env.example` and `client/.env.example` as the starting point; never commit real secrets.
@@ -33,4 +33,6 @@ Copy `server/.env.example` and `client/.env.example` as the starting point; neve
 
 - Hit a public endpoint (`GET /api/v1/courses`) to confirm the API is reachable.
 - Log in with a real (non-dev) account and confirm the refresh flow survives a page reload (HTTPS + secure cookies working).
-- Confirm file uploads (avatar, payment proof) persist after a redeploy if using local storage — if they don't, that confirms the S3/Cloudinary migration is now required, not optional.
+- Confirm file uploads (avatar, payment proof) persist after a redeploy — they live in MongoDB GridFS, so this should always pass regardless of which backend instance/redeploy serves the request.
+
+See `../DEPLOYMENT_CHECKLIST.md` at the project root for the full server provisioning, PM2, Nginx, and SSL setup.

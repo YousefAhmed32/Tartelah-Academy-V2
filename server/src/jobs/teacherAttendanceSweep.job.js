@@ -28,7 +28,11 @@ async function sweepStale() {
   let flaggedMissed = 0
   let flaggedAbsent = 0
 
-  const stale = await Session.find({ status: 'scheduled' })
+  // Bounded to sessions whose scheduled time has already passed — a session
+  // still in the future can never satisfy minutesPastEnd >= MISSED_AFTER_MINUTES
+  // below, so excluding it here avoids scanning the whole forward-scheduled
+  // calendar (the majority of the collection) every 10 minutes.
+  const stale = await Session.find({ status: 'scheduled', scheduledAt: { $lte: now } })
     .select('_id teacherId studentId titleAr scheduledAt durationMinutes status teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy')
     .populate('teacherId', 'firstNameAr lastNameAr')
 

@@ -61,7 +61,7 @@ async function run() {
 
   const APPLY = process.argv.includes('--apply')
 
-  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI)
+  await mongoose.connect(process.env.MONGO_URI)
   console.log(`[migrateTeacherGender] Connected. Mode: ${APPLY ? 'APPLY (will normalize invalid values only)' : 'DRY RUN (no changes)'}`)
 
   const teachers = await User.find({ role: 'teacher' }).select('_id gender firstNameAr lastNameAr').lean()

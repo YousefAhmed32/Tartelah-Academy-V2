@@ -20,7 +20,11 @@ const FROM = process.env.EMAIL_FROM || 'ترتيلة أونلاين <noreply@tar
 
 async function sendMail({ to, subject, html }) {
   if (!process.env.SMTP_USER || process.env.SMTP_USER === 'your_email@gmail.com') {
-    console.log(`[EMAIL-SKIP] To: ${to} | Subject: ${subject}`)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[EMAIL-SKIP] To: ${to} | Subject: ${subject}`)
+    } else {
+      console.warn('[EMAIL-SKIP] SMTP not configured — email not sent')
+    }
     return
   }
   try {

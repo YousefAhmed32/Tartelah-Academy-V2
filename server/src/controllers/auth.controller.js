@@ -13,9 +13,8 @@ const COOKIE_OPTS = {
 }
 
 function issueTokens(user, res) {
-  const payload = { id: user._id, role: user.role }
-  const accessToken = signAccessToken(payload)
-  const refreshToken = signRefreshToken(payload)
+  const accessToken = signAccessToken({ id: user._id, role: user.role })
+  const refreshToken = signRefreshToken({ id: user._id, role: user.role, v: user.tokenVersion || 0 })
   res.cookie('refreshToken', refreshToken, COOKIE_OPTS)
   return accessToken
 }
@@ -41,7 +40,7 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body
-    const user = await User.findOne({ email }).select('+password')
+    const user = await User.findOne({ email }).select('+password +tokenVersion')
     if (!user || !(await user.comparePassword(password))) {
       return sendError(res, 'البريد الإلكتروني أو كلمة المرور غير صحيحة', 401)
     }
@@ -55,6 +54,13 @@ exports.login = async (req, res, next) => {
 
 exports.logout = async (req, res, next) => {
   try {
+    const token = req.cookies?.refreshToken
+    if (token) {
+      try {
+        const decoded = verifyRefreshToken(token)
+        await User.updateOne({ _id: decoded.id }, { $inc: { tokenVersion: 1 } })
+      } catch (_) { /* token already invalid/expired — nothing to revoke */ }
+    }
     res.clearCookie('refreshToken', { ...COOKIE_OPTS, maxAge: 0 })
     sendSuccess(res, null, 'تم تسجيل الخروج')
   } catch (err) {
@@ -75,9 +81,13 @@ exports.refresh = async (req, res, next) => {
     const token = req.cookies?.refreshToken
     if (!token) return sendError(res, 'لا يوجد رمز تحديث', 401)
     const decoded = verifyRefreshToken(token)
-    const user = await User.findById(decoded.id)
+    const user = await User.findById(decoded.id).select('+tokenVersion')
     if (!user || !user.isActive) return sendError(res, 'المستخدم غير موجود', 401)
-    const accessToken = signAccessToken({ id: user._id, role: user.role })
+    if ((decoded.v || 0) !== (user.tokenVersion || 0)) {
+      res.clearCookie('refreshToken', { ...COOKIE_OPTS, maxAge: 0 })
+      return sendError(res, 'انتهت الجلسة، يرجى تسجيل الدخول مجدداً', 401)
+    }
+    const accessToken = issueTokens(user, res)
     sendSuccess(res, { accessToken })
   } catch (err) {
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
@@ -110,11 +120,12 @@ exports.resetPassword = async (req, res, next) => {
   try {
     const { token, password } = req.body
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
-    const user = await User.findOne({ passwordResetToken: hashedToken, passwordResetExpires: { $gt: Date.now() } }).select('+password')
+    const user = await User.findOne({ passwordResetToken: hashedToken, passwordResetExpires: { $gt: Date.now() } }).select('+password +tokenVersion')
     if (!user) return sendError(res, 'الرابط غير صالح أو منتهي الصلاحية', 400)
     user.password = password
     user.passwordResetToken = undefined
     user.passwordResetExpires = undefined
+    user.tokenVersion = (user.tokenVersion || 0) + 1
     await user.save()
     sendSuccess(res, null, 'تم إعادة تعيين كلمة المرور بنجاح')
   } catch (err) {
@@ -125,12 +136,16 @@ exports.resetPassword = async (req, res, next) => {
 exports.changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body
-    const user = await User.findById(req.user._id).select('+password')
+    const user = await User.findById(req.user._id).select('+password +tokenVersion')
     if (!(await user.comparePassword(currentPassword))) return sendError(res, 'كلمة المرور الحالية غير صحيحة', 400)
     user.password = newPassword
+    user.tokenVersion = (user.tokenVersion || 0) + 1
     await user.save()
     sendPasswordChangedEmail({ to: user.email, name: user.firstNameAr }).catch(() => {})
-    sendSuccess(res, null, 'تم تغيير كلمة المرور بنجاح')
+    // Reissue tokens for this device so it stays logged in — tokenVersion
+    // bump above still invalidates any other outstanding refresh token.
+    const accessToken = issueTokens(user, res)
+    sendSuccess(res, { accessToken }, 'تم تغيير كلمة المرور بنجاح')
   } catch (err) {
     next(err)
   }
@@ -157,11 +172,11 @@ exports.devLogin = async (req, res, next) => {
       return sendError(res, 'Invalid role. Use: admin | teacher | teacher_female | student', 400)
     }
     // Prefer the specific dev account, fall back to any active user matching the role (+gender, if relevant)
-    let user = await User.findOne({ email: account.email, isActive: true })
+    let user = await User.findOne({ email: account.email, isActive: true }).select('+tokenVersion')
     if (!user) {
       const fallbackFilter = { role: account.dbRole, isActive: true }
       if (account.gender) fallbackFilter.gender = account.gender
-      user = await User.findOne(fallbackFilter)
+      user = await User.findOne(fallbackFilter).select('+tokenVersion')
     }
     if (!user) return sendError(res, `No active ${account.dbRole} account found. Run npm run seed first.`, 404)
     const accessToken = issueTokens(user, res)

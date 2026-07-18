@@ -5,6 +5,7 @@ const cors = require('cors')
 const helmet = require('helmet')
 const morgan = require('morgan')
 const cookieParser = require('cookie-parser')
+const mongoSanitize = require('express-mongo-sanitize')
 const rateLimit = require('express-rate-limit')
 const connectDB = require('./src/config/database')
 const routes = require('./src/routes/index')
@@ -100,6 +101,11 @@ app.use(cookieParser())
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Strip Mongo operator keys ($ne, $gt, etc.) from body/query/params so
+// clients can't smuggle query operators into Mongoose filters built from
+// user input (e.g. admin list-filtering endpoints).
+app.use(mongoSanitize())
 
 // Logging
 if (process.env.NODE_ENV !== 'test') {
