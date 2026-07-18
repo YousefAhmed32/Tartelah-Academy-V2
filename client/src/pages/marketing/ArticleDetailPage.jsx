@@ -7,13 +7,9 @@ import { BookOpen, Search, Star, Pin, Mail } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { useAuthStore } from '../../store/authStore.js'
+import { formatDateAr as formatDate } from '../../utils/date.js'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatDate(d) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })
-}
 
 // Extract headings from HTML content for Table of Contents
 function extractHeadings(html) {

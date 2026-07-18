@@ -5,13 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { BookOpen, Star, Mail, Inbox, Library } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatDate(d) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })
-}
+import { formatDateAr as formatDate } from '../../utils/date.js'
 
 function readingLabel(n) {
   return `${n} دقيقة قراءة`

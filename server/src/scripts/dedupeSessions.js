@@ -39,7 +39,7 @@ function looksSafeToDrop(doc, keeper) {
 }
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI)
+  await mongoose.connect(process.env.MONGO_URI)
   console.log(`[dedupeSessions] Connected. Mode: ${APPLY ? 'APPLY (will delete)' : 'DRY RUN (no changes)'}`)
 
   const dupes = await Session.aggregate([

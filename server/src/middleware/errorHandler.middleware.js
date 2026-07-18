@@ -26,6 +26,15 @@ function errorHandler(err, req, res, next) {
 
   if (process.env.NODE_ENV === 'development') {
     console.error(`[ERROR] ${req.method} ${req.path}:`, err)
+  } else {
+    console.error(`[ERROR] ${req.method} ${req.path}: ${err.message}`)
+  }
+
+  // Never forward a raw, uncategorized error message (driver/library
+  // internals) to the client in production — only the specific cases
+  // handled above are safe to surface as-is.
+  if (statusCode === 500 && process.env.NODE_ENV === 'production') {
+    message = 'حدث خطأ في الخادم'
   }
 
   res.status(statusCode).json({
