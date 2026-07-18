@@ -24,11 +24,12 @@ function errorHandler(err, req, res, next) {
 
   // JWT errors handled in auth middleware
 
-  if (process.env.NODE_ENV === 'development') {
-    console.error(`[ERROR] ${req.method} ${req.path}:`, err)
-  } else {
-    console.error(`[ERROR] ${req.method} ${req.path}: ${err.message}`)
-  }
+  // Always log the full error + stack server-side, in every environment —
+  // only the response sent to the client is ever sanitized (below). Losing
+  // the stack in production logs was itself a past incident: a real
+  // exception (e.g. a missing required env var) surfaced only as a generic
+  // 500 with nothing in `pm2 logs` to diagnose it from.
+  console.error(`[ERROR] ${req.method} ${req.path}:`, err)
 
   // Never forward a raw, uncategorized error message (driver/library
   // internals) to the client in production — only the specific cases
