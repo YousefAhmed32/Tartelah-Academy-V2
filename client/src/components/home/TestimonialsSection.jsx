@@ -50,7 +50,7 @@ const GRID_CARDS = [
   {
     id:      'g3',
     image:   '/MSGC-4.png',
-    audio:   '/audio/enhaza-1.mp3',
+    audio:   '/audio/Customer opinion-1.mp3',
     name:    'ولي أمر',
     initial: 'م',
     level:   'مستوى متقدم',
@@ -62,7 +62,7 @@ const GRID_CARDS = [
 const AUDIO_CARDS = [
   {
     id:      'a4',
-    audio:   '/audio/enhaza-2.mp3',
+    audio:   '/audio/Customer opinion-3.mp3',
     name:    'طالبة',
     initial: 'ن',
     level:   'مستوى مبتدئ',

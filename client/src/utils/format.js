@@ -4,32 +4,11 @@ export function formatNumber(n) {
   return new Intl.NumberFormat('ar-EG', { numberingSystem: 'latn' }).format(n)
 }
 
-// Intl wraps currency output in invisible LRM/RLM marks (U+200E/U+200F) for
-// bidi correctness, but some webfonts (e.g. Cairo) mis-shape glyphs adjacent
-// to them, causing visible glyph overlap. Layout direction is set explicitly
-// via `dir` where this is rendered, so the marks are safe to strip.
-const BIDI_MARKS_RE = new RegExp(
-  `[${String.fromCharCode(0x200e)}${String.fromCharCode(0x200f)}]`, 'g'
-)
-
-export function formatCurrency(amount, currency = 'EGP') {
-  // EGP renders as a fixed "جنيه" suffix instead of Intl's currency symbol
-  // (ar-EG's Intl symbol is "ج.م." with a trailing period) so every EGP
-  // amount across the app reads identically regardless of formatter quirks.
-  if (currency === 'EGP') {
-    return `${formatNumber(amount)} جنيه`
-  }
-  const formatted = new Intl.NumberFormat('ar-EG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    // Cairo (this app's heading font) has a broken glyph for the
-    // Arabic-Indic zero digit that renders as overlapping garbage whenever
-    // an amount contains a zero. Western digits sidestep the font bug and
-    // are common practice for monetary amounts in Arabic UIs regardless.
-    numberingSystem: 'latn',
-  }).format(amount)
-  return formatted.replace(BIDI_MARKS_RE, '')
+// Pricing is communicated manually (WhatsApp/sales) until currency is
+// finalized, so this intentionally returns a bare number — no currency
+// symbol or label — regardless of the `currency` argument callers still pass.
+export function formatCurrency(amount) {
+  return formatNumber(amount)
 }
 
 export function getInitials(firstName = '', lastName = '') {

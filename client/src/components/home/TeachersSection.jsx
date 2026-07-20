@@ -29,13 +29,13 @@ function fallbackAvatarFor(teacher) {
 // ── Teacher data ──────────────────────────────────────────────────────────────
 
 const TEACHERS = [
-  { id: 1, name: 'د/ محمد صلاح', gender: 'male', img: '/images/teacher-1.png', cert: 'إجازة في حفص عن عاصم', rating: '4.9', audio: null },
-  { id: 2, name: 'أ/ عبد الرحمان حسن', gender: 'male', img: '/images/teacher-2.png', cert: 'إجازة في حفص عن عاصم', rating: '5.0', audio: null },
-  { id: 3, name: 'أ/ أحمد محمد', gender: 'male', img: '/images/teacher-3.png', cert: 'إجازة في شعبة عن عاصم', rating: '4.9', audio: null },
-  { id: 4, name: 'أ/ أحمد خليفة', gender: 'male', img: '/images/teacher-4.png', cert: 'إجازة في ورش عن نافع', rating: '4.8', audio: null },
-  { id: 5, name: 'أ/ أحمد العطار', gender: 'male', img: '/images/avter man.png', cert: 'إجازة في حفص عن عاصم', rating: '4.9', audio: '/audio/recorder-1-Ahmed Al-Atar.mp3' },
+  { id: 1, name: 'د/ محمد صلاح', gender: 'male', img: '/images/teacher-1-v2.png', cert: 'إجازة في حفص عن عاصم', rating: '4.9', audio: null },
+  { id: 2, name: 'أ/ عبد الرحمان حسن', gender: 'male', img: '/images/teacher-2-v2.png', cert: 'إجازة في حفص عن عاصم', rating: '5.0', audio: null },
+  { id: 3, name: 'أ/ أحمد محمد', gender: 'male', img: '/images/teacher-3-v2.png', cert: 'إجازة في شعبة عن عاصم', rating: '4.9', audio: null },
+  { id: 4, name: 'أ/ أحمد خليفة', gender: 'male', img: '/images/teacher-4-v2.png', cert: 'إجازة في ورش عن نافع', rating: '4.8', audio: null },
+  { id: 5, name: 'أ/ أحمد العتر', gender: 'male', img: '/images/avter man.png', cert: 'إجازة في حفص عن عاصم', rating: '4.9', audio: '/audio/recorder-1-Ahmed Al-Atar.mp3' },
   { id: 6, name: 'أ/ رودينا أحمد', gender: 'male', img: '/images/avter woman.png', cert: 'إجازة في القراءات العشر', rating: '5.0', audio: '/audio/recorder-1-Rodina Ahmed.mp3' },
-  { id: 7, name: 'أ/ سعدي محمود', gender: 'male', img: '/images/avter woman.png', cert: 'إجازة في ورش عن نافع', rating: '4.8', audio: '/audio/recorder-1-Saadi Mahmoud.mp3' },
+  { id: 7, name: 'أ/ اسراء عدلي', gender: 'male', img: '/images/avter woman.png', cert: 'إجازة في ورش عن نافع', rating: '4.8', audio: '/audio/recorder-1-Saadi Mahmoud.mp3' },
   { id: 8, name: 'أ/ مريم عبد الله', gender: 'female', img: '/images/avter woman.png', cert: 'إجازة في حفص عن عاصم', rating: '4.9', audio: null },
   { id: 9, name: 'أ/ آية محمود', gender: 'female', img: '/images/avter woman.png', cert: 'إجازة في القراءات العشر', rating: '5.0', audio: null },
   { id: 10, name: 'أ/ سارة أحمد', gender: 'female', img: '/images/avter woman.png', cert: 'إجازة في حفص عن عاصم', rating: '4.8', audio: null },

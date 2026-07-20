@@ -168,6 +168,18 @@ function dedupeEntities(list) {
   return out.slice(0, 6)
 }
 
+// Builds the "عرض المزيد من الدورات" deep link into /courses, carrying
+// forward whatever category/free-text query actually produced the courses
+// shown — so the visitor lands on a prefiltered browse page, not a blank one.
+function courseBrowseUrl(courseQuery) {
+  if (!courseQuery) return null
+  const params = new URLSearchParams()
+  if (courseQuery.category) params.set('category', courseQuery.category)
+  if (courseQuery.query) params.set('search', courseQuery.query)
+  const qs = params.toString()
+  return qs ? `/courses?${qs}` : '/courses'
+}
+
 // Deterministic, LLM-free intent router — used only when OPENAI_API_KEY is
 // not configured or the provider call fails. Real data only, same as the
 // LLM path; just no natural-language generation on top of it.
@@ -176,6 +188,7 @@ async function deterministicConcierge(message, pageContext) {
   let entities = []
   let handoff = false
   let answer
+  let courseQuery = null
 
   let pageCourse = null
   if (pageContext?.pageType === 'course' && pageContext.courseSlug) {
@@ -211,7 +224,7 @@ async function deterministicConcierge(message, pageContext) {
     const packages = await aiTools.getPackages()
     entities = entities.concat(packages)
     answer = packages.length
-      ? `هذه باقات الاشتراك الحالية المتاحة فعليًا على المنصة:\n\n${packages.map(p => `- ${p.name}: ${p.price} ${p.currency === 'EGP' ? 'جنيه' : p.currency} / ${p.durationDays} يوم (${p.sessionsPerMonth} حصة شهريًا)`).join('\n')}`
+      ? `هذه باقات الاشتراك الحالية المتاحة فعليًا على المنصة:\n\n${packages.map(p => `- ${p.name}: ${p.price} / ${p.durationDays} يوم (${p.sessionsPerMonth} حصة شهريًا)`).join('\n')}`
       : 'لا تتوفر لديّ حاليًا بيانات أسعار معتمدة لهذا السؤال.'
     if (!packages.length) handoff = true
   } else if (TEACHER_INTENT.some(k => q.includes(k))) {
@@ -230,6 +243,7 @@ async function deterministicConcierge(message, pageContext) {
       // regex-match against course names — browse all published courses
       // instead of searching for the literal question text.
       const isGenericBrowse = COURSE_WORDS.some(w => q.includes(w))
+      courseQuery = isGenericBrowse ? {} : { query: message }
       const courses = isGenericBrowse
         ? await aiTools.searchCourses({ limit: 5 })
         : await aiTools.searchCourses({ query: message, limit: 5 })
@@ -241,7 +255,7 @@ async function deterministicConcierge(message, pageContext) {
     }
   }
 
-  return { answer, entities: dedupeEntities(entities), handoff }
+  return { answer, entities: dedupeEntities(entities), handoff, courseQuery }
 }
 
 exports.chat = async (req, res, next) => {
@@ -254,20 +268,22 @@ exports.chat = async (req, res, next) => {
     let entities = []
     let answer = null
     let degraded = false
+    let courseQuery = null
 
     if (hasLLM) {
       try {
         const usedTools = []
-        const raw = await askConcierge({
+        const result = await askConcierge({
           message,
           history,
           pageContextNote: pageContextNoteFrom(pageContext),
           usedTools,
         })
-        if (raw) {
-          handoffRecommended = raw.includes(HANDOFF_MARKER)
-          answer = raw.replace(HANDOFF_MARKER, '').trim()
+        if (result?.text) {
+          handoffRecommended = result.text.includes(HANDOFF_MARKER)
+          answer = result.text.replace(HANDOFF_MARKER, '').trim()
           entities = dedupeEntities(usedTools)
+          courseQuery = result.courseQuery
         }
       } catch (err) {
         console.warn('[AI Concierge] provider error, falling back:', err.message)
@@ -280,6 +296,7 @@ exports.chat = async (req, res, next) => {
       answer = fallback.answer
       entities = fallback.entities
       handoffRecommended = handoffRecommended || fallback.handoff || degraded
+      courseQuery = fallback.courseQuery
     }
 
     let contact = null
@@ -292,6 +309,7 @@ exports.chat = async (req, res, next) => {
       entities,
       suggestions: suggestionsFor(pageContext),
       handoff: { recommended: handoffRecommended, contact },
+      courseBrowseUrl: courseBrowseUrl(courseQuery),
       conversationId: conversationId || null,
       mode: hasLLM && !degraded ? 'llm' : 'rule-based',
     })

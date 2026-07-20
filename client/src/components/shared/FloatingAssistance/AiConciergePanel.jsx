@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Send, X, ThumbsUp, ThumbsDown, RotateCw, BookOpen, User, Package, MessageCircle } from 'lucide-react'
 import api from '../../../utils/api.js'
 import { useAiPageContext } from '../../../hooks/useAiPageContext.js'
+import AiCourseRail from './AiCourseRail.jsx'
 
 const DEFAULT_SUGGESTIONS = ['رشّح لي دورة مناسبة', 'ما الدورات المتاحة؟', 'هل يوجد شهادة إتمام؟', 'أريد التحدث مع الدعم']
 const COURSE_PAGE_SUGGESTIONS = ['هل هذه الدورة مناسبة للمبتدئين؟', 'ما مدة الدورة؟', 'كيف أسجل؟']
@@ -36,7 +37,7 @@ function EntityCard({ entity }) {
     >
       <span style={{ color: '#a78fd6' }}>{entityIcon(entity.type)}</span>
       <span className="line-clamp-1">{entity.name}</span>
-      {entity.price != null && <span style={{ color: '#E8C76A' }}>· {entity.price} {entity.currency === 'EGP' ? 'جنيه' : entity.currency}</span>}
+      {entity.price != null && <span style={{ color: '#E8C76A' }}>· {entity.price}</span>}
     </Link>
   )
 }
@@ -116,6 +117,7 @@ export default function AiConciergePanel({ onClose, conversationId }) {
         entities: data.entities || [],
         suggestions: data.suggestions || [],
         handoff: data.handoff,
+        courseBrowseUrl: data.courseBrowseUrl || null,
         timestamp: new Date().toISOString(),
       }])
     },
@@ -244,11 +246,22 @@ export default function AiConciergePanel({ onClose, conversationId }) {
                   {msg.content}
                 </div>
 
-                {msg.entities?.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {msg.entities.map((e, i) => <EntityCard key={i} entity={e} />)}
-                  </div>
-                )}
+                {msg.role === 'assistant' && (() => {
+                  const courseEntities = msg.entities?.filter(e => e.type === 'course') || []
+                  const otherEntities = msg.entities?.filter(e => e.type !== 'course') || []
+                  return (
+                    <>
+                      {courseEntities.length > 0 && (
+                        <AiCourseRail courses={courseEntities} browseMoreUrl={msg.courseBrowseUrl} />
+                      )}
+                      {otherEntities.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {otherEntities.map((e, i) => <EntityCard key={i} entity={e} />)}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
 
                 {msg.handoff?.recommended && whatsappHref && (
                   <a

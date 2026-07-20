@@ -227,9 +227,7 @@ export default function AboutPage() {
                       {settings?.missionQuoteAr || 'سُئلت السيدة عائشة (رضي الله عنها) عن خلق النبي صلى الله عليه وسلم فقالت: (( كان خلقه القرآن ))'}
                     </p>
                   </div>
-                  <div className="relative z-10 border-t border-purple-950/60 pt-4 text-xs font-mono text-[#e3be5a] tracking-wider">
-                    ESTABLISHED FOR EXCELLENCE // 2026
-                  </div>
+                
                 </div>
               </motion.div>
 

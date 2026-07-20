@@ -245,7 +245,7 @@ export default function StudentEnrollmentPage() {
                     <div className="text-xs text-[#9b7fd6] mt-0.5">{formatDateAr(req.createdAt)}</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-brand-purple">{req.amount} جنيه</span>
+                    <span className="text-sm font-bold text-brand-purple">{req.amount}</span>
                     <Badge variant={cfg.color || 'gray'}>{cfg.label || req.status}</Badge>
                   </div>
                 </div>
@@ -460,7 +460,7 @@ function PackageGrid({ packages, selected, onSelect }) {
               <p className="text-sm text-[#9b7fd6] mb-4">{pkg.descriptionAr}</p>
               <div className="flex items-baseline gap-1 mb-5">
                 <span className="font-heading font-extrabold text-3xl text-brand-purple">{pkg.price}</span>
-                <span className="text-sm text-[#9b7fd6]">جنيه / شهر</span>
+                <span className="text-sm text-[#9b7fd6]">/ شهر</span>
               </div>
               <ul className="space-y-2 mb-5">
                 <li className="flex items-center gap-2 text-sm text-brand-textBody">
@@ -500,7 +500,7 @@ function PaymentForm({ pkg, form, onChange, onBack, onSubmit, submitting }) {
           <div className="text-xs text-[#9b7fd6] mb-0.5">الباقة المختارة</div>
           <div className="font-heading font-bold text-brand-textBody">{pkg.nameAr}</div>
         </div>
-        <div className="font-heading font-extrabold text-2xl text-brand-purple">{pkg.price} جنيه</div>
+        <div className="font-heading font-extrabold text-2xl text-brand-purple">{pkg.price}</div>
       </div>
 
       <div className="card-light p-6 space-y-4">
