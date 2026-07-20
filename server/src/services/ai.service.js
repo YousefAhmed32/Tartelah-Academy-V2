@@ -107,6 +107,11 @@ async function askConcierge({ message, history = [], pageContextNote, usedTools 
     { role: 'user', content: message },
   ]
 
+  // Remembers the args of the last search_courses call this turn, so the
+  // caller can build a "browse more courses" deep link (/courses?category=..)
+  // matching whatever the model actually searched for.
+  let courseQuery = null
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const completion = await client.chat.completions.create({
       model: MODEL,
@@ -120,13 +125,14 @@ async function askConcierge({ message, history = [], pageContextNote, usedTools 
     if (!choice) return null
 
     if (!choice.tool_calls?.length) {
-      return choice.content || null
+      return { text: choice.content || null, courseQuery }
     }
 
     messages.push(choice)
     for (const call of choice.tool_calls) {
       let args = {}
       try { args = JSON.parse(call.function.arguments || '{}') } catch (_) { /* malformed args -> empty */ }
+      if (call.function.name === 'search_courses') courseQuery = { category: args.category || null, query: args.query || null }
       const result = await callTool(call.function.name, args)
       // Only surface results shaped as renderable entities (every item
       // carries a `type`) — e.g. list_course_categories is informational
@@ -143,7 +149,7 @@ async function askConcierge({ message, history = [], pageContextNote, usedTools 
     max_completion_tokens: 700,
     messages,
   })
-  return final.choices[0]?.message?.content || null
+  return { text: final.choices[0]?.message?.content || null, courseQuery }
 }
 
 module.exports = {

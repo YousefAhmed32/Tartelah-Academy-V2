@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -435,8 +435,15 @@ function EmptyState({ onReset }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CoursesPage() {
-  const [search,        setSearch]        = useState('')
-  const [category,      setCategory]      = useState('all')
+  // Initial values only — the AI concierge's "عرض المزيد من الدورات" link
+  // (and any other deep link) lands here as /courses?category=..&search=..;
+  // the filter bar takes over as normal client-side state after that.
+  const [searchParams] = useSearchParams()
+  const [search,        setSearch]        = useState(() => searchParams.get('search') || '')
+  const [category,      setCategory]      = useState(() => {
+    const c = searchParams.get('category')
+    return c && CATEGORY_MAP[c] ? c : 'all'
+  })
   const [difficulty,    setDifficulty]    = useState('all')
   const [page,          setPage]          = useState(1)
   const [searchFocused, setSearchFocused] = useState(false)

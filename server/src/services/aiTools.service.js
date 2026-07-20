@@ -28,6 +28,43 @@ function escapeRegex(str) {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// A course is only badged "جديد" for a short, deliberately narrow window —
+// long enough to matter to a visitor, short enough that "new" stays true.
+const NEW_COURSE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+function courseBadge(c) {
+  if (c.featured) return 'featured'
+  if (c.rating >= 4.5 && c.reviewCount >= 5) return 'bestseller'
+  if (c.createdAt && Date.now() - new Date(c.createdAt).getTime() < NEW_COURSE_WINDOW_MS) return 'new'
+  if (c.studentsCount >= 50) return 'popular'
+  return null
+}
+
+function courseCardShape(c) {
+  return {
+    type: 'course',
+    id: String(c._id),
+    name: c.nameAr,
+    route: courseRoute(c),
+    slug: c.slug || String(c._id),
+    category: CATEGORY_LABELS[c.category] || c.category,
+    difficulty: DIFFICULTY_LABELS[c.difficulty] || c.difficulty,
+    lessonsCount: c.lessonsCount,
+    estimatedDurationHours: c.estimatedDuration,
+    certificateAvailable: c.certificateAvailable,
+    shortDescription: c.shortDescriptionAr || null,
+    thumbnailImage: c.thumbnailImage || null,
+    rating: c.rating || 0,
+    reviewCount: c.reviewCount || 0,
+    studentsCount: c.studentsCount || c.enrollmentCount || 0,
+    badge: courseBadge(c),
+    instructorName: c.instructor
+      ? `${c.instructor.firstNameAr || ''} ${c.instructor.lastNameAr || ''}`.trim()
+      : null,
+    enrollmentEnabled: c.enrollmentEnabled !== false,
+  }
+}
+
 async function searchCourses({ category, difficulty, query, limit = 5 } = {}) {
   const filter = { status: 'published', isActive: true }
   if (category && CATEGORY_LABELS[category]) filter.category = category
@@ -36,27 +73,21 @@ async function searchCourses({ category, difficulty, query, limit = 5 } = {}) {
     const q = escapeRegex(query)
     filter.$or = [
       { nameAr: { $regex: q, $options: 'i' } },
+      { name: { $regex: q, $options: 'i' } },
       { shortDescriptionAr: { $regex: q, $options: 'i' } },
+      { descriptionAr: { $regex: q, $options: 'i' } },
+      { slug: { $regex: q, $options: 'i' } },
       { tags: { $in: [query.toLowerCase()] } },
     ]
   }
   const courses = await Course.find(filter)
-    .select('nameAr slug category difficulty estimatedDuration lessonsCount certificateAvailable studentsCount')
+    .populate('instructor', 'firstNameAr lastNameAr')
+    .select('nameAr slug category difficulty estimatedDuration lessonsCount certificateAvailable studentsCount enrollmentCount shortDescriptionAr thumbnailImage rating reviewCount featured createdAt enrollmentEnabled instructor')
     .sort({ featured: -1, studentsCount: -1 })
     .limit(Math.min(Number(limit) || 5, 8))
     .lean()
 
-  return courses.map(c => ({
-    type: 'course',
-    id: String(c._id),
-    name: c.nameAr,
-    route: courseRoute(c),
-    category: CATEGORY_LABELS[c.category] || c.category,
-    difficulty: DIFFICULTY_LABELS[c.difficulty] || c.difficulty,
-    lessonsCount: c.lessonsCount,
-    estimatedDurationHours: c.estimatedDuration,
-    certificateAvailable: c.certificateAvailable,
-  }))
+  return courses.map(courseCardShape)
 }
 
 async function getCourseDetails({ slug } = {}) {
@@ -64,29 +95,16 @@ async function getCourseDetails({ slug } = {}) {
   const identity = mongoose.Types.ObjectId.isValid(slug) ? { _id: slug } : { slug }
   const course = await Course.findOne({ ...identity, status: 'published', isActive: true })
     .populate('instructor', 'firstNameAr lastNameAr gender')
-    .select('nameAr slug category difficulty ageGroup language estimatedDuration lessonsCount certificateAvailable enrollmentEnabled shortDescriptionAr requirementsAr targetAudienceAr instructor')
+    .select('nameAr slug category difficulty ageGroup language estimatedDuration lessonsCount certificateAvailable enrollmentEnabled shortDescriptionAr requirementsAr targetAudienceAr thumbnailImage rating reviewCount studentsCount enrollmentCount featured createdAt instructor')
     .lean()
   if (!course) return null
 
   return {
-    type: 'course',
-    id: String(course._id),
-    name: course.nameAr,
-    route: courseRoute(course),
-    category: CATEGORY_LABELS[course.category] || course.category,
-    difficulty: DIFFICULTY_LABELS[course.difficulty] || course.difficulty,
+    ...courseCardShape(course),
     ageGroup: course.ageGroup,
     language: course.language,
-    estimatedDurationHours: course.estimatedDuration,
-    lessonsCount: course.lessonsCount,
-    certificateAvailable: course.certificateAvailable,
-    enrollmentEnabled: course.enrollmentEnabled,
-    shortDescription: course.shortDescriptionAr || null,
     requirements: course.requirementsAr || [],
     targetAudience: course.targetAudienceAr || null,
-    instructorName: course.instructor
-      ? `${course.instructor.firstNameAr || ''} ${course.instructor.lastNameAr || ''}`.trim()
-      : null,
     instructorRoute: course.instructor ? teacherRoute(course.instructor._id) : null,
   }
 }
@@ -141,7 +159,7 @@ async function getTeacherDetails({ id } = {}) {
 // carry no price field — course pricing questions always resolve here.
 async function getPackages() {
   const packages = await Package.find({ isActive: true })
-    .select('nameAr descriptionAr price currency durationDays sessionsPerMonth featuresAr isPopular')
+    .select('nameAr descriptionAr price durationDays sessionsPerMonth featuresAr isPopular')
     .sort({ sortOrder: 1, price: 1 })
     .lean()
 
@@ -151,7 +169,6 @@ async function getPackages() {
     name: p.nameAr,
     route: '/pricing',
     price: p.price,
-    currency: p.currency,
     durationDays: p.durationDays,
     sessionsPerMonth: p.sessionsPerMonth,
     features: p.featuresAr || [],

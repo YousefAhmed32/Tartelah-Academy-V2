@@ -257,7 +257,7 @@ export default function AdminSubscriptionsPage() {
             <label className="block text-xs font-semibold text-brand-textBody mb-1">الباقة *</label>
             <select value={form.packageId} onChange={e => setForm(p => ({ ...p, packageId: e.target.value }))} className="field-light w-full">
               <option value="">اختر باقة</option>
-              {packages.map(p => <option key={p._id} value={p._id}>{p.nameAr} — {p.price} جنيه</option>)}
+              {packages.map(p => <option key={p._id} value={p._id}>{p.nameAr} — {p.price}</option>)}
             </select>
           </div>
           <div>
@@ -273,7 +273,7 @@ export default function AdminSubscriptionsPage() {
               <input type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="field-light w-full" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-brand-textBody mb-1">المبلغ المدفوع (جنيه)</label>
+              <label className="block text-xs font-semibold text-brand-textBody mb-1">المبلغ المدفوع</label>
               <input type="number" value={form.amountPaid} onChange={e => setForm(p => ({ ...p, amountPaid: e.target.value }))} className="field-light w-full" placeholder="0" />
             </div>
           </div>
