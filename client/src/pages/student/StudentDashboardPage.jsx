@@ -102,7 +102,7 @@ export default function StudentDashboardPage() {
   }
 
   return (
-    <div dir="rtl" className="max-w-[1200px]">
+    <div dir="rtl" className="">
 
       {/* ═══ HERO GREETING ═══ */}
       <motion.div {...fadeUp(0)} className="mb-5">
@@ -141,7 +141,8 @@ export default function StudentDashboardPage() {
       </motion.div>
 
       {/* ═══ QUICK STATS ═══ */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      {/* 1 col on very small phones, 2 cols from 375px, desktop grid unchanged */}
+      <div className="grid grid-cols-1 min-[375px]:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
           { label: 'الحصص المتبقية', value: stats?.remainingSessions || 0,    color: '#16a34a', icon: <SessIcon />, },
           { label: 'نسبة الحضور',     value: `${stats?.attendanceRate || 0}%`, color: '#22c55e', icon: <AttIcon />, },
@@ -197,15 +198,15 @@ function NextSessionCard({ session, countdown }) {
 
   return (
     <div
-      className="rounded-card p-6 flex flex-col sm:flex-row sm:items-center gap-5"
+      className="rounded-card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-5"
       style={{
         background: 'linear-gradient(140deg, #3b1a8a 0%, #1d0a3f 60%, #270c5a 100%)',
         border: '1px solid rgba(124,58,237,0.3)',
         boxShadow: '0 16px 40px rgba(74,29,158,0.25)',
       }}
     >
-      {/* Countdown */}
-      <div className="flex-none flex items-center gap-3">
+      {/* Countdown — wrap on very narrow screens so digits never overflow */}
+      <div className="flex-none flex items-center flex-wrap gap-3">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center"
           style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
@@ -276,7 +277,7 @@ function NextSessionCard({ session, countdown }) {
 function NoSessionEmptyCard({ hasSubscription }) {
   return (
     <div
-      className="rounded-card p-8 flex flex-col sm:flex-row items-center gap-6 text-center sm:text-right"
+      className="rounded-card p-5 sm:p-8 flex flex-col sm:flex-row items-center gap-6 text-center sm:text-right"
       style={{
         background: 'linear-gradient(135deg, #f8f5ff 0%, #ede8fa 100%)',
         border: '1.5px dashed #d6cef0',
@@ -333,9 +334,9 @@ function QuickStat({ label, value, color, icon }) {
       >
         {icon}
       </div>
-      <div>
-        <div className="font-heading font-bold text-2xl text-brand-textBody">{value}</div>
-        <div className="text-[13px] text-[#9b7fd6] mt-0.5">{label}</div>
+      <div className="min-w-0">
+        <div className="font-heading font-bold text-2xl text-brand-textBody truncate">{value}</div>
+        <div className="text-[13px] text-[#9b7fd6] mt-0.5 truncate">{label}</div>
       </div>
     </motion.div>
   )
@@ -349,7 +350,7 @@ function LearningJourneyCard({ memPct, juz, stats }) {
   const offset = ringC * (1 - memPct / 100)
 
   return (
-    <div className="card-light p-6">
+    <div className="card-light p-4 sm:p-6">
       <div className="flex items-center justify-between mb-5">
         <h2 className="font-heading font-bold text-lg text-brand-textBody">رحلة الحفظ</h2>
         <Link to={ROUTES.STUDENT_PROGRESS} className="text-sm font-semibold text-brand-purple hover:text-brand-purpleDark">
@@ -656,9 +657,9 @@ function RecentEvalsCard({ evals }) {
       ) : (
         <div className="space-y-2.5">
           {evals.slice(0, 3).map((ev, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-[12px] bg-[#faf8ff]">
-              <div className="text-sm text-brand-textBody font-semibold">{ev.type}</div>
-              <div className="flex items-center gap-1.5">
+            <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-[12px] bg-[#faf8ff]">
+              <div className="text-sm text-brand-textBody font-semibold min-w-0 truncate">{ev.type}</div>
+              <div className="flex items-center gap-1.5 flex-none">
                 <div className="font-heading font-bold text-brand-purple text-base">{ev.score}</div>
                 <div className="text-xs text-[#9b7fd6]">/ ١٠</div>
               </div>

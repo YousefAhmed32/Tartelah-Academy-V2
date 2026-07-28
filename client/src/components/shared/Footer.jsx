@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Mail, Phone, MessageCircle, Play, CircleCheck } from 'lucide-react'
+import { Mail, Phone, MessageCircle, Play, CircleCheck, Copy } from 'lucide-react'
+import toast from 'react-hot-toast'
 import api from '../../utils/api.js'
 import { ROUTES } from '../../config/constants.js'
 
@@ -100,8 +101,8 @@ export default function Footer() {
             <div>
               <h4 style={{ fontFamily: 'Cairo', fontWeight: 700, fontSize: 15, color: '#F3E6C0', marginBottom: 18, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,.07)' }}>تواصل معنا</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <ContactItem Icon={Mail}           label={emailAddr} href={`mailto:${emailAddr}`} />
-                <ContactItem Icon={Phone}          label={phone} href={`tel:${phone.replace(/\s/g,'')}`} />
+                <ContactItem Icon={Mail}           label={emailAddr} copyValue={emailAddr} copyMessage="تم نسخ البريد الإلكتروني" />
+                <ContactItem Icon={Phone}          label={phone} copyValue={phone} copyMessage="تم نسخ رقم الهاتف" />
                 <ContactItem Icon={MessageCircle}  label="واتساب" href={`https://api.whatsapp.com/send/?phone=${whatsapp}`} />
                 <ContactItem Icon={Play}           label={youtube} href={`https://youtube.com/${youtube.startsWith('@') ? youtube : '@'+youtube}`} />
                 <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.2)' }}>
@@ -179,17 +180,68 @@ export default function Footer() {
               ))}
             </div>
           </div>
+
+          {/* Development Credit */}
+          <div
+            className="animate-fade-up"
+            style={{ borderTop: '1px solid rgba(255,255,255,.04)', padding: '24px 0', textAlign: 'center' }}
+          >
+            <p dir="ltr" style={{ margin: 0, fontSize: 12.5, fontWeight: 400, letterSpacing: '0.04em', color: '#6b5f8a' }}>
+              Platform designed and developed by{' '}
+              <a
+                href="https://yansytech.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative inline-block cursor-pointer rounded-sm font-semibold text-brand-purple transition-colors duration-300 hover:text-brand-purpleLight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple"
+              >
+                YansyTech
+                <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-brand-purpleLight transition-all duration-300 group-hover:w-full" />
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
   )
 }
 
 
-function ContactItem({ Icon, label, href }) {
+function ContactItem({ Icon, label, href, copyValue, copyMessage }) {
+  const sharedClassName = 'group relative flex items-center gap-2.5 rounded-sm text-[#a89ec8] no-underline transition-colors duration-200 hover:text-[#E8C76A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple'
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(copyValue)
+      toast.success(copyMessage, { position: 'bottom-right', duration: 2000 })
+    } catch {
+      toast.error('تعذر النسخ', { position: 'bottom-right', duration: 2000 })
+    }
+  }
+
+  if (copyValue) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`${label} — اضغط للنسخ`}
+        className={`${sharedClassName} cursor-pointer`}
+        style={{ fontSize: 14 }}
+        onClick={handleCopy}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleCopy()
+          }
+        }}
+      >
+        <Icon size={15} strokeWidth={1.8} />
+        <span>{label}</span>
+        <Copy size={13} strokeWidth={1.8} className="opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+      </div>
+    )
+  }
+
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#a89ec8', textDecoration: 'none', fontSize: 14, transition: 'color .2s' }}
-      onMouseEnter={e => { e.currentTarget.style.color = '#E8C76A' }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#a89ec8' }}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={sharedClassName} style={{ fontSize: 14 }}>
       <Icon size={15} strokeWidth={1.8} />
       <span>{label}</span>
     </a>
