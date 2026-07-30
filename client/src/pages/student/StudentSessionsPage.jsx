@@ -1,13 +1,60 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Calendar, Clock, Timer, Link2 } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import { Calendar, Clock, Timer, Link2, X } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, MEETING_PROVIDERS } from '../../config/constants.js'
+
+// A student can cancel their own upcoming session. Cancelling at least 12h
+// before the scheduled time returns the lesson credit in full; cancelling
+// later than that still deducts it (the slot was held for you) — see
+// server/src/config/lessonPolicy.js for the exact rule.
+const CANCELLABLE_SESSION_STATUSES = ['scheduled', 'missed', 'no_show']
+
+function CancelSessionModal({ session, onClose }) {
+  const qc = useQueryClient()
+  const [reason, setReason] = useState('')
+  const hoursUntil = (new Date(session.scheduledAt) - new Date()) / (60 * 60 * 1000)
+  const withinFreeWindow = hoursUntil >= 12
+
+  const mutation = useMutation({
+    mutationFn: () => api.patch(`/sessions/${session._id}/cancel`, { reason, cancelledByRole: 'student' }),
+    onSuccess: () => {
+      toast.success('تم إلغاء الحصة')
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      qc.invalidateQueries({ queryKey: ['wallet'] })
+      onClose()
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="إلغاء الحصة" size="sm"
+      footer={<>
+        <Button variant="ghost" onClick={onClose} className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent">تراجع</Button>
+        <Button variant="danger" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!reason.trim()}>تأكيد الإلغاء</Button>
+      </>}>
+      <div className="space-y-3" dir="rtl">
+        <div className={`p-3 rounded-xl text-sm ${withinFreeWindow ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+          {withinFreeWindow
+            ? 'سيتم إرجاع الحصة إلى رصيدك لأنك تلغي قبل 12 ساعة من الموعد.'
+            : 'سيتم خصم الحصة من رصيدك لأن الإلغاء بعد المهلة المسموحة (12 ساعة قبل الموعد).'}
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-brand-textBody mb-1.5">سبب الإلغاء *</label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className="field-light resize-none w-full" placeholder="اكتب سبب الإلغاء..." />
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 const tabs = [
   { key: 'upcoming', label: 'القادمة' },
@@ -60,8 +107,10 @@ export default function StudentSessionsPage() {
 }
 
 function SessionRow({ session }) {
+  const [showCancel, setShowCancel] = useState(false)
   const status = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled
   const provider = MEETING_PROVIDERS[session.meetingProvider]
+  const canCancel = CANCELLABLE_SESSION_STATUSES.includes(session.status) && isFuture(session.scheduledAt)
 
   return (
     <div className="card-light p-5 flex items-center gap-4 flex-wrap">
@@ -96,7 +145,16 @@ function SessionRow({ session }) {
             انضم للحصة
           </a>
         )}
+        {canCancel && (
+          <button
+            onClick={() => setShowCancel(true)}
+            className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 px-3 py-2 rounded-xl hover:bg-red-50 transition-colors"
+          >
+            <X size={13} /> إلغاء
+          </button>
+        )}
       </div>
+      {showCancel && <CancelSessionModal session={session} onClose={() => setShowCancel(false)} />}
     </div>
   )
 }

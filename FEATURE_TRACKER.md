@@ -2,6 +2,33 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## Lesson Wallet Architecture — Subscription/Lesson System Redesign — 2026-07-29
+
+Full detail in `PROJECT_STATUS.md`'s "Lesson Wallet Architecture" entry and `ARCHITECTURE_PLAN.md`'s Lesson Wallet section. **Wallet was previously logged as an out-of-scope entity (line below, 2026-07-11 audit) — this is that deferred work, now formally commissioned and implemented.**
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `LessonWallet` + `LessonTransaction` (append-only ledger) models | ✅ | One wallet per student; every balance movement is an immutable transaction |
+| `wallet.service.js` — idempotent atomic write chokepoint | ✅ | No multi-doc transactions available (standalone mongod, not a replica set) — idempotency keys + atomic `$inc` instead |
+| Lesson deduction matrix (`lessonDeduction.service.js`) | ✅ | Attendance-driven consumption (present/late/left_early/absent all deduct now — absent didn't before), cancellation window rule, teacher no-show compensation |
+| Student self-cancellation | ✅ | Previously hard-blocked at 403; now real, with before/after-12h-window credit logic |
+| Booking conflict prevention (`booking.service.js`) | ✅ | 409 on teacher/student double-booking; previously not implemented at all |
+| `ScheduleRule.timezone` actually applied | ✅ | Was stored but silently ignored — slot generation used server-local time; fixed via `date-fns-tz` |
+| `TeacherPayrollEntry` persisted payroll ledger | ✅ | Replaces pure live-recompute; existing payroll endpoint response shapes unchanged |
+| Subscription renewal endpoint | ✅ | `POST /subscriptions/:id/renew` — additive credit, linked renewal chain, no data loss |
+| Wallet freeze/resume (vacation/Ramadan/medical leave) | ✅ | `POST /wallet/:studentId/freeze` \| `/resume` |
+| Manual admin lesson adjustment via ledger | ✅ | `POST /wallet/:studentId/adjust` — replaces the old raw `sessionsRemaining` PATCH (removed from the allow-list; every change is now an auditable transaction) |
+| Manual compensation grant + lesson transfer between students | ✅ | `POST /wallet/:studentId/compensation` \| `/transfer` |
+| `backfillLessonWallets` migration | ✅ | Auto-runs on boot, idempotent, reconstructs wallets from historical Subscription sums |
+| `reconcile-wallets` drift-repair script | ✅ | `npm run reconcile-wallets` — dry-run by default |
+| Teacher accept/decline endpoints | ✅ (dormant) | `PATCH /sessions/:id/accept\|decline` implemented; `teacherAcceptanceStatus` defaults to `not_required` and nothing currently sets a session to `pending` — no live UI trigger yet |
+| Frontend: student wallet balance + transaction history | ✅ | `StudentSubscriptionPage.jsx` |
+| Frontend: admin wallet management (adjust/freeze/resume/compensation) | ✅ | `AdminSubscriptionsPage.jsx` adjust modal |
+| Frontend: payroll ledger browser | ✅ | `AdminTeacherPerformancePage.jsx` |
+| Frontend: student session cancellation UX | ✅ | `StudentSessionsPage.jsx` |
+| Frontend: reskin of all other dashboard pages | ⏳ | Deliberately out of scope for this pass — ~20 unrelated pages (schedule, homework, evaluations, articles, courses) work unchanged against the new backend |
+| Jest coverage for the new subsystem | ✅ | `wallet.service`, `lessonDeduction.service`, `booking.service`, `backfillLessonWallets` — all passing |
+
 ## Operations Center Full Audit & Rebuild — 2026-07-11
 
 Full detail in `docs/OPERATIONS_CENTER_AUDIT.md`.
@@ -73,7 +100,7 @@ Full detail in `FINAL_REPORT.md`.
 | `FINAL_REPORT.md` | ✅ | Full session summary |
 
 ### Known limitations carried forward / newly documented
-- Out-of-scope entities (Wallet, Payments, Certificates, Quizzes, Support Tickets, Parent role, Achievements, Classrooms) remain a business decision, not a gap in this pass.
+- Out-of-scope entities at the time (Wallet, Payments, Certificates, Quizzes, Support Tickets, Parent role, Achievements, Classrooms) were a business decision, not a gap in this pass. **Wallet was subsequently commissioned and implemented — see the "Lesson Wallet Architecture" entry at the top of this file (2026-07-29).**
 - Open business-policy question (does student absence affect teacher pay?) — unchanged, still deliberately open.
 - Query-key hygiene is now a documented convention (`API_REFERENCE.md`) to prevent this bug class from recurring.
 

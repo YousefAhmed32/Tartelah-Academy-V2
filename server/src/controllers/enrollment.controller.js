@@ -7,6 +7,7 @@ const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
 const { uploadBuffer, deleteFile } = require('../services/media.service')
+const walletService = require('../services/wallet.service')
 
 // Student: Submit enrollment request
 exports.submitRequest = async (req, res, next) => {
@@ -188,6 +189,8 @@ exports.reviewRequest = async (req, res, next) => {
         teacherId,
         startDate: start,
         endDate: end,
+        billingDate: start,
+        renewalDate: end,
         sessionsRemaining: pkg.sessionsPerMonth,
         totalSessions: pkg.sessionsPerMonth,
         amountPaid: request.amount,
@@ -195,6 +198,22 @@ exports.reviewRequest = async (req, res, next) => {
         notes: adminNotes,
         createdBy: req.user._id,
       })
+
+      // Credit the student's Lesson Wallet — the actual source of lesson
+      // entitlement (see models/LessonWallet.js). Idempotency key scoped to
+      // this enrollment request, so a retried review call never double-credits.
+      const { transaction } = await walletService.applyTransaction({
+        studentId: request.studentId._id,
+        type: 'purchase',
+        amount: pkg.sessionsPerMonth,
+        idempotencyKey: `enrollment:${request._id}:purchase`,
+        reason: `شراء باقة "${pkg.nameAr}"`,
+        relatedSubscriptionId: subscription._id,
+        performedByRole: 'admin',
+        performedBy: req.user._id,
+      })
+      subscription.walletTransactionId = transaction._id
+      await subscription.save()
 
       request.subscriptionId = subscription._id
 

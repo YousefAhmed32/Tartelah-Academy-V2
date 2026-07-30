@@ -406,8 +406,8 @@ packageId: ObjectId (ref: Package)
 status: Enum ['pending', 'active', 'expired', 'cancelled', 'paused'] (indexed)
 startDate: Date
 endDate: Date (indexed)
-sessionsRemaining: Number
-totalSessions: Number
+sessionsRemaining: Number   -- DEPRECATED, see "Lesson Wallet Architecture" below
+totalSessions: Number       -- DEPRECATED, see "Lesson Wallet Architecture" below
 paymentStatus: Enum ['paid', 'pending', 'failed']
 paymentReference: String
 notes: String
@@ -417,6 +417,95 @@ updatedAt: Date
 
 Indexes: studentId, status, endDate
 ```
+
+> **Note (2026-07-29):** `Subscription` is now a billing-cycle/purchase record only — it does not own lesson entitlement. `sessionsRemaining`/`totalSessions` are a read-only mirror maintained by `wallet.service.js`, kept for backward compatibility. See "Lesson Wallet Architecture" immediately below.
+
+---
+
+## Lesson Wallet Architecture (2026-07-29)
+
+**Why:** The original model tied a student's right to book/attend lessons to `Subscription.sessionsRemaining` and a calendar `endDate` — a full code audit established that booking was never actually gated by either, there was no renewal/refund/compensation/freeze system, and teacher payroll was recomputed live on every request with no persisted artifact. This section documents the replacement: lesson ownership lives in a durable, auditable **Lesson Wallet** per student; `Subscription` (above) is demoted to billing/purchase bookkeeping only.
+
+### LessonWallet
+```
+_id: ObjectId
+studentId: ObjectId (ref: User, unique, indexed)
+totalPurchased: Number (default 0)      -- lifetime lessons bought
+totalUsed: Number (default 0)           -- lifetime lessons consumed
+bonusLessons: Number (default 0)
+compensationLessons: Number (default 0)
+frozenLessons: Number (default 0)
+transferredIn: Number (default 0)
+transferredOut: Number (default 0)
+remaining: Number (default 0)           -- live bookable balance; NOT clamped at 0 (see note)
+status: Enum ['active', 'frozen']
+freezeReason, frozenAt, frozenBy, resumeAt
+lastTransactionAt: Date
+```
+`remaining` is a materialized cache — always reconstructable as the sum of every `LessonTransaction.amount` for this wallet. It is deliberately **not clamped at zero**: unlike the old `Subscription.sessionsRemaining` (which silently floored at 0), an over-consumed wallet goes negative and stays visible as a real, auditable signal instead of being silently absorbed.
+
+### LessonTransaction (append-only ledger)
+```
+_id: ObjectId
+walletId: ObjectId (ref: LessonWallet, indexed)
+studentId: ObjectId (ref: User, indexed)
+type: Enum ['purchase', 'consumption', 'reversal', 'refund', 'bonus', 'compensation',
+            'freeze', 'unfreeze', 'transfer_in', 'transfer_out', 'renewal',
+            'manual_adjustment', 'admin_edit', 'migration_import']
+amount: Number            -- signed: +credit / -debit
+balanceAfter: Number      -- wallet.remaining snapshot after this entry
+relatedSessionId, relatedSubscriptionId, relatedStudentId
+reason: String
+performedByRole: Enum ['system', 'admin', 'teacher', 'student']
+performedBy: ObjectId (ref: User)
+idempotencyKey: String (unique sparse)  -- e.g. "session:<id>:consume:1"
+correctsTransactionId: ObjectId (ref: LessonTransaction)
+metadata: Mixed
+createdAt, updatedAt
+```
+Never updated or deleted — a correction is a new transaction (`type:'admin_edit'`) referencing the one it corrects.
+
+### TeacherPayrollEntry (persisted payroll ledger)
+```
+_id: ObjectId
+teacherId: ObjectId (ref: User, indexed)
+sessionId: ObjectId (ref: Session, unique sparse)   -- one entry per resolved session
+type: Enum ['session_payable', 'session_non_payable', 'session_pending_review',
+            'bonus', 'penalty', 'manual_adjustment']
+amount: Number             -- signed currency amount, snapshot-priced
+rateSnapshot: Number       -- salaryPerSession at the time this entry was recorded
+status: Enum ['pending', 'approved', 'paid']
+reason, createdBy, notes
+```
+Replaces on-the-fly `count × salaryPerSession` recomputation — a payroll figure is now a query over real, auditable rows.
+
+### Write pattern — no multi-document transactions
+
+This deployment's MongoDB runs as a **standalone `mongod`** (`mongodb://localhost:27017/tartelah`), not a replica set — `mongoose.startSession()`/`withTransaction()` are not available. `wallet.service.js`'s `applyTransaction()` is the single chokepoint for every balance change: it writes the `LessonTransaction` first (guarded by a unique `idempotencyKey`, so a duplicate/retried call is a guaranteed no-op via the unique-index 11000 error), then atomically `$inc`s the `LessonWallet` counters. `server/src/scripts/reconcileWallets.js` (`npm run reconcile-wallets`, dry-run by default) recomputes wallet counters from the ledger and reports/fixes drift — the intended recovery path for the one edge case this pattern can't fully close (a crash between the two writes).
+
+### Lesson deduction matrix (`lessonDeduction.service.js`, `config/lessonPolicy.js`)
+
+| Event | Deducts? | Compensation? |
+|---|---|---|
+| Completed (present/late/left_early) | Yes | No |
+| Student no-show (absent, teacher held it) | Yes | No — teacher still paid (independent rule, unchanged) |
+| Excused absence / technical issue | No | No (admin-correctable either way) |
+| Teacher cancelled (any time) | No | Yes, auto-granted |
+| Teacher no-show (sweep-detected) | No | Yes, auto-granted |
+| Student cancels ≥12h before scheduled time | No (credit returned) | No |
+| Student cancels <12h before scheduled time | Yes | No |
+
+Student self-cancellation is a new capability (previously hard-blocked at 403 in `session.controller.js`). `CANCELLATION_WINDOW_HOURS` lives in `config/lessonPolicy.js`.
+
+### Booking conflict prevention (`booking.service.js`)
+
+`assertNoConflict()` rejects (409) any teacher/student double-booking via an interval-overlap query, called from `createSession`, `adminCreateSession`, `rescheduleSession`, and schedule-rule generation. Previously not implemented at all — only same-series-same-timestamp dedupe existed.
+
+### Not yet wired into the booking flow
+
+`Session.teacherAcceptanceStatus` (`not_required` default, `pending`/`accepted`/`declined`) and its `PATCH /sessions/:id/accept|decline` endpoints exist and are fully functional, but nothing in the current booking flow ever sets a session to `pending` — this is a dormant capability for a future "require teacher acceptance" toggle, not yet activated for any package/course.
+
+---
 
 ### Notification
 ```

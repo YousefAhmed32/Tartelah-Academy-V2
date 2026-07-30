@@ -2,7 +2,7 @@ const Attendance = require('../models/Attendance')
 const Session = require('../models/Session')
 const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
-const { syncSubscriptionConsumption } = require('./session.controller')
+const { syncLessonConsumption } = require('../services/lessonDeduction.service')
 
 exports.getTeacherAttendance = async (req, res, next) => {
   try {
@@ -39,9 +39,9 @@ exports.updateAttendance = async (req, res, next) => {
     // consumption the exact same way completion itself does (present/late
     // consumes a purchased session, everything else gives it back).
     if (req.body.status !== undefined && req.body.status !== before.status) {
-      const session = await Session.findById(record.sessionId).select('status subscriptionId studentId subscriptionConsumed')
+      const session = await Session.findById(record.sessionId).select('status subscriptionId studentId subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq')
       if (session && session.status === 'completed') {
-        await syncSubscriptionConsumption(session, record.status)
+        await syncLessonConsumption(session, record.status, { performedByRole: req.user.role, performedBy: req.user._id })
         await session.save()
       }
     }
@@ -82,7 +82,7 @@ exports.getSessionAttendance = async (req, res, next) => {
 exports.saveSessionAttendance = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.sessionId)
-      .select('studentId teacherId attendanceFinalizedAt status subscriptionId subscriptionConsumed')
+      .select('studentId teacherId attendanceFinalizedAt status subscriptionId subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq')
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
 
     if (req.user.role === 'teacher' && session.teacherId.toString() !== req.user._id.toString()) {
@@ -118,10 +118,10 @@ exports.saveSessionAttendance = async (req, res, next) => {
       session.attendanceFinalizedBy = req.user._id
     }
 
-    // Resync session consumption if this session was already completed —
-    // present/late consumes a purchased session, everything else gives it back.
+    // Resync wallet consumption if this session was already completed — see
+    // lessonDeduction.service.js for the full deduction matrix.
     if (session.status === 'completed') {
-      await syncSubscriptionConsumption(session, status)
+      await syncLessonConsumption(session, status, { performedByRole: req.user.role, performedBy: req.user._id })
     }
     if (finalize || session.status === 'completed') await session.save()
 

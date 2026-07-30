@@ -2,8 +2,8 @@ function sendSuccess(res, data = null, message = 'تمت العملية بنجا
   return res.status(statusCode).json({ success: true, message, data })
 }
 
-function sendError(res, message = 'حدث خطأ', statusCode = 500) {
-  return res.status(statusCode).json({ success: false, message })
+function sendError(res, message = 'حدث خطأ', statusCode = 500, extra = undefined) {
+  return res.status(statusCode).json({ success: false, message, ...(extra || {}) })
 }
 
 function sendPaginated(res, data, total, page, limit, message = 'تمت العملية بنجاح') {

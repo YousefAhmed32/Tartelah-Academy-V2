@@ -196,7 +196,74 @@ function assessSessionReview(session, attendance = null) {
   return { severity, reasons }
 }
 
+// Human-facing "lesson lifecycle" label, composed from the several
+// independent fields the platform already tracks (status, outcome,
+// teacherAcceptanceStatus, teacherAttendanceStatus, the student's
+// Attendance record, compensationRequired) rather than a single 18-value
+// enum. See ARCHITECTURE_PLAN.md's Lesson Wallet section for why: forking
+// the proven, deeply-wired `Session.status` enum into every requested label
+// would duplicate state that can drift out of sync — this function is the
+// single place that reconciles the real fields into one display label, so
+// API responses and the frontend timeline never have to re-derive it.
+// Returns { code, labelAr, color, isLate }.
+const TIMELINE_LABELS_AR = {
+  compensation_required: 'بحاجة لحصة تعويضية',
+  cancelled_by_student: 'ألغاها الطالب',
+  cancelled_by_teacher: 'ألغاها المعلم',
+  cancelled_by_admin: 'ألغتها الإدارة',
+  cancelled: 'ملغاة',
+  teacher_no_show: 'غياب المعلم',
+  missed: 'فائتة — بانتظار إجراء',
+  student_no_show: 'غياب الطالب',
+  completed_with_notes: 'مكتملة (مع ملاحظات)',
+  completed_without_notes: 'مكتملة',
+  started: 'جارية الآن',
+  rescheduled: 'أُعيدت جدولتها',
+  teacher_declined: 'رفضها المعلم',
+  awaiting_teacher_acceptance: 'بانتظار موافقة المعلم',
+  confirmed: 'مؤكدة',
+  waiting: 'قيد الانتظار',
+  booked: 'محجوزة',
+}
+const TIMELINE_COLORS = {
+  compensation_required: 'gold',
+  cancelled_by_student: 'gray', cancelled_by_teacher: 'gray', cancelled_by_admin: 'gray', cancelled: 'gray',
+  teacher_no_show: 'danger', missed: 'warning', student_no_show: 'warning',
+  completed_with_notes: 'success', completed_without_notes: 'success', started: 'blue',
+  rescheduled: 'purple', teacher_declined: 'danger', awaiting_teacher_acceptance: 'warning',
+  confirmed: 'blue', waiting: 'blue', booked: 'gray',
+}
+
+function getLessonTimelineLabel(session, attendance = null) {
+  const window = getSessionWindow(session.scheduledAt, session.durationMinutes || 60)
+  let code
+
+  if (session.compensationRequired) code = 'compensation_required'
+  else if (session.status === 'cancelled') {
+    if (session.outcome === 'cancelled_by_student') code = 'cancelled_by_student'
+    else if (session.outcome === 'cancelled_by_teacher') code = 'cancelled_by_teacher'
+    else if (session.outcome === 'cancelled_by_admin') code = 'cancelled_by_admin'
+    else code = 'cancelled'
+  }
+  else if (session.status === 'no_show') code = 'teacher_no_show'
+  else if (session.status === 'missed') code = 'missed'
+  else if (session.status === 'completed' && attendance?.status === 'absent') code = 'student_no_show'
+  else if (session.status === 'completed' && session.teacherNotes) code = 'completed_with_notes'
+  else if (session.status === 'completed') code = 'completed_without_notes'
+  else if (session.status === 'ongoing') code = 'started'
+  else if (session.rescheduledFrom && session.status === 'scheduled') code = 'rescheduled'
+  else if (session.teacherAcceptanceStatus === 'declined') code = 'teacher_declined'
+  else if (session.teacherAcceptanceStatus === 'pending') code = 'awaiting_teacher_acceptance'
+  else if (session.teacherAcceptanceStatus === 'accepted') code = 'confirmed'
+  else if (['pre_session', 'in_progress'].includes(window.phase)) code = 'waiting'
+  else code = 'booked'
+
+  const isLate = attendance?.status === 'late' || session.teacherAttendanceStatus === 'late'
+
+  return { code, labelAr: TIMELINE_LABELS_AR[code], color: TIMELINE_COLORS[code], isLate }
+}
+
 module.exports = {
-  computeConfidence, computePayrollStatus, assessSessionReview,
+  computeConfidence, computePayrollStatus, assessSessionReview, getLessonTimelineLabel,
   RESOLVED_SESSION_STATUSES, PAYABLE_CHECKIN_STATUSES, SEVERITY_RANK,
 }

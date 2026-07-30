@@ -5,6 +5,7 @@ const User = require('../models/User')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
+const walletService = require('../services/wallet.service')
 
 exports.getMySubscription = async (req, res, next) => {
   try {
@@ -26,9 +27,20 @@ exports.createSubscription = async (req, res, next) => {
     const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
     const sub = await Subscription.create({
       studentId, packageId, packageNameAr: pkg.nameAr, teacherId, startDate: start, endDate: end,
+      billingDate: start, renewalDate: end,
       sessionsRemaining: pkg.sessionsPerMonth, totalSessions: pkg.sessionsPerMonth,
       amountPaid: pkg.price, notes, createdBy: req.user._id,
     })
+
+    const { transaction } = await walletService.applyTransaction({
+      studentId, type: 'purchase', amount: pkg.sessionsPerMonth,
+      idempotencyKey: `subscription:${sub._id}:purchase`,
+      reason: `شراء باقة "${pkg.nameAr}"`,
+      relatedSubscriptionId: sub._id, performedByRole: 'admin', performedBy: req.user._id,
+    })
+    sub.walletTransactionId = transaction._id
+    await sub.save()
+
     await sub.populate(['packageId', 'studentId', 'teacherId'])
     await Notification.create({ userId: studentId, titleAr: 'تم تفعيل الاشتراك', bodyAr: `تم تفعيل باقة "${pkg.nameAr}"`, type: 'subscription' })
 
@@ -38,6 +50,61 @@ exports.createSubscription = async (req, res, next) => {
     })
 
     sendSuccess(res, sub, 'تم إنشاء الاشتراك', 201)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// Renew an existing subscription: creates a NEW billing-cycle Subscription
+// document (never mutates or zeroes the old one) and credits the wallet
+// additively — existing remaining lessons and full transaction history are
+// preserved, satisfying "renewal must merge, not reset."
+exports.renewSubscription = async (req, res, next) => {
+  try {
+    const existing = await Subscription.findById(req.params.id).populate('packageId')
+    if (!existing) return sendError(res, 'الاشتراك غير موجود', 404)
+
+    const packageId = req.body.packageId || existing.packageId._id
+    const pkg = req.body.packageId ? await Package.findById(packageId) : existing.packageId
+    if (!pkg) return sendError(res, 'الباقة غير موجودة', 404)
+
+    const start = req.body.startDate ? new Date(req.body.startDate) : new Date()
+    const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
+
+    const renewed = await Subscription.create({
+      studentId: existing.studentId, packageId: pkg._id, packageNameAr: pkg.nameAr,
+      teacherId: req.body.teacherId || existing.teacherId,
+      startDate: start, endDate: end, billingDate: start, renewalDate: end,
+      sessionsRemaining: 0, totalSessions: 0, // wallet-mirrored below, not a fresh grant on the OLD doc
+      amountPaid: pkg.price, notes: req.body.notes,
+      createdBy: req.user._id, renewedFromSubscriptionId: existing._id,
+      status: 'active',
+    })
+    existing.renewsIntoSubscriptionId = renewed._id
+    await existing.save()
+
+    const { transaction } = await walletService.applyTransaction({
+      studentId: existing.studentId, type: 'renewal', amount: pkg.sessionsPerMonth,
+      idempotencyKey: `subscription:${renewed._id}:renew`,
+      reason: `تجديد باقة "${pkg.nameAr}"`,
+      relatedSubscriptionId: renewed._id, performedByRole: 'admin', performedBy: req.user._id,
+    })
+    renewed.walletTransactionId = transaction._id
+    await renewed.save()
+    await renewed.populate(['packageId', 'studentId', 'teacherId'])
+
+    await Notification.create({
+      userId: existing.studentId, titleAr: 'تم تجديد الاشتراك',
+      bodyAr: `تم تجديد باقتك "${pkg.nameAr}" وإضافة الحصص الجديدة إلى رصيدك الحالي`, type: 'subscription',
+    })
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'subscription.renew',
+      entity: 'Subscription', entityId: renewed._id,
+      changes: { renewedFrom: existing._id, packageId: pkg._id }, ip: req.ip,
+    })
+
+    sendSuccess(res, renewed, 'تم تجديد الاشتراك بنجاح', 201)
   } catch (err) {
     next(err)
   }
@@ -68,14 +135,16 @@ exports.getAllSubscriptions = async (req, res, next) => {
   }
 }
 
+// NOTE: sessionsRemaining/totalSessions are intentionally NOT in the allow-list
+// below — they are a deprecated, wallet.service-maintained mirror (see
+// models/Subscription.js). Manual lesson-balance adjustments now go through
+// POST /api/wallet/:studentId/adjust, which creates an auditable
+// LessonTransaction instead of silently overwriting a number.
 exports.updateSubscription = async (req, res, next) => {
   try {
-    const allowed = ['status', 'sessionsRemaining', 'totalSessions', 'endDate', 'teacherId', 'notes', 'amountPaid']
+    const allowed = ['status', 'endDate', 'teacherId', 'notes', 'amountPaid']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
-    if (updates.sessionsRemaining !== undefined) {
-      updates.sessionsRemaining = Math.max(0, Number(updates.sessionsRemaining))
-    }
     const sub = await Subscription.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
       .populate('studentId', 'firstNameAr lastNameAr')
       .populate('teacherId', 'firstNameAr lastNameAr')
@@ -93,24 +162,3 @@ exports.updateSubscription = async (req, res, next) => {
   }
 }
 
-exports.createSubscriptionExtra = async (req, res, next) => {
-  try {
-    const { studentId, packageId, teacherId, startDate, notes, sessionsRemaining, amountPaid } = req.body
-    const pkg = await Package.findById(packageId)
-    if (!pkg) return sendError(res, 'الباقة غير موجودة', 404)
-    const start = startDate ? new Date(startDate) : new Date()
-    const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
-    const sub = await Subscription.create({
-      studentId, packageId, packageNameAr: pkg.nameAr, teacherId, startDate: start, endDate: end,
-      sessionsRemaining: sessionsRemaining !== undefined ? Number(sessionsRemaining) : pkg.sessionsPerMonth,
-      totalSessions: pkg.sessionsPerMonth,
-      amountPaid: amountPaid !== undefined ? Number(amountPaid) : pkg.price,
-      notes, createdBy: req.user._id,
-    })
-    await sub.populate(['packageId', 'studentId', 'teacherId'])
-    await Notification.create({ userId: studentId, titleAr: 'تم تفعيل الاشتراك', bodyAr: `تم تفعيل باقة "${pkg.nameAr}"`, type: 'subscription' })
-    sendSuccess(res, sub, 'تم إنشاء الاشتراك', 201)
-  } catch (err) {
-    next(err)
-  }
-}

@@ -1,7 +1,9 @@
 const mongoose = require('mongoose')
 const Session = require('../models/Session')
 const User = require('../models/User')
+const TeacherPayrollEntry = require('../models/TeacherPayrollEntry')
 const { buildSearchFilter } = require('../utils/pagination')
+const payrollLedger = require('./payrollLedger.service')
 
 // Sessions where the teacher actually taught (used for salary + punctuality)
 const RESOLVED_STATUSES = ['completed', 'no_show']
@@ -48,16 +50,20 @@ async function getAttendanceSummary(teacherId, { from, to } = {}) {
 }
 
 /**
- * Salary owed to a teacher for a period: (on_time + late sessions) × salaryPerSession.
- * Absent sessions are unpaid. Excused sessions don't generate pay (teacher didn't teach)
- * but aren't held against punctuality either.
+ * Salary owed to a teacher for a period — sourced from the persisted
+ * TeacherPayrollEntry ledger (see payrollLedger.service.js), not a live
+ * recount, so the amount reflects whatever rate was actually snapshotted
+ * when each session resolved (a later salaryPerSession change never
+ * silently rewrites historical payroll). Absent sessions are unpaid.
+ * Excused sessions don't generate pay (teacher didn't teach) but aren't
+ * held against punctuality either.
  */
 async function getSalaryBreakdown(teacherId, { from, to } = {}) {
   const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession')
   if (!teacher) return null
   const rate = teacher.salaryPerSession || 0
   const summary = await getAttendanceSummary(teacherId, { from, to })
-  const payableSessions = summary.on_time + summary.late
+  const { totalAmount, payableSessions } = await payrollLedger.getEarnedAmount(teacherId, { from, to })
 
   return {
     teacherId: teacher._id,
@@ -66,7 +72,7 @@ async function getSalaryBreakdown(teacherId, { from, to } = {}) {
     payableSessions,
     unpaidAbsences: summary.absent,
     excusedSessions: summary.excused,
-    totalAmount: payableSessions * rate,
+    totalAmount,
     currency: 'EGP',
     summary,
   }
@@ -191,7 +197,7 @@ async function getSalaryReport({ from, to } = {}) {
 }
 
 /** Admin manual correction of a specific session's teacher-attendance status. */
-async function correctAttendance(sessionId, { status, notes, payrollStatus, payrollStatusReason }) {
+async function correctAttendance(sessionId, { status, notes, payrollStatus, payrollStatusReason, correctedBy }) {
   const session = await Session.findById(sessionId)
   if (!session) return null
   if (status) session.teacherAttendanceStatus = status
@@ -205,6 +211,7 @@ async function correctAttendance(sessionId, { status, notes, payrollStatus, payr
     session.payrollStatusReason = payrollStatusReason || 'تصحيح يدوي من الإدارة'
     session.payrollStatusSetBy = 'admin'
     session.payrollStatusSetAt = new Date()
+    await payrollLedger.recordEntry(session, { payrollStatus, reason: session.payrollStatusReason, createdBy: correctedBy })
   }
 
   await session.save()
@@ -212,31 +219,51 @@ async function correctAttendance(sessionId, { status, notes, payrollStatus, payr
 }
 
 /**
- * Payroll-readiness breakdown for one teacher over a period — counts and
- * amounts grouped by the stored payrollStatus field (system-computed by
- * default, durable once an admin corrects it). This is the concrete answer
- * to "how many payable sessions did this teacher teach this month, and
- * what's still pending review."
+ * Payroll-readiness breakdown for one teacher over a period. `pending`/
+ * `excluded` counts still come from live Session.payrollStatus (those never
+ * produce a ledger entry — see payrollLedger.service.js recordEntry), while
+ * `payable`/`non_payable`/`pending_review` counts and the estimated amount
+ * are sourced from the persisted TeacherPayrollEntry ledger, so the number
+ * reflects real recorded entries rather than a live recount.
  */
 async function getPayrollReadiness(teacherId, { from, to } = {}) {
   const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession')
   if (!teacher) return null
   const rate = teacher.salaryPerSession || 0
 
-  const rows = await Session.aggregate([
-    { $match: { teacherId: toObjectId(teacherId), ...dateRangeMatch(from, to) } },
-    { $group: { _id: '$payrollStatus', count: { $sum: 1 } } },
+  const [sessionRows, ledgerRows] = await Promise.all([
+    Session.aggregate([
+      { $match: { teacherId: toObjectId(teacherId), payrollStatus: { $in: ['pending', 'excluded'] }, ...dateRangeMatch(from, to) } },
+      { $group: { _id: '$payrollStatus', count: { $sum: 1 } } },
+    ]),
+    TeacherPayrollEntry.aggregate([
+      {
+        $match: {
+          teacherId: toObjectId(teacherId),
+          ...(from || to ? { createdAt: { ...(from ? { $gte: new Date(from) } : {}), ...(to ? { $lte: new Date(to) } : {}) } } : {}),
+        },
+      },
+      { $group: { _id: '$type', count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+    ]),
   ])
 
   const counts = { pending: 0, payable: 0, non_payable: 0, pending_review: 0, excluded: 0 }
-  rows.forEach(r => { if (r._id in counts) counts[r._id] = r.count })
+  sessionRows.forEach(r => { if (r._id in counts) counts[r._id] = r.count })
+  const LEDGER_TYPE_TO_STATUS = { session_payable: 'payable', session_non_payable: 'non_payable', session_pending_review: 'pending_review' }
+  let estimatedAmount = 0
+  ledgerRows.forEach(r => {
+    const status = LEDGER_TYPE_TO_STATUS[r._id]
+    if (!status) return
+    counts[status] = r.count
+    if (status === 'payable') estimatedAmount = r.amount
+  })
 
   return {
     teacherId: teacher._id,
     teacherName: `${teacher.firstNameAr} ${teacher.lastNameAr}`,
     salaryPerSession: rate,
     ...counts,
-    estimatedAmount: counts.payable * rate,
+    estimatedAmount,
     currency: 'EGP',
   }
 }
@@ -250,6 +277,27 @@ async function getOrgWidePayrollReadiness({ from, to } = {}) {
   return rows.filter(Boolean)
 }
 
+/** Paginated, filterable browser over the persisted TeacherPayrollEntry ledger. */
+async function getPayrollLedger({ teacherId, from, to, type, status, page = 1, limit = 20 } = {}) {
+  const filter = {}
+  if (teacherId) filter.teacherId = toObjectId(teacherId)
+  if (type) filter.type = type
+  if (status) filter.status = status
+  if (from || to) {
+    filter.createdAt = {}
+    if (from) filter.createdAt.$gte = new Date(from)
+    if (to) filter.createdAt.$lte = new Date(to)
+  }
+  const skip = (page - 1) * limit
+  const [entries, total] = await Promise.all([
+    TeacherPayrollEntry.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+      .populate('teacherId', 'firstNameAr lastNameAr avatar')
+      .populate('sessionId', 'titleAr scheduledAt'),
+    TeacherPayrollEntry.countDocuments(filter),
+  ])
+  return { entries, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / limit) }
+}
+
 module.exports = {
   getAttendanceSummary,
   getSalaryBreakdown,
@@ -261,4 +309,5 @@ module.exports = {
   correctAttendance,
   getPayrollReadiness,
   getOrgWidePayrollReadiness,
+  getPayrollLedger,
 }

@@ -4,6 +4,8 @@ const User = require('../models/User')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { POLICY } = require('../config/attendancePolicy')
 const { computePayrollStatus } = require('../services/sessionIntelligence.service')
+const { handleTeacherNoShow } = require('../services/lessonDeduction.service')
+const payrollLedger = require('../services/payrollLedger.service')
 
 // Graduated, forgiving sweep — see docs/INTELLIGENT_ATTENDANCE_SYSTEM.md
 // "Human-Centered Flexible Time Windows". A teacher is never punished the
@@ -33,7 +35,7 @@ async function sweepStale() {
   // below, so excluding it here avoids scanning the whole forward-scheduled
   // calendar (the majority of the collection) every 10 minutes.
   const stale = await Session.find({ status: 'scheduled', scheduledAt: { $lte: now } })
-    .select('_id teacherId studentId titleAr scheduledAt durationMinutes status teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy')
+    .select('_id teacherId studentId subscriptionId titleAr scheduledAt durationMinutes status teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq compensationGrantedTransactionId compensationRequired compensationReason')
     .populate('teacherId', 'firstNameAr lastNameAr')
 
   for (const session of stale) {
@@ -69,7 +71,11 @@ async function sweepStale() {
       session.payrollStatusReason = reason
       session.payrollStatusSetBy = 'system'
       session.payrollStatusSetAt = now
+      await payrollLedger.recordEntry(session, { payrollStatus, reason })
     }
+    // Teacher no-show never costs the student a lesson and auto-grants a
+    // compensation credit — see lessonDeduction.service.js.
+    await handleTeacherNoShow(session, { reason: 'غياب المعلم — تم رصده تلقائياً' })
     await session.save()
     flaggedAbsent++
 

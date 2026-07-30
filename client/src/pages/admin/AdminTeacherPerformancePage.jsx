@@ -4,17 +4,90 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
-  Search, Download, FileText, Award, Users, Wallet, TrendingUp, ChevronUp, ChevronDown,
+  Search, Download, FileText, Award, Users, Wallet, TrendingUp, ChevronUp, ChevronDown, BookOpen,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
+import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
-import { formatDateAr } from '../../utils/date.js'
+import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency, formatNumber } from '../../utils/format.js'
 import { exportRowsToCSV, exportReportToPDF } from '../../utils/exportUtils.js'
 import { ROUTES, PAYROLL_STATUS } from '../../config/constants.js'
 import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
+import { QK } from '../../services/queryKeys.js'
+
+const LEDGER_TYPE_LABELS = {
+  session_payable: 'حصة مستحقة الدفع',
+  session_non_payable: 'حصة غير مستحقة',
+  session_pending_review: 'بانتظار المراجعة',
+  bonus: 'مكافأة', penalty: 'خصم', manual_adjustment: 'تعديل يدوي',
+}
+
+// Persisted payroll ledger browser — sourced from TeacherPayrollEntry (see
+// payrollLedger.service.js), a real recorded artifact per resolved session
+// rather than a live recount. Gives admins the raw audit trail behind the
+// aggregate table above.
+function PayrollLedgerSection({ periodRange }) {
+  const [page, setPage] = useState(1)
+  const [open, setOpen] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: QK.PAYROLL_LEDGER({ from: periodRange.from, to: periodRange.to, page }),
+    queryFn: () => api.get('/admin/payroll/ledger', {
+      params: { from: periodRange.from, to: periodRange.to, page, limit: 10 },
+    }).then(r => r.data.data),
+    enabled: open,
+  })
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-4">
+        <div className="flex items-center gap-2">
+          <BookOpen size={16} className="text-violet-600" />
+          <span className="font-bold text-sm text-gray-900">سجل الرواتب (Payroll Ledger)</span>
+        </div>
+        {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+      </button>
+      {open && (
+        <div className="border-t border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {['المعلم', 'الحصة', 'النوع', 'المبلغ', 'الحالة', 'التاريخ'].map(h => (
+                  <th key={h} className="text-right px-4 py-2.5 text-[11px] font-bold text-gray-400 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.entries || []).map(entry => (
+                <tr key={entry._id} className="border-b border-gray-50 last:border-0">
+                  <td className="px-4 py-2.5 font-semibold text-gray-800">{entry.teacherId?.firstNameAr} {entry.teacherId?.lastNameAr}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500">{entry.sessionId?.titleAr || '—'}</td>
+                  <td className="px-4 py-2.5 text-xs">{LEDGER_TYPE_LABELS[entry.type] || entry.type}</td>
+                  <td className="px-4 py-2.5 font-heading font-bold text-gray-900" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(entry.amount, 'EGP')}</td>
+                  <td className="px-4 py-2.5"><Badge variant={entry.status === 'paid' ? 'success' : entry.status === 'approved' ? 'blue' : 'gray'}>{entry.status}</Badge></td>
+                  <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{formatDateAr(entry.createdAt)} {formatTimeAr(entry.createdAt)}</td>
+                </tr>
+              ))}
+              {!data?.entries?.length && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">لا توجد قيود رواتب لهذه الفترة</td></tr>
+              )}
+            </tbody>
+          </table>
+          {data?.totalPages > 1 && (
+            <div className="flex justify-center gap-2 py-3">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 border border-gray-200 disabled:opacity-40">السابق</button>
+              <span className="px-2 py-1.5 text-xs text-gray-500">{page} / {data.totalPages}</span>
+              <button disabled={page >= data.totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 border border-gray-200 disabled:opacity-40">التالي</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function getPeriodRange(preset) {
   const now = new Date()
@@ -290,6 +363,8 @@ export default function AdminTeacherPerformancePage() {
             className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-white border border-gray-200 disabled:opacity-40">التالي</button>
         </div>
       )}
+
+      <PayrollLedgerSection periodRange={periodRange} />
     </div>
   )
 }

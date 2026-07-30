@@ -1,14 +1,17 @@
 const Session = require('../models/Session')
 const Attendance = require('../models/Attendance')
-const Subscription = require('../models/Subscription')
 const Evaluation = require('../models/Evaluation')
 const Homework = require('../models/Homework')
-const { createNotification } = require('../services/notification.service')
+const User = require('../models/User')
+const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { classifyCheckIn, getSessionWindow } = require('../config/attendancePolicy')
-const { computePayrollStatus, computeConfidence, assessSessionReview } = require('../services/sessionIntelligence.service')
+const { computePayrollStatus, computeConfidence, assessSessionReview, getLessonTimelineLabel } = require('../services/sessionIntelligence.service')
 const { logAction } = require('../services/audit.service')
+const lessonDeduction = require('../services/lessonDeduction.service')
+const payrollLedger = require('../services/payrollLedger.service')
+const bookingService = require('../services/booking.service')
 
 function isOwnerOrAdmin(session, user) {
   return user.role === 'admin' || session.teacherId.toString() === user._id.toString()
@@ -16,86 +19,18 @@ function isOwnerOrAdmin(session, user) {
 
 // Applies the system-computed payroll status unless an admin has already
 // made a durable manual decision — once payrollStatusSetBy is 'admin', the
-// session is never silently overwritten by automatic recomputation.
-function applySystemPayrollStatus(session) {
+// session is never silently overwritten by automatic recomputation. Also
+// records the persisted payroll-ledger artifact (see payrollLedger.service.js)
+// so a payroll run has something real to read instead of a live recount.
+async function applySystemPayrollStatus(session) {
   if (session.payrollStatusSetBy === 'admin') return
   const { payrollStatus, reason } = computePayrollStatus(session)
   session.payrollStatus = payrollStatus
   session.payrollStatusReason = reason
   session.payrollStatusSetBy = 'system'
   session.payrollStatusSetAt = new Date()
+  await payrollLedger.recordEntry(session, { payrollStatus, reason })
 }
-
-// Scope the decrement to this session's own subscription when known; fall
-// back to the legacy studentId+active lookup for older ad-hoc sessions
-// created before subscriptionId was populated on generation.
-async function decrementSubscriptionSessions(session) {
-  if (session.subscriptionId) {
-    await Subscription.findOneAndUpdate(
-      { _id: session.subscriptionId },
-      { $inc: { sessionsRemaining: -1 } }
-    )
-  } else {
-    await Subscription.findOneAndUpdate(
-      { studentId: session.studentId, status: 'active' },
-      { $inc: { sessionsRemaining: -1 } }
-    )
-  }
-}
-
-async function incrementSubscriptionSessions(session) {
-  if (session.subscriptionId) {
-    await Subscription.findOneAndUpdate(
-      { _id: session.subscriptionId },
-      { $inc: { sessionsRemaining: 1 } }
-    )
-  } else {
-    await Subscription.findOneAndUpdate(
-      { studentId: session.studentId, status: 'active' },
-      { $inc: { sessionsRemaining: 1 } }
-    )
-  }
-}
-
-// Business rule: a purchased session is consumed by present/late attendance
-// (the student was taught) — absent, excused, and cancelled sessions never
-// consume one. `left_early` counts as attended (the class was delivered, the
-// student just didn't stay the full duration); `technical_issue` is left
-// non-consuming so an admin makes the call, consistent with its
-// pending_review handling in the payroll flow.
-const CONSUMING_ATTENDANCE_STATUSES = ['present', 'late', 'left_early']
-
-// Reverses this session's consumption unconditionally (used when a session
-// that had already been consumed turns out not to qualify — e.g. an
-// attendance correction, or a defensive cancellation path).
-async function releaseSubscriptionSession(session) {
-  if (!session.subscriptionConsumed) return
-  await incrementSubscriptionSessions(session)
-  session.subscriptionConsumed = false
-  session.subscriptionConsumedAt = null
-}
-
-// Applies or reverses this session's consumption of a purchased session
-// based on the student's CURRENT attendance status. Idempotent — only
-// touches the Subscription when the consumed flag actually needs to flip,
-// so re-running with the same status is a no-op, and a later attendance
-// correction (e.g. present -> absent) automatically gives the session back.
-// Mutates `session` in memory only — caller must still session.save() it.
-async function syncSubscriptionConsumption(session, attendanceStatus) {
-  const shouldConsume = CONSUMING_ATTENDANCE_STATUSES.includes(attendanceStatus)
-  if (shouldConsume && !session.subscriptionConsumed) {
-    await decrementSubscriptionSessions(session)
-    session.subscriptionConsumed = true
-    session.subscriptionConsumedAt = new Date()
-  } else if (!shouldConsume) {
-    await releaseSubscriptionSession(session)
-  }
-}
-
-// Exposed for reuse from attendance.controller.js — a post-hoc admin/teacher
-// attendance correction on an already-completed session must resync
-// consumption the exact same way completion itself does.
-exports.syncSubscriptionConsumption = syncSubscriptionConsumption
 
 const ATTENDANCE_STATUS_LABEL_AR = {
   present: 'حاضر', absent: 'غائب', late: 'متأخر', excused: 'معذور',
@@ -106,6 +41,7 @@ exports.createSession = async (req, res, next) => {
   try {
     const { studentId, titleAr, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
     const teacherId = req.user._id
+    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt, durationMinutes,
       meetingLink, meetingProvider, notes,
@@ -123,6 +59,7 @@ exports.createSession = async (req, res, next) => {
     })
     sendSuccess(res, session, 'تمت جدولة الحصة بنجاح', 201)
   } catch (err) {
+    if (err.name === 'BookingConflictError') return sendError(res, err.message, err.statusCode, { conflictingSessionId: err.conflictingSessionId })
     next(err)
   }
 }
@@ -138,7 +75,8 @@ exports.getSession = async (req, res, next) => {
     const window = getSessionWindow(session.scheduledAt, session.durationMinutes)
     const confidence = computeConfidence(session, attendance)
     const reviewAssessment = req.user.role === 'admin' ? assessSessionReview(session, attendance) : null
-    sendSuccess(res, { ...session.toObject(), attendance: attendance || null, window, confidence, reviewAssessment })
+    const timeline = getLessonTimelineLabel(session, attendance)
+    sendSuccess(res, { ...session.toObject(), attendance: attendance || null, window, confidence, reviewAssessment, timeline })
   } catch (err) {
     next(err)
   }
@@ -339,7 +277,7 @@ exports.completeSession = async (req, res, next) => {
       session.teacherAttendanceMarkedBy = 'system'
     }
 
-    applySystemPayrollStatus(session)
+    await applySystemPayrollStatus(session)
 
     // Only auto-create attendance as an unconfirmed 'present' draft if not
     // already recorded — this is NOT the same as the teacher explicitly
@@ -358,9 +296,11 @@ exports.completeSession = async (req, res, next) => {
       })
     }
 
-    // Session consumption follows the student's recorded attendance —
-    // present/late consumes a purchased session, absent/excused does not.
-    await syncSubscriptionConsumption(session, attendance.status)
+    // Wallet consumption follows the student's recorded attendance — see
+    // lessonDeduction.service.js for the full deduction matrix (present/
+    // late/left_early/absent all consume a lesson, excused/technical_issue
+    // don't).
+    await lessonDeduction.syncLessonConsumption(session, attendance.status, { performedByRole: req.user.role, performedBy: req.user._id })
     await session.save()
 
     logAction({
@@ -425,11 +365,11 @@ exports.finishSession = async (req, res, next) => {
     }
     session.attendanceFinalizedAt = now
     session.attendanceFinalizedBy = req.user._id
-    applySystemPayrollStatus(session)
+    await applySystemPayrollStatus(session)
 
-    // Session consumption follows the student's recorded attendance —
-    // present/late consumes a purchased session, absent/excused does not.
-    await syncSubscriptionConsumption(session, attendanceStatus)
+    // Wallet consumption follows the student's recorded attendance — see
+    // lessonDeduction.service.js for the full deduction matrix.
+    await lessonDeduction.syncLessonConsumption(session, attendanceStatus, { performedByRole: req.user.role, performedBy: req.user._id })
     await session.save()
 
     // 3) Optional evaluation.
@@ -487,45 +427,58 @@ exports.finishSession = async (req, res, next) => {
 }
 
 // Official cancellation — only possible BEFORE a session has started
-// (teacher or admin). Requires an explicit reason and records who cancelled
-// it and when. Cancelled sessions never count for teacher pay or student
-// session consumption.
+// (teacher, admin, or — as of the Lesson Wallet redesign — the student
+// themself). Requires an explicit reason. Wallet impact depends on WHO
+// cancelled and, for students, WHEN — see lessonDeduction.service.js
+// handleCancellation for the full before/after-window rule.
 const CANCELLABLE_STATUSES = ['scheduled', 'missed', 'no_show']
 
 exports.cancelSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
     const isAdmin = req.user.role === 'admin'
-    if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    const isTeacherOwner = req.user.role === 'teacher' && session.teacherId.toString() === req.user._id.toString()
+    const isStudentOwner = req.user.role === 'student' && session.studentId.toString() === req.user._id.toString()
+    if (!isAdmin && !isTeacherOwner && !isStudentOwner) return sendError(res, 'غير مصرح', 403)
+
     if (!CANCELLABLE_STATUSES.includes(session.status)) {
       return sendError(res, 'لا يمكن إلغاء حصة بدأت أو اكتملت بالفعل', 400)
     }
     const reason = (req.body.reason || '').trim()
     if (!reason) return sendError(res, 'سبب الإلغاء مطلوب', 400)
 
+    // Effective cancelling party for wallet/outcome purposes: the student
+    // themself, or an admin explicitly acting on the student's behalf
+    // (req.body.cancelledByRole:'student'), or the teacher/admin otherwise.
+    const cancelledByRole = isStudentOwner
+      ? 'student'
+      : (isAdmin && req.body.cancelledByRole === 'student' ? 'student' : (isAdmin ? 'admin' : 'teacher'))
+
     session.status = 'cancelled'
     session.cancelledAt = new Date()
     session.cancelReason = reason
     session.cancelledBy = req.user._id
-    session.outcome = req.body.cancelledByRole === 'student'
+    session.outcome = cancelledByRole === 'student'
       ? 'cancelled_by_student'
-      : (isAdmin ? 'cancelled_by_admin' : 'cancelled_by_teacher')
+      : (cancelledByRole === 'admin' ? 'cancelled_by_admin' : 'cancelled_by_teacher')
     if (session.payrollStatusSetBy !== 'admin') {
       session.payrollStatus = 'excluded'
       session.payrollStatusReason = 'الحصة ملغاة'
       session.payrollStatusSetBy = 'system'
       session.payrollStatusSetAt = new Date()
     }
-    // A cancelled session never consumes a purchased session — reverse any
-    // prior consumption on the rare path where one was already recorded.
-    await releaseSubscriptionSession(session)
+
+    const walletImpact = await lessonDeduction.handleCancellation(session, {
+      cancelledByRole, now: new Date(), reason, performedBy: req.user._id,
+    })
     await session.save()
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.cancel',
       entity: 'Session', entityId: session._id,
-      changes: { reason: session.cancelReason, outcome: session.outcome }, ip: req.ip,
+      changes: { reason: session.cancelReason, outcome: session.outcome, walletImpact }, ip: req.ip,
     })
 
     await createNotification({
@@ -551,6 +504,10 @@ exports.rescheduleSession = async (req, res, next) => {
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
     const isAdmin = req.user.role === 'admin'
     if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    await bookingService.assertNoConflict({
+      teacherId: session.teacherId, studentId: session.studentId,
+      scheduledAt: newDate, durationMinutes: session.durationMinutes, excludeSessionId: session._id,
+    })
     const previousDate = session.scheduledAt
     session.rescheduledFrom = session.scheduledAt
     session.scheduledAt = new Date(newDate)
@@ -575,6 +532,7 @@ exports.rescheduleSession = async (req, res, next) => {
 
     sendSuccess(res, session, 'تم إعادة جدولة الحصة')
   } catch (err) {
+    if (err.name === 'BookingConflictError') return sendError(res, err.message, err.statusCode, { conflictingSessionId: err.conflictingSessionId })
     next(err)
   }
 }
@@ -619,6 +577,7 @@ exports.adminUpdateSession = async (req, res, next) => {
 exports.adminCreateSession = async (req, res, next) => {
   try {
     const { studentId, teacherId, titleAr, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
+    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt,
       durationMinutes: durationMinutes || 60,
@@ -646,6 +605,65 @@ exports.adminCreateSession = async (req, res, next) => {
       type: 'session', priority: 'medium', relatedId: session._id,
     })
     sendSuccess(res, session, 'تمت جدولة الحصة بنجاح', 201)
+  } catch (err) {
+    if (err.name === 'BookingConflictError') return sendError(res, err.message, err.statusCode, { conflictingSessionId: err.conflictingSessionId })
+    next(err)
+  }
+}
+
+// Teacher: accept or decline an assigned lesson. Only meaningful when the
+// session was created with teacherAcceptanceStatus:'pending' (opt-in — a
+// normal session, which defaults to 'not_required', is unaffected and needs
+// no acceptance step, preserving today's behavior for existing flows).
+exports.acceptSession = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+    if (session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    if (session.teacherAcceptanceStatus !== 'pending') return sendError(res, 'لا تحتاج هذه الحصة لموافقة', 400)
+
+    session.teacherAcceptanceStatus = 'accepted'
+    session.teacherAcceptanceRespondedAt = new Date()
+    await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.accept',
+      entity: 'Session', entityId: session._id, ip: req.ip,
+    })
+
+    sendSuccess(res, session, 'تم قبول الحصة')
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.declineSession = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+    if (session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    if (session.teacherAcceptanceStatus !== 'pending') return sendError(res, 'لا تحتاج هذه الحصة لموافقة', 400)
+
+    session.teacherAcceptanceStatus = 'declined'
+    session.teacherAcceptanceRespondedAt = new Date()
+    await session.save()
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'session.decline',
+      entity: 'Session', entityId: session._id, changes: { reason: req.body.reason }, ip: req.ip,
+    })
+
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id')
+    if (admins.length) {
+      await createNotifications(admins.map(admin => ({
+        userId: admin._id,
+        titleAr: 'رفض معلم لحصة',
+        bodyAr: `رفض المعلم حصة "${session.titleAr}"${req.body.reason ? ` — ${req.body.reason}` : ''} — تحتاج لإعادة تعيين`,
+        type: 'session', priority: 'high', relatedId: session._id,
+      })))
+    }
+
+    sendSuccess(res, session, 'تم رفض الحصة وتنبيه الإدارة')
   } catch (err) {
     next(err)
   }

@@ -1,4 +1,7 @@
 const Session = require('../models/Session')
+const { fromZonedTime } = require('date-fns-tz')
+
+function pad2(n) { return String(n).padStart(2, '0') }
 
 /**
  * Generates an array of scheduled Date objects based on a ScheduleRule definition.
@@ -13,9 +16,9 @@ function generateDates(rule, overrideLimit) {
     endDate,
     sessionsTotal,
     skipDates = [],
+    timezone = 'Asia/Riyadh',
   } = rule
 
-  const [hours = 18, minutes = 0] = timeOfDay.split(':').map(Number)
   const skipSet = new Set(skipDates.map(d => new Date(d).toDateString()))
   const maxCount = overrideLimit || sessionsTotal || 50
   const maxDate = endDate ? new Date(endDate) : null
@@ -52,9 +55,13 @@ function generateDates(rule, overrideLimit) {
     }
 
     if (include && !skipSet.has(cur.toDateString())) {
-      const sessionDate = new Date(cur)
-      sessionDate.setHours(hours, minutes, 0, 0)
-      dates.push(new Date(sessionDate))
+      // The calendar day itself is walked in local/server time above (day-of-
+      // week matching doesn't shift meaningfully across the academy's
+      // supported timezones), but the actual clock TIME must be interpreted
+      // in the rule's own timezone — not the server's — or a "6pm Cairo"
+      // rule silently becomes 6pm-wherever-the-server-happens-to-run.
+      const dateStr = `${cur.getFullYear()}-${pad2(cur.getMonth() + 1)}-${pad2(cur.getDate())} ${timeOfDay}`
+      dates.push(fromZonedTime(dateStr, timezone))
     }
 
     cur.setDate(cur.getDate() + 1)

@@ -3,6 +3,7 @@ const ctrl = require('../controllers/admin.controller')
 const sessionCtrl = require('../controllers/session.controller')
 const notifCtrl = require('../controllers/notification.controller')
 const auditCtrl = require('../controllers/auditLog.controller')
+const perfCtrl = require('../controllers/teacherPerformance.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { isAdmin } = require('../middleware/rbac.middleware')
 
@@ -55,5 +56,9 @@ router.post('/notifications/individual', ctrl.sendIndividualNotification)
 // Audit logs (stats before :id-like generic route to avoid conflicts)
 router.get('/audit-logs/stats', auditCtrl.getAuditLogStats)
 router.get('/audit-logs', auditCtrl.getAuditLogs)
+
+// Payroll ledger browser — the persisted TeacherPayrollEntry artifact (see
+// payrollLedger.service.js), not a live recount.
+router.get('/payroll/ledger', perfCtrl.getAdminPayrollLedger)
 
 module.exports = router

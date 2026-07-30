@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Edit2, Plus, Calendar, RefreshCw, Search } from 'lucide-react'
+import { Edit2, Plus, Calendar, RefreshCw, Search, Snowflake, Gift, Wallet } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -11,8 +11,10 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
+import LessonTransactionTable from '../../components/shared/LessonTransactionTable.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
+import { QK } from '../../services/queryKeys.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -28,13 +30,36 @@ const STATUS_CONFIG = {
 
 function AdjustModal({ sub, onClose }) {
   const qc = useQueryClient()
+  const studentId = sub.studentId?._id || sub.studentId
   const [form, setForm] = useState({
     status: sub.status,
-    sessionsRemaining: sub.sessionsRemaining || 0,
     endDate: sub.endDate ? sub.endDate.slice(0, 10) : '',
     notes: sub.notes || '',
   })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const [adjustAmount, setAdjustAmount] = useState('')
+  const [adjustReason, setAdjustReason] = useState('')
+  const [freezeReason, setFreezeReason] = useState('')
+  const [compAmount, setCompAmount] = useState(1)
+  const [compReason, setCompReason] = useState('')
+
+  const { data: walletData } = useQuery({
+    queryKey: QK.WALLET(studentId),
+    queryFn: () => api.get(`/wallet/${studentId}`).then(r => r.data.data),
+    enabled: !!studentId,
+  })
+  const { data: transactions } = useQuery({
+    queryKey: QK.WALLET_TRANSACTIONS(studentId, { page: 1 }),
+    queryFn: () => api.get(`/wallet/${studentId}/transactions?limit=10`).then(r => r.data.data.transactions),
+    enabled: !!studentId,
+  })
+
+  const invalidateWallet = () => {
+    qc.invalidateQueries({ queryKey: QK.WALLET(studentId) })
+    qc.invalidateQueries({ queryKey: ['wallet', studentId, 'transactions'] })
+    qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] })
+  }
 
   const mut = useMutation({
     mutationFn: (data) => api.patch(`/subscriptions/${sub._id}`, data).then(r => r.data),
@@ -46,23 +71,55 @@ function AdjustModal({ sub, onClose }) {
     onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
   })
 
+  // Manual lesson-balance adjustments now go through the wallet ledger
+  // (POST /wallet/:studentId/adjust) instead of a raw PATCH to
+  // Subscription.sessionsRemaining — every change is an auditable
+  // LessonTransaction, never a silent number overwrite.
+  const adjustWalletMut = useMutation({
+    mutationFn: () => api.post(`/wallet/${studentId}/adjust`, { amount: Number(adjustAmount), reason: adjustReason }),
+    onSuccess: () => {
+      toast.success('تم تعديل رصيد الحصص')
+      setAdjustAmount(''); setAdjustReason('')
+      invalidateWallet()
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  const freezeMut = useMutation({
+    mutationFn: () => api.post(`/wallet/${studentId}/freeze`, { reason: freezeReason }),
+    onSuccess: () => { toast.success('تم تجميد المحفظة'); setFreezeReason(''); invalidateWallet() },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+  const resumeMut = useMutation({
+    mutationFn: () => api.post(`/wallet/${studentId}/resume`),
+    onSuccess: () => { toast.success('تم إلغاء تجميد المحفظة'); invalidateWallet() },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+  const compMut = useMutation({
+    mutationFn: () => api.post(`/wallet/${studentId}/compensation`, { amount: Number(compAmount), reason: compReason }),
+    onSuccess: () => {
+      toast.success('تم منح الحصة التعويضية')
+      setCompAmount(1); setCompReason('')
+      invalidateWallet()
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
   const handleSave = () => {
-    const updates = {
-      status: form.status,
-      sessionsRemaining: Number(form.sessionsRemaining),
-      notes: form.notes,
-    }
+    const updates = { status: form.status, notes: form.notes }
     if (form.endDate) updates.endDate = new Date(form.endDate).toISOString()
     mut.mutate(updates)
   }
 
+  const wallet = walletData
+
   return (
-    <Modal open onClose={onClose} title="تعديل الاشتراك" size="sm"
+    <Modal open onClose={onClose} title="تعديل الاشتراك والمحفظة" size="md"
       footer={<>
-        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-        <Button variant="purple" onClick={handleSave} loading={mut.isPending}>حفظ</Button>
+        <Button variant="ghost" onClick={onClose}>إغلاق</Button>
+        <Button variant="purple" onClick={handleSave} loading={mut.isPending}>حفظ بيانات الاشتراك</Button>
       </>}>
-      <div className="space-y-4" dir="rtl">
+      <div className="space-y-5" dir="rtl">
         <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
           <div className="font-semibold text-gray-900">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</div>
           <div className="text-xs text-gray-500 mt-0.5">{sub.packageId?.nameAr}</div>
@@ -78,17 +135,6 @@ function AdjustModal({ sub, onClose }) {
         </div>
 
         <div>
-          <label className="text-xs font-bold text-gray-500 mb-1.5 block">الحصص المتبقية</label>
-          <div className="flex items-center gap-2">
-            <button onClick={() => set('sessionsRemaining', Math.max(0, form.sessionsRemaining - 1))}
-              className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg transition-colors flex-none flex items-center justify-center">−</button>
-            <input type="number" min="0" className={`${inputCls} text-center`} value={form.sessionsRemaining} onChange={e => set('sessionsRemaining', e.target.value)} />
-            <button onClick={() => set('sessionsRemaining', form.sessionsRemaining + 1)}
-              className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg transition-colors flex-none flex items-center justify-center">+</button>
-          </div>
-        </div>
-
-        <div>
           <label className="text-xs font-bold text-gray-500 mb-1.5 block">تاريخ الانتهاء</label>
           <input type="date" className={inputCls} value={form.endDate} onChange={e => set('endDate', e.target.value)} />
         </div>
@@ -96,6 +142,76 @@ function AdjustModal({ sub, onClose }) {
         <div>
           <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظات</label>
           <textarea className={`${inputCls} h-16 resize-none py-2`} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="ملاحظات داخلية..." />
+        </div>
+
+        {/* ── Wallet management ── */}
+        <div className="pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Wallet size={15} className="text-violet-600" />
+            <h4 className="font-bold text-sm text-gray-900">محفظة الحصص</h4>
+            {wallet?.status === 'frozen' && <Badge variant="blue">مجمّدة</Badge>}
+          </div>
+
+          {wallet && (
+            <div className="mb-4 p-3 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-between">
+              <span className="text-xs text-violet-700 font-semibold">الرصيد الحالي</span>
+              <span className="font-heading font-extrabold text-lg text-violet-900">{wallet.remaining ?? 0} حصة</span>
+            </div>
+          )}
+
+          {/* Manual adjustment */}
+          <div className="flex items-end gap-2 mb-3">
+            <div className="flex-1">
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">تعديل الرصيد (+/-)</label>
+              <input type="number" className={inputCls} value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder="مثال: -2 أو 3" />
+            </div>
+            <div className="flex-[1.4]">
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">السبب</label>
+              <input className={inputCls} value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="سبب التعديل" />
+            </div>
+            <Button variant="outline" size="sm" disabled={!adjustAmount || !adjustReason.trim()} loading={adjustWalletMut.isPending}
+              onClick={() => adjustWalletMut.mutate()}>تطبيق</Button>
+          </div>
+
+          {/* Freeze / resume */}
+          {wallet?.status === 'frozen' ? (
+            <div className="flex items-center justify-between mb-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+              <span className="text-xs text-blue-700">{wallet.freezeReason || 'مجمّدة'}</span>
+              <Button variant="outline" size="sm" loading={resumeMut.isPending} onClick={() => resumeMut.mutate()}>إلغاء التجميد</Button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2 mb-3">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-500 mb-1.5 block">سبب التجميد (إجازة / رمضان / ظرف طبي...)</label>
+                <input className={inputCls} value={freezeReason} onChange={e => setFreezeReason(e.target.value)} placeholder="السبب" />
+              </div>
+              <Button variant="outline" size="sm" icon={<Snowflake size={13} />} disabled={!freezeReason.trim()} loading={freezeMut.isPending}
+                onClick={() => freezeMut.mutate()}>تجميد</Button>
+            </div>
+          )}
+
+          {/* Compensation grant */}
+          <div className="flex items-end gap-2 mb-4">
+            <div className="w-20">
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">عدد الحصص</label>
+              <input type="number" min="1" className={`${inputCls} text-center`} value={compAmount} onChange={e => setCompAmount(e.target.value)} />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-bold text-gray-500 mb-1.5 block">سبب الحصة التعويضية</label>
+              <input className={inputCls} value={compReason} onChange={e => setCompReason(e.target.value)} placeholder="السبب" />
+            </div>
+            <Button variant="outline" size="sm" icon={<Gift size={13} />} disabled={!compReason.trim()} loading={compMut.isPending}
+              onClick={() => compMut.mutate()}>منح</Button>
+          </div>
+
+          {transactions && (
+            <div>
+              <div className="text-xs font-bold text-gray-500 mb-2">آخر الحركات</div>
+              <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-100">
+                <LessonTransactionTable transactions={transactions} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

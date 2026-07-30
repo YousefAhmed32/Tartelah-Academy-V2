@@ -83,6 +83,13 @@ const SessionSchema = new mongoose.Schema({
   // never do (see session.controller.js syncSubscriptionConsumption).
   subscriptionConsumed: { type: Boolean, default: false },
   subscriptionConsumedAt: { type: Date },
+  // The specific LessonTransaction that performed the current consumption,
+  // and a monotonic counter of how many times this session has been
+  // consumed (present->absent->present admin corrections re-consume). Lets
+  // lessonDeduction.service.js derive a stable, collision-free idempotency
+  // key per consume/release instance instead of one fixed key per session.
+  lessonConsumedTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonTransaction' },
+  lessonConsumptionSeq: { type: Number, default: 0 },
 
   // Payroll-readiness — computed by default via sessionIntelligence.service.js,
   // but stored (not purely live-computed) so an admin correction is durable,
@@ -111,6 +118,25 @@ const SessionSchema = new mongoose.Schema({
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date },
   reviewNote: { type: String },
+
+  // Teacher acceptance of an assigned lesson. 'not_required' (the default)
+  // preserves today's behavior — a session is simply scheduled and the
+  // teacher is expected to teach it, exactly as before. A caller that wants
+  // the new accept/decline workflow (see session.controller.js acceptSession/
+  // declineSession) sets this to 'pending' at creation time.
+  teacherAcceptanceStatus: {
+    type: String,
+    enum: ['not_required', 'pending', 'accepted', 'declined'],
+    default: 'not_required',
+  },
+  teacherAcceptanceRespondedAt: { type: Date },
+
+  // Set when the academy (teacher/admin) caused this session not to happen,
+  // so the student is owed a replacement lesson. compensationGrantedTransactionId
+  // points at the LessonTransaction that credited it (see compensation.service.js).
+  compensationRequired: { type: Boolean, default: false },
+  compensationGrantedTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonTransaction' },
+  compensationReason: { type: String },
 }, { timestamps: true })
 
 SessionSchema.index({ studentId: 1, scheduledAt: -1 })

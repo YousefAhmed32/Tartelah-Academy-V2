@@ -8,5 +8,6 @@ router.get('/me', authorize('student'), ctrl.getMySubscription)
 router.get('/', isAdmin, ctrl.getAllSubscriptions)
 router.post('/', isAdmin, ctrl.createSubscription)
 router.patch('/:id', isAdmin, ctrl.updateSubscription)
+router.post('/:id/renew', isAdmin, ctrl.renewSubscription)
 
 module.exports = router

@@ -160,7 +160,9 @@ function RescheduleModal({ session, onClose, qc }) {
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
       onClose()
     },
-    onError: () => toast.error('حدث خطأ'),
+    // Surfaces the real server message (e.g. a 409 booking-conflict: "يوجد
+    // تعارض في الجدول...") instead of a generic "حدث خطأ".
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
   })
 
   return (
@@ -954,7 +956,9 @@ export default function TeacherSessionsPage() {
       setShowManual(false)
       setManualForm({ studentId:'', titleAr:'', scheduledAt:'', durationMinutes:60, meetingLink:'', meetingProvider:'zoom', notes:'' })
     },
-    onError: () => toast.error('حدث خطأ'),
+    // Surfaces the real server message — most importantly a 409 booking
+    // conflict ("يوجد تعارض في الجدول...") instead of a generic error.
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
   })
 
   function chg(e) { setManualForm(p => ({ ...p, [e.target.name]: e.target.value })) }

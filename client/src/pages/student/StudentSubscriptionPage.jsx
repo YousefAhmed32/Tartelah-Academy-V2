@@ -5,8 +5,12 @@ import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import ProgressRing from '../../components/shared/ProgressRing.jsx'
+import WalletBalanceCard from '../../components/shared/WalletBalanceCard.jsx'
+import LessonTransactionTable from '../../components/shared/LessonTransactionTable.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { ROUTES } from '../../config/constants.js'
+import { QK } from '../../services/queryKeys.js'
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },
@@ -16,9 +20,18 @@ const fadeUp = (delay = 0) => ({
 
 export default function StudentSubscriptionPage() {
   const { data, isLoading } = useQuery({
-    queryKey: ['subscription', 'me'],
+    queryKey: QK.MY_SUBSCRIPTION,
     queryFn: () => api.get('/subscriptions/me').then(r => r.data.data).catch(() => null),
     retry: false,
+  })
+
+  // Lesson entitlement now lives on the wallet, not the subscription's
+  // calendar dates — see WalletBalanceCard.jsx / ARCHITECTURE_PLAN.md's
+  // Lesson Wallet section.
+  const { data: walletData } = useQuery({
+    queryKey: QK.MY_WALLET,
+    queryFn: () => api.get('/wallet/me').then(r => r.data.data),
+    enabled: !!data,
   })
 
   if (isLoading) {
@@ -43,9 +56,6 @@ export default function StudentSubscriptionPage() {
   const daysLeft = Math.max(0, Math.ceil((endDate - now) / 86400000))
   const daysUsed = Math.max(0, totalDays - daysLeft)
   const pct = Math.min(100, Math.max(0, Math.round((daysLeft / totalDays) * 100)))
-
-  const ringC  = 2 * Math.PI * 52
-  const offset = ringC * (1 - pct / 100)
 
   const statusColor = data.status === 'active' ? '#22c55e' : data.status === 'paused' ? '#f59e0b' : '#ef4444'
   const statusLabel = data.status === 'active' ? 'فعال' : data.status === 'paused' ? 'موقوف' : 'منتهٍ'
@@ -127,7 +137,7 @@ export default function StudentSubscriptionPage() {
                   { label: 'تاريخ البدء',       value: formatDateAr(data.startDate) },
                   { label: 'تاريخ الانتهاء',     value: formatDateAr(data.endDate) },
                   { label: 'الحصص شهرياً',       value: `${data.packageId?.sessionsPerMonth || 0} حصة` },
-                  { label: 'الحصص المتبقية',     value: `${data.sessionsRemaining || 0} حصة` },
+                  { label: 'الحصص المتبقية',     value: `${walletData?.wallet?.remaining ?? data.sessionsRemaining ?? 0} حصة` },
                 ].map((item, i) => (
                   <div key={i} className="p-4 rounded-[14px]" style={{ background: '#f8f5ff' }}>
                     <div className="text-xs text-[#9b7fd6] mb-1">{item.label}</div>
@@ -164,29 +174,13 @@ export default function StudentSubscriptionPage() {
         {/* ═══ DAYS REMAINING RING ═══ */}
         <motion.div {...fadeUp(0.08)}>
           <div className="card-light p-6 flex flex-col items-center text-center h-full justify-center gap-4">
-            <div className="relative w-[120px] h-[120px]">
-              <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="60" cy="60" r="52" fill="none" stroke="#f0ecf8" strokeWidth="10" />
-                <circle
-                  cx="60" cy="60" r="52" fill="none"
-                  stroke={urgency === 'ok' ? 'url(#dg)' : urgency === 'warning' ? '#f59e0b' : '#ef4444'}
-                  strokeWidth="10" strokeLinecap="round"
-                  strokeDasharray={ringC}
-                  strokeDashoffset={offset}
-                  style={{ transition: 'stroke-dashoffset 1s ease' }}
-                />
-                <defs>
-                  <linearGradient id="dg" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stopColor="#7c3aed" />
-                    <stop offset="1" stopColor="#22c55e" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="font-heading font-extrabold text-3xl text-brand-textBody">{daysLeft}</div>
-                <div className="text-[11px] text-[#9b7fd6]">يوم</div>
-              </div>
-            </div>
+            <ProgressRing
+              percent={pct}
+              color={urgency === 'ok' ? undefined : urgency === 'warning' ? '#f59e0b' : '#ef4444'}
+            >
+              <div className="font-heading font-extrabold text-3xl text-brand-textBody">{daysLeft}</div>
+              <div className="text-[11px] text-[#9b7fd6]">يوم</div>
+            </ProgressRing>
 
             <div>
               <div className="font-heading font-bold text-lg text-brand-textBody">أيام متبقية</div>
@@ -207,6 +201,23 @@ export default function StudentSubscriptionPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* ═══ LESSON WALLET ═══ */}
+      {walletData?.wallet && (
+        <div className="mt-6">
+          <WalletBalanceCard wallet={walletData.wallet} />
+        </div>
+      )}
+
+      {/* ═══ TRANSACTION HISTORY ═══ */}
+      {walletData?.transactions && (
+        <motion.div {...fadeUp(0.1)} className="mt-6">
+          <div className="card-light p-6">
+            <h3 className="font-heading font-bold text-base text-brand-textBody mb-4">سجل حركات الرصيد</h3>
+            <LessonTransactionTable transactions={walletData.transactions} />
+          </div>
+        </motion.div>
+      )}
 
       {/* ═══ PAYMENT INSTRUCTIONS ═══ */}
       <motion.div {...fadeUp(0.15)} className="mt-6">

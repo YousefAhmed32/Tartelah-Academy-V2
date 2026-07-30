@@ -115,6 +115,17 @@ exports.getAdminPayrollReadiness = async (req, res, next) => {
   } catch (err) { next(err) }
 }
 
+exports.getAdminPayrollLedger = async (req, res, next) => {
+  try {
+    const { from, to } = rangeFromQuery(req.query)
+    const result = await svc.getPayrollLedger({
+      teacherId: req.query.teacherId, from, to, type: req.query.type, status: req.query.status,
+      page: req.query.page, limit: req.query.limit,
+    })
+    sendSuccess(res, result)
+  } catch (err) { next(err) }
+}
+
 const ATTENDANCE_STATUSES = ['pending', 'on_time', 'late', 'absent', 'excused']
 const PAYROLL_STATUSES = ['pending', 'payable', 'non_payable', 'pending_review', 'excluded']
 
@@ -124,7 +135,7 @@ exports.correctSessionAttendance = async (req, res, next) => {
     if (status && !ATTENDANCE_STATUSES.includes(status)) return sendError(res, 'حالة حضور غير صالحة', 400)
     if (payrollStatus && !PAYROLL_STATUSES.includes(payrollStatus)) return sendError(res, 'حالة راتب غير صالحة', 400)
 
-    const session = await svc.correctAttendance(req.params.sessionId, { status, notes, payrollStatus, payrollStatusReason })
+    const session = await svc.correctAttendance(req.params.sessionId, { status, notes, payrollStatus, payrollStatusReason, correctedBy: req.user._id })
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
 
     logAction({

@@ -14,11 +14,32 @@ const SubscriptionSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'active', 'expired', 'cancelled', 'paused'], default: 'active' },
   startDate: { type: Date, required: true, default: Date.now },
   endDate: { type: Date, required: true },
+  // DEPRECATED as the source of lesson entitlement — LessonWallet now owns
+  // lesson counts (see models/LessonWallet.js). These two fields are kept
+  // and dual-written by wallet.service.js purely as a read-only mirror so
+  // any not-yet-migrated code/UI reading subscription.sessionsRemaining
+  // keeps working during rollout. Do not write to them directly anymore.
   sessionsRemaining: { type: Number, default: 0 },
   totalSessions: { type: Number, default: 0 },
   amountPaid: { type: Number, default: 0 },
   notes: { type: String },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+  // The LessonTransaction created when this subscription's purchase credited
+  // the student's wallet (see wallet.service.js / enrollment.controller.js).
+  walletTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonTransaction' },
+
+  // Billing-cycle bookkeeping. Subscription is a purchase/billing record —
+  // it no longer owns lesson rights, only payment/renewal accounting.
+  invoiceNumber: { type: String },
+  billingDate: { type: Date },
+  renewalDate: { type: Date },
+
+  // Renewal chain — a renewal creates a NEW Subscription document rather
+  // than mutating the old one, so billing history stays intact. These
+  // self-refs link the chain together (see subscription.controller.js renew).
+  renewedFromSubscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
+  renewsIntoSubscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
 }, { timestamps: true })
 
 SubscriptionSchema.index({ studentId: 1, status: 1 })

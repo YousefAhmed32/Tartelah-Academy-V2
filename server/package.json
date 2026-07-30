@@ -12,12 +12,14 @@
     "seed:host": "node src/seeders/production/index.js",
     "dedupe-sessions": "node src/scripts/dedupeSessions.js",
     "migrate-teacher-gender": "node src/scripts/migrateTeacherGender.js",
+    "reconcile-wallets": "node src/scripts/reconcileWallets.js",
     "test": "jest --coverage"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-mongo-sanitize": "^2.2.0",

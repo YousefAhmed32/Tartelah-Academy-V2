@@ -1,7 +1,27 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
-2026-07-11 (latest) — Operations Center Full Audit & Rebuild
+2026-07-29 (latest) — Lesson Wallet Architecture Redesign
+
+## Status
+Full redesign of lesson entitlement per explicit client brief: lesson ownership moved off the subscription's calendar dates onto a per-student `LessonWallet` + append-only `LessonTransaction` ledger; `Subscription` demoted to a billing-cycle record. Full detail in `PROJECT_STATUS.md`'s "Lesson Wallet Architecture" entry, `ARCHITECTURE_PLAN.md`'s Lesson Wallet section, and `FEATURE_TRACKER.md`'s item-by-item table — this is a summary for continuity.
+
+**Delivered, backend-complete:** `LessonWallet`/`LessonTransaction`/`TeacherPayrollEntry` models; `wallet.service.js` (idempotent atomic write chokepoint — no multi-doc transactions available, MongoDB here is a standalone mongod, not a replica set); `lessonDeduction.service.js` (full deduction matrix — student no-show now deducts, teacher cancel/no-show auto-compensates, student self-cancel with a 12h window rule, student self-cancel newly implemented since it was previously hard-blocked at 403); `booking.service.js` (double-booking prevention, previously nonexistent); `ScheduleRule.timezone` fixed (was stored but silently ignored — now applied via `date-fns-tz`); `payrollLedger.service.js` (persisted payroll artifact, existing endpoint response shapes preserved); `POST /subscriptions/:id/renew`; `/wallet/*` routes (adjust/freeze/resume/transfer/compensation); `PATCH /sessions/:id/accept|decline` (implemented but dormant — nothing sets `teacherAcceptanceStatus:'pending'` yet); `backfillLessonWallets` boot migration + `npm run reconcile-wallets` drift-repair script.
+
+**Delivered, frontend (scoped, not a full reskin):** `StudentSubscriptionPage` wallet balance + transaction history; `AdminSubscriptionsPage`'s adjust modal replaced the raw `sessionsRemaining` field (removed from the backend's PATCH allow-list — writes now must go through the wallet ledger) with real wallet actions; `AdminTeacherPerformancePage` gained a payroll-ledger browser; `StudentSessionsPage` gained real self-cancellation with before/after-window feedback; booking-conflict 409s now surface their real message in `TeacherSessionsPage` instead of a generic toast. ~20 other dashboard pages (schedule, homework, evaluations, articles, courses) were deliberately left untouched — they work unchanged against the new backend via the `Subscription.sessionsRemaining` backward-compat mirror.
+
+### Verification
+`cd server && npx jest` — 122/124 passing (2 pre-existing, unrelated failures in `sessionIntelligence.test.js`, confirmed untouched by this session, documented since the 2026-07-16 entry below). New coverage: `wallet.service.test.js`, `lessonDeduction.service.test.js`, `booking.service.test.js`, `backfillLessonWallets.test.js` — all passing, covering the full deduction matrix, idempotency/no-double-deduction, booking conflicts, and migration idempotency. `cd client && npm run build` — zero errors. Manual DB-connected smoke testing (actually completing/cancelling a session, renewing a subscription, freezing a wallet) was **not** performed this session — no running dev DB was available; recommend running `npm run seed` + booting the server once before relying on this in a real environment, and running `npm run reconcile-wallets` after the first boot to confirm the migration produced sane numbers.
+
+### Not done / follow-ups
+- Teacher accept/decline is implemented but not activated anywhere — no package/course setting yet flips `teacherAcceptanceStatus` to `pending` at booking time.
+- Full frontend reskin of the remaining ~20 dashboard pages was explicitly out of scope for this pass (see the plan's stated scope decision) — they're unaffected, not broken, just not visually touched.
+- Pre-existing unused-import lint warnings (`Calendar` in `AdminSubscriptionsPage.jsx`, `AttendanceStatusBadge` in `AdminTeacherPerformancePage.jsx`, `Badge`/`Spinner` in a couple of pages) predate this session and were left as-is — not introduced by this work, out of scope to fix.
+- No manual live-browser QA pass this session (no dev DB running) — do one before shipping, focused on: complete-session wallet decrement, teacher-cancel compensation grant, subscription renewal additive balance, double-booking 409.
+
+---
+
+## Operations Center Full Audit & Rebuild (2026-07-11)
 
 ## Status
 User reported the Admin Operations Center showing mostly-zero statistics and asked for a full investigation (not an assumption the frontend was wrong) plus a production-grade redesign. Full detail in `docs/OPERATIONS_CENTER_AUDIT.md` — summary here.
