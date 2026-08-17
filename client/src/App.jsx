@@ -4,6 +4,7 @@ import { useInitAuth } from './hooks/useAuth.js'
 import { useAuthStore } from './store/authStore.js'
 import { ROUTES } from './config/constants.js'
 import LoadingPage from './components/shared/LoadingPage.jsx'
+import MustChangePasswordGate from './components/shared/MustChangePasswordGate.jsx'
 import { queryClient } from './config/queryClient.js'
 import api from './utils/api.js'
 import { QK } from './services/queryKeys.js'
@@ -62,6 +63,7 @@ const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage.j
 const AdminStudentsPage = lazy(() => import('./pages/admin/AdminStudentsPage.jsx'))
 const AdminStudentDetailPage = lazy(() => import('./pages/admin/AdminStudentDetailPage.jsx'))
 const AdminTeachersPage = lazy(() => import('./pages/admin/AdminTeachersPage.jsx'))
+const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage.jsx'))
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage.jsx'))
 const AdminSessionsPage = lazy(() => import('./pages/admin/AdminSessionsPage.jsx'))
 const AdminScheduleRulesPage = lazy(() => import('./pages/admin/AdminScheduleRulesPage.jsx'))
@@ -135,6 +137,7 @@ export default function App() {
 
   return (
     <Suspense fallback={<LoadingPage dark />}>
+      <MustChangePasswordGate />
       <Routes>
         {/* Marketing */}
         <Route element={<PublicLayout />}>
@@ -196,6 +199,7 @@ export default function App() {
           <Route path={ROUTES.ADMIN_STUDENTS} element={<AdminStudentsPage />} />
           <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<AdminStudentDetailPage />} />
           <Route path={ROUTES.ADMIN_TEACHERS} element={<AdminTeachersPage />} />
+          <Route path={ROUTES.ADMIN_ADMINS} element={<AdminAdminsPage />} />
           <Route path={ROUTES.ADMIN_COURSES} element={<AdminCoursesPage />} />
           <Route path={ROUTES.ADMIN_COURSE_NEW} element={<AdminCourseFormPage />} />
           <Route path={ROUTES.ADMIN_COURSE_EDIT} element={<AdminCourseFormPage />} />

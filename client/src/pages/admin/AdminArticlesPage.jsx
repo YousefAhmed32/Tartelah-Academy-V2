@@ -75,7 +75,7 @@ function CategoryModal({ open, onClose, refetch }) {
   }
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="إدارة الفئات" size="md">
+    <Modal open={open} onClose={onClose} title="إدارة الفئات" size="md">
       <div className="space-y-4">
         {/* Form */}
         <div className="bg-gray-50 rounded-xl p-4 space-y-3">

@@ -284,7 +284,7 @@ export default function AdminStudentsPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5 ">
 
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -314,61 +314,89 @@ export default function AdminStudentsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (md+) / Cards (mobile) — a 6-column table has no room on a
+          360–390px viewport; stacking as cards below md avoids clipping
+          content instead of just scrolling it out of reach. */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-violet-600" /></div>
+      ) : !students.length ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 text-gray-400">
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
+            <User size={24} />
+          </div>
+          <p className="font-semibold text-gray-500">لا توجد نتائج</p>
+        </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'الحالة', ''].map(h => (
-                  <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((st) => (
-                <motion.tr key={st._id} whileHover={{ backgroundColor: '#FAFAFA' }}
-                  className="border-b border-gray-50 cursor-pointer transition-colors"
-                  onClick={() => setSelected(st)}>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">{st.firstNameAr} {st.lastNameAr}</div>
-                        {st.bioAr && <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-[160px]">{st.bioAr}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4"><span className="text-sm text-gray-500">{st.email}</span></td>
-                  <td className="px-5 py-4"><span className="text-sm text-gray-500" dir="ltr">{st.phone || '—'}</span></td>
-                  <td className="px-5 py-4"><span className="text-sm text-gray-500">{formatDateAr(st.createdAt)}</span></td>
-                  <td className="px-5 py-4">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+        <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2.5">
+            {students.map((st) => (
+              <button key={st._id} onClick={() => setSelected(st)}
+                className="w-full text-start bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
+                <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 text-sm truncate">{st.firstNameAr} {st.lastNameAr}</div>
+                  <div className="text-xs text-gray-400 truncate mt-0.5">{st.email}</div>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                       {st.isActive ? 'نشط' : 'موقوف'}
                     </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <button onClick={e => { e.stopPropagation(); setSelected(st) }}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors px-3 py-1.5 rounded-lg hover:bg-violet-50">
-                      <Edit2 size={12} /> إدارة
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-          {!students.length && (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
-                <User size={24} />
-              </div>
-              <p className="font-semibold text-gray-500">لا توجد نتائج</p>
+                    <span className="text-[10px] text-gray-400">{formatDateAr(st.createdAt)}</span>
+                  </div>
+                </div>
+                <Edit2 size={14} className="text-violet-400 flex-none" />
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop/tablet table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'الحالة', ''].map(h => (
+                      <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((st) => (
+                    <motion.tr key={st._id} whileHover={{ backgroundColor: '#FAFAFA' }}
+                      className="border-b border-gray-50 cursor-pointer transition-colors"
+                      onClick={() => setSelected(st)}>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">{st.firstNameAr} {st.lastNameAr}</div>
+                            {st.bioAr && <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-[160px]">{st.bioAr}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-500">{st.email}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-500" dir="ltr">{st.phone || '—'}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-500">{formatDateAr(st.createdAt)}</span></td>
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                          {st.isActive ? 'نشط' : 'موقوف'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button onClick={e => { e.stopPropagation(); setSelected(st) }}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors px-3 py-1.5 rounded-lg hover:bg-violet-50">
+                          <Edit2 size={12} /> إدارة
+                        </button>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
 
       {data?.totalPages > 1 && (

@@ -340,7 +340,7 @@ export default function AdminPackagesPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5 ">
 
       {/* Page Header */}
       <div className="flex items-center justify-between gap-4">

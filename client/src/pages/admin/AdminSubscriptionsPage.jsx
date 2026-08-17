@@ -288,65 +288,98 @@ export default function AdminSubscriptionsPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
+      ) : !subs.length ? (
+        <div className="card-light overflow-hidden">
+          <EmptyState
+            icon={<RefreshCw size={26} strokeWidth={1.6} />}
+            title={search || statusFilter ? 'لا توجد نتائج مطابقة' : 'لا توجد اشتراكات بعد'}
+            description={search || statusFilter ? 'جرّب تعديل البحث أو الفلتر' : 'ستظهر هنا الاشتراكات فور إنشائها'}
+          />
+        </div>
       ) : (
         <>
-          <div className="card-light overflow-hidden">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-[#f0ecf8]">
-                  {['الطالب', 'الباقة', 'المعلم', 'الانتهاء', 'الحصص المتبقية', 'الحالة', ''].map(h => (
-                    <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#9b7fd6] whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {subs.map((sub) => {
-                  const sc = STATUS_CONFIG[sub.status] || { label: sub.status, badge: 'gray' }
-                  const daysLeft = sub.endDate ? Math.ceil((new Date(sub.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0
-                  const isExpiringSoon = sub.status === 'active' && daysLeft <= 7 && daysLeft > 0
-                  return (
-                    <tr key={sub._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="xs" />
-                          <span className="text-sm font-semibold text-brand-textBody">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-brand-textBody">{sub.packageId?.nameAr}</td>
-                      <td className="px-4 py-3 text-sm text-[#9b7fd6]">{sub.teacherId?.firstNameAr || '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-[#9b7fd6]">{formatDateAr(sub.endDate)}</div>
-                        {isExpiringSoon && (
-                          <div className="text-xs text-amber-600 font-semibold mt-0.5">{daysLeft} أيام للانتهاء</div>
-                        )}
-                        {daysLeft <= 0 && sub.status === 'active' && (
-                          <div className="text-xs text-red-500 font-semibold mt-0.5">منتهي الصلاحية</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`font-semibold text-sm ${sub.sessionsRemaining <= 2 ? 'text-amber-600' : 'text-brand-textBody'}`}>
-                          {sub.sessionsRemaining || 0} حصص
-                        </span>
-                      </td>
-                      <td className="px-4 py-3"><Badge variant={sc.badge}>{sc.label}</Badge></td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setAdjustSub(sub)}
-                          className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors">
-                          <Edit2 size={12} /> تعديل
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {!subs.length && (
-              <EmptyState
-                icon={<RefreshCw size={26} strokeWidth={1.6} />}
-                title={search || statusFilter ? 'لا توجد نتائج مطابقة' : 'لا توجد اشتراكات بعد'}
-                description={search || statusFilter ? 'جرّب تعديل البحث أو الفلتر' : 'ستظهر هنا الاشتراكات فور إنشائها'}
-              />
-            )}
+          {/* Mobile cards — a 7-column table has no room on a small screen;
+              stacking avoids clipping content behind overflow-hidden. */}
+          <div className="md:hidden space-y-2.5">
+            {subs.map((sub) => {
+              const sc = STATUS_CONFIG[sub.status] || { label: sub.status, badge: 'gray' }
+              const daysLeft = sub.endDate ? Math.ceil((new Date(sub.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0
+              const isExpiringSoon = sub.status === 'active' && daysLeft <= 7 && daysLeft > 0
+              return (
+                <button key={sub._id} onClick={() => setAdjustSub(sub)} className="w-full text-start card-light p-4 flex items-center gap-3">
+                  <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-brand-textBody truncate">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
+                      <Badge variant={sc.badge}>{sc.label}</Badge>
+                    </div>
+                    <div className="text-xs text-[#9b7fd6] mt-1 truncate">{sub.packageId?.nameAr} {sub.teacherId?.firstNameAr ? `• ${sub.teacherId.firstNameAr}` : ''}</div>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      <span className={`text-xs font-semibold ${sub.sessionsRemaining <= 2 ? 'text-amber-600' : 'text-brand-textBody'}`}>{sub.sessionsRemaining || 0} حصص متبقية</span>
+                      <span className="text-xs text-[#9b7fd6]">{formatDateAr(sub.endDate)}</span>
+                      {isExpiringSoon && <span className="text-xs text-amber-600 font-semibold">{daysLeft} أيام للانتهاء</span>}
+                      {daysLeft <= 0 && sub.status === 'active' && <span className="text-xs text-red-500 font-semibold">منتهي الصلاحية</span>}
+                    </div>
+                  </div>
+                  <Edit2 size={14} className="text-violet-400 flex-none" />
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Desktop/tablet table */}
+          <div className="hidden md:block card-light overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-[#f0ecf8]">
+                    {['الطالب', 'الباقة', 'المعلم', 'الانتهاء', 'الحصص المتبقية', 'الحالة', ''].map(h => (
+                      <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#9b7fd6] whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {subs.map((sub) => {
+                    const sc = STATUS_CONFIG[sub.status] || { label: sub.status, badge: 'gray' }
+                    const daysLeft = sub.endDate ? Math.ceil((new Date(sub.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0
+                    const isExpiringSoon = sub.status === 'active' && daysLeft <= 7 && daysLeft > 0
+                    return (
+                      <tr key={sub._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="xs" />
+                            <span className="text-sm font-semibold text-brand-textBody">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-brand-textBody">{sub.packageId?.nameAr}</td>
+                        <td className="px-4 py-3 text-sm text-[#9b7fd6]">{sub.teacherId?.firstNameAr || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-[#9b7fd6]">{formatDateAr(sub.endDate)}</div>
+                          {isExpiringSoon && (
+                            <div className="text-xs text-amber-600 font-semibold mt-0.5">{daysLeft} أيام للانتهاء</div>
+                          )}
+                          {daysLeft <= 0 && sub.status === 'active' && (
+                            <div className="text-xs text-red-500 font-semibold mt-0.5">منتهي الصلاحية</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`font-semibold text-sm ${sub.sessionsRemaining <= 2 ? 'text-amber-600' : 'text-brand-textBody'}`}>
+                            {sub.sessionsRemaining || 0} حصص
+                          </span>
+                        </td>
+                        <td className="px-4 py-3"><Badge variant={sc.badge}>{sc.label}</Badge></td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => setAdjustSub(sub)}
+                            className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 px-2 py-1 rounded-lg hover:bg-violet-50 transition-colors">
+                            <Edit2 size={12} /> تعديل
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           {data?.totalPages > 1 && <div className="mt-4 flex justify-center"><Pagination current={page} total={data.totalPages} onChange={setPage} /></div>}
         </>

@@ -20,6 +20,7 @@ const DEFAULT_ACCOUNTS = [
       email: 'admin@tartelah.com',
       password: 'Tartelah@Admin2026',
       role: 'admin',
+      isPrimaryAdmin: true,
       firstNameAr: 'مدير', lastNameAr: 'المنصة',
       firstName: 'Super', lastName: 'Admin',
       phone: '+201000000001',

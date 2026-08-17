@@ -275,7 +275,7 @@ export default function AdminSuccessStoriesPage() {
   }
 
   return (
-    <div dir="rtl" className="max-w-[1200px] space-y-5">
+    <div dir="rtl" className=" space-y-5">
       <PageHeader
         title="قصص النجاح"
         subtitle="إدارة قسم أفضل معلم / أفضل طالب / أفضل إنجاز في الصفحة الرئيسية"

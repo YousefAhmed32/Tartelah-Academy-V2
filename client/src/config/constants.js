@@ -22,10 +22,61 @@ export function getFileUrl(value) {
   return `${BACKEND_URL}${str}` // legacy "/uploads/..." path, if any pre-migration value slips through
 }
 
+// Internal role identifiers — mirrors server/src/config/permissions.js ROLES.
+// `role` on the user object IS the stable "systemRole"; never rename these
+// values. No visible SUPER_ADMIN role — the original administrator instead
+// carries `isPrimaryAdmin: true` while keeping role: 'admin'.
 export const ROLES = {
   ADMIN: 'admin',
+  ASSISTANT_ADMIN: 'assistant_admin',
+  OPERATOR: 'operator',
+  MANAGER: 'manager',
+  STAFF: 'staff',
   TEACHER: 'teacher',
   STUDENT: 'student',
+}
+
+// Roles that live in the admin dashboard/staff hierarchy — distinct from
+// TEACHER/STUDENT, which keep their own dedicated dashboards.
+export const ADMIN_FAMILY_ROLES = [ROLES.ADMIN, ROLES.ASSISTANT_ADMIN, ROLES.OPERATOR, ROLES.MANAGER, ROLES.STAFF]
+
+export const ROLE_DISPLAY_NAMES = {
+  [ROLES.ADMIN]: 'مدير',
+  [ROLES.ASSISTANT_ADMIN]: 'مساعد مدير',
+  [ROLES.OPERATOR]: 'موظف عمليات',
+  [ROLES.MANAGER]: 'مدير قسم',
+  [ROLES.STAFF]: 'موظف',
+  [ROLES.TEACHER]: 'معلم',
+  [ROLES.STUDENT]: 'طالب',
+}
+
+// Mirrors server/src/config/permissions.js ALL_PERMISSIONS — kept in sync
+// manually (small, stable list); the backend remains the source of truth
+// and is re-fetched live via GET /permissions for the assignment UI.
+export const PERMISSIONS = {
+  USERS_VIEW: 'users.view',
+  USERS_CREATE: 'users.create',
+  USERS_UPDATE: 'users.update',
+  USERS_DISABLE: 'users.disable',
+  USERS_DELETE: 'users.delete',
+  USERS_RESET_PASSWORD: 'users.reset_password',
+  ADMINS_CREATE: 'admins.create',
+  ADMINS_UPDATE: 'admins.update',
+  ADMINS_DISABLE: 'admins.disable',
+  PERMISSIONS_VIEW: 'permissions.view',
+  PERMISSIONS_ASSIGN: 'permissions.assign',
+  ROLES_VIEW: 'roles.view',
+  ROLES_CREATE: 'roles.create',
+  ROLES_UPDATE: 'roles.update',
+  ROLES_DELETE: 'roles.delete',
+  DASHBOARD_VIEW: 'dashboard.view',
+  CONTENT_CREATE: 'content.create',
+  CONTENT_UPDATE: 'content.update',
+  CONTENT_DELETE: 'content.delete',
+  CONTENT_PUBLISH: 'content.publish',
+  CONTENT_SCHEDULE: 'content.schedule',
+  SETTINGS_VIEW: 'settings.view',
+  SETTINGS_UPDATE: 'settings.update',
 }
 
 export const ROUTES = {

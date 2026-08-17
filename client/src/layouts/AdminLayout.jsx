@@ -50,6 +50,13 @@ const NAV_GROUPS = [
         to: ROUTES.ADMIN_TEACHERS, label: 'المعلمون',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
+      {
+        // Team/Account management — admins, assistant admins, operators,
+        // managers, staff. Hidden unless the current user can at least view
+        // accounts (backend independently enforces this on every route).
+        to: ROUTES.ADMIN_ADMINS, label: 'إدارة الفريق', permission: 'users.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M15.5 4.5a3 3 0 0 1 0 6M17 19a4.2 4.2 0 0 0-3.3-4.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
     ]
   },
   {
@@ -142,8 +149,35 @@ function navLinkClass({ isActive }) {
   ].join(' ')
 }
 
+// Existing admin sub-resources (students, teachers, sessions, etc.) are still
+// gated strictly to role==='admin' on the backend (server/src/routes/
+// admin.routes.js — unchanged by the RBAC+PBAC upgrade, to avoid widening an
+// already-working authorization boundary). Nav items with no `permission`
+// tag are that legacy surface, so they only render for the literal 'admin'
+// role; items tagged with a `permission` (e.g. Team Management) render for
+// whoever actually holds it, across the whole admin-family hierarchy. This
+// keeps assistant_admin/operator/manager/staff from seeing links that would
+// just 403.
+function isNavItemVisible(item, role, hasPermission) {
+  if (item.permission) return hasPermission(item.permission)
+  return role === ROLES.ADMIN
+}
+
+// The header used to hardcode "مركز العمليات" (Operations Center) regardless
+// of which admin page was actually open — this derives the real page title
+// from the matching nav item instead, falling back to the academy name for
+// routes with no nav entry (e.g. /admin/students/:id).
+function currentPageTitle(pathname) {
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.end ? pathname === item.to : pathname.startsWith(item.to)) return item.label
+    }
+  }
+  return 'ترتيلة أونلاين'
+}
+
 export default function AdminLayout() {
-  const { user, isAuthenticated, getRole, logout } = useAuthStore()
+  const { user, isAuthenticated, getRole, hasAdminAccess, hasPermission, logout } = useAuthStore()
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
@@ -165,7 +199,20 @@ export default function AdminLayout() {
   })
 
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
-  if (getRole() !== ROLES.ADMIN) return <Navigate to="/" replace />
+  // Admin-family roles (admin/assistant_admin/operator/manager/staff) reach
+  // the dashboard shell; which nav items and data they can actually use is
+  // still gated per-feature by permission (backend enforces this — see
+  // rbac.middleware.js — this is only the entry gate to the shell itself).
+  if (!hasAdminAccess()) return <Navigate to="/" replace />
+  // The legacy dashboard (/admin) still requires the literal 'admin' role
+  // on the backend (admin.routes.js's stats endpoint) — a non-'admin'
+  // admin-family user landing there would just see 403s. Send them
+  // straight to Team Management instead, the one page every admin-family
+  // role is meant to be able to reach (its own data calls still 403
+  // per-user if they lack users.view, same as any other page here).
+  if (getRole() !== ROLES.ADMIN && location.pathname === ROUTES.ADMIN_DASHBOARD) {
+    return <Navigate to={ROUTES.ADMIN_ADMINS} replace />
+  }
 
   function handleLogout() {
     authService.logout().catch(() => {})
@@ -217,7 +264,7 @@ export default function AdminLayout() {
             <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               {group.label}
             </div>
-            {group.items.map((item) => (
+            {group.items.filter((item) => isNavItemVisible(item, getRole(), hasPermission)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -308,8 +355,8 @@ export default function AdminLayout() {
             </svg>
           </button>
 
-          <div className="font-heading font-bold text-base text-gray-900 hidden lg:block">
-            مركز العمليات
+          <div className="font-heading font-bold text-base text-gray-900 hidden lg:block truncate">
+            {currentPageTitle(location.pathname)}
           </div>
 
           <div className="flex items-center gap-2.5">

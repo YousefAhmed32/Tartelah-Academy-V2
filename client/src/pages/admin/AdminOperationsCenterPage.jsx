@@ -143,9 +143,9 @@ function buildAttentionFeed(sections) {
 function AttentionFeedRow({ entry, onOpenReview }) {
   const { session, reasons } = entry
   return (
-    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition-colors">
+    <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap p-3.5 rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition-colors">
       <PersonPair session={session} />
-      <div className="flex-1 flex flex-wrap gap-1.5 justify-end">
+      <div className="flex-1 flex flex-wrap gap-1.5 justify-start sm:justify-end basis-full sm:basis-auto order-3 sm:order-none">
         {reasons.map((r, i) => (
           <span key={i} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full flex-none"
             style={{ background: `${r.color}15`, color: r.color }}>
@@ -189,7 +189,7 @@ function LiveTab({ onGoToTimeline, onGoToReview }) {
       <CriticalAlertBanner count={c.criticalReviewCount} onClick={onGoToReview} />
 
       {/* Operational health — "is the platform healthy right now", not just "what's broken" */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <HealthCard label="نسبة حضور الطلاب اليوم" value={h.attendanceRateToday} Icon={TrendingUp} color="#22c55e" rateBased
           sub={h.attendanceRateToday === null ? 'لا بيانات بعد' : undefined} />
         <HealthCard label="التزام المعلمين بالموعد" value={h.teacherOnTimeRateToday} Icon={CheckCircle2} color="#7c3aed" rateBased
@@ -200,7 +200,7 @@ function LiveTab({ onGoToTimeline, onGoToReview }) {
       </div>
 
       {/* Stat grid — colored by urgency (critical → warning → info → positive/neutral) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatTile label="جارية الآن" value={c.liveNow} Icon={Radio} color="#22c55e" tone="positive" onClick={() => onGoToTimeline({ status: 'ongoing' })} />
         <StatTile label="تبدأ قريباً" value={c.startingSoon} Icon={Clock} color="#7c3aed" tone="info" onClick={() => onGoToTimeline({ status: 'scheduled' })} />
         <StatTile label="لم يسجّل المعلم حضوره" value={c.missingCheckIn} Icon={UserX} color="#ef4444" tone="critical" onClick={onGoToReview} />
@@ -586,7 +586,7 @@ export default function AdminOperationsCenterPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5 ">
       <PageHeader title="مركز العمليات" subtitle="نظرة تشغيلية فورية على الأكاديمية — ما يحدث الآن وما يحتاج إجراءً" />
 
       <div className="flex gap-1.5 p-1 rounded-xl w-fit bg-gray-100">

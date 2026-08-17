@@ -35,6 +35,9 @@ connectDB().then(async () => {
   const { backfillLessonWallets } = require('./src/migrations/backfillLessonWallets')
   await backfillLessonWallets().catch(err => console.warn('[migration] backfillLessonWallets warning:', err.message))
 
+  const { rbacUpgrade } = require('./src/migrations/rbacUpgrade')
+  await rbacUpgrade().catch(err => console.warn('[migration] rbacUpgrade warning:', err.message))
+
   if (process.env.NODE_ENV !== 'test') {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')

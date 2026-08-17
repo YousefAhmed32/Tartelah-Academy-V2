@@ -459,7 +459,7 @@ export default function AdminSessionsPage() {
   ]
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
@@ -510,40 +510,85 @@ export default function AdminSessionsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (md+) / Cards (mobile). A 6-column table with hover-only row
+          actions was both clipped by overflow-hidden below md AND its
+          actions were unreachable on touch devices (opacity-0 until
+          :hover) — the mobile cards below show actions unconditionally. */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-violet-600" /></div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                {['الحصة', 'الطالب', 'المعلم', 'التاريخ', 'الحالة', 'إجراءات'].map(h => (
-                  <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((s) => (
-                <SessionRow key={s._id} session={s}
-                  onEdit={setEditSession}
-                  onReschedule={setRescheduleSession}
-                  onCancel={handleCancel}
-                  onCorrect={setCorrectSession}
-                />
-              ))}
-            </tbody>
-          </table>
-          {!sessions.length && (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
-                <Calendar size={24} />
-              </div>
-              <p className="font-semibold text-gray-500">لا توجد حصص</p>
-              <p className="text-sm text-gray-400 mt-1">جرب تغيير الفلاتر أو أنشئ حصة جديدة</p>
-            </div>
-          )}
+      ) : !sessions.length ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 text-gray-400">
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
+            <Calendar size={24} />
+          </div>
+          <p className="font-semibold text-gray-500">لا توجد حصص</p>
+          <p className="text-sm text-gray-400 mt-1">جرب تغيير الفلاتر أو أنشئ حصة جديدة</p>
         </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2.5">
+            {sessions.map((s) => {
+              const sc = STATUS_CONFIG[s.status] || STATUS_CONFIG.scheduled
+              const canCancel = ['scheduled', 'ongoing'].includes(s.status)
+              return (
+                <div key={s._id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm truncate">{s.titleAr}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{formatDateAr(s.scheduledAt)} · {formatTimeAr(s.scheduledAt)} · {s.durationMinutes}د</div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full flex-none ${sc.bg} ${sc.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {sc.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Avatar src={getFileUrl(s.studentId?.avatar)} firstName={s.studentId?.firstNameAr} lastName={s.studentId?.lastNameAr} size="xs" />
+                      <span className="text-xs text-gray-600 truncate">{s.studentId?.firstNameAr}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Avatar src={getFileUrl(s.teacherId?.avatar)} firstName={s.teacherId?.firstNameAr} lastName={s.teacherId?.lastNameAr} size="xs" />
+                      <span className="text-xs text-gray-600 truncate">{s.teacherId?.firstNameAr}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50">
+                    <button onClick={() => setEditSession(s)} className="flex-1 h-8 rounded-lg text-xs font-semibold bg-violet-50 text-violet-700 flex items-center justify-center gap-1"><Edit2 size={12} /> تعديل</button>
+                    <button onClick={() => setCorrectSession(s)} className="flex-1 h-8 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 flex items-center justify-center gap-1"><ShieldAlert size={12} /> تصحيح</button>
+                    {canCancel && <button onClick={() => setRescheduleSession(s)} className="h-8 w-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center flex-none"><RefreshCw size={12} /></button>}
+                    {canCancel && <button onClick={() => handleCancel(s)} className="h-8 w-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-none"><XCircle size={12} /></button>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop/tablet table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {['الحصة', 'الطالب', 'المعلم', 'التاريخ', 'الحالة', 'إجراءات'].map(h => (
+                      <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s) => (
+                    <SessionRow key={s._id} session={s}
+                      onEdit={setEditSession}
+                      onReschedule={setRescheduleSession}
+                      onCancel={handleCancel}
+                      onCorrect={setCorrectSession}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {data?.totalPages > 1 && (

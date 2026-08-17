@@ -627,7 +627,7 @@ export default function AdminCourseFormPage() {
   }
 
   return (
-    <div dir="rtl" className="max-w-[1200px] space-y-5">
+    <div dir="rtl" className=" space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">

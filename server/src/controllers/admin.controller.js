@@ -17,6 +17,27 @@ const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { isValidGender } = require('../config/teacherIdentity')
 const crypto = require('crypto')
 
+const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+
+// Turns a Mongo $group-by-{y,m} aggregation result into a fixed-length,
+// gap-filled series for the last `monthsBack` months ending this month —
+// real months with zero activity show as 0, not a linear interpolation or
+// invented value, and the array is always exactly `monthsBack` long
+// regardless of which specific months had documents. Reused by every
+// monthly trend the Reports page charts (see getReports below) so the
+// charts reflect actual historical data instead of a distributed guess.
+function buildMonthSeries(aggResult, monthsBack, now = new Date()) {
+  const byKey = new Map(aggResult.map(r => [`${r._id.y}-${r._id.m}`, r]))
+  const series = []
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}`
+    const row = byKey.get(key)
+    series.push({ month: MONTHS_AR_SHORT[d.getMonth()], value: row?.sum ?? row?.count ?? 0 })
+  }
+  return series
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 exports.getDashboardStats = async (req, res, next) => {
@@ -109,11 +130,14 @@ exports.getReports = async (req, res, next) => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const TREND_MONTHS = 6
+    const trendStart = new Date(now.getFullYear(), now.getMonth() - (TREND_MONTHS - 1), 1)
 
     const [
       thisMonthRev, lastMonthRev, totalRev, totalSessions, thisMonthSessions, totalStudents,
       activeStudents, newStudents, completedSessions, totalSessionsCount, cancelledSessionsCount,
       attendanceByStatus, teacherPayrollStats,
+      revenueTrendRaw, sessionsTrendRaw, studentsTrendRaw,
     ] = await Promise.all([
       Subscription.aggregate([{ $match: { createdAt: { $gte: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
       Subscription.aggregate([{ $match: { createdAt: { $gte: lastMonthStart, $lt: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
@@ -137,6 +161,21 @@ exports.getReports = async (req, res, next) => {
           nonPayableSessions: { $sum: { $cond: [{ $eq: ['$payrollStatus', 'non_payable'] }, 1, 0] } },
           lateTeacherSessions: { $sum: { $cond: [{ $eq: ['$teacherAttendanceStatus', 'late'] }, 1, 0] } },
         } },
+      ]),
+      // Real month-by-month series for the Reports page charts — replaces a
+      // previous frontend bug that fabricated these curves by distributing
+      // the current total across fixed, made-up per-month weights.
+      Subscription.aggregate([
+        { $match: { createdAt: { $gte: trendStart } } },
+        { $group: { _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } }, sum: { $sum: '$amountPaid' } } },
+      ]),
+      Session.aggregate([
+        { $match: { createdAt: { $gte: trendStart } } },
+        { $group: { _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } }, count: { $sum: 1 } } },
+      ]),
+      User.aggregate([
+        { $match: { role: 'student', createdAt: { $gte: trendStart } } },
+        { $group: { _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } }, count: { $sum: 1 } } },
       ]),
     ])
 
@@ -188,6 +227,11 @@ exports.getReports = async (req, res, next) => {
         lateTeacherSessions: payroll.lateTeacherSessions || 0,
       },
       topTeachers,
+      trends: {
+        revenue: buildMonthSeries(revenueTrendRaw, TREND_MONTHS, now),
+        sessions: buildMonthSeries(sessionsTrendRaw, TREND_MONTHS, now),
+        students: buildMonthSeries(studentsTrendRaw, TREND_MONTHS, now),
+      },
     })
   } catch (err) { next(err) }
 }

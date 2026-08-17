@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
+const { ALL_ROLES, DEFAULT_DISPLAY_NAMES } = require('../config/permissions')
 
 const UserSchema = new mongoose.Schema({
   firstNameAr: { type: String, required: true, trim: true },
@@ -8,7 +9,36 @@ const UserSchema = new mongoose.Schema({
   lastName: { type: String, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, select: false, minlength: 8 },
-  role: { type: String, enum: ['admin', 'teacher', 'student'], default: 'student' },
+  // The stable internal "systemRole" from the RBAC spec — this field IS
+  // that identifier (see config/permissions.js), never renamed. Extended
+  // beyond admin/teacher/student with the admin-family roles
+  // (assistant_admin/operator/manager/staff) introduced by the RBAC+PBAC
+  // upgrade; existing admin/teacher/student accounts are unaffected.
+  role: { type: String, enum: ALL_ROLES, default: 'student' },
+  // Per-account customizable label shown in the UI instead of the raw role
+  // (e.g. "Operations Supervisor" for an assistant_admin). Falls back to
+  // DEFAULT_DISPLAY_NAMES[role] in toPublic() below when unset — role stays
+  // the stable identifier, this is presentation only.
+  displayRoleName: { type: String, trim: true, default: null },
+  jobTitle: { type: String, trim: true, default: null },
+  roleDescription: { type: String, trim: true, default: null },
+  // Fine-grained permission grants (see config/permissions.js ALL_PERMISSIONS).
+  // Ignored for isPrimaryAdmin (who implicitly holds every permission) and
+  // unused by teacher/student, which keep the original coarse role checks.
+  permissions: { type: [String], default: [] },
+  // The one, original administrator — set only by the RBAC migration for the
+  // pre-existing admin account, never by any API route. Grants every
+  // permission implicitly and is protected from deletion/disable/demotion/
+  // permission-removal (see middleware/rbac.middleware.js + user.controller.js).
+  isPrimaryAdmin: { type: Boolean, default: false },
+  mustChangePassword: { type: Boolean, default: false },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  lastPermissionsChangedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  lastPermissionsChangedAt: { type: Date, default: null },
+  lastLoginAt: { type: Date, default: null },
+  disabledAt: { type: Date, default: null },
+  disabledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  notes: { type: String, trim: true, default: null },
   phone: { type: String, trim: true },
   // GridFS file _id (server/src/config/gridfs.js), NOT a path or URL — kept as
   // `avatar` (not renamed to avatarId) deliberately: dozens of existing
@@ -55,12 +85,22 @@ UserSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password)
 }
 
+// Primary Admin implicitly holds every permission — never persisted as a
+// giant array, always computed, so ALL_PERMISSIONS growing over time never
+// requires a data migration to keep them "fully" permissioned.
+UserSchema.methods.hasPermission = function (permission) {
+  if (this.isPrimaryAdmin) return true
+  return Array.isArray(this.permissions) && this.permissions.includes(permission)
+}
+
 UserSchema.methods.toPublic = function () {
   const obj = this.toObject()
   delete obj.password
   delete obj.refreshToken
   delete obj.passwordResetToken
   delete obj.passwordResetExpires
+  delete obj.tokenVersion
+  obj.displayRoleName = obj.displayRoleName || DEFAULT_DISPLAY_NAMES[obj.role] || obj.role
   return obj
 }
 

@@ -232,7 +232,7 @@ export default function AdminDashboardPage() {
   )
 
   return (
-    <div dir="rtl" className="space-y-6 max-w-[1400px]">
+    <div dir="rtl" className="space-y-6 ">
 
       {/* Page header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -273,7 +273,7 @@ export default function AdminDashboardPage() {
       />
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard
           label="إجمالي الطلاب"
           value={formatNumber(stats?.totalStudents)}

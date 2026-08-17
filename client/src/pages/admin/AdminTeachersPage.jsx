@@ -526,7 +526,7 @@ export default function AdminTeachersPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5 ">
 
       <div className="flex items-center justify-between gap-4">
         <div>

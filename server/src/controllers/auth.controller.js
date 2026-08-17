@@ -46,6 +46,8 @@ exports.login = async (req, res, next) => {
     }
     if (!user.isActive) return sendError(res, 'تم إيقاف حسابك. تواصل مع الإدارة.', 403)
     const accessToken = issueTokens(user, res)
+    user.lastLoginAt = new Date()
+    await user.save({ validateBeforeSave: false })
     sendSuccess(res, { user: user.toPublic(), accessToken }, 'تم تسجيل الدخول بنجاح')
   } catch (err) {
     next(err)
@@ -140,12 +142,13 @@ exports.changePassword = async (req, res, next) => {
     if (!(await user.comparePassword(currentPassword))) return sendError(res, 'كلمة المرور الحالية غير صحيحة', 400)
     user.password = newPassword
     user.tokenVersion = (user.tokenVersion || 0) + 1
+    user.mustChangePassword = false // clears the admin-issued/temporary-password flag, if set
     await user.save()
     sendPasswordChangedEmail({ to: user.email, name: user.firstNameAr }).catch(() => {})
     // Reissue tokens for this device so it stays logged in — tokenVersion
     // bump above still invalidates any other outstanding refresh token.
     const accessToken = issueTokens(user, res)
-    sendSuccess(res, { accessToken }, 'تم تغيير كلمة المرور بنجاح')
+    sendSuccess(res, { accessToken, user: user.toPublic() }, 'تم تغيير كلمة المرور بنجاح')
   } catch (err) {
     next(err)
   }

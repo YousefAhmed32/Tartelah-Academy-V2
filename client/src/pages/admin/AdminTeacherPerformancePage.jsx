@@ -229,7 +229,7 @@ export default function AdminTeacherPerformancePage() {
   )
 
   return (
-    <div dir="rtl" className="space-y-5 max-w-[1400px]">
+    <div dir="rtl" className="space-y-5 ">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">أداء المعلمين والرواتب</h1>

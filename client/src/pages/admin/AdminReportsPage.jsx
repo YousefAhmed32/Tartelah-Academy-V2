@@ -14,22 +14,17 @@ import api from '../../utils/api.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { formatCurrency, formatNumber } from '../../utils/format.js'
 
-// ── Static data ─────────────────────────────────────────────────────────────
-const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو']
-const MONTH_WEIGHTS = [0.82, 0.91, 0.87, 1.04, 1.13, 1.23]
-const SPARK = {
-  rising:  [44, 52, 49, 63, 71, 68, 80],
-  growing: [38, 47, 53, 59, 66, 73, 80],
-  steady:  [68, 65, 72, 67, 74, 70, 75],
-}
-
-function monthlyData(total, key) {
-  const base = (total || 0) / 6
-  return MONTHS_AR.map((month, i) => ({ month, [key]: Math.round(base * MONTH_WEIGHTS[i]) }))
-}
-
 // ── Sparkline ────────────────────────────────────────────────────────────────
+// `data` must be a real numeric series (see `trends.*` from GET /admin/reports
+// — server/src/controllers/admin.controller.js#getReports). Previously this
+// page faked all trend charts and KPI sparklines by distributing the current
+// total across hardcoded per-month weights / static arrays that had no
+// relationship to actual history; the backend now computes real month-by-
+// month aggregations instead, so a sparkline only renders where it reflects
+// genuine data (see KpiCard usages below — cards with no matching real
+// series simply omit the trend indicator rather than show a fake one).
 function Sparkline({ data, color }) {
+  if (!data || data.length < 2) return null
   const max = Math.max(...data)
   const min = Math.min(...data)
   const range = max - min || 1
@@ -217,6 +212,7 @@ export default function AdminReportsPage() {
       attendance:  { rate: 0, present: 0, late: 0, absent: 0, excused: 0 },
       teacherPayroll: { payableSessions: 0, nonPayableSessions: 0, lateTeacherSessions: 0 },
       topTeachers: [],
+      trends: { revenue: [], sessions: [], students: [] },
     },
   })
 
@@ -228,9 +224,14 @@ export default function AdminReportsPage() {
     )
   }
 
-  const revenueChart  = monthlyData(data?.revenue?.total,   'value')
-  const sessionsChart = monthlyData(data?.sessions?.total,  'value')
-  const studentsChart = monthlyData(data?.students?.total,  'value')
+  // Real month-by-month series from the backend (see getReports) — no
+  // client-side fabrication.
+  const revenueChart  = data?.trends?.revenue  || []
+  const sessionsChart = data?.trends?.sessions || []
+  const studentsChart = data?.trends?.students || []
+  const revenueSpark  = revenueChart.map(d => d.value)
+  const sessionsSpark = sessionsChart.map(d => d.value)
+  const studentsSpark = studentsChart.map(d => d.value)
 
   return (
     <div dir="rtl" className="space-y-8">
@@ -252,35 +253,33 @@ export default function AdminReportsPage() {
         <p className="text-[11px] font-semibold text-brand-purple uppercase tracking-widest mb-4 font-body">
           الملخص التنفيذي
         </p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard
             label="إجمالي الإيرادات"
             value={formatCurrency(data?.revenue?.total)}
             icon={DollarSign} color="#7c3aed" bg="#f5f3ff"
             trend={data?.revenue?.growth}
             trendLabel="مقارنة بالشهر الماضي"
-            sparkData={SPARK.rising}
+            sparkData={revenueSpark}
             delay={0}
           />
           <KpiCard
             label="الطلاب النشطون"
             value={formatNumber(data?.students?.active)}
             icon={UserCheck} color="#3b82f6" bg="#eff6ff"
-            sparkData={SPARK.growing}
             delay={0.06}
           />
           <KpiCard
             label="حصص هذا الشهر"
             value={formatNumber(data?.sessions?.thisMonth)}
             icon={CalendarDays} color="#E8C76A" bg="#fffbeb"
-            sparkData={SPARK.steady}
+            sparkData={sessionsSpark}
             delay={0.12}
           />
           <KpiCard
             label="معدل الحضور"
             value={`${data?.attendance?.rate || 0}%`}
             icon={CheckCircle} color="#22c55e" bg="#f0fdf4"
-            sparkData={SPARK.steady}
             delay={0.18}
           />
         </div>
@@ -293,7 +292,7 @@ export default function AdminReportsPage() {
           subtitle="نظرة على الأداء المالي للمنصة"
           icon={DollarSign} color="#7c3aed"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
           <KpiCard label="الإجمالي الكلي"       value={formatCurrency(data?.revenue?.total)}     icon={DollarSign} color="#7c3aed" bg="#f5f3ff" delay={0} />
           <KpiCard label="إيرادات هذا الشهر"     value={formatCurrency(data?.revenue?.thisMonth)} icon={Wallet}     color="#22c55e" bg="#f0fdf4" delay={0.05} />
           <KpiCard label="إيرادات الشهر الماضي"  value={formatCurrency(data?.revenue?.lastMonth)} icon={Wallet}     color="#E8C76A" bg="#fffbeb" delay={0.1} />
@@ -333,8 +332,8 @@ export default function AdminReportsPage() {
           subtitle="إحصاءات الحصص والإكمال"
           icon={CalendarDays} color="#E8C76A"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-          <KpiCard label="إجمالي الحصص"   value={formatNumber(data?.sessions?.total)}          icon={CalendarDays} color="#E8C76A" bg="#fffbeb" sparkData={SPARK.rising}  delay={0} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+          <KpiCard label="إجمالي الحصص"   value={formatNumber(data?.sessions?.total)}          icon={CalendarDays} color="#E8C76A" bg="#fffbeb" sparkData={sessionsSpark}  delay={0} />
           <KpiCard label="حصص هذا الشهر"  value={formatNumber(data?.sessions?.thisMonth)}      icon={Clock3}       color="#f97316" bg="#fff7ed"                           delay={0.06} />
           <KpiCard label="نسبة الإكمال"   value={`${data?.sessions?.completionRate || 0}%`}    icon={CheckCircle}  color="#22c55e" bg="#f0fdf4"                           delay={0.12} />
           <KpiCard label="حصص ملغاة"      value={formatNumber(data?.sessions?.cancelled)}      icon={CalendarDays} color="#ef4444" bg="#fef2f2"                           delay={0.18} />
@@ -359,7 +358,7 @@ export default function AdminReportsPage() {
           subtitle="حصص المعلمين المستحقة للدفع وإحصاءات التأخر — يعتمد المعلم راتبه على حضوره هو، بصرف النظر عن حضور الطالب"
           icon={GraduationCap} color="#7c3aed"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <KpiCard label="حصص مستحقة الدفع"  value={formatNumber(data?.teacherPayroll?.payableSessions)}    icon={CheckCircle} color="#22c55e" bg="#f0fdf4" delay={0} />
           <KpiCard label="حصص غير مستحقة"    value={formatNumber(data?.teacherPayroll?.nonPayableSessions)} icon={Clock3}      color="#ef4444" bg="#fef2f2" delay={0.06} />
           <KpiCard label="حصص تأخّر بها المعلم" value={formatNumber(data?.teacherPayroll?.lateTeacherSessions)} icon={Clock3}   color="#f59e0b" bg="#fffbeb" delay={0.12} />
@@ -373,7 +372,7 @@ export default function AdminReportsPage() {
           subtitle="توزيع سجلات الحضور حسب الحالة"
           icon={CheckCircle} color="#22c55e"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard label="حاضر"  value={formatNumber(data?.attendance?.present)} icon={CheckCircle} color="#22c55e" bg="#f0fdf4" delay={0} />
           <KpiCard label="متأخر" value={formatNumber(data?.attendance?.late)}    icon={Clock3}       color="#f59e0b" bg="#fffbeb" delay={0.06} />
           <KpiCard label="غائب"  value={formatNumber(data?.attendance?.absent)}  icon={Clock3}       color="#ef4444" bg="#fef2f2" delay={0.12} />
@@ -388,8 +387,8 @@ export default function AdminReportsPage() {
           subtitle="نمو قاعدة الطلاب وإحصاءاتهم"
           icon={Users} color="#3b82f6"
         />
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
-          <KpiCard label="إجمالي الطلاب"        value={formatNumber(data?.students?.total)}  icon={Users}     color="#3b82f6" bg="#eff6ff" sparkData={SPARK.growing} delay={0} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-5">
+          <KpiCard label="إجمالي الطلاب"        value={formatNumber(data?.students?.total)}  icon={Users}     color="#3b82f6" bg="#eff6ff" sparkData={studentsSpark} delay={0} />
           <KpiCard label="الطلاب النشطون"        value={formatNumber(data?.students?.active)} icon={UserCheck} color="#22c55e" bg="#f0fdf4"                          delay={0.06} />
           <KpiCard label="طلاب جدد هذا الشهر"   value={formatNumber(data?.students?.new)}   icon={UserPlus}  color="#8b5cf6" bg="#f5f3ff"                          delay={0.12} />
         </div>
