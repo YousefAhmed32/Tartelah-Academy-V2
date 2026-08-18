@@ -9,6 +9,7 @@ import {
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
+import Can from '../../components/shared/Can.jsx'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -540,15 +541,17 @@ export default function AdminCoursesPage() {
             {stats?.total || 0} مقرر • {stats?.totalStudents || 0} طالب مسجل
           </p>
         </div>
-        <Link
-          to={ROUTES.ADMIN_COURSE_NEW}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-          </svg>
-          دورة جديدة
-        </Link>
+        <Can permission="courses.manage">
+          <Link
+            to={ROUTES.ADMIN_COURSE_NEW}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            </svg>
+            دورة جديدة
+          </Link>
+        </Can>
       </div>
 
       {/* ── Stats Row ── */}

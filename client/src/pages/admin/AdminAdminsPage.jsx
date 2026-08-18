@@ -16,7 +16,7 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import Can from '../../components/shared/Can.jsx'
 import { useAuthStore } from '../../store/authStore.js'
-import { ROLES, ROLE_DISPLAY_NAMES, ADMIN_FAMILY_ROLES } from '../../config/constants.js'
+import { ROLES, ROLE_DISPLAY_NAMES, ADMIN_FAMILY_ROLES, PERMISSION_GROUPS } from '../../config/constants.js'
 import { formatDateAr } from '../../utils/date.js'
 
 const PERMISSION_LABELS = {
@@ -43,6 +43,28 @@ const PERMISSION_LABELS = {
   'content.schedule': 'جدولة المحتوى',
   'settings.view': 'عرض الإعدادات',
   'settings.update': 'تعديل الإعدادات',
+  'content.view': 'عرض المحتوى',
+  'students.view': 'عرض الطلاب',
+  'students.manage': 'إدارة الطلاب (تعديل / حذف / إعادة تعيين كلمة المرور)',
+  'teachers.view': 'عرض المعلمين',
+  'teachers.manage': 'إدارة المعلمين (إنشاء / تعديل / إعادة تعيين كلمة المرور)',
+  'courses.view': 'عرض المقررات والمستويات',
+  'courses.manage': 'إدارة المقررات والمستويات',
+  'packages.view': 'عرض الباقات والأسعار',
+  'packages.manage': 'إدارة الباقات والأسعار',
+  'sessions.view': 'عرض الحصص',
+  'sessions.manage': 'إدارة الحصص والتقييمات والحضور',
+  'scheduleRules.view': 'عرض جداول الحصص',
+  'scheduleRules.manage': 'إدارة جداول الحصص',
+  'subscriptions.view': 'عرض الاشتراكات',
+  'subscriptions.manage': 'إدارة الاشتراكات والمحفظة',
+  'notifications.view': 'عرض سجل الإشعارات',
+  'notifications.manage': 'إرسال إشعارات جماعية',
+  'audit.view': 'عرض سجل الأنشطة',
+  'reports.view': 'عرض التقارير وأداء المعلمين',
+  'operations.view': 'عرض مركز العمليات',
+  'enrollments.view': 'عرض طلبات التسجيل',
+  'enrollments.manage': 'مراجعة طلبات التسجيل',
 }
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
@@ -85,25 +107,103 @@ function TempPasswordModal({ open, onClose, password }) {
   )
 }
 
-function PermissionChecklist({ allPermissions, actorPermissions, isPrimaryAdminActor, selected, onChange, disabled }) {
+// Grouped permission selector — mirrors the actual Sidebar's information
+// architecture (PERMISSION_GROUPS, shared with AdminLayout.jsx's nav-item
+// tags, see config/constants.js) instead of one flat two-column wall of
+// checkboxes. Every group is independently select-all-able (with a real
+// indeterminate state), plus a global "صلاحيات كاملة" toggle and a live
+// summary count. Grant-ceiling behavior (`canGrant`) is unchanged from the
+// original flat checklist — an actor can never select a permission it
+// doesn't itself hold, Primary Admin excepted.
+function PermissionSelector({ allPermissions, actorPermissions, isPrimaryAdminActor, selected, onChange, disabled }) {
   const canGrant = (p) => isPrimaryAdminActor || actorPermissions.includes(p)
+  const grantable = allPermissions.filter(canGrant)
+  const selectedGrantable = selected.filter((p) => grantable.includes(p))
+  const isFullAdmin = grantable.length > 0 && selectedGrantable.length === grantable.length
+
   function toggle(p) {
     if (disabled || !canGrant(p)) return
     onChange(selected.includes(p) ? selected.filter((x) => x !== p) : [...selected, p])
   }
+  function selectAll() {
+    if (disabled) return
+    onChange(Array.from(new Set([...selected, ...grantable])))
+  }
+  function deselectAll() {
+    if (disabled) return
+    onChange([])
+  }
+  function toggleGroup(groupPerms, groupIsFullySelected) {
+    if (disabled) return
+    if (groupIsFullySelected) {
+      onChange(selected.filter((p) => !groupPerms.includes(p)))
+    } else {
+      onChange(Array.from(new Set([...selected, ...groupPerms.filter(canGrant)])))
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {allPermissions.map((p) => {
-        const grantable = canGrant(p)
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-violet-50/70 border border-violet-100">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" disabled={disabled} onClick={() => (isFullAdmin ? deselectAll() : selectAll())}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 ${isFullAdmin ? 'bg-violet-600 text-white' : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50'}`}>
+            <ShieldCheck size={13} /> صلاحيات كاملة
+          </button>
+          <button type="button" disabled={disabled} onClick={selectAll}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+            اختيار الكل
+          </button>
+          <button type="button" disabled={disabled} onClick={deselectAll}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+            إلغاء الكل
+          </button>
+        </div>
+        <span className="text-xs font-bold text-violet-700">{selectedGrantable.length} من {grantable.length} صلاحية محددة</span>
+      </div>
+
+      {PERMISSION_GROUPS.map((group) => {
+        const groupPerms = group.permissions.filter((p) => allPermissions.includes(p))
+        if (!groupPerms.length) return null
+        const groupGrantable = groupPerms.filter(canGrant)
+        const groupSelectedCount = groupPerms.filter((p) => selected.includes(p)).length
+        const groupFullySelected = groupSelectedCount > 0 && groupSelectedCount === groupPerms.length
+        const indeterminate = groupSelectedCount > 0 && groupSelectedCount < groupPerms.length
+
         return (
-          <label key={p} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm transition-colors ${selected.includes(p) ? 'bg-violet-50 border-violet-200 text-violet-800' : 'bg-gray-50 border-gray-100 text-gray-600'} ${(!grantable || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-violet-200'}`}>
-            <input type="checkbox" checked={selected.includes(p)} disabled={disabled || !grantable} onChange={() => toggle(p)} className="accent-violet-600 w-4 h-4" />
-            <span className="flex-1">{PERMISSION_LABELS[p] || p}</span>
-          </label>
+          <details key={group.key} open className="rounded-xl border border-gray-100 bg-gray-50/60 overflow-hidden">
+            <summary className="flex items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer select-none list-none">
+              <div className="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={groupFullySelected}
+                  ref={(el) => { if (el) el.indeterminate = indeterminate }}
+                  disabled={disabled || !groupGrantable.length}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleGroup(groupPerms, groupFullySelected)}
+                  className="accent-violet-600 w-4 h-4"
+                />
+                <span className="text-sm font-bold text-gray-700">{group.label}</span>
+              </div>
+              <span className="text-[11px] font-semibold text-gray-400">{groupSelectedCount} / {groupPerms.length}</span>
+            </summary>
+            <div className="px-3.5 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {groupPerms.map((p) => {
+                const g = canGrant(p)
+                return (
+                  <label key={p} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm transition-colors ${selected.includes(p) ? 'bg-violet-50 border-violet-200 text-violet-800' : 'bg-white border-gray-100 text-gray-600'} ${(!g || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-violet-200'}`}>
+                    <input type="checkbox" checked={selected.includes(p)} disabled={disabled || !g} onChange={() => toggle(p)} className="accent-violet-600 w-4 h-4" />
+                    <span className="flex-1">{PERMISSION_LABELS[p] || p}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </details>
         )
       })}
+
       {!isPrimaryAdminActor && (
-        <p className="col-span-full text-[11px] text-gray-400 mt-1">
+        <p className="text-[11px] text-gray-400">
           الصلاحيات المعطّلة تتجاوز صلاحياتك الحالية — لا يمكنك منح ما لا تملكه.
         </p>
       )}
@@ -174,7 +274,7 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
         {form.role && (
           <div>
             <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">الصلاحيات</label>
-            <PermissionChecklist
+            <PermissionSelector
               allPermissions={allPermissions}
               actorPermissions={actor.permissions}
               isPrimaryAdminActor={actor.isPrimaryAdmin()}
@@ -334,7 +434,7 @@ function EditAccountDrawer({ account, allPermissions, actor, onClose, onUpdated 
                 <p className="py-8 text-center text-sm text-gray-400">لا يمكنك تعديل صلاحياتك الخاصة.</p>
               ) : (
                 <div className="py-4 space-y-4">
-                  <PermissionChecklist
+                  <PermissionSelector
                     allPermissions={allPermissions}
                     actorPermissions={actor.permissions}
                     isPrimaryAdminActor={actor.isPrimaryAdmin()}

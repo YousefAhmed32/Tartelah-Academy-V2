@@ -1,12 +1,11 @@
 const router = require('express').Router()
 const ctrl = require('../controllers/operations.controller')
 const { authenticate } = require('../middleware/auth.middleware')
-const { isAdmin } = require('../middleware/rbac.middleware')
+const { requirePermission } = require('../middleware/rbac.middleware')
 
-// Admin Operations Center — entirely admin-only, mirrors the guard already
-// used for every other admin-only surface (admin.routes.js, the
-// teacher-performance admin.* routes).
-router.use(authenticate, isAdmin)
+// Admin Operations Center — gated by operations.view for the whole module
+// (monitoring dashboard + its one review-triage mutation).
+router.use(authenticate, requirePermission('operations.view'))
 
 router.get('/live', ctrl.getLiveSummary)
 router.get('/timeline', ctrl.getTimeline)

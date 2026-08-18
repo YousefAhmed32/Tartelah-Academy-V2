@@ -75,7 +75,12 @@ describe('createUser — admins.create gate', () => {
     User.findOne.mockResolvedValue(null)
     User.create.mockResolvedValue({ toPublic: () => ({ _id: 'u3', role: 'operator' }) })
     const req = {
-      user: withPermission({ role: 'assistant_admin', permissions: ['users.view', 'admins.create', 'dashboard.view', 'content.create', 'content.update'] }),
+      // Includes the full operator default set (see config/permissions.js
+      // DEFAULT_PERMISSIONS_BY_ROLE.operator) since the request below omits
+      // an explicit `permissions` array, so createUser falls back to
+      // granting those defaults — which still must not exceed what this
+      // actor itself holds.
+      user: withPermission({ role: 'assistant_admin', permissions: ['users.view', 'admins.create', 'dashboard.view', 'content.view', 'content.create', 'content.update', 'sessions.view', 'enrollments.view'] }),
       body: { role: 'operator', email: 'op2@x.com', firstNameAr: 'أ', lastNameAr: 'ب' },
       ip: '1.1.1.1',
     }

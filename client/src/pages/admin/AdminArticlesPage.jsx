@@ -8,6 +8,7 @@ import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Modal from '../../components/ui/Modal.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
+import Can from '../../components/shared/Can.jsx'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -266,11 +267,13 @@ export default function AdminArticlesPage() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
             الفئات
           </button>
-          <button onClick={() => navigate(ROUTES.ADMIN_ARTICLE_NEW)}
-            className="px-5 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors flex items-center gap-2 shadow-md shadow-violet-200">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-            مقال جديد
-          </button>
+          <Can permission="content.create">
+            <button onClick={() => navigate(ROUTES.ADMIN_ARTICLE_NEW)}
+              className="px-5 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors flex items-center gap-2 shadow-md shadow-violet-200">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              مقال جديد
+            </button>
+          </Can>
         </div>
       </div>
 

@@ -70,6 +70,7 @@ export const PERMISSIONS = {
   ROLES_UPDATE: 'roles.update',
   ROLES_DELETE: 'roles.delete',
   DASHBOARD_VIEW: 'dashboard.view',
+  CONTENT_VIEW: 'content.view',
   CONTENT_CREATE: 'content.create',
   CONTENT_UPDATE: 'content.update',
   CONTENT_DELETE: 'content.delete',
@@ -77,7 +78,70 @@ export const PERMISSIONS = {
   CONTENT_SCHEDULE: 'content.schedule',
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_UPDATE: 'settings.update',
+  STUDENTS_VIEW: 'students.view',
+  STUDENTS_MANAGE: 'students.manage',
+  TEACHERS_VIEW: 'teachers.view',
+  TEACHERS_MANAGE: 'teachers.manage',
+  COURSES_VIEW: 'courses.view',
+  COURSES_MANAGE: 'courses.manage',
+  PACKAGES_VIEW: 'packages.view',
+  PACKAGES_MANAGE: 'packages.manage',
+  SESSIONS_VIEW: 'sessions.view',
+  SESSIONS_MANAGE: 'sessions.manage',
+  SCHEDULE_RULES_VIEW: 'scheduleRules.view',
+  SCHEDULE_RULES_MANAGE: 'scheduleRules.manage',
+  SUBSCRIPTIONS_VIEW: 'subscriptions.view',
+  SUBSCRIPTIONS_MANAGE: 'subscriptions.manage',
+  NOTIFICATIONS_VIEW: 'notifications.view',
+  NOTIFICATIONS_MANAGE: 'notifications.manage',
+  AUDIT_VIEW: 'audit.view',
+  REPORTS_VIEW: 'reports.view',
+  OPERATIONS_VIEW: 'operations.view',
+  ENROLLMENTS_VIEW: 'enrollments.view',
+  ENROLLMENTS_MANAGE: 'enrollments.manage',
 }
+
+// Permission catalog grouped to mirror the actual admin Sidebar's IA (see
+// AdminLayout.jsx's NAV_GROUPS) — single source of truth reused by both the
+// nav's per-item `permission` tags and AdminAdminsPage.jsx's grouped
+// permission selector, so the two can never drift into different taxonomies.
+export const PERMISSION_GROUPS = [
+  {
+    key: 'platform', label: 'المنصة',
+    permissions: ['dashboard.view', 'operations.view', 'enrollments.view', 'enrollments.manage'],
+  },
+  {
+    key: 'accounts', label: 'إدارة المستخدمين',
+    permissions: [
+      'students.view', 'students.manage', 'teachers.view', 'teachers.manage',
+      'users.view', 'users.create', 'users.update', 'users.disable', 'users.delete', 'users.reset_password',
+      'admins.create', 'admins.update', 'admins.disable',
+    ],
+  },
+  {
+    key: 'academy', label: 'الأكاديمية',
+    permissions: [
+      'packages.view', 'packages.manage', 'courses.view', 'courses.manage',
+      'sessions.view', 'sessions.manage', 'scheduleRules.view', 'scheduleRules.manage',
+      'subscriptions.view', 'subscriptions.manage',
+    ],
+  },
+  {
+    key: 'content', label: 'المحتوى',
+    permissions: ['content.view', 'content.create', 'content.update', 'content.delete', 'content.publish', 'content.schedule'],
+  },
+  {
+    key: 'reports_system', label: 'التقارير والنظام',
+    permissions: [
+      'reports.view', 'notifications.view', 'notifications.manage', 'audit.view',
+      'settings.view', 'settings.update',
+    ],
+  },
+  {
+    key: 'roles_permissions', label: 'الأدوار والصلاحيات',
+    permissions: ['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'permissions.view', 'permissions.assign'],
+  },
+]
 
 export const ROUTES = {
   HOME: '/',

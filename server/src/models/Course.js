@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { TEACHING_CATEGORIES } = require('../config/categories')
 
 const SEOSchema = new mongoose.Schema({
   title:        { type: String, trim: true, maxlength: 200 },
@@ -37,7 +38,7 @@ const CourseSchema = new mongoose.Schema({
   introVideoUrl:  { type: String, trim: true, default: '' }, // YouTube URL
 
   // ── Classification ────────────────────────────────────────────────────────────
-  category:    { type: String, enum: ['tajweed', 'hifz', 'nazra', 'arabic', 'quran', 'other'], default: 'other' },
+  category:    { type: String, enum: TEACHING_CATEGORIES, default: 'other' },
   subCategory: { type: String, trim: true },
   tags:        [{ type: String, trim: true, lowercase: true }],
   language:    { type: String, enum: ['ar', 'en', 'both'], default: 'ar' },

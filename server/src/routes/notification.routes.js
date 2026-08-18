@@ -1,7 +1,7 @@
 const router = require('express').Router()
 const ctrl = require('../controllers/notification.controller')
 const { authenticate } = require('../middleware/auth.middleware')
-const { isAdmin } = require('../middleware/rbac.middleware')
+const { requirePermission } = require('../middleware/rbac.middleware')
 
 router.use(authenticate)
 
@@ -16,7 +16,7 @@ router.patch('/:id/unread',        ctrl.markOneUnread)
 router.patch('/:id/archive',       ctrl.archiveOne)
 router.patch('/:id/unarchive',     ctrl.unarchiveOne)
 router.delete('/:id',              ctrl.deleteNotification)
-router.post('/admin/broadcast',    isAdmin, ctrl.broadcastNotification)
-router.get('/admin/logs',          isAdmin, ctrl.getAdminNotificationLogs)
+router.post('/admin/broadcast',    requirePermission('notifications.manage'), ctrl.broadcastNotification)
+router.get('/admin/logs',          requirePermission('notifications.view'), ctrl.getAdminNotificationLogs)
 
 module.exports = router

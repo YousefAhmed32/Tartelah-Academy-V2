@@ -15,6 +15,7 @@ const { logAction } = require('../services/audit.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { isValidGender } = require('../config/teacherIdentity')
+const { validateTeacherProfileFields } = require('../config/teacherProfile')
 const crypto = require('crypto')
 
 const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -367,6 +368,18 @@ exports.createTeacher = async (req, res, next) => {
     if (req.body.gender !== undefined && !isValidGender(req.body.gender)) {
       return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
     }
+    // Category, hourly rate, and available shifts are mandatory when
+    // creating a teacher (unlike on update, where legacy teachers may still
+    // be missing them — see updateTeacher below).
+    if (!req.body.category) return sendError(res, 'يجب تحديد فئة المعلم', 400)
+    if (req.body.hourlyRate === undefined || req.body.hourlyRate === null || req.body.hourlyRate === '') {
+      return sendError(res, 'يجب تحديد سعر ساعة التدريس', 400)
+    }
+    if (!Array.isArray(req.body.availableShifts) || !req.body.availableShifts.length) {
+      return sendError(res, 'يجب تحديد شيفت واحد على الأقل', 400)
+    }
+    const profileError = validateTeacherProfileFields(req.body)
+    if (profileError) return sendError(res, profileError, 400)
     const user = await User.create({ ...req.body, role: 'teacher' })
     sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
   } catch (err) { next(err) }
@@ -377,9 +390,16 @@ exports.updateTeacher = async (req, res, next) => {
     if (req.body.gender !== undefined && req.body.gender !== null && !isValidGender(req.body.gender)) {
       return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
     }
-    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession', 'gender']
+    // Format/enum validation only — presence isn't enforced here so editing
+    // an unrelated field on a legacy teacher who predates this feature never
+    // gets blocked (see model comments on category/hourlyRate/availableShifts).
+    const profileError = validateTeacherProfileFields(req.body)
+    if (profileError) return sendError(res, profileError, 400)
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession', 'gender', 'category', 'hourlyRate', 'availableShifts']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    if (updates.hourlyRate === '') updates.hourlyRate = 0
+    if (updates.category === '') updates.category = null
     const user = await User.findOneAndUpdate(
       { _id: req.params.id, role: 'teacher' },
       updates,

@@ -1,7 +1,7 @@
 const router = require('express').Router()
 const ctrl = require('../controllers/wallet.controller')
 const { authenticate } = require('../middleware/auth.middleware')
-const { isAdmin, isAdminOrTeacher, authorize } = require('../middleware/rbac.middleware')
+const { isAdminOrTeacher, requirePermission, authorize } = require('../middleware/rbac.middleware')
 
 router.use(authenticate)
 
@@ -11,10 +11,10 @@ router.get('/me', authorize('student'), ctrl.getMyWallet)
 router.get('/:studentId', isAdminOrTeacher, ctrl.getStudentWallet)
 router.get('/:studentId/transactions', isAdminOrTeacher, ctrl.getStudentTransactions)
 
-router.post('/:studentId/adjust', isAdmin, ctrl.adjustWallet)
-router.post('/:studentId/freeze', isAdmin, ctrl.freezeWallet)
-router.post('/:studentId/resume', isAdmin, ctrl.resumeWallet)
-router.post('/:studentId/transfer', isAdmin, ctrl.transferLessons)
-router.post('/:studentId/compensation', isAdmin, ctrl.grantCompensation)
+router.post('/:studentId/adjust', requirePermission('subscriptions.manage'), ctrl.adjustWallet)
+router.post('/:studentId/freeze', requirePermission('subscriptions.manage'), ctrl.freezeWallet)
+router.post('/:studentId/resume', requirePermission('subscriptions.manage'), ctrl.resumeWallet)
+router.post('/:studentId/transfer', requirePermission('subscriptions.manage'), ctrl.transferLessons)
+router.post('/:studentId/compensation', requirePermission('subscriptions.manage'), ctrl.grantCompensation)
 
 module.exports = router

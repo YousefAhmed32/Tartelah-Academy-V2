@@ -10,6 +10,7 @@ import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
+import Can from '../../components/shared/Can.jsx'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',   bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -467,10 +468,12 @@ export default function AdminSessionsPage() {
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة الحصص</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} حصة — صلاحيات كاملة على جميع الحصص</p>
         </div>
-        <button onClick={() => setCreateModal(true)}
-          className="flex items-center gap-2 h-10 px-5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">
-          <Plus size={16} /> حصة جديدة
-        </button>
+        <Can permission="sessions.manage">
+          <button onClick={() => setCreateModal(true)}
+            className="flex items-center gap-2 h-10 px-5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">
+            <Plus size={16} /> حصة جديدة
+          </button>
+        </Can>
       </div>
 
       {/* Filters */}

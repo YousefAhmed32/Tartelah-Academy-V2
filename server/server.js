@@ -38,6 +38,9 @@ connectDB().then(async () => {
   const { rbacUpgrade } = require('./src/migrations/rbacUpgrade')
   await rbacUpgrade().catch(err => console.warn('[migration] rbacUpgrade warning:', err.message))
 
+  const { rbacModulePermissionsBackfill } = require('./src/migrations/rbacModulePermissionsBackfill')
+  await rbacModulePermissionsBackfill().catch(err => console.warn('[migration] rbacModulePermissionsBackfill warning:', err.message))
+
   if (process.env.NODE_ENV !== 'test') {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')

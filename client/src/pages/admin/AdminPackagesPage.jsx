@@ -9,6 +9,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import { formatCurrency } from '../../utils/format.js'
 import { usePackages } from '../../hooks/usePackages.js'
 import { QK } from '../../services/queryKeys.js'
+import Can from '../../components/shared/Can.jsx'
 
 const initialForm = {
   nameAr: '', name: '', descriptionAr: '', price: '', durationDays: 30,
@@ -348,16 +349,18 @@ export default function AdminPackagesPage() {
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">الباقات والأسعار</h1>
           <p className="text-sm text-gray-500 mt-0.5">{packages.length} باقة — كل باقة قابلة للتعديل والإدارة</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity"
-          style={{ background: '#7c3aed' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          باقة جديدة
-        </button>
+        <Can permission="packages.manage">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity"
+            style={{ background: '#7c3aed' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            باقة جديدة
+          </button>
+        </Can>
       </div>
 
       {/* Summary Bar */}
@@ -412,13 +415,15 @@ export default function AdminPackagesPage() {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/></svg>
           </div>
           <p className="font-semibold text-gray-500">لا توجد باقات بعد</p>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: '#7c3aed' }}
-          >
-            إضافة أول باقة
-          </button>
+          <Can permission="packages.manage">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: '#7c3aed' }}
+            >
+              إضافة أول باقة
+            </button>
+          </Can>
         </div>
       )}
 

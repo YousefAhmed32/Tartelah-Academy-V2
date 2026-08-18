@@ -27,6 +27,7 @@ const ALL_PERMISSIONS = [
   'roles.update',
   'roles.delete',
   'dashboard.view',
+  'content.view',
   'content.create',
   'content.update',
   'content.delete',
@@ -34,6 +35,32 @@ const ALL_PERMISSIONS = [
   'content.schedule',
   'settings.view',
   'settings.update',
+  // Module permissions below extend PBAC coverage beyond Team Management to
+  // the rest of the admin product surface (see docs/ RBAC notes). Each
+  // module gets a .view/.manage pair — .manage covers create/update/delete/
+  // publish-style mutations for that module, matching the .view/.update
+  // granularity already established by settings.*.
+  'students.view',
+  'students.manage',
+  'teachers.view',
+  'teachers.manage',
+  'courses.view',
+  'courses.manage',
+  'packages.view',
+  'packages.manage',
+  'sessions.view',
+  'sessions.manage',
+  'scheduleRules.view',
+  'scheduleRules.manage',
+  'subscriptions.view',
+  'subscriptions.manage',
+  'notifications.view',
+  'notifications.manage',
+  'audit.view',
+  'reports.view',
+  'operations.view',
+  'enrollments.view',
+  'enrollments.manage',
 ]
 
 // Internal role identifiers (User.role). Stable — never rename these values,
@@ -73,17 +100,36 @@ const DEFAULT_PERMISSIONS_BY_ROLE = {
   [ROLES.ADMIN]: [
     'users.view', 'users.create', 'users.update', 'users.disable', 'users.reset_password',
     'dashboard.view', 'roles.view', 'permissions.view',
-    'content.create', 'content.update', 'content.delete', 'content.publish', 'content.schedule',
+    'content.view', 'content.create', 'content.update', 'content.delete', 'content.publish', 'content.schedule',
     'settings.view',
+    // Full module coverage — a plain 'admin' account has always had full
+    // access to every one of these via the legacy role-based gate; this
+    // keeps that real-world behavior intact now that the gates are
+    // permission-based instead of role-based. Deliberately still excludes
+    // admins.*/permissions.assign/users.delete/roles.*/settings.update —
+    // same reasoning as above, unchanged.
+    'students.view', 'students.manage',
+    'teachers.view', 'teachers.manage',
+    'courses.view', 'courses.manage',
+    'packages.view', 'packages.manage',
+    'sessions.view', 'sessions.manage',
+    'scheduleRules.view', 'scheduleRules.manage',
+    'subscriptions.view', 'subscriptions.manage',
+    'notifications.view', 'notifications.manage',
+    'audit.view', 'reports.view', 'operations.view',
+    'enrollments.view', 'enrollments.manage',
   ],
   [ROLES.ASSISTANT_ADMIN]: [
-    'users.view', 'dashboard.view', 'content.create', 'content.update', 'content.publish',
+    'users.view', 'dashboard.view', 'content.view', 'content.create', 'content.update', 'content.publish',
+    'students.view', 'teachers.view', 'courses.view', 'enrollments.view',
   ],
   [ROLES.OPERATOR]: [
-    'dashboard.view', 'content.create', 'content.update',
+    'dashboard.view', 'content.view', 'content.create', 'content.update',
+    'sessions.view', 'enrollments.view',
   ],
   [ROLES.MANAGER]: [
     'users.view', 'dashboard.view', 'settings.view',
+    'students.view', 'teachers.view', 'reports.view', 'subscriptions.view',
   ],
   [ROLES.STAFF]: [
     'dashboard.view',

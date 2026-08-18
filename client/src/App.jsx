@@ -5,6 +5,7 @@ import { useAuthStore } from './store/authStore.js'
 import { ROUTES } from './config/constants.js'
 import LoadingPage from './components/shared/LoadingPage.jsx'
 import MustChangePasswordGate from './components/shared/MustChangePasswordGate.jsx'
+import RequirePermission from './components/shared/RequirePermission.jsx'
 import { queryClient } from './config/queryClient.js'
 import api from './utils/api.js'
 import { QK } from './services/queryKeys.js'
@@ -193,33 +194,37 @@ export default function App() {
           <Route path={ROUTES.TEACHER_SETTINGS} element={<TeacherSettingsPage />} />
         </Route>
 
-        {/* Admin */}
+        {/* Admin — every page wrapped in RequirePermission using the exact
+            permission its Sidebar entry declares (see AdminLayout.jsx's
+            NAV_GROUPS) and its backend route requires (see
+            requirePermission(...) in the matching *.routes.js), so
+            Sidebar/Route/Backend can never disagree. */}
         <Route element={<AdminLayout />}>
-          <Route path={ROUTES.ADMIN_DASHBOARD} element={<AdminDashboardPage />} />
-          <Route path={ROUTES.ADMIN_STUDENTS} element={<AdminStudentsPage />} />
-          <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<AdminStudentDetailPage />} />
-          <Route path={ROUTES.ADMIN_TEACHERS} element={<AdminTeachersPage />} />
-          <Route path={ROUTES.ADMIN_ADMINS} element={<AdminAdminsPage />} />
-          <Route path={ROUTES.ADMIN_COURSES} element={<AdminCoursesPage />} />
-          <Route path={ROUTES.ADMIN_COURSE_NEW} element={<AdminCourseFormPage />} />
-          <Route path={ROUTES.ADMIN_COURSE_EDIT} element={<AdminCourseFormPage />} />
-          <Route path={ROUTES.ADMIN_SESSIONS} element={<AdminSessionsPage />} />
-          <Route path={ROUTES.ADMIN_SCHEDULE_RULES} element={<AdminScheduleRulesPage />} />
-          <Route path={ROUTES.ADMIN_PACKAGES} element={<AdminPackagesPage />} />
-          <Route path={ROUTES.ADMIN_SUBSCRIPTIONS} element={<AdminSubscriptionsPage />} />
-          <Route path={ROUTES.ADMIN_ENROLLMENTS} element={<AdminEnrollmentsPage />} />
-          <Route path={ROUTES.ADMIN_WEBSITE} element={<AdminWebsitePage />} />
-          <Route path={ROUTES.ADMIN_REPORTS} element={<AdminReportsPage />} />
-          <Route path={ROUTES.ADMIN_NOTIFICATIONS} element={<AdminNotificationsPage />} />
-          <Route path={ROUTES.ADMIN_AUDIT_LOGS} element={<AdminAuditLogsPage />} />
-          <Route path={ROUTES.ADMIN_SETTINGS} element={<AdminSettingsPage />} />
-          <Route path={ROUTES.ADMIN_ARTICLES} element={<AdminArticlesPage />} />
-          <Route path={ROUTES.ADMIN_ARTICLE_NEW} element={<AdminArticleEditorPage />} />
-          <Route path={ROUTES.ADMIN_ARTICLE_EDIT} element={<AdminArticleEditorPage />} />
-          <Route path={ROUTES.ADMIN_CONTACT_MESSAGES} element={<AdminContactPage />} />
-          <Route path={ROUTES.ADMIN_SUCCESS_STORIES} element={<AdminSuccessStoriesPage />} />
-          <Route path={ROUTES.ADMIN_TEACHER_PERFORMANCE} element={<AdminTeacherPerformancePage />} />
-          <Route path={ROUTES.ADMIN_OPERATIONS} element={<AdminOperationsCenterPage />} />
+          <Route path={ROUTES.ADMIN_DASHBOARD} element={<RequirePermission permission="dashboard.view"><AdminDashboardPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_STUDENTS} element={<RequirePermission permission="students.view"><AdminStudentsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<RequirePermission permission="students.view"><AdminStudentDetailPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHERS} element={<RequirePermission permission="teachers.view"><AdminTeachersPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ADMINS} element={<RequirePermission permission="users.view"><AdminAdminsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_COURSES} element={<RequirePermission permission="courses.view"><AdminCoursesPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_COURSE_NEW} element={<RequirePermission permission="courses.manage"><AdminCourseFormPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_COURSE_EDIT} element={<RequirePermission permission="courses.manage"><AdminCourseFormPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SESSIONS} element={<RequirePermission permission="sessions.view"><AdminSessionsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SCHEDULE_RULES} element={<RequirePermission permission="scheduleRules.view"><AdminScheduleRulesPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_PACKAGES} element={<RequirePermission permission="packages.view"><AdminPackagesPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SUBSCRIPTIONS} element={<RequirePermission permission="subscriptions.view"><AdminSubscriptionsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ENROLLMENTS} element={<RequirePermission permission="enrollments.view"><AdminEnrollmentsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_WEBSITE} element={<RequirePermission permission="content.view"><AdminWebsitePage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_REPORTS} element={<RequirePermission permission="reports.view"><AdminReportsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_NOTIFICATIONS} element={<RequirePermission permission="notifications.view"><AdminNotificationsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_AUDIT_LOGS} element={<RequirePermission permission="audit.view"><AdminAuditLogsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SETTINGS} element={<RequirePermission permission="settings.view"><AdminSettingsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ARTICLES} element={<RequirePermission permission="content.view"><AdminArticlesPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ARTICLE_NEW} element={<RequirePermission permission="content.create"><AdminArticleEditorPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ARTICLE_EDIT} element={<RequirePermission permission="content.update"><AdminArticleEditorPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_CONTACT_MESSAGES} element={<RequirePermission permission="content.view"><AdminContactPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SUCCESS_STORIES} element={<RequirePermission permission="content.view"><AdminSuccessStoriesPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHER_PERFORMANCE} element={<RequirePermission permission="reports.view"><AdminTeacherPerformancePage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_OPERATIONS} element={<RequirePermission permission="operations.view"><AdminOperationsCenterPage /></RequirePermission>} />
         </Route>
 
         {/* AI */}

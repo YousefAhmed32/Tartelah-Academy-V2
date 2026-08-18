@@ -15,6 +15,7 @@ import LessonTransactionTable from '../../components/shared/LessonTransactionTab
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
 import { QK } from '../../services/queryKeys.js'
+import Can from '../../components/shared/Can.jsx'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -266,7 +267,7 @@ export default function AdminSubscriptionsPage() {
   return (
     <div dir="rtl">
       <PageHeader title="الاشتراكات" subtitle={`${data?.total || 0} اشتراك`}
-        actions={<Button variant="purple" onClick={() => setShowCreate(true)}><Plus size={14} className="ml-1" /> اشتراك جديد</Button>} />
+        actions={<Can permission="subscriptions.manage"><Button variant="purple" onClick={() => setShowCreate(true)}><Plus size={14} className="ml-1" /> اشتراك جديد</Button></Can>} />
 
       {/* Search + Status tabs */}
       <div className="flex items-center gap-3 flex-wrap mb-5">

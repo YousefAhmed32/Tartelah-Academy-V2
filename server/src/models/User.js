@@ -1,6 +1,8 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
 const { ALL_ROLES, DEFAULT_DISPLAY_NAMES } = require('../config/permissions')
+const { TEACHING_CATEGORIES } = require('../config/categories')
+const { SHIFT_VALUES } = require('../config/teacherProfile')
 
 const UserSchema = new mongoose.Schema({
   firstNameAr: { type: String, required: true, trim: true },
@@ -55,6 +57,21 @@ const UserSchema = new mongoose.Schema({
   // (e.g. from their Arabic name). Only meaningful for role: 'teacher'.
   gender: { type: String, enum: ['male', 'female'] },
   salaryPerSession: { type: Number, default: 0 },
+  // Teacher's subject/category specialization ("الفئة") — reuses the same
+  // taxonomy as Course.category (config/categories.js) rather than a
+  // separate list. Not required/defaulted, same convention as `gender`:
+  // legacy teachers with no value are simply uncategorized, never guessed.
+  // Only meaningful for role: 'teacher'.
+  category: { type: String, enum: TEACHING_CATEGORIES },
+  // Hourly teaching rate ("سعر ساعة التدريس") — distinct from
+  // salaryPerSession, which is the per-session payroll amount consumed by
+  // teacherPerformance.service.js. Only meaningful for role: 'teacher'.
+  hourlyRate: { type: Number, default: 0, min: [0, 'سعر ساعة التدريس يجب أن يكون رقمًا موجبًا'] },
+  // Structured shift availability ("أوقات الشيفت المتاحة") — an array of
+  // enum values rather than a single string/boolean pair so it can safely
+  // support more shifts later without a migration. Only meaningful for
+  // role: 'teacher'.
+  availableShifts: { type: [String], enum: SHIFT_VALUES, default: [] },
   isActive: { type: Boolean, default: true },
   isEmailVerified: { type: Boolean, default: false },
   meetingLinks: [{

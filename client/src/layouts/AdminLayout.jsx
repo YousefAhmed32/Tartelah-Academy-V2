@@ -11,7 +11,7 @@ import Spinner from '../components/ui/Spinner.jsx'
 import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import api from '../utils/api.js'
-import { ROUTES, ROLES, getFileUrl } from '../config/constants.js'
+import { ROUTES, getFileUrl } from '../config/constants.js'
 
 function ContentFallback() {
   return (
@@ -26,15 +26,15 @@ const NAV_GROUPS = [
     label: 'المنصة',
     items: [
       {
-        to: ROUTES.ADMIN_DASHBOARD, label: 'لوحة التحكم', end: true,
+        to: ROUTES.ADMIN_DASHBOARD, label: 'لوحة التحكم', end: true, permission: 'dashboard.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11 12 4l9 7M5 10v9h5v-5h4v5h5v-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_OPERATIONS, label: 'مركز العمليات',
+        to: ROUTES.ADMIN_OPERATIONS, label: 'مركز العمليات', permission: 'operations.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_ENROLLMENTS, label: 'طلبات التسجيل', enrollment: true,
+        to: ROUTES.ADMIN_ENROLLMENTS, label: 'طلبات التسجيل', enrollment: true, permission: 'enrollments.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M14 2v6h6M9 13l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
     ]
@@ -43,11 +43,11 @@ const NAV_GROUPS = [
     label: 'إدارة المستخدمين',
     items: [
       {
-        to: ROUTES.ADMIN_STUDENTS, label: 'الطلاب',
+        to: ROUTES.ADMIN_STUDENTS, label: 'الطلاب', permission: 'students.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="17" cy="9" r="2.3" stroke="currentColor" strokeWidth="1.8"/><path d="M15.5 19a4 4 0 0 1 6-3.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_TEACHERS, label: 'المعلمون',
+        to: ROUTES.ADMIN_TEACHERS, label: 'المعلمون', permission: 'teachers.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
@@ -63,23 +63,23 @@ const NAV_GROUPS = [
     label: 'الأكاديمية',
     items: [
       {
-        to: ROUTES.ADMIN_PACKAGES, label: 'الباقات والأسعار',
+        to: ROUTES.ADMIN_PACKAGES, label: 'الباقات والأسعار', permission: 'packages.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/></svg>
       },
       {
-        to: ROUTES.ADMIN_COURSES, label: 'المقررات والمستويات',
+        to: ROUTES.ADMIN_COURSES, label: 'المقررات والمستويات', permission: 'courses.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7"/><rect x="13" y="4" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7"/><rect x="3" y="13" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7"/><rect x="13" y="13" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SESSIONS, label: 'الحصص',
+        to: ROUTES.ADMIN_SESSIONS, label: 'الحصص', permission: 'sessions.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SCHEDULE_RULES, label: 'جداول الحصص',
+        to: ROUTES.ADMIN_SCHEDULE_RULES, label: 'جداول الحصص', permission: 'scheduleRules.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2" stroke="currentColor" strokeWidth="1.8"/><path d="M12 3v6l2-1.5L16 9V3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SUBSCRIPTIONS, label: 'الاشتراكات',
+        to: ROUTES.ADMIN_SUBSCRIPTIONS, label: 'الاشتراكات', permission: 'subscriptions.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/><path d="M6 14h4M14 14h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
     ]
@@ -88,19 +88,19 @@ const NAV_GROUPS = [
     label: 'المحتوى',
     items: [
       {
-        to: ROUTES.ADMIN_ARTICLES, label: 'المقالات والمدونة',
+        to: ROUTES.ADMIN_ARTICLES, label: 'المقالات والمدونة', permission: 'content.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_CONTACT_MESSAGES, label: 'رسائل التواصل', contactMessages: true,
+        to: ROUTES.ADMIN_CONTACT_MESSAGES, label: 'رسائل التواصل', contactMessages: true, permission: 'content.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_WEBSITE, label: 'إدارة الموقع',
+        to: ROUTES.ADMIN_WEBSITE, label: 'إدارة الموقع', permission: 'content.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/><path d="M3 12h18M12 3c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.2-4-10s1.5-7.3 4-10Z" stroke="currentColor" strokeWidth="1.8"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SUCCESS_STORIES, label: 'قصص النجاح',
+        to: ROUTES.ADMIN_SUCCESS_STORIES, label: 'قصص النجاح', permission: 'content.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l3.09 6.26L22 9.77l-5 4.87 1.18 6.88L12 18.27l-6.18 3.25L7 14.64l-5-4.87 6.91-1.01L12 2.5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
       },
     ]
@@ -109,23 +109,23 @@ const NAV_GROUPS = [
     label: 'التقارير والنظام',
     items: [
       {
-        to: ROUTES.ADMIN_REPORTS, label: 'التقارير والإحصائيات',
+        to: ROUTES.ADMIN_REPORTS, label: 'التقارير والإحصائيات', permission: 'reports.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_TEACHER_PERFORMANCE, label: 'أداء المعلمين',
+        to: ROUTES.ADMIN_TEACHER_PERFORMANCE, label: 'أداء المعلمين', permission: 'reports.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9 8.5 11 10.5 15.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_NOTIFICATIONS, label: 'الإشعارات', notification: true,
+        to: ROUTES.ADMIN_NOTIFICATIONS, label: 'الإشعارات', notification: true, permission: 'notifications.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_AUDIT_LOGS, label: 'سجل الأنشطة',
+        to: ROUTES.ADMIN_AUDIT_LOGS, label: 'سجل الأنشطة', permission: 'audit.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SETTINGS, label: 'الإعدادات',
+        to: ROUTES.ADMIN_SETTINGS, label: 'الإعدادات', permission: 'settings.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.47V21a2 2 0 0 1-4 0v-.09A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.6 1.6 0 0 0 4.6 15a1.6 1.6 0 0 0-1.47-1H3a2 2 0 0 1 0-4h.09A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.6 1.6 0 0 0 9 4.6a1.6 1.6 0 0 0 1-1.47V3a2 2 0 0 1 4 0v.09a1.6 1.6 0 0 0 1 1.47 1.6 1.6 0 0 0 1.8-.3l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.6 1.6 0 0 0 19.4 9a1.6 1.6 0 0 0 1.47 1H21a2 2 0 0 1 0 4h-.09a1.6 1.6 0 0 0-1.51 1Z" stroke="currentColor" strokeWidth="1.8"/></svg>
       },
     ]
@@ -149,18 +149,15 @@ function navLinkClass({ isActive }) {
   ].join(' ')
 }
 
-// Existing admin sub-resources (students, teachers, sessions, etc.) are still
-// gated strictly to role==='admin' on the backend (server/src/routes/
-// admin.routes.js — unchanged by the RBAC+PBAC upgrade, to avoid widening an
-// already-working authorization boundary). Nav items with no `permission`
-// tag are that legacy surface, so they only render for the literal 'admin'
-// role; items tagged with a `permission` (e.g. Team Management) render for
-// whoever actually holds it, across the whole admin-family hierarchy. This
-// keeps assistant_admin/operator/manager/staff from seeing links that would
-// just 403.
-function isNavItemVisible(item, role, hasPermission) {
-  if (item.permission) return hasPermission(item.permission)
-  return role === ROLES.ADMIN
+// Every nav item now declares the exact module permission that gates its
+// backend routes (see server/src/config/permissions.js + the matching
+// requirePermission(...) calls across admin.routes.js/course.routes.js/...).
+// This is the single canonical check — same permission string the route
+// guard (RequirePermission, App.jsx) and the backend middleware use — so the
+// Sidebar can never show a link the user's own effective permissions don't
+// actually back.
+function isNavItemVisible(item, hasPermission) {
+  return hasPermission(item.permission)
 }
 
 // The header used to hardcode "مركز العمليات" (Operations Center) regardless
@@ -177,7 +174,7 @@ function currentPageTitle(pathname) {
 }
 
 export default function AdminLayout() {
-  const { user, isAuthenticated, getRole, hasAdminAccess, hasPermission, logout } = useAuthStore()
+  const { user, isAuthenticated, hasAdminAccess, hasPermission, logout } = useAuthStore()
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
@@ -188,14 +185,14 @@ export default function AdminLayout() {
     queryKey: ['admin', 'enrollments', 'pending-count'],
     queryFn: () => api.get('/enrollments/pending-count').then(r => r.data.data?.count || 0),
     refetchInterval: 60000,
-    enabled: isAuthenticated && getRole() === ROLES.ADMIN,
+    enabled: isAuthenticated && hasPermission('enrollments.view'),
   })
 
   const { data: newContactMessages = 0 } = useQuery({
     queryKey: ['admin', 'contact-stats'],
     queryFn: () => api.get('/website/contact-messages/stats').then(r => r.data.data?.new || 0),
     refetchInterval: 120000,
-    enabled: isAuthenticated && getRole() === ROLES.ADMIN,
+    enabled: isAuthenticated && hasPermission('content.view'),
   })
 
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
@@ -204,13 +201,13 @@ export default function AdminLayout() {
   // still gated per-feature by permission (backend enforces this — see
   // rbac.middleware.js — this is only the entry gate to the shell itself).
   if (!hasAdminAccess()) return <Navigate to="/" replace />
-  // The legacy dashboard (/admin) still requires the literal 'admin' role
-  // on the backend (admin.routes.js's stats endpoint) — a non-'admin'
-  // admin-family user landing there would just see 403s. Send them
-  // straight to Team Management instead, the one page every admin-family
-  // role is meant to be able to reach (its own data calls still 403
-  // per-user if they lack users.view, same as any other page here).
-  if (getRole() !== ROLES.ADMIN && location.pathname === ROUTES.ADMIN_DASHBOARD) {
+  // /admin (the dashboard) requires dashboard.view like any other module —
+  // a restricted account landing there would just hit AccessDeniedPage via
+  // RequirePermission. Send them straight to Team Management instead (the
+  // one page every admin-family role is realistically meant to reach; its
+  // own data still 403s per-user if they lack users.view too, same as any
+  // other page here).
+  if (!hasPermission('dashboard.view') && location.pathname === ROUTES.ADMIN_DASHBOARD) {
     return <Navigate to={ROUTES.ADMIN_ADMINS} replace />
   }
 
@@ -264,7 +261,7 @@ export default function AdminLayout() {
             <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               {group.label}
             </div>
-            {group.items.filter((item) => isNavItemVisible(item, getRole(), hasPermission)).map((item) => (
+            {group.items.filter((item) => isNavItemVisible(item, hasPermission)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

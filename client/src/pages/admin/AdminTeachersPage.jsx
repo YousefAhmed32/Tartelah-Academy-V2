@@ -15,13 +15,17 @@ import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
+import Select from '../../components/ui/Select.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
+import ShiftsMultiSelect from '../../components/ui/ShiftsMultiSelect.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
+import Can from '../../components/shared/Can.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { exportReportToPDF } from '../../utils/exportUtils.js'
 import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
+import { TEACHER_CATEGORY_OPTIONS, teacherCategoryLabel, teacherShiftsLabel } from '../../utils/teacherProfile.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -50,6 +54,9 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
     bioAr: teacher.bioAr || '',
     salaryPerSession: teacher.salaryPerSession || '',
     gender: teacher.gender || '',
+    category: teacher.category || '',
+    hourlyRate: teacher.hourlyRate ?? '',
+    availableShifts: teacher.availableShifts || [],
   })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const handleSubmit = (e) => { e.preventDefault(); onSave(form) }
@@ -85,6 +92,21 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
         <label className="text-xs font-bold text-gray-400 mb-1 block">التخصص</label>
         <input className={inputCls} value={form.specialization} onChange={e => set('specialization', e.target.value)} placeholder="تجويد القرآن الكريم" />
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-bold text-gray-400 mb-1 block">الفئة</label>
+          <select className={inputCls} value={form.category} onChange={e => set('category', e.target.value)}>
+            <option value="">— اختر الفئة —</option>
+            {TEACHER_CATEGORY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-400 mb-1 block">سعر ساعة التدريس</label>
+          <input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate}
+            onChange={e => set('hourlyRate', e.target.value)} placeholder="0" />
+        </div>
+      </div>
+      <ShiftsMultiSelect value={form.availableShifts} onChange={v => set('availableShifts', v)} />
       <div>
         <label className="text-xs font-bold text-gray-400 mb-1 block">نبذة</label>
         <textarea className={`${inputCls} h-20 resize-none py-2.5`} value={form.bioAr} onChange={e => set('bioAr', e.target.value)} />
@@ -408,6 +430,14 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
                 <InfoRow label="نبذة" value={teacher.bioAr} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 10h16M4 14h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>} />
               </div>
 
+              {/* Professional info */}
+              <div className="py-4 border-b border-gray-100">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">المعلومات المهنية</h3>
+                <InfoRow label="الفئة" value={teacherCategoryLabel(teacher.category)} icon={<GraduationCap size={14} />} />
+                <InfoRow label="سعر ساعة التدريس" value={teacher.hourlyRate ? formatCurrency(teacher.hourlyRate, 'EGP') : null} icon={<Wallet size={14} />} />
+                <InfoRow label="أوقات الشيفت المتاحة" value={teacherShiftsLabel(teacher.availableShifts)} icon={<Calendar size={14} />} />
+              </div>
+
               {/* Account */}
               <div className="py-4 border-b border-gray-100">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">بيانات الحساب</h3>
@@ -472,7 +502,10 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const initialForm = { firstNameAr: '', lastNameAr: '', email: '', password: '', phone: '', specialization: '', gender: '' }
+const initialForm = {
+  firstNameAr: '', lastNameAr: '', email: '', password: '', phone: '', specialization: '', gender: '',
+  category: '', hourlyRate: '', availableShifts: [],
+}
 
 export default function AdminTeachersPage() {
   const [page, setPage] = useState(1)
@@ -517,6 +550,11 @@ export default function AdminTeachersPage() {
   function change(e) { setForm(p => ({ ...p, [e.target.name]: e.target.value })) }
   function submitCreate() {
     if (!form.gender) return toast.error('يرجى تحديد تصنيف المعلم: معلم أو معلمة')
+    if (!form.category) return toast.error('يرجى تحديد فئة المعلم')
+    if (form.hourlyRate === '' || Number(form.hourlyRate) < 0 || Number.isNaN(Number(form.hourlyRate))) {
+      return toast.error('يرجى تحديد سعر ساعة تدريس صحيح')
+    }
+    if (!form.availableShifts.length) return toast.error('يرجى تحديد شيفت واحد على الأقل')
     createMutation.mutate(form)
   }
   const teachers = data?.data || []
@@ -533,10 +571,12 @@ export default function AdminTeachersPage() {
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة المعلمين</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} معلم — صلاحيات كاملة على جميع الحسابات</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
-          <Plus size={16} /> إضافة معلم
-        </button>
+        <Can permission="teachers.manage">
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
+            <Plus size={16} /> إضافة معلم
+          </button>
+        </Can>
       </div>
 
       {/* Search */}
@@ -573,6 +613,9 @@ export default function AdminTeachersPage() {
                     </span>
                     {!t.gender && (
                       <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">التصنيف غير محدد</span>
+                    )}
+                    {t.category && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">{teacherCategoryLabel(t.category)}</span>
                     )}
                   </div>
                 </div>
@@ -635,6 +678,20 @@ export default function AdminTeachersPage() {
             <Input label="رقم الهاتف" name="phone" value={form.phone} onChange={change} variant="light" />
             <Input label="التخصص" name="specialization" value={form.specialization} onChange={change} variant="light" />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-brand-textBody">الفئة</label>
+              <Select
+                value={form.category}
+                onValueChange={v => setForm(p => ({ ...p, category: v }))}
+                options={TEACHER_CATEGORY_OPTIONS}
+                placeholder="اختر الفئة"
+              />
+            </div>
+            <Input label="سعر ساعة التدريس" name="hourlyRate" type="number" min="0" step="0.5"
+              value={form.hourlyRate} onChange={change} variant="light" placeholder="0" />
+          </div>
+          <ShiftsMultiSelect value={form.availableShifts} onChange={v => setForm(p => ({ ...p, availableShifts: v }))} required />
         </div>
       </Modal>
     </div>
