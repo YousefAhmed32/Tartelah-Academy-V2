@@ -16,7 +16,7 @@ function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
-
+// test
 function StatusBadge({ status }) {
   const MAP = {
     published: { label: 'منشور', bg: 'bg-emerald-100', text: 'text-emerald-700' },
