@@ -45,6 +45,7 @@ exports.submitRequest = async (req, res, next) => {
       bodyAr: `قدّم ${req.user.firstNameAr} ${req.user.lastNameAr} طلب تسجيل في باقة "${pkg.nameAr}"`,
       type: 'enrollment',
       relatedId: request._id,
+      actionUrl: '/admin/enrollments',
     }))
     if (adminNotifs.length) await createNotifications(adminNotifs)
 
@@ -89,6 +90,7 @@ exports.uploadPaymentProof = async (req, res, next) => {
       bodyAr: `رفع الطالب إثبات الدفع — يرجى مراجعة طلب التسجيل`,
       type: 'enrollment',
       relatedId: request._id,
+      actionUrl: '/admin/enrollments',
     }))
     if (notifs.length) await createNotifications(notifs)
 
@@ -225,6 +227,7 @@ exports.reviewRequest = async (req, res, next) => {
         type: 'enrollment',
         priority: 'high',
         relatedId: request._id,
+        actionUrl: '/student/subscription',
       })
 
       // Notify teacher: new student assigned
@@ -235,6 +238,7 @@ exports.reviewRequest = async (req, res, next) => {
         type: 'enrollment',
         priority: 'high',
         relatedId: request._id,
+        actionUrl: '/teacher/students',
       })
     } else {
       // Notify student: rejected
@@ -245,6 +249,7 @@ exports.reviewRequest = async (req, res, next) => {
         type: 'enrollment',
         priority: 'medium',
         relatedId: request._id,
+        actionUrl: '/student/enrollment',
       })
     }
 

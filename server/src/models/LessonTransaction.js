@@ -20,6 +20,13 @@ const LessonTransactionSchema = new mongoose.Schema({
       'purchase', 'consumption', 'reversal', 'refund', 'bonus',
       'compensation', 'freeze', 'unfreeze', 'transfer_in', 'transfer_out',
       'renewal', 'manual_adjustment', 'admin_edit', 'migration_import',
+      // A new subscription's documented opening lesson balance (Phase 2 Part
+      // 1) — distinct from 'purchase' so reporting can tell "credited via a
+      // brand-new subscription's opening balance" apart from an ad hoc
+      // top-up. Same wallet-increment behavior as 'purchase' (see
+      // wallet.service.js fieldsToIncrement). `metadata` on this type
+      // records { packageTotal, lessonsUsedAtOpening, lessonsRemainingAtOpening }.
+      'opening_balance',
     ],
     required: true,
   },

@@ -57,6 +57,10 @@ const NAV_GROUPS = [
         to: ROUTES.ADMIN_ADMINS, label: 'إدارة الفريق', permission: 'users.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M15.5 4.5a3 3 0 0 1 0 6M17 19a4.2 4.2 0 0 0-3.3-4.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
+      {
+        to: ROUTES.ADMIN_ASSIGNMENT_REQUESTS, label: 'طلبات إسناد الطلاب', assignmentRequests: true, permission: 'assignments.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      },
     ]
   },
   {
@@ -195,6 +199,16 @@ export default function AdminLayout() {
     enabled: isAuthenticated && hasPermission('content.view'),
   })
 
+  // Rejected/needs-schedule-change assignment requests waiting on an admin
+  // follow-up action (edit & resend / reassign / cancel) — see
+  // AdminAssignmentRequestsPage.jsx.
+  const { data: pendingAssignmentFollowUps = 0 } = useQuery({
+    queryKey: ['admin', 'assignment-requests', 'follow-up-count'],
+    queryFn: () => api.get('/admin/assignments', { params: { status: 'rejected,time_change_requested', limit: 1 } }).then(r => r.data.data?.total || 0),
+    refetchInterval: 60000,
+    enabled: isAuthenticated && hasPermission('assignments.view'),
+  })
+
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
   // Admin-family roles (admin/assistant_admin/operator/manager/staff) reach
   // the dashboard shell; which nav items and data they can actually use is
@@ -284,6 +298,11 @@ export default function AdminLayout() {
                 {item.contactMessages && newContactMessages > 0 && (
                   <span className="bg-rose-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
                     {newContactMessages > 9 ? '9+' : newContactMessages}
+                  </span>
+                )}
+                {item.assignmentRequests && pendingAssignmentFollowUps > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+                    {pendingAssignmentFollowUps > 9 ? '9+' : pendingAssignmentFollowUps}
                   </span>
                 )}
               </NavLink>

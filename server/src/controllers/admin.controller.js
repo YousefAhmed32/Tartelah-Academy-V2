@@ -16,6 +16,14 @@ const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { isValidGender } = require('../config/teacherIdentity')
 const { validateTeacherProfileFields } = require('../config/teacherProfile')
+const { isValidAudienceCategoriesArray, isValidAudienceCategory } = require('../config/studentAudience')
+// Dynamic catalog-backed check (replaces the old static allow-list) — a
+// filter must accept any KNOWN subject, active or archived, so filtering by
+// an archived subject to review historical teachers still works. See
+// services/teachingSubject.service.js.
+const { isKnownKey } = require('../services/teachingSubject.service')
+const TeacherWorkingHours = require('../models/TeacherWorkingHours')
+const LessonWallet = require('../models/LessonWallet')
 const crypto = require('crypto')
 
 const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -246,6 +254,7 @@ exports.getStudents = async (req, res, next) => {
     const filter = { role: 'student', ...searchFilter }
     if (req.query.status === 'active') filter.isActive = true
     if (req.query.status === 'inactive') filter.isActive = false
+    if (['existing', 'new'].includes(req.query.studentType)) filter.studentType = req.query.studentType
     const [data, total] = await Promise.all([
       User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-password -refreshToken'),
       User.countDocuments(filter),
@@ -277,7 +286,10 @@ exports.getStudent = async (req, res, next) => {
 
 exports.updateStudent = async (req, res, next) => {
   try {
-    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr']
+    if (req.body.studentType !== undefined && !['existing', 'new'].includes(req.body.studentType)) {
+      return sendError(res, 'نوع الطالب يجب أن يكون "قديم" أو "جديد"', 400)
+    }
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'studentType']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     const user = await User.findOneAndUpdate(
@@ -310,9 +322,31 @@ exports.getTeachers = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
     const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
-    const filter = { role: 'teacher', ...searchFilter }
+    const filter = { role: 'teacher' }
     if (req.query.status === 'active') filter.isActive = true
     if (req.query.status === 'inactive') filter.isActive = false
+    // Validated against the fixed enum before ever reaching a Mongo filter —
+    // req.query values are attacker-controlled strings (or, with array/object
+    // query syntax, objects) and must never be trusted as raw filter values
+    // (a `?audienceCategory[$ne]=x`-style payload would otherwise inject a
+    // Mongo query operator).
+    if (req.query.audienceCategory) {
+      if (!isValidAudienceCategory(req.query.audienceCategory)) return sendError(res, 'قيمة غير صالحة للفئة', 400)
+      filter.audienceCategories = req.query.audienceCategory
+    }
+
+    // Combined via $and (not spread into one shared $or) so a name/email
+    // search and a specialization filter apply together, not either/or.
+    const andConditions = []
+    if (searchFilter.$or) andConditions.push(searchFilter)
+    // Teaching specialization filter — matches either the legacy singular
+    // `category` or the new plural `specializations` (kept in sync, but a
+    // filter should never depend on which one happened to be written last).
+    if (req.query.specialization) {
+      if (!(await isKnownKey(req.query.specialization))) return sendError(res, 'قيمة غير صالحة للتخصص', 400)
+      andConditions.push({ $or: [{ category: req.query.specialization }, { specializations: req.query.specialization }] })
+    }
+    if (andConditions.length) filter.$and = andConditions
 
     // Aggregate teacher stats with student/session counts
     const pipeline = [
@@ -343,23 +377,75 @@ exports.getTeachers = async (req, res, next) => {
   } catch (err) { next(err) }
 }
 
+// Full administrative teacher profile (Phase 2 Part 1 §7): base profile,
+// categories/specializations/hourly rate (already on `teacher`), working
+// hours, and every currently assigned student with their type, package, and
+// live wallet balance (never a fabricated/derived number — read directly
+// from LessonWallet, the canonical source, not the Subscription mirror).
 exports.getTeacher = async (req, res, next) => {
   try {
     const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-password -refreshToken')
     if (!teacher) return sendError(res, 'المعلم غير موجود', 404)
 
-    const [students, sessions, scheduleRules] = await Promise.all([
+    const [subscriptions, sessions, scheduleRules, workingHours] = await Promise.all([
       Subscription.find({ teacherId: req.params.id, status: 'active' })
-        .populate('studentId', 'firstNameAr lastNameAr avatar email phone'),
+        .populate('studentId', 'firstNameAr lastNameAr avatar email phone studentType')
+        .populate('packageId', 'nameAr sessionsPerMonth price'),
       Session.find({ teacherId: req.params.id }).sort({ scheduledAt: -1 }).limit(10)
         .populate('studentId', 'firstNameAr lastNameAr'),
       ScheduleRule.find({ teacherId: req.params.id, status: 'active' })
-        .populate('studentId', 'firstNameAr lastNameAr avatar'),
+        .populate('studentId', 'firstNameAr lastNameAr avatar studentType'),
+      TeacherWorkingHours.findOne({ teacherId: req.params.id }),
     ])
 
-    sendSuccess(res, { teacher, students, recentSessions: sessions, scheduleRules })
+    const studentIds = subscriptions.map((s) => s.studentId?._id).filter(Boolean)
+    const wallets = await LessonWallet.find({ studentId: { $in: studentIds } })
+    const walletByStudent = new Map(wallets.map((w) => [String(w.studentId), w]))
+
+    const students = subscriptions.map((sub) => ({
+      subscriptionId: sub._id,
+      student: sub.studentId,
+      package: sub.packageId,
+      status: sub.status,
+      startDate: sub.startDate,
+      endDate: sub.endDate,
+      wallet: sub.studentId ? (walletByStudent.get(String(sub.studentId._id)) || null) : null,
+    }))
+
+    // A student can have an active recurring schedule (Phase 2 Part 2's
+    // assignment-request activation) with no package/subscription yet — the
+    // brief explicitly allows scheduling now and adding a package later.
+    // Without this, such a student would never appear in "الطلاب المسندون"
+    // even though their schedule is real and active — surface them too,
+    // deduped against the subscription-based list above.
+    const subscribedStudentIds = new Set(studentIds.map((id) => String(id)))
+    const seenScheduleOnly = new Set()
+    for (const rule of scheduleRules) {
+      const student = rule.studentId
+      if (!student || subscribedStudentIds.has(String(student._id)) || seenScheduleOnly.has(String(student._id))) continue
+      seenScheduleOnly.add(String(student._id))
+      students.push({
+        subscriptionId: null, student, package: null, status: 'schedule_only',
+        startDate: rule.startDate, endDate: rule.endDate || null, wallet: null,
+      })
+    }
+
+    sendSuccess(res, { teacher, students, recentSessions: sessions, scheduleRules, workingHours })
   } catch (err) { next(err) }
 }
+
+// Explicit allow-list for teacher create/update — never spread req.body
+// directly into User.create/findOneAndUpdate (mass-assignment risk: role,
+// isPrimaryAdmin, permissions, tokenVersion, etc. must never be settable
+// from this endpoint). `password` is deliberately NOT in this shared list —
+// it's added only on create; changing an existing teacher's password must
+// go through adminResetPassword (which also bumps tokenVersion and
+// notifies the teacher) rather than this generic update endpoint.
+const TEACHER_WRITABLE_FIELDS = [
+  'firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr',
+  'specialization', 'salaryPerSession', 'gender', 'category', 'specializations', 'audienceCategories',
+  'hourlyRate', 'availableShifts',
+]
 
 exports.createTeacher = async (req, res, next) => {
   try {
@@ -368,19 +454,37 @@ exports.createTeacher = async (req, res, next) => {
     if (req.body.gender !== undefined && !isValidGender(req.body.gender)) {
       return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
     }
-    // Category, hourly rate, and available shifts are mandatory when
-    // creating a teacher (unlike on update, where legacy teachers may still
-    // be missing them — see updateTeacher below).
-    if (!req.body.category) return sendError(res, 'يجب تحديد فئة المعلم', 400)
+    // Category/specializations, hourly rate, and available shifts are
+    // mandatory when creating a teacher (unlike on update, where legacy
+    // teachers may still be missing them — see updateTeacher below).
+    const specializations = Array.isArray(req.body.specializations) ? req.body.specializations : []
+    if (!req.body.category && !specializations.length) {
+      return sendError(res, 'يجب تحديد تخصص تدريس واحد على الأقل للمعلم', 400)
+    }
     if (req.body.hourlyRate === undefined || req.body.hourlyRate === null || req.body.hourlyRate === '') {
       return sendError(res, 'يجب تحديد سعر ساعة التدريس', 400)
     }
     if (!Array.isArray(req.body.availableShifts) || !req.body.availableShifts.length) {
       return sendError(res, 'يجب تحديد شيفت واحد على الأقل', 400)
     }
-    const profileError = validateTeacherProfileFields(req.body)
+    if (req.body.audienceCategories !== undefined && !isValidAudienceCategoriesArray(req.body.audienceCategories)) {
+      return sendError(res, 'قائمة الفئات تحتوي على قيمة غير صالحة', 400)
+    }
+    const profileError = await validateTeacherProfileFields(req.body)
     if (profileError) return sendError(res, profileError, 400)
-    const user = await User.create({ ...req.body, role: 'teacher' })
+
+    const fields = {}
+    TEACHER_WRITABLE_FIELDS.forEach((f) => { if (req.body[f] !== undefined) fields[f] = req.body[f] })
+    if (req.body.password !== undefined) fields.password = req.body.password
+    const user = await User.create({ ...fields, role: 'teacher', createdBy: req.user._id })
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'admin.create_teacher',
+      entity: 'User', entityId: user._id,
+      changes: { specializations: user.specializations, audienceCategories: user.audienceCategories, hourlyRate: user.hourlyRate },
+      ip: req.ip,
+    })
+
     sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
   } catch (err) { next(err) }
 }
@@ -393,19 +497,38 @@ exports.updateTeacher = async (req, res, next) => {
     // Format/enum validation only — presence isn't enforced here so editing
     // an unrelated field on a legacy teacher who predates this feature never
     // gets blocked (see model comments on category/hourlyRate/availableShifts).
-    const profileError = validateTeacherProfileFields(req.body)
+    const profileError = await validateTeacherProfileFields(req.body)
     if (profileError) return sendError(res, profileError, 400)
-    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'specialization', 'salaryPerSession', 'gender', 'category', 'hourlyRate', 'availableShifts']
     const updates = {}
-    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+    TEACHER_WRITABLE_FIELDS.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     if (updates.hourlyRate === '') updates.hourlyRate = 0
     if (updates.category === '') updates.category = null
+
+    const before = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('hourlyRate category specializations audienceCategories')
+    if (!before) return sendError(res, 'المعلم غير موجود', 404)
+
     const user = await User.findOneAndUpdate(
       { _id: req.params.id, role: 'teacher' },
       updates,
       { new: true, runValidators: true }
     ).select('-password -refreshToken')
     if (!user) return sendError(res, 'المعلم غير موجود', 404)
+
+    // hourlyRate is a protected financial field — every change gets its own
+    // dedicated, clearly-labeled audit entry in addition to the general
+    // update log below, per Part 1's audit requirements.
+    if (updates.hourlyRate !== undefined && updates.hourlyRate !== before.hourlyRate) {
+      logAction({
+        actorId: req.user._id, actorRole: req.user.role, action: 'admin.update_teacher_hourly_rate',
+        entity: 'User', entityId: user._id,
+        changes: { before: before.hourlyRate, after: updates.hourlyRate }, ip: req.ip,
+      })
+    }
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'admin.update_teacher',
+      entity: 'User', entityId: user._id, changes: updates, ip: req.ip,
+    })
+
     sendSuccess(res, user, 'تم تحديث بيانات المعلم')
   } catch (err) { next(err) }
 }

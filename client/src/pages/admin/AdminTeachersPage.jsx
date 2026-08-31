@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Edit2, Phone, Mail, MessageCircle, KeyRound, Plus, GraduationCap, Users, Calendar,
-  TrendingUp, Wallet, FileText, CheckCircle2,
+  TrendingUp, Wallet, FileText, CheckCircle2, UserPlus,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import api from '../../utils/api.js'
@@ -15,17 +15,23 @@ import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
-import Select from '../../components/ui/Select.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
 import ShiftsMultiSelect from '../../components/ui/ShiftsMultiSelect.jsx'
+import SpecializationsMultiSelect from '../../components/ui/SpecializationsMultiSelect.jsx'
+import AudienceCategoriesMultiSelect from '../../components/ui/AudienceCategoriesMultiSelect.jsx'
+import WorkingHoursEditor from '../../components/ui/WorkingHoursEditor.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import Can from '../../components/shared/Can.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { exportReportToPDF } from '../../utils/exportUtils.js'
 import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
-import { TEACHER_CATEGORY_OPTIONS, teacherCategoryLabel, teacherShiftsLabel } from '../../utils/teacherProfile.js'
+import { subjectLabel, teacherShiftsLabel } from '../../utils/teacherProfile.js'
+import { useTeachingSubjects } from '../../hooks/useTeachingSubjects.js'
+import { audienceCategoriesLabel } from '../../utils/studentAudience.js'
+import { buildDefaultWorkingHours } from '../../utils/workingHours.js'
+import { ROUTES } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -54,7 +60,8 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
     bioAr: teacher.bioAr || '',
     salaryPerSession: teacher.salaryPerSession || '',
     gender: teacher.gender || '',
-    category: teacher.category || '',
+    specializations: teacher.specializations?.length ? teacher.specializations : (teacher.category ? [teacher.category] : []),
+    audienceCategories: teacher.audienceCategories || [],
     hourlyRate: teacher.hourlyRate ?? '',
     availableShifts: teacher.availableShifts || [],
   })
@@ -89,22 +96,15 @@ function EditTeacherForm({ teacher, onSave, isSaving }) {
         </div>
       </div>
       <div>
-        <label className="text-xs font-bold text-gray-400 mb-1 block">التخصص</label>
+        <label className="text-xs font-bold text-gray-400 mb-1 block">نبذة عن التخصص (نصي، اختياري)</label>
         <input className={inputCls} value={form.specialization} onChange={e => set('specialization', e.target.value)} placeholder="تجويد القرآن الكريم" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">الفئة</label>
-          <select className={inputCls} value={form.category} onChange={e => set('category', e.target.value)}>
-            <option value="">— اختر الفئة —</option>
-            {TEACHER_CATEGORY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">سعر ساعة التدريس</label>
-          <input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate}
-            onChange={e => set('hourlyRate', e.target.value)} placeholder="0" />
-        </div>
+      <SpecializationsMultiSelect value={form.specializations} onChange={v => set('specializations', v)} required />
+      <AudienceCategoriesMultiSelect value={form.audienceCategories} onChange={v => set('audienceCategories', v)} />
+      <div>
+        <label className="text-xs font-bold text-gray-400 mb-1 block">سعر ساعة التدريس</label>
+        <input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate}
+          onChange={e => set('hourlyRate', e.target.value)} placeholder="0" />
       </div>
       <ShiftsMultiSelect value={form.availableShifts} onChange={v => set('availableShifts', v)} />
       <div>
@@ -312,9 +312,54 @@ function TeacherPerformanceTab({ teacherId }) {
   )
 }
 
+// ── Working Hours Tab ─────────────────────────────────────────────────────────
+
+function WorkingHoursTab({ teacherId }) {
+  const qc = useQueryClient()
+  const [days, setDays] = useState(null)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['admin', 'teacher-working-hours', teacherId],
+    queryFn: () => api.get(`/admin/teachers/${teacherId}/working-hours`).then(r => r.data.data),
+  })
+
+  useEffect(() => { if (data?.days) setDays(data.days) }, [data])
+
+  const saveMut = useMutation({
+    mutationFn: (payload) => api.put(`/admin/teachers/${teacherId}/working-hours`, payload).then(r => r.data),
+    onSuccess: () => {
+      toast.success('تم تحديث أوقات عمل المعلم')
+      qc.invalidateQueries({ queryKey: ['admin', 'teacher-working-hours', teacherId] })
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  if (isLoading) return <div className="flex justify-center py-8"><Spinner color="border-violet-600" /></div>
+  if (isError) return <p className="text-sm text-red-500 py-6 text-center">تعذّر تحميل أوقات العمل</p>
+  if (!days) return null
+
+  return (
+    <div className="py-4 space-y-4">
+      <p className="text-xs text-gray-400">
+        حدد الأوقات المتاحة للمعلم في كل يوم — سيُستخدم هذا لاحقًا لحساب المواعيد الشاغرة تلقائيًا.
+      </p>
+      <WorkingHoursEditor value={days} onChange={setDays} disabled={saveMut.isPending} />
+      <button
+        onClick={() => saveMut.mutate({ days })}
+        disabled={saveMut.isPending}
+        className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {saveMut.isPending && <Spinner size="sm" color="border-white" />}
+        حفظ أوقات العمل
+      </button>
+    </div>
+  )
+}
+
 function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
   const [tab, setTab] = useState(initialTab)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const { data: subjects = [] } = useTeachingSubjects()
   const qc = useQueryClient()
 
   const updateMut = useMutation({
@@ -351,6 +396,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
   const tabs = [
     { key: 'info', label: 'الملف' },
     { key: 'performance', label: 'الأداء' },
+    { key: 'hours', label: 'أوقات العمل' },
     { key: 'edit', label: 'تعديل' },
     { key: 'reset', label: 'كلمة المرور' },
   ]
@@ -433,7 +479,12 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
               {/* Professional info */}
               <div className="py-4 border-b border-gray-100">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">المعلومات المهنية</h3>
-                <InfoRow label="الفئة" value={teacherCategoryLabel(teacher.category)} icon={<GraduationCap size={14} />} />
+                <InfoRow
+                  label="تخصصات التدريس"
+                  value={(teacher.specializations?.length ? teacher.specializations : (teacher.category ? [teacher.category] : [])).map((s) => subjectLabel(subjects, s)).filter(Boolean).join('، ') || null}
+                  icon={<GraduationCap size={14} />}
+                />
+                <InfoRow label="الفئات المستهدفة" value={audienceCategoriesLabel(teacher.audienceCategories)} icon={<Users size={14} />} />
                 <InfoRow label="سعر ساعة التدريس" value={teacher.hourlyRate ? formatCurrency(teacher.hourlyRate, 'EGP') : null} icon={<Wallet size={14} />} />
                 <InfoRow label="أوقات الشيفت المتاحة" value={teacherShiftsLabel(teacher.availableShifts)} icon={<Calendar size={14} />} />
               </div>
@@ -463,7 +514,11 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                <Link to={ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', teacher._id)}
+                  className="w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 bg-violet-50 text-violet-700 hover:bg-violet-100">
+                  الملف الإداري الكامل — الطلاب والأرصدة وأوقات العمل
+                </Link>
                 <button onClick={requestToggle} disabled={toggleMut.isPending}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${teacher.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                   {toggleMut.isPending && <Spinner size="sm" color={teacher.isActive ? 'border-red-500' : 'border-emerald-600'} />}
@@ -475,6 +530,10 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
 
           {tab === 'performance' && (
             <TeacherPerformanceTab teacherId={teacher._id} />
+          )}
+
+          {tab === 'hours' && (
+            <WorkingHoursTab teacherId={teacher._id} />
           )}
 
           {tab === 'edit' && (
@@ -504,7 +563,7 @@ function TeacherCRMPanel({ teacher, onClose, onUpdate, initialTab = 'info' }) {
 
 const initialForm = {
   firstNameAr: '', lastNameAr: '', email: '', password: '', phone: '', specialization: '', gender: '',
-  category: '', hourlyRate: '', availableShifts: [],
+  specializations: [], audienceCategories: [], hourlyRate: '', availableShifts: [],
 }
 
 export default function AdminTeachersPage() {
@@ -516,6 +575,7 @@ export default function AdminTeachersPage() {
   const [form, setForm] = useState(initialForm)
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { data: subjects = [] } = useTeachingSubjects()
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'teachers', page, search],
@@ -550,7 +610,7 @@ export default function AdminTeachersPage() {
   function change(e) { setForm(p => ({ ...p, [e.target.name]: e.target.value })) }
   function submitCreate() {
     if (!form.gender) return toast.error('يرجى تحديد تصنيف المعلم: معلم أو معلمة')
-    if (!form.category) return toast.error('يرجى تحديد فئة المعلم')
+    if (!form.specializations.length) return toast.error('يرجى تحديد تخصص تدريس واحد على الأقل')
     if (form.hourlyRate === '' || Number(form.hourlyRate) < 0 || Number.isNaN(Number(form.hourlyRate))) {
       return toast.error('يرجى تحديد سعر ساعة تدريس صحيح')
     }
@@ -571,12 +631,20 @@ export default function AdminTeachersPage() {
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة المعلمين</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} معلم — صلاحيات كاملة على جميع الحسابات</p>
         </div>
-        <Can permission="teachers.manage">
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
-            <Plus size={16} /> إضافة معلم
-          </button>
-        </Can>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Can all={['teachers.manage', 'students.manage']}>
+            <Link to={ROUTES.ADMIN_TEACHER_ONBOARDING}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors">
+              <UserPlus size={16} /> إضافة معلم وطلابه
+            </Link>
+          </Can>
+          <Can permission="teachers.manage">
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
+              <Plus size={16} /> إضافة معلم
+            </button>
+          </Can>
+        </div>
       </div>
 
       {/* Search */}
@@ -614,9 +682,9 @@ export default function AdminTeachersPage() {
                     {!t.gender && (
                       <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">التصنيف غير محدد</span>
                     )}
-                    {t.category && (
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">{teacherCategoryLabel(t.category)}</span>
-                    )}
+                    {(t.specializations?.length ? t.specializations : (t.category ? [t.category] : [])).slice(0, 2).map((c) => (
+                      <span key={c} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">{subjectLabel(subjects, c)}</span>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -678,19 +746,10 @@ export default function AdminTeachersPage() {
             <Input label="رقم الهاتف" name="phone" value={form.phone} onChange={change} variant="light" />
             <Input label="التخصص" name="specialization" value={form.specialization} onChange={change} variant="light" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-brand-textBody">الفئة</label>
-              <Select
-                value={form.category}
-                onValueChange={v => setForm(p => ({ ...p, category: v }))}
-                options={TEACHER_CATEGORY_OPTIONS}
-                placeholder="اختر الفئة"
-              />
-            </div>
-            <Input label="سعر ساعة التدريس" name="hourlyRate" type="number" min="0" step="0.5"
-              value={form.hourlyRate} onChange={change} variant="light" placeholder="0" />
-          </div>
+          <SpecializationsMultiSelect value={form.specializations} onChange={v => setForm(p => ({ ...p, specializations: v }))} required />
+          <AudienceCategoriesMultiSelect value={form.audienceCategories} onChange={v => setForm(p => ({ ...p, audienceCategories: v }))} />
+          <Input label="سعر ساعة التدريس" name="hourlyRate" type="number" min="0" step="0.5"
+            value={form.hourlyRate} onChange={change} variant="light" placeholder="0" />
           <ShiftsMultiSelect value={form.availableShifts} onChange={v => setForm(p => ({ ...p, availableShifts: v }))} required />
         </div>
       </Modal>

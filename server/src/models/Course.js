@@ -1,5 +1,4 @@
 const mongoose = require('mongoose')
-const { TEACHING_CATEGORIES } = require('../config/categories')
 
 const SEOSchema = new mongoose.Schema({
   title:        { type: String, trim: true, maxlength: 200 },
@@ -38,7 +37,11 @@ const CourseSchema = new mongoose.Schema({
   introVideoUrl:  { type: String, trim: true, default: '' }, // YouTube URL
 
   // ── Classification ────────────────────────────────────────────────────────────
-  category:    { type: String, enum: TEACHING_CATEGORIES, default: 'other' },
+  // No hard Mongoose `enum` — the dynamic teaching-subject catalog (services/
+  // teachingSubject.service.js) means new valid values can be created at
+  // runtime; controllers/course.controller.js validates against the catalog
+  // (async) before create/update instead.
+  category:    { type: String, trim: true, default: 'other' },
   subCategory: { type: String, trim: true },
   tags:        [{ type: String, trim: true, lowercase: true }],
   language:    { type: String, enum: ['ar', 'en', 'both'], default: 'ar' },

@@ -3,6 +3,10 @@ const Course = require('../models/Course')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { isValidYouTubeUrl } = require('../utils/youtube')
 const { uploadBuffer, deleteFile } = require('../services/media.service')
+// Dynamic catalog-backed check — Course.category shares the same
+// teaching-subject taxonomy as User.category/AssignmentRequest.specialization
+// (see config/categories.js's header note). See services/teachingSubject.service.js.
+const { isValidActiveKey } = require('../services/teachingSubject.service')
 
 // ── Slug Helpers ─────────────────────────────────────────────────────────────
 
@@ -209,6 +213,9 @@ exports.create = async (req, res, next) => {
     if (cleanIntroVideoUrl && !isValidYouTubeUrl(cleanIntroVideoUrl)) {
       return sendError(res, 'رابط الفيديو التعريفي غير صالح. يُسمح بروابط YouTube فقط', 400)
     }
+    if (category !== undefined && category !== null && category !== '' && !(await isValidActiveKey(category))) {
+      return sendError(res, 'قيمة غير صالحة لتصنيف المقرر', 400)
+    }
 
     const slug = await uniqueSlug(name, nameAr)
 
@@ -267,6 +274,9 @@ exports.update = async (req, res, next) => {
       : undefined
     if (cleanIntroVideoUrl && !isValidYouTubeUrl(cleanIntroVideoUrl)) {
       return sendError(res, 'رابط الفيديو التعريفي غير صالح. يُسمح بروابط YouTube فقط', 400)
+    }
+    if (category !== undefined && category !== null && category !== '' && !(await isValidActiveKey(category))) {
+      return sendError(res, 'قيمة غير صالحة لتصنيف المقرر', 400)
     }
 
     if (nameAr !== undefined) course.nameAr = nameAr

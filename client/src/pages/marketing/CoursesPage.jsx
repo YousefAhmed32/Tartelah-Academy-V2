@@ -10,6 +10,9 @@ import {
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
+import { useTeachingSubjects } from '../../hooks/useTeachingSubjects.js'
+import { subjectLabel } from '../../utils/teacherProfile.js'
+import { resolveSubjectColor } from '../../utils/subjectBadge.js'
 
 // ── Design tokens — premium light theme ──────────────────────────────────────
 
@@ -47,6 +50,18 @@ const CATEGORIES = [
 ]
 
 const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
+
+// A course's `category` may be a dynamically admin-created subject that has
+// no entry in the static CATEGORIES list above — resolve its real name from
+// the live catalog and give it a stable (never random, never generic-gray)
+// color instead of silently collapsing into "أخرى". `subjects` is whatever
+// the live public catalog query currently holds; an archived subject not
+// present there still gets its color (deterministic from the key) even if
+// the friendlier catalog name isn't available, so it never renders blank.
+function resolveCategoryBadge(category, subjects) {
+  if (CATEGORY_MAP[category]) return CATEGORY_MAP[category]
+  return { label: subjectLabel(subjects, category) || category || CATEGORY_MAP.other.label, Icon: Gem, ...resolveSubjectColor(category) }
+}
 
 const DIFFICULTY_OPTIONS = [
   { value: 'all',          label: 'جميع المستويات', color: T.textSec,  bg: T.bgSection,    border: T.border      },
@@ -107,8 +122,9 @@ function SkeletonCard() {
 // ── Course Card ───────────────────────────────────────────────────────────────
 
 const CourseCard = memo(function CourseCard({ course }) {
+  const { data: subjects } = useTeachingSubjects()
   const diff    = DIFF_MAP[course.difficulty]
-  const cat     = CATEGORY_MAP[course.category] || CATEGORY_MAP.other
+  const cat     = resolveCategoryBadge(course.category, subjects)
   const slug    = course.slug || course._id
   const thumb   = getFileUrl(course.thumbnailImage)
   const CatIcon = cat.Icon
@@ -300,8 +316,9 @@ const CourseCard = memo(function CourseCard({ course }) {
 // ── Featured Spotlight ────────────────────────────────────────────────────────
 
 function FeaturedSpotlight({ course }) {
+  const { data: subjects } = useTeachingSubjects()
   const slug = course.slug || course._id
-  const cat  = CATEGORY_MAP[course.category] || CATEGORY_MAP.other
+  const cat  = resolveCategoryBadge(course.category, subjects)
 
   return (
     <div

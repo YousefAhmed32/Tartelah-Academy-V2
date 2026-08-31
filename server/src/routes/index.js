@@ -27,5 +27,6 @@ router.use('/operations', require('./operations.routes'))
 router.use('/media', require('./media.routes'))
 router.use('/roles', require('./roles.routes'))
 router.use('/permissions', require('./permissions.routes'))
+router.use('/teaching-subjects', require('./teachingSubject.routes'))
 
 module.exports = router

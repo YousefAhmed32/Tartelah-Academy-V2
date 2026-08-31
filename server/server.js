@@ -41,6 +41,9 @@ connectDB().then(async () => {
   const { rbacModulePermissionsBackfill } = require('./src/migrations/rbacModulePermissionsBackfill')
   await rbacModulePermissionsBackfill().catch(err => console.warn('[migration] rbacModulePermissionsBackfill warning:', err.message))
 
+  const { seedTeachingSubjects } = require('./src/migrations/seedTeachingSubjects')
+  await seedTeachingSubjects().catch(err => console.warn('[migration] seedTeachingSubjects warning:', err.message))
+
   if (process.env.NODE_ENV !== 'test') {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')

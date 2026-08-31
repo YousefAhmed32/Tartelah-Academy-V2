@@ -2,6 +2,196 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## Phase 2 Change Requests — Reservation Holds, Flexible Alternative Schedules, Notification Deep Links, Admin Profiles — 2026-08-31 (latest)
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry. Delivered against `PHASE_2_CHANGE_REQUESTS_AR.md` items #1 (reservation completeness), #2 (flexible alternative schedule), and the admin-profile/notification/assignment-UX requests layered on top of the already-complete §17 assignment workflow.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Teacher-proposed alternative time now holds a real reservation | ✅ | `time_change_requested` was previously unprotected — a second request could grab the exact slot a teacher had just proposed. `RESERVING_STATUSES`/`RESERVING_SLOT_SOURCE` now cover it; `ScheduleReservationLock` release-then-reacquire mirrors `editAndResend`'s pattern; 3 new availability tests + 3 new assignment-service tests |
+| Confirmed vs. temporarily-held distinction surfaced everywhere | ✅ | `checkAvailability`/`getWeeklyAvailability` now tag every busy interval `kind: 'confirmed'\|'reserved'`; `ScheduleSlotPicker`/`StudentScheduleSection` render a 3rd amber "محجوز مؤقتًا — بانتظار الموافقة" state, never merged into a confirmed booking |
+| Flexible multi-day alternative-schedule proposal | ✅ | `ProposeAlternativeTimeModal.jsx` rebuilt: pre-fills from the current schedule, add/remove any weekday, per-day real-availability time picker, original-vs-proposed comparison panel with added/changed/removed badges. Backend: `AssignmentRequest.teacherResponse.proposedSchedule.days[]` (array, legacy `proposedTime` kept as a mirror), `respondToAssignment`'s `time_change` branch validates + locks the whole set atomically |
+| Admin edit-and-resend pre-fills from the teacher's proposal | ✅ | `EditResendModal` defaults to `proposedSchedule.days` when present, with a visible "تم تعبئة الجدول تلقائيًا من اقتراح المعلم" banner |
+| Notification click → mark read + navigate | ✅ | `NotificationBell`/`NotificationCenter` items are real buttons that mark read and `navigate(actionUrl)`; `actionUrl` added to every remaining producer (session/homework/evaluation/wallet/enrollment/schedule-rule/website-contact) that lacked one |
+| Admin teacher profile consolidated | ✅ | Clickable student rows → `AdminStudentDetailPage`; new pending-requests card, recent-sessions card (previously-fetched, never-rendered `recentSessions`/`scheduleRules` now shown), workload row, `reports.view`-gated compensation card (`teacher-performance/admin/:id/summary` + a rate×duration reference grid) |
+| Admin student profile consolidated | ✅ | Assigned-teacher card (links to their profile), "سجل طلبات الإسناد" link, new "الحصص" tab (completed/upcoming/cancelled/missed) |
+| Admin assignment list deep-link filters | ✅ | `AdminAssignmentRequestsPage` reads `?teacherId=`/`?studentId=`; teacher/student names on each row are now real links |
+| Teacher "طلابي" page rebuilt richer | ✅ | Expandable per-student cards: lesson-status counts, next/last lesson, wallet balance (teacher-authorized), latest evaluation note, package name — `getMyStudents` backend rewritten to compute all of it in one bounded call |
+| Assignment message preview UX | ✅ | Was fully hidden by default, then a giant redundant wall of text when expanded. Now a permanent 2-line preview + explicit "عرض الكل"/"نسخ" — never hidden, never dominates the card |
+| Verification | ✅ | Backend `npx jest` 386/386 (30 new). Frontend `npx vitest run` 69/69 (+6 new). `npm run build` 0 errors. Live-browser QA (admin + teacher roles): notification→navigate, EditResendModal prefill, the rebuilt multi-day modal's add/remove/comparison/3-state slot picker, admin teacher/student profile sections, teacher students page — all confirmed against real seeded data |
+| Not done this pass | — | No new teacher-facing student full-profile page (names/avatars on `TeacherStudentsPage` have nowhere permitted to link to yet); highlighted-row deep-linking for session/homework/evaluation notifications (they land on the correct list page, not a scrolled-to/highlighted row); full payroll/bonus/deduction ledger UI (§7/§10 of `PHASE_2_CHANGE_REQUESTS_AR.md`, explicitly out of this pass's scope, unaffected) |
+
+## Phase 1 Delivery Readiness Pass — 2026-08-28
+
+Full detail in `PROJECT_STATUS.md`'s matching entry and `PHASE_1_DELIVERY_READINESS_REPORT.md`. The real live-browser QA pass every prior session below had deferred — real Playwright-driven Chromium, real dev backend/MongoDB, not code tracing.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Live browser QA across mandatory Phase 1 scenarios | ✅ | Onboarding wizard (admin-defined password), dynamic-curriculum creation mid-wizard, 3-student intelligent scheduling exclusion (verified across save/remove/refresh-resume), finalize + success page + "add more students", new-student approval workflow, teacher forced password change, Arabic assignment message, redesigned alternative-time modal (keyboard-only day selection), admin follow-up queue + edit-and-resend prefill |
+| Responsive/overflow audit | ✅ | 360/375/768/1920 checked via `scrollWidth` vs. viewport (not eyeballing) — zero horizontal overflow found; modal internal-scroll + footer-non-overlap verified structurally and with a real non-fullPage screenshot |
+| `Input.jsx` label/input association bug | ✅ fixed | Shared component's `<label>` had no `htmlFor`/`id` — every form built on it (`getByLabel` failed in Playwright, and real screen readers) was affected. Fixed via `useId()` + `aria-invalid`/`aria-describedby`; same raw-label pattern fixed in the onboarding wizard's `ActiveStudentCard` and the teacher-profile `AddStudentModal` |
+| Missing remove-student confirmation | ✅ fixed | `AdminTeacherOnboardingWizardPage.jsx` fired a real, irreversible delete-account-and-release-reservation on one click with zero confirmation — added `window.confirm()` |
+| Duplicate `/auth/refresh` requests on every app load | ✅ fixed | `hooks/useAuth.js`'s bootstrap effect had no `AbortController`; `StrictMode` double-invoked it in dev, firing two real requests (both visibly 401ing on a cold session). Fixed — confirmed 2→1 via direct network capture |
+| Subject-badge dynamic-color limitation | ✅ closed | New `utils/subjectBadge.js` — bounded, deterministic (hash-of-key) palette for dynamic subjects, distinct from the 6 canonical colors, never random/generic-gray. Wired into `AdminCoursesPage.jsx` + marketing `CoursesPage.jsx`; 8 new tests |
+| Automated regression re-run | ✅ | Backend 380/380 (unchanged), client 63/63 (+8 new), ESLint 0 errors, production build 0 errors |
+| QA data cleanup | ✅ | All QA-created records (1 teacher, 3 students, 1 course, 2 test dynamic-subject entries + their sessions/schedule-rules/notifications) deleted from the dev database after evidence capture |
+
+## Phase 2 Part 1 — Operational Foundation (Teacher/Student Onboarding) — 2026-08-25
+
+Full detail in `ARCHITECTURE_PLAN.md`'s "Phase 2 Part 1" section and `PHASE_2_CHANGE_REQUESTS_AR.md`'s "متابعة تنفيذ الجزء الأول" checklist (task-by-task status + change log, kept in sync with reality throughout this pass, not just at the end).
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Teacher audience categories (`User.audienceCategories`) | ✅ | New separate taxonomy from teaching specialization — `config/studentAudience.js` |
+| Teacher teaching specializations, plural (`User.specializations`) | ✅ | Legacy singular `category` auto-mirrored via a `pre('save')` hook — zero breaking changes |
+| Admin search/filter by specialization + audience category | ✅ | `GET /admin/teachers?specialization=&audienceCategory=`, `GET /teachers/public?specialization=&audienceCategory=` |
+| Student type (`existing`/`new`) | ✅ | Defaults `'existing'` — safe, non-destructive backfill for every legacy student; searchable via `?studentType=` |
+| Teacher weekly working hours (`TeacherWorkingHours` model) | ✅ | Full day / unavailable / one-or-more custom periods per day; breaks represented as the gap between periods |
+| Working-hours overlap/format validation (front + back) | ✅ | `config/workingHours.js` (backend) + `utils/workingHours.js` (client mirror for inline UX) |
+| Academy-wide configurable timezone | ✅ | `AcademySettings.timezone`, default `Africa/Cairo`, admin-editable in `AdminWebsitePage.jsx` |
+| Teacher hourly rate protection + audit logging | ✅ | Already existed as a field; this pass added a dedicated `admin.update_teacher_hourly_rate` audit entry on every change, and an explicit backend allow-list (was previously spreading `req.body` directly into `User.create`) |
+| "Create a teacher with their students" wizard | ✅ | `POST /admin/onboarding/teacher-with-students` — all-or-nothing, compensating rollback on partial failure, `clientRequestId`-based idempotent replay |
+| Package selection + opening lesson balance (used/remaining split) | ✅ | `computeOpeningBalance()` (`config/lessonPolicy.js`) + new `opening_balance` `LessonTransaction` type; reused by both the wizard and the standalone subscription-creation endpoint |
+| Duplicate-email rejection (within request + against DB) | ✅ | Pre-checked before any write in the wizard; standalone create-student endpoint checks independently |
+| Standalone "create student from admin panel" | ✅ | `POST /admin/students` |
+| "Add another student" from teacher's administrative profile | ✅ | `POST /admin/teachers/:id/students` — reuses the same subscription/opening-balance logic as the wizard |
+| Administrative teacher profile page | ✅ | New `AdminTeacherProfilePage.jsx` (`/admin/teachers/:id`) — profile, working hours, assigned students + live wallet balances, add-student action |
+| Audit logging for all Part 1 sensitive operations | ✅ | Teacher create/update, hourly-rate change, working-hours change, student create, subscription create, wizard create — see `PHASE_2_CHANGE_REQUESTS_AR.md` for the full action-name list |
+| Backend test coverage | ✅ | `lessonPolicy`, `workingHours`, `subscription.service`, `onboarding.service`, `adminOnboarding.controller`, updated `admin.teacher.controller` — 243/245 passing (2 pre-existing, unrelated `sessionIntelligence` failures, untouched) |
+| Full recurring lesson-schedule generation for new students | ✅ | Delivered in Phase 2 Part 2 — see below |
+| Automatic free-slot / availability engine | ✅ | Delivered in Phase 2 Part 2 — see below |
+| Teacher acceptance/rejection of a new-student assignment | ✅ | Delivered in Phase 2 Part 2 — see below |
+
+## Phase 2 Part 2b — Compact Student-Scheduling UX Redesign — 2026-08-25
+
+Full detail in `PHASE_2_CHANGE_REQUESTS_AR.md`'s "4. إعادة تصميم واجهة جدولة الطالب المضغوطة" checklist. Replaces the seven-permanently-visible-weekday-rows layout with a compact, progressive builder — backend-compatible (same canonical `{dayOfWeek,time}[]` schedule shape), not a visual-only reskin. `ui-ux-pro-max` consulted before implementation.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Compact schedule builder (specialization → duration → recurrence → days → times → dates → review) | ✅ | Replaces the old always-visible 7-day grid; verified live |
+| All 4 backend-supported recurrence patterns exposed (daily/weekly/biweekly/monthly) | ✅ | `'daily'` was engine-supported but unexposed — now allowed in `validateSchedulePayload` |
+| Weekday chips shown only for weekly/biweekly (daily/monthly need no weekday picker) | ✅ | `FREQUENCIES_WITH_WEEKDAY_PICKER` gates this in the UI and in `deriveScheduleDays()` |
+| Accessible weekday chip selector | ✅ | `WeekdayChipSelector.jsx` — real `<button>`s, `aria-pressed`, full-day-name `aria-label`, never color-only selected/conflict state |
+| Time row per selected day only, with computed end time, "apply to all", per-row copy, remove | ✅ | Verified live with two different weekdays and two different times |
+| Smart slot picker fed by the real availability engine, grouped morning/afternoon/evening | ✅ | `ScheduleSlotPicker.jsx` — reuses the existing `GET /admin/teachers/:id/availability` / `POST /admin/assignments/check-availability` endpoints, no new API |
+| Friendly Arabic availability text (never raw `00:00–24:00`) | ✅ | `describeAvailability()` — "متاح طوال اليوم" / "متاح من 10:00 ص إلى 2:00 م" / "لا توجد مواعيد تناسب مدة الحصة" |
+| Real availability-derived schedule suggestions | ✅ | `buildSuggestions()` — nearest slot, same time on another day, same days at a different time; one-click apply, still editable after |
+| Date-range validation (end date must be after start; explicit "يستمر حتى الإلغاء") | ✅ | `validateScheduleDates()`, mirrored front/back; inline errors block progression to the next step |
+| Live weekly-summary card | ✅ | Updates immediately on any schedule change |
+| Expandable monthly-preview drawer showing real recurrence-derived occurrences | ✅ | `computeUpcomingOccurrences()` mirrors the backend's `generateDates()` semantics for daily/weekly/biweekly/monthly |
+| Compact schedule summary in the collapsed student-card header | ✅ | `scheduleSummaryLabel()`, e.g. "الأحد والثلاثاء • 6:00 م • 30 دقيقة • أسبوعيًا" |
+| Assignment-path badge visually separated from the schedule controls | ✅ | Its own bordered card below the schedule builder, not interleaved with it |
+| Backend: `'monthly'` recurrence latent bug found and fixed | ✅ fixed | `activateAssignment()` was passing `daysOfWeek` through for monthly rules, making them behave like weekly (found during this pass, not previously caught) |
+| First frontend test suite in this repo (`vitest`) | ✅ | 41 pure-logic tests for slot generation, suggestions, date validation, the monthly-preview mirror, and the summary formatter |
+| **Bug found & fixed during live QA:** full-day availability collapsed to a zero-length window client-side | ✅ fixed | A new time-formatting helper wrapped 1440 minutes to `'00:00'` instead of `'24:00'` — fixed with a dedicated boundary-safe formatter; regression-covered |
+| Responsive/RTL correctness at 320–1440px | ⚠️ code-reviewed, not screenshot-verified | `resize_window` did not change the actual viewport in this environment (verified twice) — recommend one manual pass in a real browser |
+
+## Phase 2 Part 2 — Credential Options, Availability Engine & Assignment Workflow — 2026-08-25
+
+Full detail in `ARCHITECTURE_PLAN.md`'s "Phase 2 Part 2" section and `PHASE_2_CHANGE_REQUESTS_AR.md`'s "متابعة استكمال الجزء الأول وتنفيذ الجداول والإسناد" checklist. **Verified with live manual browser QA against a real running dev server + MongoDB, not unit tests alone** — two real bugs were found and fixed during that pass (noted below).
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Automatic secure credential generation (preserved) | ✅ | Unchanged existing behavior — `utils/tempPassword.js`, always forces a password change |
+| Administrator-defined initial password | ✅ | `config/passwordPolicy.js` + `config/credentialMode.js`; ≥8 chars/letter+digit/confirmation-match enforced server-side regardless of frontend checks; never stored/logged/returned in plaintext |
+| Configurable "require password change on next login" | ✅ | Independent of credential mode, default `true`; verified live — a manual password with the default flag correctly triggered the existing `MustChangePasswordGate` and cleared after a real password change |
+| Backward compatibility with Part 1's flat `password` field | ✅ | `resolveCredentialInput()` fallback preserves exact prior behavior; full pre-existing onboarding test suite passes unchanged |
+| Automatic teacher-availability engine | ✅ | `services/availability.service.js` — working hours minus active schedule rules, real sessions (60-day lookahead), and reserved pending requests; buffer- and full-duration-aware; verified live splitting a real working day around a real existing booking |
+| Server-authoritative slot re-validation before every write | ✅ | `checkAvailability()` called again at create/accept/edit-resend — frontend preview is never trusted for the actual save |
+| Client-side availability estimate for a not-yet-created teacher | ✅ | `computeLocalFreeWindows()` — used inside the onboarding wizard before the teacher account exists |
+| `AssignmentRequest` model + explicit state machine | ✅ | `config/assignmentStatus.js` — 8 statuses, enforced valid transitions only, full response/reassignment history preserved |
+| Existing-student direct assignment (no teacher approval) | ✅ | Verified live end-to-end: real `ScheduleRule` + 5 real `Session` documents generated at the correct weekly dates |
+| New-student pending-approval request + teacher notification | ✅ | Verified live — "طلبات الطلاب" inbox, real-time notification delivery confirmed |
+| Immediate admin override (bypass teacher approval) | ✅ | New `assignments.override` permission, excluded from every default permission set including plain `admin`; mandatory reason, audited; covered by 24 automated tests, not re-run live this session (flagged as a pre-production follow-up) |
+| Teacher accept → schedule activation | ✅ | Verified live: accept re-validates availability, activates, generates sessions, request moves to "مكتمل ومفعّل" |
+| Teacher reject (reason required) + admin notification | ✅ | Verified live |
+| Teacher propose-alternative-time | ✅ | Automated test coverage; not re-run live this session |
+| Admin edit & resend (same teacher) | ✅ | Verified live — regenerates the message, re-validates the new slot, returns to pending |
+| Admin reassign to another teacher (linked request, history preserved) | ✅ | Automated test coverage; not re-run live this session |
+| Admin cancel (with reason, releases reservation) | ✅ | Automated test coverage; not re-run live this session |
+| Default Arabic assignment message, editable per request | ✅ | `config/assignmentMessage.js`; gender-aware wording only when `User.gender` is explicitly set, never inferred |
+| Assignment notifications (new/accepted/rejected/time-change/resent/reassigned/override/cancelled/activated) | ✅ | New `assignment` notification type; verified live for create/existing-direct/reject/accept |
+| Teacher inbox page ("طلبات الطلاب") + sidebar pending-count badge | ✅ | `TeacherAssignmentRequestsPage.jsx` |
+| Admin follow-up queue page + sidebar needs-attention badge | ✅ | `AdminAssignmentRequestsPage.jsx` |
+| Notification deep-links open the exact request | ✅ | Both pages support a `:id` route reading the specific request even outside the current tab filter |
+| **Bug found & fixed during live QA:** assignment message rendered `[object Object]` instead of day names | ✅ fixed | `config/assignmentMessage.js` — regression test added (`assignmentMessage.test.js`) |
+| **Bug found & fixed during live QA:** schedule-only students (no subscription yet) invisible on the teacher's admin profile | ✅ fixed | `admin.controller.getTeacher` now merges `ScheduleRule`-linked students; the teacher-**list** page's per-row count is still subscription-only (follow-up, not blocking) |
+| Backend test coverage | ✅ | `passwordPolicy`, `credentialMode`, `assignmentStatus`, `assignmentMessage`, `availability.service`, `assignment.service` (24 cases) + extended `onboarding.service`/`adminOnboarding.controller` — 320/322 passing (2 pre-existing, unrelated, untouched) |
+
+## Phase 2 Part 2c — Incremental Onboarding & Concurrency-Safe Scheduling — 2026-08-26
+
+Full detail in `PHASE_2_CHANGE_REQUESTS_AR.md`'s "5. إصلاح معمارية الإعداد التدريجي متعدد الطلاب" checklist. Fixes a real architectural bug: the one-shot wizard deferred ALL persistence to final submit, so a second/third student's availability check never saw an earlier student's already-chosen slot in the same wizard run — root cause of duplicate-suggestion and potential double-booking. **Verified with a full live 3-student browser QA run against a real running dev server + MongoDB**, not unit tests alone.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Teacher persisted immediately, before any student | ✅ | New `POST /admin/onboarding/sessions` — teacher created with `onboardingStatus: 'draft'`, idempotent via `clientRequestId`, resumable |
+| New resumable `OnboardingSession` model | ✅ | Deliberately separate from `OnboardingRequest` (an immutable idempotency/replay cache for the old one-shot endpoint, left fully intact) |
+| Incremental per-student save | ✅ | `POST /admin/onboarding/sessions/:id/students` — creates the student account + subscription/opening balance (if any) + schedule reservation in one call; the very next student's availability check sees it immediately |
+| Atomic concurrency protection | ✅ | New `ScheduleReservationLock` model, unique index `{teacherId, dayOfWeek, time}` — two concurrent callers targeting the exact same slot can never both succeed; loser gets 409 |
+| Real alternative-slot suggestions on conflict | ✅ | New `suggestAlternativeSlots()` in `availability.service.js` — never a hardcoded "+1 hour" guess; matches the spec's worked examples (30-min booking → next free instant; buffer pushes it out further; full-hour booking → next hour) |
+| Reservation release on reject/time-change/cancel/remove | ✅ | Verified live — removing a student re-opens their slot for the next one |
+| Student-save failure never touches the teacher or a sibling student | ✅ | Compensating rollback scoped to exactly what that one call created |
+| Resumable wizard (refresh/reopen) | ✅ | `localStorage`-backed resume banner + `GET /admin/onboarding/sessions/:id`; verified live — teacher and saved students reloaded with zero duplication |
+| Final review loads from the backend, not local state | ✅ | Blocks finalization while any student has an unresolved rejected/time-change-requested schedule |
+| Finalization flips teacher `onboardingStatus` to `complete` | ✅ | Draft teachers are hidden from the public directory and blocked from login until finalized — verified live (teacher appeared in `/teachers/public` immediately after finalize) |
+| Old one-shot wizard endpoint fully preserved | ✅ | `POST /admin/onboarding/teacher-with-students` untouched — additive, parallel system, not a replacement |
+| Backend test coverage | ✅ | 4 new `suggestAlternativeSlots` tests, 7 new `ScheduleReservationLock` integration tests in `assignment.service.test.js`, 15 new tests in `onboardingSession.service.test.js` — 351/353 passing (2 pre-existing, unrelated `sessionIntelligence` failures, untouched) |
+| **Live 3-student browser QA** | ✅ | Teacher saved → Student 1 booked Sunday 12:00 (60 min) → Student 2's picker correctly excluded 12:00 (jumped 11:00→13:00), booked 13:00 → Student 3's picker excluded both 12:00 and 13:00 (jumped 11:00→14:00), booked 14:00 → removed Student 2 → confirmed 13:00–14:00 re-opened while the other two stayed booked → full page refresh → resume banner appeared → resumed with teacher + both remaining students intact, zero duplication → finalized → teacher confirmed live in the public directory |
+
+### Follow-up: success-page continuation to "add more students" (2026-08-26)
+
+Small, separate navigation/UX improvement — not a further onboarding-architecture change. Full detail in `PHASE_2_CHANGE_REQUESTS_AR.md`'s "6. تحسين تنقّل مركّز" checklist.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Primary success-page action "إضافة المزيد من الطلاب لهذا المعلم" | ✅ | Uses the real `teacher._id` from the finalize result; navigates to `/admin/teachers/:id?action=add` |
+| Reuses the existing add-student flow, no duplicate page | ✅ | `AdminTeacherProfilePage.jsx`'s existing `AddStudentModal` auto-opens on `?action=add`, then the flag is stripped from the URL |
+| Teacher fixed/locked in the continuation flow | ✅ | No teacher selector existed in `AddStudentModal` to begin with; a new locked context card (name, specializations, working-hours summary, current student count) makes this explicit |
+| Success-page action hierarchy reordered | ✅ | Primary (add students) → secondary (view teacher profile) → secondary/outline (teacher list) → de-emphasized tertiary (create another teacher) |
+| Teacher-existence/permission check before opening the flow | ✅ | Reuses the profile page's existing backend fetch + `ErrorState` — never opens a blank form if the teacher is missing or inaccessible |
+| Refresh-safety fallback | ✅ | Non-sensitive `sessionStorage` banner (teacher id/name only) offers a safe link to the teacher's profile if the success page's state is lost — never auto-resubmits onboarding |
+| Backend changes required | ✅ none | Reuses `POST /admin/teachers/:teacherId/students` and its existing subscription/credential/scheduling/assignment/notification/audit services unchanged |
+| New tests | ✅ | `buildTeacherAddStudentUrl` (`config/__tests__/constants.test.js`) and `summarizeWorkingHoursDays` (`utils/__tests__/workingHours.test.js`) — 47/47 client tests passing (41 pre-existing + 6 new) |
+| Live browser QA | ⚠️ not run this session | Claude-in-Chrome extension did not connect after repeated retries; verified via code review, lint, and build/test runs instead — recommend a manual pass before production use |
+
+### Follow-up: assignment-approval workflow audit, visibility & UX fixes (2026-08-27)
+
+The workflow's backend state machine, locking, and notification logic (Phase 2 Part 2, above) were already sound and fully test-covered. This pass targeted why a new request could go unnoticed/confusing, plus finished several UX requirements the pages hadn't picked up yet.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Root cause: admin monitoring page defaulted to "تحتاج متابعة"** | ✅ fixed | That tab is rejected/time_change_requested only — a freshly created `pending_teacher_approval` request (the common case) was invisible on first load. Default tab changed to `pending_teacher_approval`; page now also polls every 30s |
+| Admin tab count badges | ✅ | New bounded `GET /admin/assignments/status-counts` (single aggregate, indexed on `status`) — `assignmentService.getStatusCounts()` |
+| **Bug found & fixed: gender pronoun hardcoded feminine** | ✅ fixed | `assignmentMessage.js`'s intro line always rendered "وبياناتها" (her data) regardless of student gender — wrong for every male student. New `studentDataPossessive()` agrees with gender the same way the rest of the message already did; regression test added |
+| Teacher dashboard "طلبات طلاب جديدة" section | ✅ | Was entirely missing — new `PendingAssignmentSection` in `TeacherDashboardPage.jsx`, placed right after the greeting; shows up to 3 latest requests with student/age/curriculum/days/duration/teaching-type/request-age, deep-links per card; hidden entirely when nothing is pending; syncs via notification-store watch + 60s polling fallback |
+| **Bug found & fixed: shared loading state disabled every card** | ✅ fixed | `TeacherAssignmentRequestsPage.jsx` used one mutation's `isPending` for every card's buttons — responding to one request disabled all of them. Now tracks `submittingId` so only the acted-on card disables |
+| Acceptance confirmation modal | ✅ | New `AcceptConfirmModal` summarizes the final schedule (days/times/duration/teaching type/start date) before activation, per spec |
+| Rejection inline validation | ✅ | Reason field shows an inline error and the confirm button disables when empty, instead of relying on the backend's 400 alone |
+| 44px touch targets + copy-message action | ✅ | Card action buttons bumped to `min-h-[44px]`; new accessible "نسخ الرسالة" button via `navigator.clipboard` |
+| Teaching type + request creation time on cards | ✅ | Both were missing from the request card's detail grid |
+| Backend test coverage | ✅ | New `studentDataPossessive`/gender-agreement test in `assignmentMessage.test.js`, new `getStatusCounts` test in `assignment.service.test.js` — 355/357 server tests passing (2 pre-existing, unrelated `sessionIntelligence` failures, untouched); 48/48 client tests passing |
+| Live browser QA | ⚠️ not run this session | Verified via targeted backend/frontend test suites + full production build instead — recommend a manual responsive/RTL pass (375px + desktop) before production use |
+
+### Follow-up: alternative-time redesign, dynamic curriculum catalog, Phase 1 readiness audit (2026-08-28)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Root cause: teacher's "propose alternative time" never revalidated on the backend** | ✅ fixed | `respondToAssignment`'s `time_change` branch accepted ANY day/time with no availability check — now calls `checkAvailability()` and returns 409 + real alternatives (`suggestAlternativeSlots`) if the slot is no longer free, mirroring the `accept` branch |
+| New teacher-owned availability endpoint | ✅ | `GET /teachers/me/assignment-requests/:id/availability` — ownership enforced by scoping to the teacher's own request (never the general admin endpoint); returns real weekly availability + smart suggestions |
+| Redesigned picker UI | ✅ | New `ProposeAlternativeTimeModal.jsx`: request summary, smart suggestions (with a plain-Arabic reason for each), single-select day chips with per-day slot counts, `ScheduleSlotPicker` reused for morning/afternoon/evening grouped 12-hour slots, live confirmation sentence, optional note — replaces the old `<select>` + `<input type="time">` (which rendered malformed values and had no real availability behind it) |
+| Dynamic teaching-subject/curriculum catalog | ✅ | New `TeachingSubject` model + `teachingSubject.service.js` (cached, seeds the 6 canonical keys with their EXACT legacy string values — zero data migration needed). Hard Mongoose `enum`s removed from `User`/`Course`/`AssignmentRequest`; authoritative validation moved to the service layer (`isValidActiveKey`/`isKnownKey`), reached from every create/update path (teacher profile, course, assignment, onboarding) |
+| Duplicate prevention | ✅ | Arabic-diacritic/alef/ya-variant-insensitive (reuses existing `utils/arabicNormalize.js`) + English case/space-insensitive — a repeat "create" call returns the existing subject instead of duplicating |
+| New permissions | ✅ | `curricula.view`/`curricula.manage`, added to the plain-admin default set — auto-backfilled onto every existing admin account by the already-existing `rbacModulePermissionsBackfill` migration, no new migration needed |
+| Creatable combobox | ✅ | New `TeachingSubjectCombobox.jsx` (search, keyboard nav, Enter/click-to-create only, never per-keystroke) — wired into teacher specializations, student scheduling (and therefore the onboarding wizard + edit-and-resend automatically), and the course category field |
+| Live label resolution everywhere | ✅ | Every card/dashboard/profile/filter that showed a curriculum label now reads it from the live catalog (`subjectLabel()` + `useTeachingSubjects()`) instead of a frozen frontend array — a new subject displays correctly everywhere immediately |
+| Admin management UI | ✅ | New "المناهج التعليمية" tab in `AdminSettingsPage.jsx` — create/archive/unarchive, gated by `curricula.manage` |
+| Assignment-message integration | ✅ | Label resolved via the catalog (`resolveLabel`) before message generation (`curriculumLabelOverride`) — `buildAssignmentMessage` itself stays pure/synchronous; frozen `sentMessage`/`generatedMessage` history already protects against a later rename (existing architecture, confirmed, no new snapshot mechanism needed) |
+| **2 previously-"pre-existing" test failures actually fixed, not left as pre-existing** | ✅ fixed | `sessionIntelligence.test.js` had two stale tests written for an old check-in-tolerance/payroll policy — the current code already implements the correct, documented, later-decided business rule (5-min tolerance; teacher paid regardless of student attendance). Tests corrected to match. **Full backend suite is 100% green for the first time** (0 pre-existing failures remaining) |
+| Backend test coverage | ✅ | New `teachingSubject.service.test.js` (15), `teacherAssignment.controller.test.js` (3, ownership/ IDOR), +3 tests in `assignment.service.test.js` (time-change revalidation), +2 in `assignmentMessage.test.js` (dynamic label override) — 380/380 server tests passing |
+| Frontend test coverage | ✅ | New `teacherProfile.test.js` (7, `subjectLabel` resolution) — 55/55 client tests passing |
+| Live browser QA | ✅ done (2026-08-28 follow-up) | Completed by the **Phase 1 Delivery Readiness Pass** (`PROJECT_STATUS.md`, `PHASE_1_DELIVERY_READINESS_REPORT.md`) — real Playwright-driven Chromium against the live dev backend/frontend/MongoDB (Claude-in-Chrome extension still would not connect), exercising the onboarding wizard, 3-student intelligent scheduling exclusion, new-student approval workflow, alternative-time modal, and admin follow-up queue end-to-end |
+| Known, deliberate limitation | ✅ closed (2026-08-28 follow-up) | Course-catalog browsing pages (`AdminCoursesPage.jsx`, marketing `CoursesPage.jsx`) now resolve dynamic-subject badge colors via new `utils/subjectBadge.js` — a bounded, deterministic (hash-of-key) palette distinct from the 6 canonical colors, never random, never a generic gray fallback. 8 new tests in `subjectBadge.test.js`. See the Phase 1 Delivery Readiness Pass entry in `PROJECT_STATUS.md` |
+
 ## Lesson Wallet Architecture — Subscription/Lesson System Redesign — 2026-07-29
 
 Full detail in `PROJECT_STATUS.md`'s "Lesson Wallet Architecture" entry and `ARCHITECTURE_PLAN.md`'s Lesson Wallet section. **Wallet was previously logged as an out-of-scope entity (line below, 2026-07-11 audit) — this is that deferred work, now formally commissioned and implemented.**

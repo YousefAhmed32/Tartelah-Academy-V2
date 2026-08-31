@@ -61,6 +61,21 @@ const ALL_PERMISSIONS = [
   'operations.view',
   'enrollments.view',
   'enrollments.manage',
+  // Assignment-request workflow (Phase 2 Part 2 §7–§11): assigning a new
+  // student to a teacher for approval, tracking/reassigning the request
+  // queue, and — separately, more sensitively — bypassing teacher approval
+  // to activate a new student's schedule immediately.
+  'assignments.view',
+  'assignments.manage',
+  'assignments.override',
+  // Dynamic teaching-subject/curriculum catalog (config/categories.js →
+  // services/teachingSubject.service.js). `.view` is only needed to see the
+  // admin management screen (any authenticated admin/teacher can already
+  // read the active list via the public GET /teaching-subjects endpoint for
+  // form population); `.manage` covers create/rename/archive/unarchive/
+  // reorder.
+  'curricula.view',
+  'curricula.manage',
 ]
 
 // Internal role identifiers (User.role). Stable — never rename these values,
@@ -118,6 +133,12 @@ const DEFAULT_PERMISSIONS_BY_ROLE = {
     'notifications.view', 'notifications.manage',
     'audit.view', 'reports.view', 'operations.view',
     'enrollments.view', 'enrollments.manage',
+    'assignments.view', 'assignments.manage',
+    'curricula.view', 'curricula.manage',
+    // 'assignments.override' deliberately excluded even for a plain 'admin'
+    // account — the immediate-assignment-without-teacher-approval bypass
+    // must always be explicitly granted (or held via isPrimaryAdmin), never
+    // auto-inherited, per the brief's "disabled by default" requirement.
   ],
   [ROLES.ASSISTANT_ADMIN]: [
     'users.view', 'dashboard.view', 'content.view', 'content.create', 'content.update', 'content.publish',

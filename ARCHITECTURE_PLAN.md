@@ -574,6 +574,242 @@ updatedAt: Date
 
 ---
 
+## Phase 2 Part 1 — Operational Foundation Architecture (2026-08-25)
+
+**Why:** Before the academy can onboard teachers/students at scale, four structural gaps had to close: teacher taxonomy conflated "who they teach" with "what they teach" into one field; no working-hours storage existed at all; a new subscription always credited the full package (no way to record a partially-consumed legacy package as an opening balance); and creating a teacher + their students was N separate manual steps with no atomicity or duplicate-safety. This section documents the additive schema/service layer that closes them — see `PHASE_2_CHANGE_REQUESTS_AR.md`'s "متابعة تنفيذ الجزء الأول" for the task-by-task tracking.
+
+### User — additive teacher/student taxonomy fields
+```
+specializations: [String] enum TEACHING_CATEGORIES (default [])  -- plural; teacher may hold >1
+audienceCategories: [String] enum ['children','teenagers','adults','men','women','all'] (default [])
+studentType: Enum ['existing', 'new'] (default 'existing')        -- role: 'student' only
+```
+`category` (legacy singular, pre-existing) is kept and auto-mirrored to/from `specializations[0]` by a `pre('save')` hook on `User`, so every existing consumer of the singular field keeps working unchanged — `specializations` is the new source of truth going forward. Audience categories are a deliberately **separate** taxonomy from teaching specialization (own config file, `config/studentAudience.js`) — never merged into one list, per the Phase 2 brief's explicit requirement. `studentType` defaults to `'existing'` so every pre-existing student is classified without a migration script or any change in behavior (the Part 2 teacher-acceptance workflow keys off `studentType: 'new'`, not built yet).
+
+### TeacherWorkingHours (new collection, one doc per teacher)
+```
+_id: ObjectId
+teacherId: ObjectId (ref: User, unique, indexed)
+timezone: String | null           -- null = inherit AcademySettings.timezone
+days: [{
+  dayOfWeek: Number (0=Sunday..6=Saturday, matches ScheduleRule.daysOfWeek)
+  mode: Enum ['full_day', 'unavailable', 'custom']
+  periods: [{ start: String 'HH:mm', end: String 'HH:mm' }]   -- only when mode:'custom'
+}]
+updatedBy: ObjectId (ref: User)
+```
+Storage + validation only for Part 1 (`config/workingHours.js`'s `validateWorkingHoursDays` — format/overlap/ordering checks, shared verbatim in spirit by a client-side mirror for inline UX feedback). A "break" between two lessons is deliberately represented as the **implicit gap** between consecutive `periods` on a `custom` day, not a separate stored concept — one array does both jobs. The automatic free-slot computation against booked sessions (the "availability engine") is explicitly Part 2 — this only gives that future engine a well-formed weekly template to read.
+
+### AcademySettings.timezone (new field)
+```
+timezone: String (default 'Africa/Cairo')
+```
+The first academy-wide timezone setting (previously only `ScheduleRule.timezone`, a **per-rule** field defaulting `'Asia/Riyadh'`, existed — left untouched, different concern). Resolved through one function, `services/academySettings.service.js#getAcademyTimezone()` — every future time-of-day feature must read it from there, never a hardcoded string. Admin-editable from `AdminWebsitePage.jsx`'s settings tab.
+
+### LessonTransaction — new `opening_balance` type
+Added to the existing append-only ledger's `type` enum (see the Lesson Wallet section above). Behaves identically to `'purchase'` in `wallet.service.js`'s increment table (`{remaining: amount, totalPurchased: amount}`) but is reported separately so "credited via a new subscription's documented opening balance" is distinguishable from an ad hoc top-up. `metadata` on this transaction type records `{ packageTotal, lessonsUsedAtOpening, lessonsRemainingAtOpening }`.
+
+### computeOpeningBalance (config/lessonPolicy.js)
+Pure function: given a package's total lesson count plus **at most one** of `{lessonsUsed, lessonsRemaining}`, derives the other and validates both are within `[0, packageTotal]`. Omitting both defaults to `{used: 0, remaining: packageTotal}` — the platform's pre-existing behavior, so every caller that doesn't pass either field is 100% backward compatible. Shared by both the standalone `POST /subscriptions` endpoint and the onboarding wizard via `services/subscription.service.js#createSubscriptionWithOpeningBalance()` — one function, not two parallel implementations.
+
+### OnboardingRequest (new collection — idempotency + audit record)
+```
+_id: ObjectId
+clientRequestId: String (unique)
+actorId: ObjectId (ref: User)
+teacherId: ObjectId (ref: User)
+studentIds: [ObjectId] (ref: User)
+resultSummary: Mixed          -- cached response, replayed verbatim on a repeat call
+```
+Written **only on a fully-successful** `createTeacherWithStudents()` run (`services/onboarding.service.js`). A repeat call with the same `clientRequestId` short-circuits to the cached `resultSummary` instead of re-creating anything — the wizard's protection against a network-retry or accidental double-submit re-running the whole flow. A failed run writes nothing here (by design — see the rollback pattern below), so retrying the same `clientRequestId` after a failure is free to try again from scratch.
+
+### "Create a teacher with their students" wizard — write pattern (no multi-document transactions)
+Same constraint as the Lesson Wallet section above: this MongoDB deployment is a standalone `mongod`, so there is no `mongoose.startSession()` to wrap "create teacher + working hours + N students + N subscriptions" as one atomic unit. The wizard instead: **(1)** validates every input up front — emails (including in-request duplicates), package existence/active status, working-hours structure, opening-balance math — before writing anything, so the overwhelming majority of bad requests never touch the database at all; **(2)** performs the writes, tracking every document id it creates; **(3)** on any failure at any point, runs an explicit compensating rollback (`onboarding.service.js#rollback()`) that deletes exactly the teacher/working-hours/students/subscriptions/wallet-transactions *this call* created — never touching pre-existing data — then rethrows, so the caller never receives a success response for a partially-completed operation. This is the same documented pattern `wallet.service.js` established for the Lesson Wallet redesign, extended here to a multi-entity flow.
+
+### Endpoints added
+```
+POST   /admin/students                          -- standalone student creation (no teacher/subscription yet)
+POST   /admin/teachers/:id/students              -- add a student to an existing teacher (+ optional package/opening balance)
+POST   /admin/onboarding/teacher-with-students   -- the full wizard
+GET    /admin/teachers/:id/working-hours
+PUT    /admin/teachers/:id/working-hours
+```
+All gated by the existing `teachers.manage`/`students.manage` permissions (no new permission strings needed — see `config/permissions.js`, unchanged). `GET /admin/teachers/:id` (existing route) was extended to also return `workingHours` and each assigned student's live `LessonWallet` balance (previously returned only the raw `Subscription` list) — this route was not yet consumed by any frontend page before this change, so the response-shape change is not a breaking one.
+
+---
+
+## Phase 2 Part 2 — Credential Options, Availability Engine & Assignment Workflow (2026-08-25)
+
+**Why:** Part 1 deliberately deferred three structural pieces: an administrator could not choose *how* a student's password was set (only the existing auto-generation path existed, plus an undocumented flat `password` override with no strength policy); there was no way to compute a teacher's real free time against actual bookings (`TeacherWorkingHours` was write-only groundwork); and `User.studentType:'new'` was a classification field with no actual request/accept/reject cycle behind it. This section closes all three, verified live against a real running instance (not just unit-tested) — see `PHASE_2_CHANGE_REQUESTS_AR.md`'s "متابعة استكمال الجزء الأول وتنفيذ الجداول والإسناد" for task-by-task tracking.
+
+### Credential resolution (`config/passwordPolicy.js` + `config/credentialMode.js`)
+Two modes only, by explicit scope decision — no academy-wide/shared password exists anywhere in this design:
+```
+resolveCredentialInput(input, fieldPrefix) -> { passwordToStore, mustChangePassword, mode, temporaryPasswordToReturn? }
+```
+`input.credential = { mode: 'auto'|'manual', password?, passwordConfirm?, requirePasswordChange? }`. `'auto'` is unchanged from Part 1 (`utils/tempPassword.js`, always forces a change). `'manual'` validates via `passwordPolicy.js` (≥8 chars, letter+digit, confirmation match — re-checked here regardless of what the frontend already validated) and respects `requirePasswordChange` independently (default `true`). A **backward-compatible fallback** (`resolveCredentialInput` with no `credential` key, only a flat `password`) preserves Part 1's exact prior behavior (`mustChangePassword: false`) for any caller that hasn't migrated to the new shape — verified by the full pre-existing onboarding test suite passing unchanged. Never returns a manual password past the point of `User.create()`; only the auto-generated one is ever echoed back, once, for the admin's one-time copy action.
+
+### AcademySettings.lessonBufferMinutes (new field)
+```
+lessonBufferMinutes: Number (default 0, max 120)
+```
+The optional gap the availability engine keeps free immediately before/after every booked lesson. `services/academySettings.service.js#getAcademySchedulingSettings()` reads timezone + buffer together in one query.
+
+### Availability engine (`services/availability.service.js`)
+```
+getWeeklyAvailability({ teacherId, durationMinutes, timezone?, excludeAssignmentRequestId? })
+  -> { timezone, bufferMinutes, durationMinutes, days: [{ dayOfWeek, mode, freeWindows: [{start,end}] }] }
+checkAvailability({ teacherId, studentId, days: [{dayOfWeek,time}], durationMinutes, timezone?, excludeAssignmentRequestId? })
+  -> { valid, conflicts: [{dayOfWeek,time,reason,source?}], timezone }
+```
+Busy intervals are assembled per day-of-week from three sources, each one bounded/indexed query (never an unbounded scan): active `ScheduleRule`s (matched structurally by `daysOfWeek`/`timeOfDay`, not by walking calendar dates — correct regardless of frequency), real `Session` documents within a capped 60-day lookahead (`EXCEPTION_LOOKAHEAD_DAYS`, converted to the target timezone via `date-fns-tz` before deriving day/time — the same library/pattern `schedule.service.js` already used), and currently-`pending_teacher_approval` `AssignmentRequest`s (a soft reservation, released the moment a request leaves that status — see `config/assignmentStatus.js#RESERVING_STATUSES`). A candidate slot is only valid if the **entire duration** fits inside one working period after subtracting buffer-padded busy intervals — never checked at the start instant alone. `checkAvailability()` is called a second time, authoritatively, immediately before every write (`createAssignmentRequest`, `respondToAssignment`'s accept, `editAndResend`) — this narrows but (per the standalone-`mongod`, no-multi-document-transactions constraint already documented for `wallet.service.js`) does not eliminate a race window; the unique `{seriesId,scheduledAt}` `Session` index remains the hard backstop against an actual duplicate. For a teacher that does not exist yet (mid-wizard), the client computes an equivalent estimate purely from the just-entered working hours (`client/src/utils/assignmentSchedule.js#computeLocalFreeWindows`) since there are no bookings yet to conflict with by construction.
+
+### AssignmentRequest (new collection) + state machine (`config/assignmentStatus.js`)
+```
+_id, studentId, teacherId, studentType: 'existing'|'new'
+ageCategory, studentAge, specialization: TEACHING_CATEGORIES, lessonDurationMinutes: 30|45|60|90
+schedule: { days: [{dayOfWeek,time}], startDate, endDate?, frequency: 'daily'|'weekly'|'biweekly'|'monthly', timezone? }
+teachingType: 'individual'|'group', adminNotes
+generatedMessage, editedMessage?, sentMessage?    -- canonical data kept separate from editable message text
+status: 'draft'|'pending_teacher_approval'|'accepted'|'rejected'|'time_change_requested'|'reassigned'|'completed'|'cancelled'
+teacherResponse: { type: 'accept'|'reject'|'time_change', reason?, proposedTime?, note?, respondedAt }
+responseHistory: [{ action, actorId, actorRole, note, at, snapshot }]   -- full audit trail, every action appends, nothing is overwritten
+previousRequestId / replacementRequestId   -- reassignment linkage, both directions
+immediateOverride: { enabled, reason, actorId, at }
+activationResult: { scheduleRuleIds[], sessionIds[], activatedAt }
+correlationId (unique, sparse)   -- idempotent replay, same pattern as OnboardingRequest.clientRequestId
+```
+Transitions (`assertTransition(from,to)`, enforced in `services/assignment.service.js`, never a raw `.status =` write elsewhere):
+```
+draft → pending_teacher_approval | accepted | cancelled
+pending_teacher_approval → accepted | rejected | time_change_requested | cancelled
+accepted → completed                                  -- transitional; only forward, retried on activation failure
+rejected | time_change_requested → pending_teacher_approval (edit & resend) | reassigned | cancelled
+reassigned | completed | cancelled → (terminal)
+```
+`studentType:'existing'` OR an authorized `immediateOverride` (requires the new `assignments.override` permission + a mandatory reason, always audited — deliberately **excluded** from every role's default permission set, including plain `'admin'`, per the brief's "disabled by default" requirement; `isPrimaryAdmin` bypasses as usual) skip straight to `accepted` and activate synchronously in the same call. `activateAssignment()` groups the request's `schedule.days` by shared time-of-day (one real `ScheduleRule` per distinct time, supporting different start times per day within one request) and calls the pre-existing `schedule.service.js#generateSessionsFromRule()` unchanged — the exact same bounded generation Part 1 already used elsewhere, not a second implementation. A failed activation rolls back only what that activation attempt created (`ScheduleRule`s + `Session`s), and a failed *creation* (the immediate path) deletes the just-created `AssignmentRequest` itself rather than leaving a stuck row.
+
+**`'daily'` and `'monthly'` frequency handling (added during the compact-scheduling-UX redesign pass):** `'daily'` was already fully supported by `schedule.service.js`'s `generateDates()` (it ignores `daysOfWeek` entirely and repeats every calendar day) but had no UI and was excluded from `validateSchedulePayload`'s allow-list — now allowed, and the frontend derives all 7 weekday entries at the same time so `checkAvailability` still validates the time against every real weekday's working hours. `'monthly'` had a **latent correctness gap**: `generateDates()`'s monthly branch only honors "same day-of-month as `startDate`" when `daysOfWeek` is **empty** — a non-empty `daysOfWeek` makes it behave identically to `'weekly'`. `activateAssignment()` now explicitly passes `daysOfWeek: []` to `ScheduleRule.create()` whenever `schedule.frequency === 'monthly'`, regardless of what `schedule.days` contains (which still needs exactly one `{dayOfWeek,time}` entry to satisfy the schema and give the availability engine a representative weekday to conflict-check against).
+
+### Assignment message (`config/assignmentMessage.js`)
+Pure, deterministic Arabic template matching the brief's structure verbatim. Gender-aware wording (`طالب جديد`/`طالبة جديدة`/neutral `طالب/طالبة جديد/جديدة`) is derived from `User.gender` **only when explicitly set** — never inferred from a name, matching the existing teacher-identity policy (`config/teacherIdentity.js`) extended here to also cover students optionally. Rendered as plain text only (never `dangerouslySetInnerHTML`) on the frontend, which is the actual XSS boundary — the backend does not HTML-escape the string because it is never interpreted as markup.
+
+### Endpoints added
+```
+GET    /admin/teachers/:id/availability?durationMinutes=&timezone=
+POST   /admin/assignments/check-availability
+GET    /admin/assignments                        -- list (status/teacherId/studentId filters, paginated)
+POST   /admin/assignments                        -- create (existing-student direct, new-student pending, or override)
+GET    /admin/assignments/:id
+PATCH  /admin/assignments/:id/edit-resend
+POST   /admin/assignments/:id/reassign
+POST   /admin/assignments/:id/cancel
+GET    /teachers/me/assignment-requests          -- "طلبات الطلاب" inbox
+GET    /teachers/me/assignment-requests/:id      -- ownership-scoped (teacherId must match)
+PATCH  /teachers/me/assignment-requests/:id/respond   -- accept | reject | time_change
+```
+New permissions: `assignments.view`, `assignments.manage` (both in the default `'admin'` set), `assignments.override` (never in any default set). Teacher-side ownership is enforced in the service layer (`respondToAssignment` / `getMyAssignmentRequest`'s query scoping), not just the route — closes an IDOR class of bug by construction rather than by convention.
+
+### `admin.controller.getTeacher` — schedule-only students (bug found during live QA, fixed)
+The "assigned students" list this endpoint returns was built exclusively from `Subscription` records. A student scheduled via the new assignment workflow with no package yet — an explicitly supported case in this design — was invisible on the teacher's own admin profile. Fixed by merging in students reachable via an active `ScheduleRule` not already present from a subscription, tagged `status:'schedule_only'`, deduped by student id. The admin **teacher-list** page's per-row count was left as subscription-based only (lower-traffic surface, flagged as a follow-up, not a blocking gap).
+
+---
+
+## Phase 2 Change Requests — Reservation Completeness & Flexible Alternative Schedules (2026-08-31)
+
+**The gap:** a teacher's proposed alternative time (`time_change_requested`) revalidated availability but held no reservation on it — `RESERVING_STATUSES` only covered `pending_teacher_approval`. A second, unrelated request could be created for the exact slot a teacher had just proposed while it sat awaiting an admin decision.
+
+### `config/assignmentStatus.js` additions
+```
+RESERVING_STATUSES = ['pending_teacher_approval', 'time_change_requested']
+RESERVING_SLOT_SOURCE = { pending_teacher_approval: 'schedule', time_change_requested: 'proposedSchedule' }
+```
+`availability.service.js#loadBusyByDay` looks up `RESERVING_SLOT_SOURCE[status]` per reserving `AssignmentRequest` row to decide which field actually holds the slot: `schedule.days` (the originally requested one) or `teacherResponse.proposedSchedule.days` (the teacher's own alternative). `respondToAssignment`'s `time_change` branch now releases the original `ScheduleReservationLock` and atomically re-acquires one for the proposed set (same release-then-reacquire pattern `editAndResend` already used) — the lock rows always match whichever slot the availability engine currently treats as busy for that status, never an orphaned stale set.
+
+### Confirmed vs. reserved — a genuine third UI state
+Every busy interval `checkAvailability()`/`getWeeklyAvailability()` produces is now tagged `kind: 'confirmed'` (an active `ScheduleRule`/`Session`) or `'reserved'` (only a pending hold — `reserved_request`/`reserved_proposed_time` sources). `blockedIntervalsForPeriods()` merges intervals only within the same `kind`, so a confirmed booking can never blend into (and hide) an adjacent temporary hold. Additive to the wire format — `busyWindows`/`conflicts` entries gained a `kind` field, existing consumers reading only `start`/`end` are unaffected. `ScheduleSlotPicker`/`StudentScheduleSection` render the amber third state with the exact Arabic phrase the brief specified: "محجوز مؤقتًا — بانتظار الموافقة".
+
+### `AssignmentRequest.teacherResponse.proposedSchedule` — flexible multi-day proposals
+```
+teacherResponse: { type, reason?, proposedTime?, proposedSchedule?: { days: [{dayOfWeek,time}] }, note?, respondedAt }
+```
+`proposedTime` (singular) is kept only as a backward-compatible mirror of `proposedSchedule.days[0]` for any pre-existing row or consumer that still reads it — every new `time_change` response populates both. `respondToAssignment` validates the whole proposed array (`validateProposedDays` — day/time shape + no duplicate weekdays), revalidates availability across every proposed day, and locks the whole set atomically (same all-or-nothing rollback pattern as `createAssignmentRequest`'s `acquireLocks`). `ProposeAlternativeTimeModal.jsx` was rebuilt around this: pre-fills from the request's current `schedule.days`, lets the teacher add/remove any weekday with its own real-availability time picker, and shows an original-vs-proposed comparison panel. The admin's `EditResendModal` pre-fills from `proposedSchedule.days` when present (the common case: reviewing a `time_change_requested` row) instead of the now-superseded original schedule.
+
+---
+
+## Phase 2 Part 2c — Incremental Onboarding & Concurrency-Safe Scheduling (2026-08-26)
+
+**Why:** the Part 2b wizard, despite its UX redesign, still deferred every write to a single all-or-nothing submit at the end. A second or third student's schedule was checked against `checkAvailability()` while every earlier student in the same wizard run still existed only in React state — the availability engine had no way to see them, so it would suggest an already-chosen slot again, and a genuine race toward a real double-booking existed at final submit. This section is a structural fix, not a UI patch: persistence itself becomes incremental.
+
+### `OnboardingSession` (new collection)
+```
+_id, clientRequestId (unique)         -- idempotent "start session" replay
+teacherId, createdBy
+status: 'draft'|'teacher_saved'|'adding_students'|'ready_for_review'|'finalizing'|'completed'|'cancelled'|'expired'
+currentStep: 'teacher'|'specialization'|'workingHours'|'students'|'review'
+studentIds: [User]                    -- resumability index only; every id here is already a real, persisted student
+cancelReason, cancelledBy, cancelledAt, completedAt
+```
+Deliberately **not** an extension of `OnboardingRequest` — that model is a write-once idempotency/replay cache for the legacy one-shot endpoint (never mutated, no notion of "in progress"), while this one is a genuinely mutable, long-lived draft. Both coexist; `OnboardingRequest` and `POST /admin/onboarding/teacher-with-students` are untouched.
+
+### `ScheduleReservationLock` (new collection) — atomic concurrency primitive
+```
+_id, teacherId, dayOfWeek, time        -- unique index on {teacherId, dayOfWeek, time}
+assignmentRequestId, onboardingSessionId?, createdBy
+```
+Not a second source of truth for "what is booked" — `ScheduleRule`/`Session` (once activated) and `AssignmentRequest.status` (while pending) remain canonical, and `availability.service.js` keeps reading from those. Its only job: make the *write* that creates a new reservation for one `(teacher, dayOfWeek, time)` atomic. MongoDB enforces the unique index on each insert, so two near-simultaneous attempts to reserve the exact same slot can never both succeed — the loser's insert fails with a duplicate-key error, which `assignment.service.js` turns into an HTTP 409 with `lockConflict: true` and real alternatives (`suggestAlternativeSlots()`, below). Acquired the moment a reservation is first requested (`createAssignmentRequest`, `editAndResend`); released the moment the reservation becomes durable (`activateAssignment` succeeds) or the request leaves every reserving status (`reject`/`time_change`/`cancel`, all in `respondToAssignment`/`cancelAssignment`). Deliberately does **not** model arbitrary partial-interval overlap (12:00–13:00 vs 12:30–13:30) — same documented residual gap as `wallet.service.js`'s "no multi-document transactions on a standalone `mongod`" constraint; `checkAvailability()`'s authoritative re-check immediately before lock acquisition narrows this as far as possible without real ACID transactions.
+
+### `suggestAlternativeSlots()` (new, `availability.service.js`)
+```
+suggestAlternativeSlots({ teacherId, days, durationMinutes, timezone?, excludeAssignmentRequestId?, maxResults=3 })
+  -> [{ dayOfWeek, time }]
+```
+Reuses `getWeeklyAvailability()`'s real free windows — never a hardcoded "+1 hour" guess. Preference order per requested day: same day at-or-after the requested time (nearest first), then same day before it, then other days nearest to the requested time. Powers both the lock-conflict 409 response and the wizard's implicit "next slot" behavior (the next student's picker simply reflects real, already-updated availability).
+
+### `User.onboardingStatus` (new field) + `onboardingSaveKey` (new field)
+```
+onboardingStatus: 'draft'|'complete' (default 'complete')   -- 'draft' only while mid-incremental-onboarding
+onboardingSaveKey: String (unique, sparse)                   -- idempotency key for a schedule-less student save
+```
+Every pre-existing account and every account created through any other path defaults to `'complete'` — zero behavior change for existing data. A `'draft'` teacher is excluded from `GET /teachers/public` and `GET /teachers/public/:id` (`onboardingStatus: { $ne: 'draft' }` — matches `undefined` too, so legacy rows are unaffected) and blocked at login with a distinct message (`auth.controller.js`), not the "suspended" one. `finalizeOnboardingSession()` flips it to `'complete'`.
+
+### `services/onboardingSession.service.js` (new)
+```
+startOnboardingSession({ clientRequestId, teacher, workingHours, actorId })
+  -> persists the teacher (draft) + TeacherWorkingHours + the OnboardingSession row, all-or-nothing, idempotent on clientRequestId
+getOnboardingSession({ sessionId }) -> { session, teacher, workingHours, students[] }   -- always backend-authoritative; used for resume AND final review
+saveStudentToSession({ sessionId, clientRequestId, student, actorId, overrideAllowed })
+  -> creates the student + subscription/opening-balance (if any) + AssignmentRequest/reservation (if a schedule is given) in ONE call;
+     idempotent (correlationId for schedule-bearing saves, onboardingSaveKey otherwise);
+     on any failure, rolls back ONLY what this call created — the teacher and every previously-saved sibling are untouched
+removeStudentFromSession({ sessionId, studentId, actorId, reason })
+  -> releases the reservation (cancels while pending, tears down ScheduleRule/Session directly if already activated), then deletes the student's own records
+finalizeOnboardingSession({ sessionId, actorId }) -> idempotent; reloads every student fresh from the backend and blocks if any has an unresolved rejected/time_change_requested schedule; flips teacher onboardingStatus to 'complete'
+cancelOnboardingSession({ sessionId, actorId, reason }) -> reason required; removes every student this session created, then the teacher
+listOnboardingSessions({ status, page, limit }) -> bounded/paginated, ready to back a future "resume any admin's session" screen
+```
+Reuses `onboarding.service.js`'s existing validation helpers (`validateTeacherPayload`, `validateStudentsPayload`, `assertPackagesValid`, `pickAllowed`, `normalizeEmail` — all exported for this purpose) so per-field rules never diverge between the one-shot and incremental wizards.
+
+### Endpoints added
+```
+POST   /admin/onboarding/sessions                              -- start (idempotent)
+GET    /admin/onboarding/sessions                              -- bounded list
+GET    /admin/onboarding/sessions/:id                          -- resume / review, backend-authoritative
+POST   /admin/onboarding/sessions/:id/students                 -- incremental save (idempotent)
+DELETE /admin/onboarding/sessions/:id/students/:studentId       -- remove, releases reservation
+POST   /admin/onboarding/sessions/:id/finalize                 -- idempotent
+POST   /admin/onboarding/sessions/:id/cancel                   -- reason required
+```
+Same `teachers.manage`+`students.manage` permission gate as the legacy `teacher-with-students` endpoint, which remains mounted and fully functional alongside these.
+
+### Frontend
+`AdminTeacherOnboardingWizardPage.jsx` reworked: the teacher-info/specialization/working-hours steps stay local until "Next" leaves working-hours, which calls `startOnboardingSession()` and persists the teacher immediately (idempotent on repeated clicks via a stable `clientRequestId` ref). The students step then shows every already-saved student as a compact `SavedStudentCard` (Edit/Remove) plus exactly one active, editable `ActiveStudentCard` — never more than one large form expanded at once. Because the active form's `teacherId` is now always real, `StudentScheduleSection`'s existing backend-availability query naturally reflects every sibling already saved — no separate `siblingDaysList` estimation is needed for saved students anymore. A `localStorage`-backed banner offers to resume an incomplete session on reload; the final review step always re-fetches from `GET /admin/onboarding/sessions/:id` rather than trusting local state.
+
+### Verified live (3-student scenario)
+Teacher persisted immediately → Student 1 booked Sunday 12:00 (60 min) → Student 2's real-time picker excluded 12:00–13:00 entirely (jumped 11:00 ص → 1:00 م) → booked 13:00 → Student 3's picker excluded both 12:00–13:00 and 13:00–14:00 (jumped to 2:00 م) → booked 14:00 → removed Student 2 → 13:00–14:00 confirmed available again while the other two stayed booked → full page reload → resume banner appeared → resumed with teacher + both remaining students intact, zero duplication → finalized → teacher confirmed live in `/teachers/public`.
+
+---
+
 ## API Architecture
 
 ### Base URL: `/api/v1`

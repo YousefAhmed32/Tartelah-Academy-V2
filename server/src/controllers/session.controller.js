@@ -56,6 +56,7 @@ exports.createSession = async (req, res, next) => {
       type: 'session',
       priority: 'medium',
       relatedId: session._id,
+      actionUrl: '/student/sessions',
     })
     sendSuccess(res, session, 'تمت جدولة الحصة بنجاح', 201)
   } catch (err) {
@@ -190,6 +191,7 @@ exports.startSession = async (req, res, next) => {
         type: 'attendance',
         priority: 'medium',
         relatedId: session._id,
+        actionUrl: '/teacher/attendance',
       })
     }
 
@@ -384,6 +386,7 @@ exports.finishSession = async (req, res, next) => {
         titleAr: 'تقييم جديد',
         bodyAr: `أضاف معلمك تقييماً جديداً بدرجة ${evaluation.score}/10`,
         type: 'evaluation', priority: 'medium', relatedId: createdEvaluation._id,
+        actionUrl: '/student/evaluations',
       })
     }
 
@@ -400,6 +403,7 @@ exports.finishSession = async (req, res, next) => {
         titleAr: 'واجب جديد',
         bodyAr: `تم تعيين واجب: "${homework.titleAr}"`,
         type: 'homework', priority: 'medium', relatedId: createdHomework._id,
+        actionUrl: '/student/homework',
       })
     }
 
@@ -409,6 +413,7 @@ exports.finishSession = async (req, res, next) => {
       titleAr: 'انتهت الحصة',
       bodyAr: `انتهت حصة "${session.titleAr}" — تم تسجيل حضورك: ${ATTENDANCE_STATUS_LABEL_AR[attendanceStatus] || attendanceStatus}`,
       type: 'session', priority: 'low', relatedId: session._id,
+      actionUrl: '/student/sessions',
     })
 
     logAction({
@@ -488,6 +493,7 @@ exports.cancelSession = async (req, res, next) => {
       type: 'session',
       priority: 'high',
       relatedId: session._id,
+      actionUrl: '/student/sessions',
     })
 
     sendSuccess(res, session, 'تم إلغاء الحصة')
@@ -528,6 +534,7 @@ exports.rescheduleSession = async (req, res, next) => {
       type: 'session',
       priority: 'high',
       relatedId: session._id,
+      actionUrl: '/student/sessions',
     })
 
     sendSuccess(res, session, 'تم إعادة جدولة الحصة')
@@ -597,12 +604,14 @@ exports.adminCreateSession = async (req, res, next) => {
       titleAr: 'حصة جديدة مجدولة',
       bodyAr: `تم جدولة حصة "${titleAr}" في ${new Date(scheduledAt).toLocaleDateString('ar')}`,
       type: 'session', priority: 'medium', relatedId: session._id,
+      actionUrl: '/student/sessions',
     })
     await createNotification({
       userId: teacherId,
       titleAr: 'حصة جديدة مجدولة',
       bodyAr: `تم جدولة حصة "${titleAr}" مع طالب في ${new Date(scheduledAt).toLocaleDateString('ar')}`,
       type: 'session', priority: 'medium', relatedId: session._id,
+      actionUrl: '/teacher/sessions',
     })
     sendSuccess(res, session, 'تمت جدولة الحصة بنجاح', 201)
   } catch (err) {
@@ -660,6 +669,7 @@ exports.declineSession = async (req, res, next) => {
         titleAr: 'رفض معلم لحصة',
         bodyAr: `رفض المعلم حصة "${session.titleAr}"${req.body.reason ? ` — ${req.body.reason}` : ''} — تحتاج لإعادة تعيين`,
         type: 'session', priority: 'high', relatedId: session._id,
+        actionUrl: '/admin/sessions',
       })))
     }
 

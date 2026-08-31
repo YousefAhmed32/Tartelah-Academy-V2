@@ -71,6 +71,7 @@ exports.createRule = async (req, res, next) => {
         type: 'schedule',
         priority: 'high',
         relatedId: rule._id,
+        actionUrl: '/student/schedule',
       })
     }
 

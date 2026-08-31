@@ -15,6 +15,7 @@ exports.create = async (req, res, next) => {
         type: 'homework',
         priority: 'medium',
         relatedId: hw._id,
+        actionUrl: '/student/homework',
       })))
     }
     sendSuccess(res, hw, 'تم إنشاء الواجب', 201)
@@ -67,6 +68,7 @@ exports.gradeSubmission = async (req, res, next) => {
       titleAr: 'تم تصحيح الواجب',
       bodyAr: `حصلت على ${grade} في واجب "${hw.titleAr}"`,
       type: 'homework', priority: 'medium', relatedId: hw._id,
+      actionUrl: '/student/homework',
     })
     sendSuccess(res, { graded: true, grade, teacherFeedback }, 'تم تصحيح الواجب')
   } catch (err) {
@@ -111,6 +113,7 @@ exports.submit = async (req, res, next) => {
       type: 'homework',
       priority: 'medium',
       relatedId: hw._id,
+      actionUrl: '/teacher/homework',
     })
     sendSuccess(res, { submitted: true }, 'تم تسليم الواجب')
   } catch (err) {

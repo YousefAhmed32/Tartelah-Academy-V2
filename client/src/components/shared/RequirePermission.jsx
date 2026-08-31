@@ -8,8 +8,11 @@ import AccessDeniedPage from './AccessDeniedPage.jsx'
 // clear explanation, since nothing at the React Router level enforced
 // permissions before this. Like Can, this is UX only — the real boundary is
 // the matching requirePermission(...) middleware on the backend route.
-export default function RequirePermission({ permission, any, children }) {
-  const { hasPermission, hasAnyPermission } = useAuthStore()
-  const allowed = any ? hasAnyPermission(any) : hasPermission(permission)
+export default function RequirePermission({ permission, any, all, children }) {
+  const { hasPermission, hasAnyPermission, hasAllPermissions } = useAuthStore()
+  let allowed = true
+  if (permission) allowed = allowed && hasPermission(permission)
+  if (any) allowed = allowed && hasAnyPermission(any)
+  if (all) allowed = allowed && hasAllPermissions(all)
   return allowed ? children : <AccessDeniedPage />
 }

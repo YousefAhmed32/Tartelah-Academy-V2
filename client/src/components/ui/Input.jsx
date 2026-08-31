@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react'
+import { forwardRef, useState, useId } from 'react'
 
 const Input = forwardRef(function Input({
   label,
@@ -11,6 +11,7 @@ const Input = forwardRef(function Input({
   className = '',
   containerClass = '',
   onIconEndClick,
+  id,
   ...props
 }, ref) {
   const [showPass, setShowPass] = useState(false)
@@ -19,10 +20,15 @@ const Input = forwardRef(function Input({
 
   const fieldClass = variant === 'light' ? 'field-light' : 'field'
 
+  const generatedId = useId()
+  const inputId = id || (label ? generatedId : undefined)
+  const errorId = error ? `${inputId || generatedId}-error` : undefined
+  const hintId = (hint && !error) ? `${inputId || generatedId}-hint` : undefined
+
   return (
     <div className={`flex flex-col gap-1.5 ${containerClass}`}>
       {label && (
-        <label className={`text-sm font-semibold ${variant === 'light' ? 'text-brand-textBody' : 'text-[#cdbef0]'}`}>
+        <label htmlFor={inputId} className={`text-sm font-semibold ${variant === 'light' ? 'text-brand-textBody' : 'text-[#cdbef0]'}`}>
           {label}
         </label>
       )}
@@ -34,7 +40,10 @@ const Input = forwardRef(function Input({
         )}
         <input
           ref={ref}
+          id={inputId}
           type={inputType}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={errorId || hintId}
           className={`
             ${fieldClass}
             ${icon ? 'pe-12' : ''}
@@ -67,8 +76,8 @@ const Input = forwardRef(function Input({
           </button>
         )}
       </div>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {hint && !error && <p className="text-[#9888bd] text-sm">{hint}</p>}
+      {error && <p id={errorId} className="text-red-400 text-sm">{error}</p>}
+      {hint && !error && <p id={hintId} className="text-[#9888bd] text-sm">{hint}</p>}
     </div>
   )
 })

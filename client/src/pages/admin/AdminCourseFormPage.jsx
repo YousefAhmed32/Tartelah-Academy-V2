@@ -9,6 +9,7 @@ import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import { extractYouTubeId, youtubeThumbnail, youtubeEmbedUrl, isValidYouTubeUrl } from '../../utils/youtube.js'
+import TeachingSubjectCombobox from '../../components/ui/TeachingSubjectCombobox.jsx'
 
 // ── Shared design-language primitives ────────────────────────────────────────
 
@@ -739,12 +740,7 @@ export default function AdminCourseFormPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Field label="الفئة">
-                <select value={form.category} onChange={e => set('category', e.target.value)} className={selectCls}>
-                  {[['tajweed','التجويد'],['hifz','الحفظ'],['nazra','النظر'],['arabic','العربية'],['quran','القرآن'],['other','أخرى']].map(([v,l]) =>
-                    <option key={v} value={v}>{l}</option>)}
-                </select>
-              </Field>
+              <TeachingSubjectCombobox label="الفئة" value={form.category} onChange={(key) => set('category', key)} />
               <Field label="المستوى">
                 <select value={form.difficulty} onChange={e => set('difficulty', e.target.value)} className={selectCls}>
                   {[['beginner','مبتدئ'],['intermediate','متوسط'],['advanced','متقدم']].map(([v,l]) =>

@@ -1,18 +1,21 @@
-const OPTIONS = [
+const TEACHER_OPTIONS = [
   { value: 'male', label: 'معلم' },
   { value: 'female', label: 'معلمة' },
 ]
 
-// The one place a teacher's gender is ever chosen in the UI (admin
-// create/edit, teacher self-settings). A plain radio-card group rather than
-// a free-text field or a silently-defaulted value — nothing here ever
-// pre-selects "معلم" for an unresolved teacher.
-export default function GenderSegmentedControl({ value, onChange, label = 'تصنيف المعلم', required = false }) {
+// The one place a teacher's (or, via `options`, a student's) gender is ever
+// chosen in the UI (admin create/edit, teacher self-settings, the optional
+// student credential/message-personalization field in the onboarding
+// wizard). A plain radio-card group rather than a free-text field or a
+// silently-defaulted value — nothing here ever pre-selects a value for an
+// unresolved person. `options` defaults to the teacher labels for backward
+// compatibility with every existing call site.
+export default function GenderSegmentedControl({ value, onChange, label = 'تصنيف المعلم', required = false, options = TEACHER_OPTIONS }) {
   return (
     <div>
       {label && <label className="text-xs font-bold text-gray-400 mb-1 block">{label}</label>}
       <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-2">
-        {OPTIONS.map(o => (
+        {options.map(o => (
           <button
             key={o.value}
             type="button"

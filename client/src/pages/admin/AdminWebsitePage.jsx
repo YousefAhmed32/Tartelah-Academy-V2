@@ -31,7 +31,7 @@ function Field({ label, children }) {
 function SettingsForm({ settings, onSave, isPending }) {
   const [form, setForm] = useState({
     phone: '', whatsapp: '', email: '', youtube: '', instagram: '', facebook: '', twitter: '', linkedin: '',
-    workingHours: '', supportText: '', emergencyContact: '', googleMapsEmbed: '',
+    workingHours: '', supportText: '', emergencyContact: '', googleMapsEmbed: '', timezone: 'Africa/Cairo',
     footerDescription: '', footerCopyright: '', newsletterEnabled: true, newsletterText: '',
     privacyPolicyUrl: '', termsUrl: '', cookiesPolicyUrl: '',
   })
@@ -74,6 +74,17 @@ function SettingsForm({ settings, onSave, isPending }) {
         </Field>
         <Field label="جهة اتصال الطوارئ">
           <input value={form.emergencyContact} onChange={f('emergencyContact')} className="field-light w-full" placeholder="+966 XX XXX XXXX" dir="ltr" />
+        </Field>
+        <Field label="المنطقة الزمنية المعتمدة للأكاديمية">
+          <select value={form.timezone} onChange={f('timezone')} className="field-light w-full" dir="ltr">
+            <option value="Africa/Cairo">Africa/Cairo (القاهرة)</option>
+            <option value="Asia/Riyadh">Asia/Riyadh (الرياض)</option>
+            <option value="Asia/Kuwait">Asia/Kuwait (الكويت)</option>
+            <option value="Asia/Dubai">Asia/Dubai (الإمارات)</option>
+            <option value="Asia/Amman">Asia/Amman (عمّان)</option>
+            <option value="Asia/Baghdad">Asia/Baghdad (بغداد)</option>
+            <option value="UTC">UTC</option>
+          </select>
         </Field>
         <div className="md:col-span-2">
           <Field label="تضمين خريطة Google — الصق كود الـ iframe الكامل من Google Maps أو رابط src مباشرة">

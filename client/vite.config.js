@@ -18,4 +18,12 @@ export default defineConfig({
       },
     },
   },
+  // Pure-logic unit tests only (no jsdom/testing-library) — see
+  // src/utils/__tests__/assignmentSchedule.test.js. No frontend component/DOM
+  // test infra exists in this repo; keeping this addition minimal and scoped
+  // to what the Phase 2 Part 2 UX redesign's testing requirements actually need.
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
 })

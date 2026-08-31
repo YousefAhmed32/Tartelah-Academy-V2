@@ -6,6 +6,7 @@ const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { logAction } = require('../services/audit.service')
 const walletService = require('../services/wallet.service')
+const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
 
 exports.getMySubscription = async (req, res, next) => {
   try {
@@ -20,33 +21,28 @@ exports.getMySubscription = async (req, res, next) => {
 
 exports.createSubscription = async (req, res, next) => {
   try {
-    const { studentId, packageId, teacherId, startDate, notes } = req.body
-    const pkg = await Package.findById(packageId)
-    if (!pkg) return sendError(res, 'الباقة غير موجودة', 404)
-    const start = startDate ? new Date(startDate) : new Date()
-    const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
-    const sub = await Subscription.create({
-      studentId, packageId, packageNameAr: pkg.nameAr, teacherId, startDate: start, endDate: end,
-      billingDate: start, renewalDate: end,
-      sessionsRemaining: pkg.sessionsPerMonth, totalSessions: pkg.sessionsPerMonth,
-      amountPaid: pkg.price, notes, createdBy: req.user._id,
-    })
+    const { studentId, packageId, teacherId, startDate, notes, lessonsUsed, lessonsRemaining } = req.body
 
-    const { transaction } = await walletService.applyTransaction({
-      studentId, type: 'purchase', amount: pkg.sessionsPerMonth,
-      idempotencyKey: `subscription:${sub._id}:purchase`,
-      reason: `شراء باقة "${pkg.nameAr}"`,
-      relatedSubscriptionId: sub._id, performedByRole: 'admin', performedBy: req.user._id,
-    })
-    sub.walletTransactionId = transaction._id
-    await sub.save()
+    let result
+    try {
+      result = await createSubscriptionWithOpeningBalance({
+        studentId, packageId, teacherId, startDate, notes, lessonsUsed, lessonsRemaining,
+        actorId: req.user._id, actorRole: 'admin',
+      })
+    } catch (err) {
+      if (err.status) return sendError(res, err.message, err.status)
+      throw err
+    }
+    const { subscription: sub, package: pkg, used, remaining } = result
 
     await sub.populate(['packageId', 'studentId', 'teacherId'])
     await Notification.create({ userId: studentId, titleAr: 'تم تفعيل الاشتراك', bodyAr: `تم تفعيل باقة "${pkg.nameAr}"`, type: 'subscription' })
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'subscription.create',
-      entity: 'Subscription', entityId: sub._id, changes: { studentId, teacherId, packageId }, ip: req.ip,
+      entity: 'Subscription', entityId: sub._id,
+      changes: { studentId, teacherId, packageId, lessonsUsedAtOpening: used, lessonsRemainingAtOpening: remaining },
+      ip: req.ip,
     })
 
     sendSuccess(res, sub, 'تم إنشاء الاشتراك', 201)

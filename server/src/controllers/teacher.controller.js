@@ -2,10 +2,19 @@ const Session = require('../models/Session')
 const Subscription = require('../models/Subscription')
 const Evaluation = require('../models/Evaluation')
 const User = require('../models/User')
+const LessonWallet = require('../models/LessonWallet')
+const ScheduleRule = require('../models/ScheduleRule')
 const { sendSuccess, sendError } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { toPublicTeacher } = require('../utils/teacherPublic')
 const { isValidGender } = require('../config/teacherIdentity')
+// Dynamic catalog-backed check (replaces the old static allow-list). The
+// public directory only ever needs to filter by an ACTIVE subject — an
+// archived one has no public teachers newly advertising it anyway, and
+// keeping this active-only avoids surfacing a discontinued subject as a
+// selectable public filter. See services/teachingSubject.service.js.
+const { isValidActiveKey } = require('../services/teachingSubject.service')
+const { isValidAudienceCategory } = require('../config/studentAudience')
 
 // ── Public (unauthenticated) teacher directory ───────────────────────────────
 // Deliberately separate from /admin/teachers: no salary, email, phone,
@@ -14,14 +23,26 @@ const { isValidGender } = require('../config/teacherIdentity')
 exports.getPublicTeachers = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
-    const filter = { role: 'teacher', isActive: true }
+    // `$ne: 'draft'` also matches every pre-existing teacher (the field is
+    // simply undefined there) — a draft only exists mid-way through the
+    // incremental onboarding wizard (onboardingSession.service.js) and must
+    // never be publicly visible before an admin finalizes it.
+    const filter = { role: 'teacher', isActive: true, onboardingStatus: { $ne: 'draft' } }
     if (req.query.gender) {
       if (!isValidGender(req.query.gender)) return sendError(res, 'قيمة غير صالحة لتصنيف المعلم', 400)
       filter.gender = req.query.gender
     }
+    if (req.query.specialization) {
+      if (!(await isValidActiveKey(req.query.specialization))) return sendError(res, 'قيمة غير صالحة للتخصص', 400)
+      filter.specializations = req.query.specialization
+    }
+    if (req.query.audienceCategory) {
+      if (!isValidAudienceCategory(req.query.audienceCategory)) return sendError(res, 'قيمة غير صالحة للفئة', 400)
+      filter.audienceCategories = req.query.audienceCategory
+    }
     const [teachers, total] = await Promise.all([
       User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
-        .select('firstNameAr lastNameAr gender avatar specialization bioAr createdAt'),
+        .select('firstNameAr lastNameAr gender avatar specialization specializations audienceCategories bioAr createdAt'),
       User.countDocuments(filter),
     ])
     sendSuccess(res, {
@@ -33,40 +54,103 @@ exports.getPublicTeachers = async (req, res, next) => {
 
 exports.getPublicTeacher = async (req, res, next) => {
   try {
-    const teacher = await User.findOne({ _id: req.params.id, role: 'teacher', isActive: true })
-      .select('firstNameAr lastNameAr gender avatar specialization bioAr createdAt')
+    const teacher = await User.findOne({ _id: req.params.id, role: 'teacher', isActive: true, onboardingStatus: { $ne: 'draft' } })
+      .select('firstNameAr lastNameAr gender avatar specialization specializations audienceCategories bioAr createdAt')
     if (!teacher) return sendError(res, 'المعلم غير موجود', 404)
     sendSuccess(res, toPublicTeacher(teacher))
   } catch (err) { next(err) }
 }
 
+// Rich per-student summary for the teacher's own roster (Phase 2 change
+// request #5) — lesson counts, attendance, upcoming/last lesson, wallet
+// balance, and latest evaluation note, all in one bounded call so the
+// teacher dashboard/students page never needs a per-student round-trip
+// (and never needs to leave for a general list to see this). A teacher IS
+// authorized to see their own assigned student's balance — this is scoped
+// to `teacherId: req.user._id` throughout, never another teacher's roster.
 exports.getMyStudents = async (req, res, next) => {
   try {
     const teacherId = req.user._id
-    const subs = await Subscription.find({ teacherId, status: 'active' }).populate('studentId')
+    const subs = await Subscription.find({ teacherId, status: 'active' })
+      .populate('studentId')
+      .populate('packageId', 'nameAr')
     const studentIds = subs.map(s => s.studentId?._id).filter(Boolean)
 
-    // Attendance rate = completed / (all non-cancelled sessions) with THIS
-    // teacher, mirroring the same completed-vs-total definition student.controller.js
-    // uses for the student's own dashboard — computed here via aggregation
-    // (not per-student queries) to stay O(1) round-trips regardless of roster size.
-    const attendanceAgg = await Session.aggregate([
-      { $match: { teacherId, studentId: { $in: studentIds }, status: { $ne: 'cancelled' } } },
-      { $group: {
-        _id: '$studentId',
-        total: { $sum: 1 },
-        completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
-      } },
-    ])
-    const attendanceRateByStudent = new Map(
-      attendanceAgg.map(a => [a._id.toString(), a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0])
-    )
+    // A student can have an active recurring schedule with no subscription
+    // yet (see admin.controller.js's getTeacher for the identical rationale)
+    // — surface them too instead of silently dropping them from "my students".
+    const scheduleOnlyRulesRaw = await ScheduleRule.find({ teacherId, status: 'active', studentId: { $nin: studentIds } })
+      .populate('studentId')
+    // De-duplicated by student — a student can have more than one active rule.
+    const seenScheduleOnly = new Set()
+    const scheduleOnlyRules = scheduleOnlyRulesRaw.filter((r) => {
+      const key = r.studentId?._id && String(r.studentId._id)
+      if (!key || seenScheduleOnly.has(key)) return false
+      seenScheduleOnly.add(key)
+      return true
+    })
+    const allStudentIds = [...studentIds, ...scheduleOnlyRules.map(r => r.studentId._id)]
 
-    const students = subs.map(s => {
-      const st = s.studentId?.toPublic ? s.studentId.toPublic() : s.studentId
+    const now = new Date()
+    const [attendanceAgg, wallets, nextSessions, lastSessions, lastEvaluations] = await Promise.all([
+      // Attendance rate = completed / (all non-cancelled sessions) with THIS
+      // teacher, mirroring student.controller.js's own dashboard definition.
+      Session.aggregate([
+        { $match: { teacherId, studentId: { $in: allStudentIds }, status: { $ne: 'cancelled' } } },
+        { $group: {
+          _id: '$studentId',
+          total: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+          upcoming: { $sum: { $cond: [{ $eq: ['$status', 'scheduled'] }, 1, 0] } },
+          cancelled: { $sum: { $cond: [{ $in: ['$status', ['cancelled', 'rescheduled']] }, 1, 0] } },
+          missed: { $sum: { $cond: [{ $in: ['$status', ['missed', 'no_show']] }, 1, 0] } },
+        } },
+      ]),
+      LessonWallet.find({ studentId: { $in: allStudentIds } }),
+      Session.find({ teacherId, studentId: { $in: allStudentIds }, status: 'scheduled', scheduledAt: { $gte: now } })
+        .sort({ scheduledAt: 1 }).select('studentId scheduledAt'),
+      Session.find({ teacherId, studentId: { $in: allStudentIds }, scheduledAt: { $lt: now } })
+        .sort({ scheduledAt: -1 }).select('studentId scheduledAt status'),
+      Evaluation.find({ teacherId, studentId: { $in: allStudentIds } })
+        .sort({ createdAt: -1 }).select('studentId score notesAr createdAt'),
+    ])
+
+    const attendanceByStudent = new Map(attendanceAgg.map(a => [a._id.toString(), a]))
+    const walletByStudent = new Map(wallets.map(w => [String(w.studentId), w]))
+    const nextByStudent = new Map()
+    for (const s of nextSessions) { const k = String(s.studentId); if (!nextByStudent.has(k)) nextByStudent.set(k, s) }
+    const lastByStudent = new Map()
+    for (const s of lastSessions) { const k = String(s.studentId); if (!lastByStudent.has(k)) lastByStudent.set(k, s) }
+    const evalByStudent = new Map()
+    for (const e of lastEvaluations) { const k = String(e.studentId); if (!evalByStudent.has(k)) evalByStudent.set(k, e) }
+
+    function buildEntry(studentDoc, { subscriptionId, packageName, scheduleStatus }) {
+      const st = studentDoc?.toPublic ? studentDoc.toPublic() : studentDoc
       if (!st) return null
-      return { ...st, subscriptionId: s._id, attendanceRate: attendanceRateByStudent.get(st._id.toString()) || 0 }
-    }).filter(Boolean)
+      const key = st._id.toString()
+      const att = attendanceByStudent.get(key)
+      const wallet = walletByStudent.get(key)
+      const next = nextByStudent.get(key)
+      const last = lastByStudent.get(key)
+      const lastEval = evalByStudent.get(key)
+      return {
+        ...st,
+        subscriptionId, packageName: packageName || null, scheduleStatus,
+        attendanceRate: att && att.total > 0 ? Math.round((att.completed / att.total) * 100) : 0,
+        lessonsCompleted: att?.completed || 0, lessonsUpcoming: att?.upcoming || 0,
+        lessonsCancelled: att?.cancelled || 0, lessonsMissed: att?.missed || 0,
+        walletRemaining: wallet ? wallet.remaining : null,
+        nextSession: next ? { scheduledAt: next.scheduledAt } : null,
+        lastSession: last ? { scheduledAt: last.scheduledAt, status: last.status } : null,
+        lastEvaluation: lastEval ? { score: lastEval.score, notesAr: lastEval.notesAr, createdAt: lastEval.createdAt } : null,
+      }
+    }
+
+    const students = [
+      ...subs.map(s => buildEntry(s.studentId, { subscriptionId: s._id, packageName: s.packageId?.nameAr, scheduleStatus: 'active' })),
+      ...scheduleOnlyRules.map(r => buildEntry(r.studentId, { subscriptionId: null, packageName: null, scheduleStatus: 'schedule_only' })),
+    ].filter(Boolean)
+
     sendSuccess(res, students)
   } catch (err) {
     next(err)

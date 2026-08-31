@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ArrowRight, Star, BookOpen, ClipboardList, CheckCircle, XCircle, Clock, Edit2, Trash2 } from 'lucide-react'
+import { ArrowRight, Star, BookOpen, ClipboardList, CheckCircle, XCircle, Clock, Edit2, Trash2, History } from 'lucide-react'
 import api from '../../utils/api.js'
 import Badge from '../../components/ui/Badge.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -12,13 +12,24 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import { formatDateAr, formatDateTimeAr } from '../../utils/date.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
 
-const TAB_KEYS = ['evaluations', 'attendance', 'homework', 'memorization', 'revision']
+const TAB_KEYS = ['sessions', 'evaluations', 'attendance', 'homework', 'memorization', 'revision']
 const TAB_LABELS = {
+  sessions: 'الحصص',
   evaluations: 'التقييمات',
   attendance: 'الحضور',
   homework: 'الواجبات',
   memorization: 'الحفظ',
   revision: 'المراجعة',
+}
+
+const SESSION_STATUS_CFG = {
+  scheduled: { label: 'قادمة', badge: 'purple' },
+  ongoing: { label: 'جارية', badge: 'purple' },
+  completed: { label: 'مكتملة', badge: 'success' },
+  cancelled: { label: 'ملغاة', badge: 'gray' },
+  rescheduled: { label: 'أُجّلت', badge: 'warning' },
+  missed: { label: 'فائتة', badge: 'danger' },
+  no_show: { label: 'غياب', badge: 'danger' },
 }
 
 // ── Edit Evaluation Modal ─────────────────────────────────────────────────────
@@ -153,6 +164,8 @@ export default function AdminStudentDetailPage() {
   }
 
   const sub = studentData?.subscription
+  const recentSessions = studentData?.recentSessions || []
+  const assignedTeacher = sub?.teacherId
   const evalList = academics?.evaluations || []
   const attList = academics?.attendance || []
   const hwList = academics?.homework || []
@@ -183,6 +196,15 @@ export default function AdminStudentDetailPage() {
               <Badge variant={student.isActive ? 'success' : 'gray'}>{student.isActive ? 'نشط' : 'موقوف'}</Badge>
             </div>
             <div className="text-sm text-[#9b7fd6] mb-4">{student.email} {student.phone ? `· ${student.phone}` : ''}</div>
+            {assignedTeacher ? (
+              <Link to={ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', assignedTeacher._id)}
+                className="inline-flex items-center gap-2 mb-4 rounded-xl bg-[#f8f5ff] hover:bg-violet-100 transition-colors px-3 py-2 text-xs font-semibold text-brand-textBody">
+                <Avatar src={getFileUrl(assignedTeacher.avatar)} firstName={assignedTeacher.firstNameAr} lastName={assignedTeacher.lastNameAr} size="xs" />
+                المعلم المسؤول: {assignedTeacher.firstNameAr} {assignedTeacher.lastNameAr}
+              </Link>
+            ) : (
+              <p className="text-xs text-[#c0b4de] mb-4">لا يوجد معلم مسؤول حاليًا</p>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'متوسط التقييم', value: avgScore ? `${avgScore}/10` : '—', color: 'text-violet-600' },
@@ -197,9 +219,14 @@ export default function AdminStudentDetailPage() {
               ))}
             </div>
           </div>
-          <Link to={`${ROUTES.ADMIN_STUDENTS}?edit=${id}`} className="btn-outline text-xs px-3 py-2">
-            <Edit2 size={12} className="inline ml-1" /> تعديل الملف
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link to={`${ROUTES.ADMIN_STUDENTS}?edit=${id}`} className="btn-outline text-xs px-3 py-2">
+              <Edit2 size={12} className="inline ml-1" /> تعديل الملف
+            </Link>
+            <Link to={`${ROUTES.ADMIN_ASSIGNMENT_REQUESTS}?studentId=${id}`} className="btn-outline text-xs px-3 py-2">
+              <History size={12} className="inline ml-1" /> سجل طلبات الإسناد
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -217,6 +244,36 @@ export default function AdminStudentDetailPage() {
         <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
       ) : (
         <>
+          {/* ── Sessions (completed/upcoming/cancelled/missed) ── */}
+          {tab === 'sessions' && (
+            <div className="card-light overflow-hidden">
+              {recentSessions.length === 0 ? <div className="text-center py-12 text-[#9b7fd6]">لا توجد حصص مسجلة بعد</div> : (
+                <table className="w-full min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-[#f0ecf8]">
+                      {['التاريخ', 'المعلم', 'الحالة', 'المدة'].map(h => (
+                        <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#9b7fd6]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentSessions.map(s => {
+                      const cfg = SESSION_STATUS_CFG[s.status] || { label: s.status, badge: 'gray' }
+                      return (
+                        <tr key={s._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff]">
+                          <td className="px-4 py-3 text-sm text-[#9b7fd6]">{formatDateTimeAr(s.scheduledAt)}</td>
+                          <td className="px-4 py-3 text-sm text-brand-textBody">{s.teacherId?.firstNameAr} {s.teacherId?.lastNameAr}</td>
+                          <td className="px-4 py-3"><Badge variant={cfg.badge}>{cfg.label}</Badge></td>
+                          <td className="px-4 py-3 text-sm text-[#9b7fd6]">{s.durationMinutes || 60} دقيقة</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
           {/* ── Evaluations ── */}
           {tab === 'evaluations' && (
             <div className="card-light overflow-hidden">

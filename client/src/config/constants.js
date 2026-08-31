@@ -181,11 +181,15 @@ export const ROUTES = {
   TEACHER_PERFORMANCE: '/teacher/performance',
   TEACHER_NOTIFICATIONS: '/teacher/notifications',
   TEACHER_SETTINGS: '/teacher/settings',
+  TEACHER_ASSIGNMENT_REQUESTS: '/teacher/assignment-requests',
+  TEACHER_ASSIGNMENT_REQUEST_DETAIL: '/teacher/assignment-requests/:id',
 
   ADMIN_DASHBOARD: '/admin',
   ADMIN_STUDENTS: '/admin/students',
   ADMIN_STUDENT_DETAIL: '/admin/students/:id',
   ADMIN_TEACHERS: '/admin/teachers',
+  ADMIN_TEACHER_ONBOARDING: '/admin/teachers/onboarding',
+  ADMIN_TEACHER_PROFILE: '/admin/teachers/:id',
   ADMIN_ADMINS: '/admin/admins',
   ADMIN_COURSES: '/admin/courses',
   ADMIN_LEVELS: '/admin/levels',
@@ -221,6 +225,20 @@ export const ROUTES = {
   ADMIN_TEACHER_PERFORMANCE: '/admin/teacher-performance',
 
   ADMIN_OPERATIONS: '/admin/operations',
+
+  ADMIN_ASSIGNMENT_REQUESTS: '/admin/assignment-requests',
+  ADMIN_ASSIGNMENT_REQUEST_DETAIL: '/admin/assignment-requests/:id',
+}
+
+// Continuation link from the onboarding wizard's success page (and its
+// refresh-fallback banner) straight into the existing "add student" flow on
+// that teacher's own admin profile — reuses ADMIN_TEACHER_PROFILE's route
+// shape via a query flag rather than inventing a duplicate page. Requires a
+// real database teacherId; falls back to the teacher list if none is given
+// (never a blank/invalid teacher route).
+export function buildTeacherAddStudentUrl(teacherId) {
+  if (!teacherId) return ROUTES.ADMIN_TEACHERS
+  return `/admin/teachers/${teacherId}?action=add`
 }
 
 export const MEETING_PROVIDERS = {

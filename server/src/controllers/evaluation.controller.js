@@ -15,6 +15,7 @@ exports.create = async (req, res, next) => {
       type: 'evaluation',
       priority: 'medium',
       relatedId: ev._id,
+      actionUrl: '/student/evaluations',
     })
     sendSuccess(res, ev, 'تم إضافة التقييم', 201)
   } catch (err) {

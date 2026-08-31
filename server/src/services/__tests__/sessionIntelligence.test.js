@@ -2,12 +2,17 @@ const { classifyCheckIn, getSessionWindow, POLICY } = require('../../config/atte
 const { computePayrollStatus, computeConfidence, assessSessionReview } = require('../sessionIntelligence.service')
 
 describe('attendancePolicy.classifyCheckIn', () => {
+  // Regression fix (2026-08-28 Phase 1 audit): this test was stale —
+  // POLICY.LATE_TOLERANCE_MINUTES is documented (config/attendancePolicy.js)
+  // as a deliberate 5-minute business rule ("0-5min = on time, >5min =
+  // late"), not the 15 this test's old comment assumed. Updated to a
+  // genuinely-within-tolerance check-in instead of loosening the real policy.
   test('on-time check-in within tolerance', () => {
     const scheduled = new Date('2026-01-01T17:00:00Z')
-    const checkIn = new Date('2026-01-01T17:07:00Z') // 7 min in, tolerance is 15
+    const checkIn = new Date('2026-01-01T17:03:00Z') // 3 min in, tolerance is 5
     const result = classifyCheckIn(scheduled, checkIn)
     expect(result.status).toBe('on_time')
-    expect(result.lateMinutes).toBe(7)
+    expect(result.lateMinutes).toBe(3)
   })
 
   test('late check-in past tolerance', () => {
@@ -98,9 +103,15 @@ describe('sessionIntelligence.computePayrollStatus', () => {
     expect(result.payrollStatus).toBe('non_payable')
   })
 
-  test('teacher present but no student attended goes to pending_review, not auto-payable', () => {
+  // Regression fix (2026-08-28 Phase 1 audit): this test predated the
+  // deliberate "teacher paid regardless of student attendance" policy
+  // (see docs/ teacher-payroll audit, 2026-07-13) — computePayrollStatus's
+  // own code comment confirms this is the intentional, current business
+  // rule. Updated to assert the real policy instead of the pre-policy-change
+  // expectation.
+  test('teacher present but no student attended is still payable — teacher is paid regardless of student attendance', () => {
     const result = computePayrollStatus({ status: 'completed', outcome: 'no_students_attended', teacherAttendanceStatus: 'on_time' })
-    expect(result.payrollStatus).toBe('pending_review')
+    expect(result.payrollStatus).toBe('payable')
   })
 
   test('technical issue always requires admin review', () => {

@@ -1,6 +1,16 @@
 const mongoose = require('mongoose')
+const { DEFAULT_ACADEMY_TIMEZONE } = require('../config/academyTimezone')
 
 const AcademySettingsSchema = new mongoose.Schema({
+  // Academy-wide IANA timezone — the single configurable source every
+  // time-of-day feature (teacher working hours now, the future automatic
+  // availability engine) must resolve through, instead of a hardcoded
+  // string. See config/academyTimezone.js / services/academySettings.service.js.
+  timezone: { type: String, default: DEFAULT_ACADEMY_TIMEZONE },
+  // Minimum gap (minutes) the availability engine keeps free immediately
+  // before and after every booked lesson (Phase 2 Part 2 §4's "configured
+  // lesson buffer"). 0 = no buffer, preserving today's behavior by default.
+  lessonBufferMinutes: { type: Number, default: 0, min: 0, max: 120 },
   academyNameAr: { type: String, default: 'ترتيلة للتعليم الإسلامي' },
   academyNameEn: { type: String, default: 'Tartelah Academy' },
   taglineAr: { type: String, default: 'تعلم القرآن الكريم بأيسر الطرق' },

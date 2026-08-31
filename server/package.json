@@ -12,6 +12,7 @@
     "seed:host": "node src/seeders/production/index.js",
     "dedupe-sessions": "node src/scripts/dedupeSessions.js",
     "migrate-teacher-gender": "node src/scripts/migrateTeacherGender.js",
+    "migrate-onboarding-save-key-index": "node src/scripts/migrateOnboardingSaveKeyIndex.js",
     "reconcile-wallets": "node src/scripts/reconcileWallets.js",
     "test": "jest --coverage"
   },

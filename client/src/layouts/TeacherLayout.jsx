@@ -1,9 +1,11 @@
 import { Suspense, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore.js'
 import { useNotificationStore } from '../store/notificationStore.js'
 import { authService } from '../services/auth.service.js'
+import api from '../utils/api.js'
 import Avatar from '../components/ui/Avatar.jsx'
 import NotificationBell from '../components/ui/NotificationBell.jsx'
 import Spinner from '../components/ui/Spinner.jsx'
@@ -34,6 +36,10 @@ const NAV_GROUPS = [
       {
         to: ROUTES.TEACHER_SESSIONS, label: 'الحصص والجداول',
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
+        to: ROUTES.TEACHER_ASSIGNMENT_REQUESTS, label: 'طلبات الطلاب', assignmentRequests: true,
+        icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
     ]
   },
@@ -94,6 +100,14 @@ export default function TeacherLayout() {
   const { unreadCount } = useNotificationStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+
+  // Assignment requests awaiting this teacher's response ("طلبات الطلاب").
+  const { data: pendingAssignmentRequests = 0 } = useQuery({
+    queryKey: ['teacher', 'assignment-requests', 'pending-count'],
+    queryFn: () => api.get('/teachers/me/assignment-requests', { params: { status: 'pending_teacher_approval', limit: 1 } }).then(r => r.data.data?.total || 0),
+    refetchInterval: 60000,
+    enabled: isAuthenticated,
+  })
   const location = useLocation()
   useNotificationInit()
 
@@ -170,6 +184,11 @@ export default function TeacherLayout() {
                 {item.notification && unreadCount > 0 && (
                   <span className="bg-brand-purple text-white text-[10px] font-extrabold min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5">
                     {unreadCount}
+                  </span>
+                )}
+                {item.assignmentRequests && pendingAssignmentRequests > 0 && (
+                  <span className="bg-amber-500 text-white text-[10px] font-extrabold min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5">
+                    {pendingAssignmentRequests > 9 ? '9+' : pendingAssignmentRequests}
                   </span>
                 )}
               </NavLink>

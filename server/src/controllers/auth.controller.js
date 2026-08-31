@@ -45,6 +45,13 @@ exports.login = async (req, res, next) => {
       return sendError(res, 'البريد الإلكتروني أو كلمة المرور غير صحيحة', 401)
     }
     if (!user.isActive) return sendError(res, 'تم إيقاف حسابك. تواصل مع الإدارة.', 403)
+    // A 'draft' teacher exists only mid-way through the incremental
+    // onboarding wizard (onboardingSession.service.js) — distinct from a
+    // suspended account, so it gets its own clear message rather than
+    // reusing the "suspended" one.
+    if (user.onboardingStatus === 'draft') {
+      return sendError(res, 'الحساب قيد الإعداد من قبل الإدارة، يرجى المحاولة لاحقاً بعد إكمال الإعداد', 403)
+    }
     const accessToken = issueTokens(user, res)
     user.lastLoginAt = new Date()
     await user.save({ validateBeforeSave: false })

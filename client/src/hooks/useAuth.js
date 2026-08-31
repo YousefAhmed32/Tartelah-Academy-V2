@@ -19,10 +19,16 @@ export function useInitAuth() {
   const { setAuth, logout, setAccessToken } = useAuthStore()
 
   useEffect(() => {
-    let cancelled = false
+    // React.StrictMode double-invokes this effect once in development
+    // (mount → cleanup → mount) — without an abort, that fired two real,
+    // duplicate /auth/refresh requests against the backend on every app
+    // load (both failing loudly with a 401 on a cold/unauthenticated
+    // session). The abort signal makes the first, superseded request a
+    // genuine no-op instead of a second live network call.
+    const controller = new AbortController()
 
     axios
-      .post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+      .post(`${API_URL}/auth/refresh`, {}, { withCredentials: true, signal: controller.signal })
       .then((refreshRes) => {
         const { accessToken } = refreshRes.data.data
         // Put the new token in the store so the api.js interceptor attaches it
@@ -30,21 +36,21 @@ export function useInitAuth() {
         return authService.me()
       })
       .then((meRes) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           // /auth/me returns { success, data: <user> } — user IS data, not data.user
           const user = meRes.data.data
           const token = useAuthStore.getState().accessToken
           setAuth(user, token)
         }
       })
-      .catch(() => {
-        if (!cancelled) {
+      .catch((err) => {
+        if (!controller.signal.aborted && !axios.isCancel(err)) {
           logout()
         }
       })
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

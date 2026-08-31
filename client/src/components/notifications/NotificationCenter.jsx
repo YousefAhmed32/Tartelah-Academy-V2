@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, FileText, Star, CreditCard, UserRound,
   Bell, LayoutGrid, Inbox, Search, CircleCheck, Clock3,
-  Archive, ArchiveRestore, CalendarClock, Tag, ChevronDown,
+  Archive, ArchiveRestore, CalendarClock, Tag, ChevronDown, ChevronLeft, ClipboardCheck,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../shared/PageHeader.jsx'
@@ -24,6 +25,7 @@ const FILTER_TABS = [
   { key: 'evaluation',   label: 'التقييمات',    Icon: Star        },
   { key: 'enrollment',   label: 'التسجيل',      Icon: UserRound   },
   { key: 'subscription', label: 'الاشتراك',     Icon: CreditCard  },
+  { key: 'assignment',   label: 'الإسناد',      Icon: ClipboardCheck },
   { key: 'attendance',   label: 'الحضور',       Icon: Clock3      },
   { key: 'system',       label: 'النظام',       Icon: Bell        },
 ]
@@ -62,6 +64,7 @@ function sortByPriorityThenDate(items) {
 }
 
 export default function NotificationCenter({ theme = 'light' }) {
+  const navigate = useNavigate()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
@@ -176,6 +179,16 @@ export default function NotificationCenter({ theme = 'light' }) {
 
   function handleArchive(notif) {
     archiveMutation.mutate({ id: notif._id, archived: showArchived })
+  }
+
+  // Clicking a notification's content marks it read AND navigates straight
+  // to the record it references — never a passive "mark read" tap. A
+  // notification without an `actionUrl` (older rows, or a type with no
+  // deep-link target) safely just marks read; the destination page itself
+  // handles a since-deleted/inaccessible record.
+  function handleActivate(notif) {
+    handleMarkRead(notif)
+    if (notif.actionUrl) navigate(notif.actionUrl)
   }
 
   function toggleSelect(id) {
@@ -460,6 +473,7 @@ export default function NotificationCenter({ theme = 'light' }) {
                     isArchivedView={showArchived}
                     onToggleSelect={() => toggleSelect(notif._id)}
                     onMarkRead={() => handleMarkRead(notif)}
+                    onActivate={() => handleActivate(notif)}
                     onMarkUnread={() => handleMarkUnread(notif)}
                     onDelete={() => handleDelete(notif._id)}
                     onArchive={() => handleArchive(notif)}
@@ -475,11 +489,12 @@ export default function NotificationCenter({ theme = 'light' }) {
   )
 }
 
-function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleSelect, onMarkRead, onMarkUnread, onDelete, onArchive, cardColors }) {
+function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleSelect, onMarkRead, onActivate, onMarkUnread, onDelete, onArchive, cardColors }) {
   const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.system
   const pri = PRIORITY_CONFIG[notif.priority] || PRIORITY_CONFIG.medium
   const isUnread = !notif.isRead
   const isUrgent = notif.priority === 'urgent' && isUnread
+  const isActionable = !!notif.actionUrl
 
   return (
     <motion.div
@@ -529,8 +544,16 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
         <cfg.Icon size={16} strokeWidth={1.8} color={cfg.color} />
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0" onClick={onMarkRead} style={{ cursor: isUnread ? 'pointer' : 'default' }}>
+      {/* Content — a real button (not a bare div) so mouse AND keyboard
+          (Tab + Enter/Space) both mark it read and navigate straight to the
+          record it references. Read notifications stay clickable too (to
+          revisit), just without the "جديد" affordance. */}
+      <button
+        type="button"
+        onClick={onActivate}
+        className="flex-1 min-w-0 text-start bg-transparent border-0 p-0 m-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ cursor: 'pointer', outlineColor: isDark ? '#E8C76A' : '#7c3aed' }}
+      >
         <div className="flex items-start justify-between gap-2 mb-1">
           <span
             className="text-sm leading-snug line-clamp-1"
@@ -581,8 +604,13 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
               جديد
             </span>
           )}
+          {isActionable && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#c0b4de' }}>
+              <ChevronLeft size={11} aria-hidden="true" /> فتح
+            </span>
+          )}
         </div>
-      </div>
+      </button>
 
       {/* Action buttons - visible on hover */}
       <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-none">

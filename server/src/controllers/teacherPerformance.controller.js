@@ -151,6 +151,7 @@ exports.correctSessionAttendance = async (req, res, next) => {
       type: 'attendance',
       priority: 'medium',
       relatedId: session._id,
+      actionUrl: '/teacher/attendance',
     })
 
     sendSuccess(res, session, 'تم تحديث سجل الحضور')

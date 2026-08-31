@@ -1,4 +1,3 @@
-const crypto = require('crypto')
 const User = require('../models/User')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
@@ -6,6 +5,7 @@ const { isValidGender } = require('../config/teacherIdentity')
 const { uploadBuffer, deleteFile } = require('../services/media.service')
 const { createNotification } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
+const { generateTempPassword } = require('../utils/tempPassword')
 const {
   ALL_PERMISSIONS, ALL_ROLES, ADMIN_FAMILY_ROLES, DEFAULT_PERMISSIONS_BY_ROLE,
   isValidPermission, isValidRole,
@@ -63,21 +63,6 @@ exports.uploadAvatar = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════
 
 const POPULATE_ACTOR = 'firstNameAr lastNameAr email role'
-
-function generateTempPassword() {
-  // 12 chars, guaranteed at least one upper/lower/digit/symbol so it always
-  // clears typical password-strength validation on first login.
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const lower = 'abcdefghijkmnpqrstuvwxyz'
-  const digits = '23456789'
-  const symbols = '!@#$%*?'
-  const all = upper + lower + digits + symbols
-  const pick = (set) => set[crypto.randomInt(set.length)]
-  let pw = pick(upper) + pick(lower) + pick(digits) + pick(symbols)
-  for (let i = pw.length; i < 12; i++) pw += pick(all)
-  // Shuffle so the guaranteed chars aren't always in the same position.
-  return pw.split('').sort(() => crypto.randomInt(3) - 1).join('')
-}
 
 // Every permission in `requested` must already be held by `actor` — the
 // single choke point that prevents any account (other than the Primary

@@ -4,10 +4,24 @@ const sessionCtrl = require('../controllers/session.controller')
 const notifCtrl = require('../controllers/notification.controller')
 const auditCtrl = require('../controllers/auditLog.controller')
 const perfCtrl = require('../controllers/teacherPerformance.controller')
+const onboardingCtrl = require('../controllers/adminOnboarding.controller')
+const onboardingSessionCtrl = require('../controllers/onboardingSession.controller')
+const assignmentCtrl = require('../controllers/adminAssignment.controller')
+const subjectCtrl = require('../controllers/teachingSubject.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { requirePermission } = require('../middleware/rbac.middleware')
 
 router.use(authenticate)
+
+// Dynamic teaching-subject/curriculum catalog management. Must stay ahead of
+// GET /assignments/:id-style param routes below — none of these paths
+// collide, but kept together and near the top for discoverability.
+router.get('/teaching-subjects', requirePermission('curricula.view'), subjectCtrl.listAll)
+router.post('/teaching-subjects', requirePermission('curricula.manage'), subjectCtrl.create)
+router.patch('/teaching-subjects/reorder', requirePermission('curricula.manage'), subjectCtrl.reorder)
+router.patch('/teaching-subjects/:id', requirePermission('curricula.manage'), subjectCtrl.update)
+router.patch('/teaching-subjects/:id/archive', requirePermission('curricula.manage'), subjectCtrl.archive)
+router.patch('/teaching-subjects/:id/unarchive', requirePermission('curricula.manage'), subjectCtrl.unarchive)
 
 // Dashboard + Reports
 router.get('/stats', requirePermission('dashboard.view'), ctrl.getDashboardStats)
@@ -15,6 +29,7 @@ router.get('/reports', requirePermission('reports.view'), ctrl.getReports)
 
 // Students
 router.get('/students', requirePermission('students.view'), ctrl.getStudents)
+router.post('/students', requirePermission('students.manage'), onboardingCtrl.createStudent)
 router.get('/students/:id', requirePermission('students.view'), ctrl.getStudent)
 router.patch('/students/:id', requirePermission('students.manage'), ctrl.updateStudent)
 router.delete('/students/:id', requirePermission('students.manage'), ctrl.deleteStudent)
@@ -29,6 +44,59 @@ router.get('/teachers/:id', requirePermission('teachers.view'), ctrl.getTeacher)
 router.post('/teachers', requirePermission('teachers.manage'), ctrl.createTeacher)
 router.patch('/teachers/:id', requirePermission('teachers.manage'), ctrl.updateTeacher)
 router.post('/teachers/:id/reset-password', requirePermission('teachers.manage'), ctrl.adminResetPassword)
+
+// Teacher working hours (Phase 2 Part 1 — admin-configured weekly template;
+// see config/workingHours.js)
+router.get('/teachers/:id/working-hours', requirePermission('teachers.view'), onboardingCtrl.getTeacherWorkingHours)
+router.put('/teachers/:id/working-hours', requirePermission('teachers.manage'), onboardingCtrl.updateTeacherWorkingHours)
+
+// Add another student to an existing teacher from their administrative
+// profile (Part 1 §7) — creates the student account + optional
+// package/opening-balance subscription in one step.
+router.post(
+  '/teachers/:id/students',
+  requirePermission('teachers.manage', 'students.manage'),
+  onboardingCtrl.addStudentToTeacher
+)
+
+// "Create a teacher with their students" wizard (Part 1 §5) — one
+// administrative flow: teacher account + profile + working hours, plus zero
+// or more student accounts each with their own package/opening balance.
+router.post(
+  '/onboarding/teacher-with-students',
+  requirePermission('teachers.manage', 'students.manage'),
+  onboardingCtrl.createTeacherWithStudentsHandler
+)
+
+// Incremental, resumable onboarding session (Phase 2 Part 2c) — fixes the
+// multi-student duplicate-suggestion/double-booking bug in the one-shot
+// wizard above by persisting the teacher immediately and each student one at
+// a time, so every subsequent student's availability check sees every
+// already-saved sibling's real reservation. Additive: the one-shot endpoint
+// above is untouched and remains fully supported.
+const onboardingSessionPermission = requirePermission('teachers.manage', 'students.manage')
+router.post('/onboarding/sessions', onboardingSessionPermission, onboardingSessionCtrl.startSession)
+router.get('/onboarding/sessions', onboardingSessionPermission, onboardingSessionCtrl.listSessions)
+router.get('/onboarding/sessions/:id', onboardingSessionPermission, onboardingSessionCtrl.getSession)
+router.post('/onboarding/sessions/:id/students', onboardingSessionPermission, onboardingSessionCtrl.saveStudent)
+router.delete('/onboarding/sessions/:id/students/:studentId', onboardingSessionPermission, onboardingSessionCtrl.removeStudent)
+router.post('/onboarding/sessions/:id/finalize', onboardingSessionPermission, onboardingSessionCtrl.finalizeSession)
+router.post('/onboarding/sessions/:id/cancel', onboardingSessionPermission, onboardingSessionCtrl.cancelSession)
+
+// Teacher availability engine (Phase 2 Part 2 §4)
+router.get('/teachers/:id/availability', requirePermission('teachers.view'), assignmentCtrl.getTeacherAvailability)
+
+// Assignment-request workflow (Phase 2 Part 2 §6–§11)
+router.post('/assignments/check-availability', requirePermission('assignments.view'), assignmentCtrl.checkAvailability)
+router.get('/assignments', requirePermission('assignments.view'), assignmentCtrl.listAssignments)
+router.post('/assignments', requirePermission('assignments.manage'), assignmentCtrl.createAssignment)
+// Must stay ahead of GET /assignments/:id below — otherwise Express would
+// match "status-counts" as the :id param.
+router.get('/assignments/status-counts', requirePermission('assignments.view'), assignmentCtrl.getStatusCounts)
+router.get('/assignments/:id', requirePermission('assignments.view'), assignmentCtrl.getAssignment)
+router.patch('/assignments/:id/edit-resend', requirePermission('assignments.manage'), assignmentCtrl.editAndResend)
+router.post('/assignments/:id/reassign', requirePermission('assignments.manage'), assignmentCtrl.reassign)
+router.post('/assignments/:id/cancel', requirePermission('assignments.manage'), assignmentCtrl.cancelAssignment)
 
 // Sessions (admin full control)
 router.get('/sessions', requirePermission('sessions.view'), ctrl.getAllSessions)

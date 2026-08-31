@@ -60,7 +60,7 @@ exports.adjustWallet = async (req, res, next) => {
     await createNotification({
       userId: req.params.studentId, titleAr: 'تعديل على رصيد حصصك',
       bodyAr: `تم تعديل رصيد حصصك بمقدار ${numAmount > 0 ? '+' : ''}${numAmount} — ${reason}`,
-      type: 'subscription', priority: 'medium',
+      type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
     })
 
     sendSuccess(res, { wallet, transaction }, 'تم تعديل الرصيد')
@@ -79,7 +79,7 @@ exports.freezeWallet = async (req, res, next) => {
     })
     await createNotification({
       userId: req.params.studentId, titleAr: 'تم تجميد رصيد حصصك',
-      bodyAr: `تم تجميد رصيد حصصك مؤقتاً — ${reason}`, type: 'subscription', priority: 'high',
+      bodyAr: `تم تجميد رصيد حصصك مؤقتاً — ${reason}`, type: 'subscription', priority: 'high', actionUrl: '/student/subscription',
     })
 
     sendSuccess(res, wallet, 'تم تجميد المحفظة')
@@ -96,7 +96,7 @@ exports.resumeWallet = async (req, res, next) => {
     })
     await createNotification({
       userId: req.params.studentId, titleAr: 'تم إلغاء تجميد رصيد حصصك',
-      bodyAr: 'أصبح بإمكانك حجوز حصص جديدة مرة أخرى', type: 'subscription', priority: 'medium',
+      bodyAr: 'أصبح بإمكانك حجوز حصص جديدة مرة أخرى', type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
     })
 
     sendSuccess(res, wallet, 'تم إلغاء تجميد المحفظة')
@@ -149,7 +149,7 @@ exports.grantCompensation = async (req, res, next) => {
     })
     await createNotification({
       userId: req.params.studentId, titleAr: 'حصة تعويضية',
-      bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium',
+      bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
     })
 
     sendSuccess(res, { wallet, transaction }, 'تم منح الحصة التعويضية')

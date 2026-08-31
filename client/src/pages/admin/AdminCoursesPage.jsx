@@ -10,9 +10,16 @@ import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Can from '../../components/shared/Can.jsx'
+import { useAdminTeachingSubjects } from '../../hooks/useTeachingSubjects.js'
+import { subjectLabel } from '../../utils/teacherProfile.js'
+import { resolveSubjectColor } from '../../utils/subjectBadge.js'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// The six original, hand-picked labels/colors — kept exactly as-is for
+// backward-compatible styling. Any course category NOT in this map (an
+// admin-created dynamic subject) is resolved through `resolveCategoryBadge`
+// below instead of silently collapsing into the generic "other" style.
 const CATEGORY_MAP = {
   tajweed: { label: 'التجويد',  color: '#7c3aed', bg: 'rgba(124,58,237,0.1)'  },
   hifz:    { label: 'الحفظ',   color: '#059669', bg: 'rgba(5,150,105,0.1)'    },
@@ -20,6 +27,14 @@ const CATEGORY_MAP = {
   arabic:  { label: 'العربية', color: '#d97706', bg: 'rgba(217,119,6,0.1)'    },
   quran:   { label: 'القرآن',  color: '#b45309', bg: 'rgba(180,83,9,0.1)'     },
   other:   { label: 'أخرى',   color: '#64748b', bg: 'rgba(100,116,139,0.1)'  },
+}
+
+// `subjects` is the full admin catalog (active + archived) so a course tagged
+// with a since-archived dynamic subject still renders its real name and its
+// own stable color instead of falling back to the generic "other" style.
+function resolveCategoryBadge(category, subjects) {
+  if (CATEGORY_MAP[category]) return CATEGORY_MAP[category]
+  return { label: subjectLabel(subjects, category) || category || CATEGORY_MAP.other.label, ...resolveSubjectColor(category) }
 }
 
 const DIFFICULTY_MAP = {
@@ -87,9 +102,9 @@ function ContextMenu({ isOpen, items, align = 'left' }) {
 
 // ── Course Table Row ──────────────────────────────────────────────────────────
 
-function CourseTableRow({ course, selected, onSelect, onEdit, onTogglePublish, onToggleFeature, onDuplicate, onDelete }) {
+function CourseTableRow({ course, selected, onSelect, onEdit, onTogglePublish, onToggleFeature, onDuplicate, onDelete, subjects }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const cat    = CATEGORY_MAP[course.category]     || CATEGORY_MAP.other
+  const cat    = resolveCategoryBadge(course.category, subjects)
   const diff   = DIFFICULTY_MAP[course.difficulty] || DIFFICULTY_MAP.beginner
   const status = STATUS_MAP[course.status]         || STATUS_MAP.draft
 
@@ -212,9 +227,9 @@ function CourseTableRow({ course, selected, onSelect, onEdit, onTogglePublish, o
 
 // ── Course Grid Card ──────────────────────────────────────────────────────────
 
-function CourseGridCard({ course, selected, onSelect, onEdit, onTogglePublish, onToggleFeature, onDuplicate, onDelete }) {
+function CourseGridCard({ course, selected, onSelect, onEdit, onTogglePublish, onToggleFeature, onDuplicate, onDelete, subjects }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const cat    = CATEGORY_MAP[course.category]     || CATEGORY_MAP.other
+  const cat    = resolveCategoryBadge(course.category, subjects)
   const diff   = DIFFICULTY_MAP[course.difficulty] || DIFFICULTY_MAP.beginner
   const status = STATUS_MAP[course.status]         || STATUS_MAP.draft
 
@@ -481,8 +496,11 @@ export default function AdminCoursesPage() {
   }
 
   // Shared props factory
+  const { data: subjects } = useAdminTeachingSubjects()
+
   const itemProps = (c) => ({
     course: c,
+    subjects,
     selected: selected.includes(c._id),
     onSelect: handleSelect,
     onEdit: (id) => navigate(ROUTES.ADMIN_COURSE_EDIT.replace(':id', id)),

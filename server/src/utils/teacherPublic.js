@@ -14,6 +14,12 @@ function toPublicTeacher(teacher) {
     gender: teacher.gender || null,
     avatar: teacher.avatar || null, // GridFS ObjectId — client getFileUrl() resolves it
     specialization: teacher.specialization || null,
+    // Taxonomy fields — never financial (hourlyRate/salaryPerSession are
+    // deliberately excluded from this projection), safe to surface so a
+    // student/admin search can filter by "who does this teacher teach" and
+    // "what do they teach" (see config/categories.js / studentAudience.js).
+    specializations: Array.isArray(teacher.specializations) ? teacher.specializations : [],
+    audienceCategories: Array.isArray(teacher.audienceCategories) ? teacher.audienceCategories : [],
     bioAr: teacher.bioAr || null,
     createdAt: teacher.createdAt,
   }

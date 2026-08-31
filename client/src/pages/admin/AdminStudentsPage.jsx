@@ -8,6 +8,8 @@ import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
+import Modal from '../../components/ui/Modal.jsx'
+import Button from '../../components/ui/Button.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
@@ -47,6 +49,7 @@ function EditStudentForm({ student, onSave, isSaving }) {
     email: student.email || '',
     phone: student.phone || '',
     bioAr: student.bioAr || '',
+    studentType: student.studentType || 'existing',
   })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -74,6 +77,17 @@ function EditStudentForm({ student, onSave, isSaving }) {
       <div>
         <label className="text-xs font-bold text-gray-400 mb-1 block">رقم الهاتف</label>
         <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} dir="ltr" />
+      </div>
+      <div>
+        <label className="text-xs font-bold text-gray-400 mb-1 block">نوع الطالب</label>
+        <div className="grid grid-cols-2 gap-2">
+          {[['existing', 'قديم'], ['new', 'جديد']].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => set('studentType', v)}
+              className={`h-10 rounded-xl text-sm font-bold border transition-colors ${form.studentType === v ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
       <div>
         <label className="text-xs font-bold text-gray-400 mb-1 block">نبذة</label>
@@ -222,6 +236,7 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
               <div className="py-4 border-b border-gray-100">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">بيانات الحساب</h3>
                 <InfoRow label="تاريخ التسجيل" value={formatDateAr(student.createdAt)} icon={<Calendar size={14} />} />
+                <InfoRow label="نوع الطالب" value={student.studentType === 'new' ? 'طالب جديد' : 'طالب قديم'} icon={<User size={14} />} />
                 <InfoRow label="الدور" value="طالب" icon={<User size={14} />} />
                 {student.bioAr && <InfoRow label="نبذة" value={student.bioAr} icon={<BookOpen size={14} />} />}
               </div>
@@ -265,15 +280,71 @@ function StudentCRMPanel({ student, onClose, onUpdate }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+const initialCreateForm = { firstNameAr: '', lastNameAr: '', email: '', phone: '', studentType: 'new', password: '' }
+
+function CreateStudentModal({ open, onClose }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState(initialCreateForm)
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const mut = useMutation({
+    mutationFn: (payload) => api.post('/admin/students', payload).then(r => r.data),
+    onSuccess: () => {
+      toast.success('تم إنشاء حساب الطالب')
+      qc.invalidateQueries({ queryKey: ['admin', 'students'] })
+      onClose()
+      setForm(initialCreateForm)
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  function submit() {
+    if (!form.firstNameAr.trim() || !form.lastNameAr.trim()) return toast.error('الاسم الأول واسم العائلة مطلوبان')
+    if (!form.email.trim()) return toast.error('البريد الإلكتروني مطلوب')
+    mut.mutate(form)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="إضافة طالب جديد" size="sm"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="purple" onClick={submit} loading={mut.isPending}>إنشاء الحساب</Button>
+      </>}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-xs font-bold text-gray-400 mb-1 block">الاسم الأول</label><input className={inputCls} value={form.firstNameAr} onChange={e => set('firstNameAr', e.target.value)} /></div>
+          <div><label className="text-xs font-bold text-gray-400 mb-1 block">اسم العائلة</label><input className={inputCls} value={form.lastNameAr} onChange={e => set('lastNameAr', e.target.value)} /></div>
+        </div>
+        <div><label className="text-xs font-bold text-gray-400 mb-1 block">البريد الإلكتروني</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} /></div>
+        <div><label className="text-xs font-bold text-gray-400 mb-1 block">رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+        <div>
+          <label className="text-xs font-bold text-gray-400 mb-1 block">نوع الطالب</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[['existing', 'قديم'], ['new', 'جديد']].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => set('studentType', v)}
+                className={`h-10 rounded-xl text-sm font-bold border transition-colors ${form.studentType === v ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div><label className="text-xs font-bold text-gray-400 mb-1 block">كلمة مرور (اختياري)</label><input type="password" className={inputCls} value={form.password} onChange={e => set('password', e.target.value)} /></div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function AdminStudentsPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
+  const [studentTypeFilter, setStudentTypeFilter] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'students', page, search, statusFilter],
-    queryFn: () => api.get(`/admin/students?page=${page}&limit=15&search=${encodeURIComponent(search)}${statusFilter ? `&status=${statusFilter}` : ''}`).then(r => r.data),
+    queryKey: ['admin', 'students', page, search, statusFilter, studentTypeFilter],
+    queryFn: () => api.get(`/admin/students?page=${page}&limit=15&search=${encodeURIComponent(search)}${statusFilter ? `&status=${statusFilter}` : ''}${studentTypeFilter ? `&studentType=${studentTypeFilter}` : ''}`).then(r => r.data),
     placeholderData: (prev) => prev,
   })
 
@@ -291,6 +362,10 @@ export default function AdminStudentsPage() {
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة الطلاب</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} طالب — انقر لعرض الملف الكامل والتعديل</p>
         </div>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
+          <User size={16} /> إضافة طالب
+        </button>
       </div>
 
       {/* Search + Filters */}
@@ -308,6 +383,14 @@ export default function AdminStudentsPage() {
           {[['', 'الكل'], ['active', 'نشطون'], ['inactive', 'موقوفون']].map(([k, l]) => (
             <button key={k} onClick={() => { setStatusFilter(k); setPage(1) }}
               className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${statusFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+          {[['', 'كل الأنواع'], ['existing', 'قدامى'], ['new', 'جدد']].map(([k, l]) => (
+            <button key={k} onClick={() => { setStudentTypeFilter(k); setPage(1) }}
+              className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${studentTypeFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               {l}
             </button>
           ))}
@@ -342,6 +425,9 @@ export default function AdminStudentsPage() {
                       <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                       {st.isActive ? 'نشط' : 'موقوف'}
                     </span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                      {st.studentType === 'new' ? 'جديد' : 'قديم'}
+                    </span>
                     <span className="text-[10px] text-gray-400">{formatDateAr(st.createdAt)}</span>
                   </div>
                 </div>
@@ -356,7 +442,7 @@ export default function AdminStudentsPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
-                    {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'الحالة', ''].map(h => (
+                    {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'النوع', 'الحالة', ''].map(h => (
                       <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -378,6 +464,11 @@ export default function AdminStudentsPage() {
                       <td className="px-5 py-4"><span className="text-sm text-gray-500">{st.email}</span></td>
                       <td className="px-5 py-4"><span className="text-sm text-gray-500" dir="ltr">{st.phone || '—'}</span></td>
                       <td className="px-5 py-4"><span className="text-sm text-gray-500">{formatDateAr(st.createdAt)}</span></td>
+                      <td className="px-5 py-4">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                          {st.studentType === 'new' ? 'جديد' : 'قديم'}
+                        </span>
+                      </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -410,6 +501,8 @@ export default function AdminStudentsPage() {
           <StudentCRMPanel student={selected} onClose={() => setSelected(null)} onUpdate={handlePanelUpdate} />
         )}
       </AnimatePresence>
+
+      <CreateStudentModal open={showCreate} onClose={() => setShowCreate(false)} />
     </div>
   )
 }

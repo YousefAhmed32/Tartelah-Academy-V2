@@ -58,12 +58,16 @@ const TeacherLinksPage = lazy(() => import('./pages/teacher/TeacherLinksPage.jsx
 const TeacherPerformancePage = lazy(() => import('./pages/teacher/TeacherPerformancePage.jsx'))
 const TeacherNotificationsPage = lazy(() => import('./pages/teacher/TeacherNotificationsPage.jsx'))
 const TeacherSettingsPage = lazy(() => import('./pages/teacher/TeacherSettingsPage.jsx'))
+const TeacherAssignmentRequestsPage = lazy(() => import('./pages/teacher/TeacherAssignmentRequestsPage.jsx'))
 
 // Admin
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage.jsx'))
 const AdminStudentsPage = lazy(() => import('./pages/admin/AdminStudentsPage.jsx'))
 const AdminStudentDetailPage = lazy(() => import('./pages/admin/AdminStudentDetailPage.jsx'))
 const AdminTeachersPage = lazy(() => import('./pages/admin/AdminTeachersPage.jsx'))
+const AdminTeacherOnboardingWizardPage = lazy(() => import('./pages/admin/AdminTeacherOnboardingWizardPage.jsx'))
+const AdminTeacherProfilePage = lazy(() => import('./pages/admin/AdminTeacherProfilePage.jsx'))
+const AdminAssignmentRequestsPage = lazy(() => import('./pages/admin/AdminAssignmentRequestsPage.jsx'))
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage.jsx'))
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage.jsx'))
 const AdminSessionsPage = lazy(() => import('./pages/admin/AdminSessionsPage.jsx'))
@@ -192,6 +196,8 @@ export default function App() {
           <Route path={ROUTES.TEACHER_PERFORMANCE} element={<TeacherPerformancePage />} />
           <Route path={ROUTES.TEACHER_NOTIFICATIONS} element={<TeacherNotificationsPage />} />
           <Route path={ROUTES.TEACHER_SETTINGS} element={<TeacherSettingsPage />} />
+          <Route path={ROUTES.TEACHER_ASSIGNMENT_REQUESTS} element={<TeacherAssignmentRequestsPage />} />
+          <Route path={ROUTES.TEACHER_ASSIGNMENT_REQUEST_DETAIL} element={<TeacherAssignmentRequestsPage />} />
         </Route>
 
         {/* Admin — every page wrapped in RequirePermission using the exact
@@ -204,6 +210,10 @@ export default function App() {
           <Route path={ROUTES.ADMIN_STUDENTS} element={<RequirePermission permission="students.view"><AdminStudentsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<RequirePermission permission="students.view"><AdminStudentDetailPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_TEACHERS} element={<RequirePermission permission="teachers.view"><AdminTeachersPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHER_ONBOARDING} element={<RequirePermission all={['teachers.manage', 'students.manage']}><AdminTeacherOnboardingWizardPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHER_PROFILE} element={<RequirePermission permission="teachers.view"><AdminTeacherProfilePage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ASSIGNMENT_REQUESTS} element={<RequirePermission permission="assignments.view"><AdminAssignmentRequestsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_ASSIGNMENT_REQUEST_DETAIL} element={<RequirePermission permission="assignments.view"><AdminAssignmentRequestsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_ADMINS} element={<RequirePermission permission="users.view"><AdminAdminsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_COURSES} element={<RequirePermission permission="courses.view"><AdminCoursesPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_COURSE_NEW} element={<RequirePermission permission="courses.manage"><AdminCourseFormPage /></RequirePermission>} />

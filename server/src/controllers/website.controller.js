@@ -6,6 +6,7 @@ const NewsletterSubscriber = require('../models/NewsletterSubscriber')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { uploadBuffer, deleteFile } = require('../services/media.service')
+const { isValidTimezone } = require('../config/academyTimezone')
 
 exports.getTestimonials = async (req, res, next) => {
   try {
@@ -75,7 +76,7 @@ const SETTINGS_ALLOWED = [
   'phone', 'whatsapp', 'email', 'address',
   'facebook', 'instagram', 'twitter', 'youtube', 'linkedin',
   'workingHours', 'supportText', 'emergencyContact',
-  'googleMapsEmbed',
+  'googleMapsEmbed', 'timezone',
   'footerDescription', 'footerCopyright',
   'privacyPolicyUrl', 'termsUrl', 'cookiesPolicyUrl',
   'newsletterEnabled', 'newsletterText',
@@ -99,6 +100,9 @@ exports.updateSettings = async (req, res, next) => {
     const updates = {}
     SETTINGS_ALLOWED.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     if (updates.googleMapsEmbed !== undefined) updates.googleMapsEmbed = normalizeMapEmbed(updates.googleMapsEmbed)
+    if (updates.timezone !== undefined && !isValidTimezone(updates.timezone)) {
+      return sendError(res, 'المنطقة الزمنية المحددة غير صالحة', 400)
+    }
     const settings = await AcademySettings.findOneAndUpdate({}, updates, { new: true, upsert: true })
     sendSuccess(res, settings, 'تم حفظ الإعدادات')
   } catch (err) { next(err) }
@@ -146,7 +150,7 @@ exports.submitContactForm = async (req, res, next) => {
         userId: a._id,
         titleAr: `رسالة جديدة من الموقع: ${name}`,
         bodyAr: notifBody.slice(0, 300),
-        type: 'system', priority: 'medium',
+        type: 'system', priority: 'medium', actionUrl: '/admin/contact-messages',
       })))
     } catch (_) { /* non-critical */ }
 

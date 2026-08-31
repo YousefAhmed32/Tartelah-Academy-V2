@@ -3,18 +3,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink, Check, AlertCircle } from 'lucide-react'
+import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink, Check, AlertCircle, UserPlus, Clock } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
+import { useNotificationStore } from '../../store/notificationStore.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
-import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { formatDateAr, formatTimeAr, timeFromNow } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
+import { dayLabel, durationLabel, TEACHING_TYPE_OPTIONS } from '../../utils/assignmentSchedule.js'
+import { subjectLabel } from '../../utils/teacherProfile.js'
+import { useTeachingSubjects } from '../../hooks/useTeachingSubjects.js'
 
 const DEFAULT_STATS = {
   totalStudents: 0, sessionsToday: 0, pendingEvaluations: 0, completedThisMonth: 0,
@@ -240,6 +244,110 @@ function CurrentSessionCard({ session, ongoingCount }) {
   )
 }
 
+function teachingTypeLabel(value) {
+  return TEACHING_TYPE_OPTIONS.find((o) => o.value === value)?.label || 'حصص فردية'
+}
+
+// Premium, high-visibility section for new-student assignment requests
+// awaiting this teacher's approval — placed right after the greeting so it's
+// impossible to miss, per the brief. Renders nothing when there are no
+// pending requests (no large empty dashboard block).
+function PendingAssignmentSection() {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { notifications } = useNotificationStore()
+  const { data: subjects = [] } = useTeachingSubjects()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['teacher', 'assignment-requests', 'dashboard-pending'],
+    queryFn: () => api.get('/teachers/me/assignment-requests', {
+      params: { status: 'pending_teacher_approval', limit: 3 },
+    }).then((r) => r.data.data),
+    // Safe polling fallback — the socket-driven invalidation below (on a new
+    // "assignment" notification) is the primary update path.
+    refetchInterval: 60000,
+  })
+
+  // Real-time sync: the shared notification store already receives new
+  // requests instantly via the app-wide socket (see useNotificationInit) —
+  // the moment a fresh "assignment" notification lands, invalidate this
+  // widget's query instead of waiting for the next poll.
+  const latestId = notifications[0]?._id
+  const latestType = notifications[0]?.type
+  useEffect(() => {
+    if (latestType === 'assignment') {
+      qc.invalidateQueries({ queryKey: ['teacher', 'assignment-requests'] })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestId])
+
+  const pendingCount = data?.total || 0
+  const items = toArray(data?.items).slice(0, 3)
+
+  // No large empty dashboard block when there's nothing pending — and no
+  // loading-flash either, since the common case (zero pending requests)
+  // would otherwise show a spinner card that immediately disappears.
+  if (isLoading || pendingCount === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl p-5 bg-white border-2 border-violet-200 shadow-sm relative overflow-hidden"
+    >
+      <div className="absolute top-0 end-0 w-40 h-40 rounded-full opacity-[0.06]" style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', transform: 'translate(30%, -30%)' }} />
+      <div className="flex items-center justify-between mb-4 relative">
+        <h2 className="font-heading font-extrabold text-lg text-gray-900 flex items-center gap-2">
+          <UserPlus size={20} strokeWidth={1.8} className="text-violet-600" />
+          طلبات طلاب جديدة
+          {pendingCount > 0 && (
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">{pendingCount}</span>
+          )}
+        </h2>
+      </div>
+
+      <div className="space-y-2.5 relative">
+        {items.map((req) => {
+            const student = req.studentId || {}
+            const daysText = toArray(req.schedule?.days).map((d) => `${dayLabel(d.dayOfWeek)} ${d.time}`).join('، ')
+            return (
+              <button
+                key={req._id}
+                type="button"
+                onClick={() => navigate(`${ROUTES.TEACHER_ASSIGNMENT_REQUESTS}/${req._id}`)}
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl text-start transition-all bg-violet-50/50 border border-violet-100 hover:bg-violet-50"
+              >
+                <Avatar src={getFileUrl(student.avatar)} firstName={student.firstNameAr} lastName={student.lastNameAr} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-sm text-gray-900 truncate">{student.firstNameAr} {student.lastNameAr}</span>
+                    {req.createdAt && (
+                      <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-none">
+                        <Clock size={10} /> {timeFromNow(req.createdAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5 truncate">
+                    {subjectLabel(subjects, req.specialization)}{req.studentAge ? ` • ${req.studentAge} سنة` : ''} • {durationLabel(req.lessonDurationMinutes)} • {teachingTypeLabel(req.teachingType)}
+                  </div>
+                  {daysText && <div className="text-[11px] text-violet-600 font-semibold mt-1 truncate">{daysText}</div>}
+                </div>
+              </button>
+            )
+          })}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => navigate(ROUTES.TEACHER_ASSIGNMENT_REQUESTS)}
+        className="w-full mt-4 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors relative"
+      >
+        مراجعة الطلبات
+      </button>
+    </motion.div>
+  )
+}
+
 function ActionItem({ icon, title, count, color, onClick }) {
   if (!count) return null
   return (
@@ -319,6 +427,10 @@ export default function TeacherDashboardPage() {
           {hasActions ? 'لديك مهام تنتظرك اليوم' : 'يومك التعليمي هادئ اليوم — أحسنت!'}
         </p>
       </motion.div>
+
+      {/* New-student assignment requests awaiting this teacher's approval —
+          placed high, right after the greeting, per the brief. */}
+      <PendingAssignmentSection />
 
       {/* Unscheduled students alert */}
       {unscheduledCount > 0 && (

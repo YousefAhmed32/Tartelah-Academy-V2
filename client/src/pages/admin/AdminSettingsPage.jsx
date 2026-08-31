@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart } from 'lucide-react'
+import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart, GraduationCap, Archive, ArchiveRestore, Plus, Loader2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Button from '../../components/ui/Button.jsx'
@@ -10,6 +10,9 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import ImageUploadField from '../../components/ui/ImageUploadField.jsx'
 import { getFileUrl } from '../../config/constants.js'
+import {
+  useAdminTeachingSubjects, useCreateTeachingSubject, useArchiveTeachingSubject, useUnarchiveTeachingSubject,
+} from '../../hooks/useTeachingSubjects.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -199,11 +202,11 @@ function AcademyTab() {
             <textarea className={`${inputCls} h-20 py-2 resize-y`} value={form.visionAr} onChange={e => set('visionAr', e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">عنوان "من نحن"</label>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">عنوان &quot;من نحن&quot;</label>
             <input className={inputCls} value={form.aboutHeadlineAr} onChange={e => set('aboutHeadlineAr', e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">نص "من نحن"</label>
+            <label className="text-xs font-bold text-gray-500 mb-1.5 block">نص &quot;من نحن&quot;</label>
             <textarea className={`${inputCls} h-32 py-2 resize-y`} value={form.aboutBodyAr} onChange={e => set('aboutBodyAr', e.target.value)} />
           </div>
         </div>
@@ -302,15 +305,125 @@ function AcademyTab() {
   )
 }
 
+// ── Teaching Curricula Tab ────────────────────────────────────────────────────
+// Admin management screen for the dynamic teaching-subject/curriculum
+// catalog (server/src/services/teachingSubject.service.js). The primary
+// creation flow is the inline creatable combobox used across every
+// teacher/student/assignment form (components/ui/TeachingSubjectCombobox.jsx)
+// — this screen is for reviewing the full catalog and archiving subjects
+// that are no longer in use.
+function CurriculaTab() {
+  const { hasPermission } = useAuthStore()
+  const canManage = hasPermission('curricula.manage')
+  const { data: subjects = [], isLoading } = useAdminTeachingSubjects()
+  const createMutation = useCreateTeachingSubject()
+  const archiveMutation = useArchiveTeachingSubject()
+  const unarchiveMutation = useUnarchiveTeachingSubject()
+  const [newNameAr, setNewNameAr] = useState('')
+  const [newNameEn, setNewNameEn] = useState('')
+  const [pendingId, setPendingId] = useState(null)
+
+  async function handleCreate() {
+    const trimmed = newNameAr.trim()
+    if (!trimmed || createMutation.isPending) return
+    try {
+      const res = await createMutation.mutateAsync({ nameAr: trimmed, nameEn: newNameEn.trim() || undefined })
+      toast.success(res.message || 'تم إنشاء المنهج')
+      setNewNameAr(''); setNewNameEn('')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'تعذّر إنشاء المنهج')
+    }
+  }
+
+  async function toggleArchive(subject) {
+    setPendingId(subject._id)
+    try {
+      if (subject.isActive) {
+        await archiveMutation.mutateAsync(subject._id)
+        toast.success('تمت أرشفة المنهج')
+      } else {
+        await unarchiveMutation.mutateAsync(subject._id)
+        toast.success('تمت إعادة تفعيل المنهج')
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'حدث خطأ')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {canManage && (
+        <Section title="إضافة منهج جديد" icon={Plus}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">الاسم بالعربية *</label>
+              <input className={inputCls} value={newNameAr} onChange={(e) => setNewNameAr(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreate() } }}
+                placeholder="مثال: الرياضيات" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">الاسم بالإنجليزية (اختياري)</label>
+              <input className={inputCls} value={newNameEn} onChange={(e) => setNewNameEn(e.target.value)} placeholder="Mathematics" dir="ltr" />
+            </div>
+          </div>
+          <Button variant="purple" className="mt-3" loading={createMutation.isPending} disabled={!newNameAr.trim()} onClick={handleCreate} size="sm">
+            <Plus size={15} /> إضافة المنهج
+          </Button>
+        </Section>
+      )}
+
+      <Section title="كل المناهج التعليمية" icon={GraduationCap}>
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Spinner color="border-brand-purple" /></div>
+        ) : !subjects.length ? (
+          <p className="text-sm text-gray-400 text-center py-6">لا توجد مناهج بعد</p>
+        ) : (
+          <div className="space-y-2">
+            {subjects.map((s) => (
+              <div key={s._id} className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${s.isActive ? 'border-gray-100 bg-white' : 'border-gray-100 bg-gray-50'}`}>
+                <div className="min-w-0">
+                  <div className={`font-bold text-sm truncate ${s.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {s.nameAr}{s.nameEn ? ` (${s.nameEn})` : ''}
+                    {s.isSystem && <span className="ms-2 text-[10px] font-bold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">أساسي</span>}
+                  </div>
+                  <div className={`text-[11px] mt-0.5 ${s.isActive ? 'text-emerald-600' : 'text-gray-400'}`}>{s.isActive ? 'نشط' : 'مؤرشف'}</div>
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => toggleArchive(s)}
+                    disabled={pendingId === s._id}
+                    className={`flex-none min-h-[44px] px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 disabled:opacity-60 ${
+                      s.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {pendingId === s._id ? <Loader2 size={14} className="animate-spin" /> : (s.isActive ? <Archive size={14} /> : <ArchiveRestore size={14} />)}
+                    {s.isActive ? 'أرشفة' : 'إعادة تفعيل'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const TABS = [
+const ALL_TABS = [
   { key: 'profile', label: 'حسابي', icon: User },
   { key: 'academy', label: 'إعدادات الأكاديمية', icon: Building2 },
+  { key: 'curricula', label: 'المناهج التعليمية', icon: GraduationCap, permission: 'curricula.view' },
 ]
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
+  const { hasPermission } = useAuthStore()
+  const TABS = ALL_TABS.filter((t) => !t.permission || hasPermission(t.permission))
 
   return (
     <div dir="rtl" className="space-y-6 max-w-[1100px]">
@@ -320,7 +433,7 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit flex-wrap">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -331,6 +444,7 @@ export default function AdminSettingsPage() {
 
       {activeTab === 'profile' && <ProfileTab />}
       {activeTab === 'academy' && <AcademyTab />}
+      {activeTab === 'curricula' && <CurriculaTab />}
     </div>
   )
 }

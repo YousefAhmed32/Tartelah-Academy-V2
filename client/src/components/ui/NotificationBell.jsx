@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNotificationStore } from '../../store/notificationStore.js'
@@ -49,6 +50,19 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
     if (notif.isRead) return
     markRead(notif._id)
     api.patch(`/notifications/${notif._id}/read`).catch(() => {})
+  }
+
+  // Clicking a notification marks it read AND navigates straight to the
+  // record it references (the request/lesson/subscription/etc. `actionUrl`
+  // points at) — never just a passive "mark read" tap. A notification
+  // without an `actionUrl` (older rows, or a type with no deep-link target)
+  // safely falls back to marking read only; the destination page itself
+  // handles a since-deleted/inaccessible record (its own not-found/
+  // permission-denied state), so no extra guard is needed here.
+  function handleActivate(notif) {
+    handleMarkRead(notif)
+    closeDropdown()
+    if (notif.actionUrl) navigate(notif.actionUrl)
   }
 
   function handleViewAll() {
@@ -204,7 +218,7 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
                       key={notif._id}
                       notif={notif}
                       isDark={isDark}
-                      onMarkRead={handleMarkRead}
+                      onActivate={handleActivate}
                     />
                   ))}
 
@@ -225,7 +239,7 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
                       key={notif._id}
                       notif={notif}
                       isDark={isDark}
-                      onMarkRead={handleMarkRead}
+                      onActivate={handleActivate}
                     />
                   ))}
                 </>
@@ -256,13 +270,15 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
   )
 }
 
-function NotifItem({ notif, isDark, onMarkRead }) {
+function NotifItem({ notif, isDark, onActivate }) {
   const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.system
   const isUnread = !notif.isRead
+  const isActionable = !!notif.actionUrl
 
   return (
     <button
-      onClick={() => onMarkRead(notif)}
+      onClick={() => onActivate(notif)}
+      aria-label={isActionable ? `${notif.titleAr || notif.title} — فتح` : notif.titleAr || notif.title}
       className="w-full flex items-start gap-3 px-4 py-3 text-start transition-colors"
       style={{
         background: isUnread
@@ -318,12 +334,14 @@ function NotifItem({ notif, isDark, onMarkRead }) {
         </div>
       </div>
 
-      {isUnread && (
-        <div
-          className="w-2 h-2 rounded-full flex-none mt-2"
-          style={{ background: cfg.dot, flexShrink: 0 }}
-        />
-      )}
+      <div className="flex flex-col items-center gap-1.5 flex-none mt-1">
+        {isUnread && (
+          <div className="w-2 h-2 rounded-full flex-none" style={{ background: cfg.dot, flexShrink: 0 }} />
+        )}
+        {isActionable && (
+          <ChevronLeft size={12} aria-hidden="true" style={{ color: isDark ? 'rgba(255,255,255,0.25)' : '#c0b4de' }} />
+        )}
+      </div>
     </button>
   )
 }

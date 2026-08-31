@@ -23,6 +23,10 @@ function fieldsToIncrement(type, amount) {
   switch (type) {
     case 'purchase':
     case 'renewal':
+    // A new subscription's documented opening balance — credited the same
+    // way a purchase is (see LessonTransaction's enum comment for why this
+    // is a distinct type rather than reusing 'purchase').
+    case 'opening_balance':
       return { remaining: amount, totalPurchased: amount }
     case 'consumption':
     case 'reversal':

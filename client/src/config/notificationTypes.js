@@ -1,4 +1,4 @@
-import { Calendar, FileText, Star, CreditCard, UserRound, CalendarDays, Wallet, Clock3, Bell } from 'lucide-react'
+import { Calendar, FileText, Star, CreditCard, UserRound, CalendarDays, Wallet, Clock3, Bell, ClipboardCheck } from 'lucide-react'
 
 // Single source of truth for Notification.type display (icon/color/label) —
 // shared by the bell dropdown, the full notification center, and the
@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPE_CONFIG = {
   schedule:     { label: 'جدول',   color: '#0891b2', bg: 'rgba(8,145,178,0.13)',  dot: '#0891b2', Icon: CalendarDays },
   payment:      { label: 'دفع',    color: '#059669', bg: 'rgba(5,150,105,0.13)',  dot: '#059669', Icon: Wallet },
   attendance:   { label: 'حضور',   color: '#f59e0b', bg: 'rgba(245,158,11,0.13)', dot: '#f59e0b', Icon: Clock3 },
+  assignment:   { label: 'إسناد',  color: '#7c3aed', bg: 'rgba(124,58,237,0.13)', dot: '#7c3aed', Icon: ClipboardCheck },
   system:       { label: 'نظام',   color: '#7c6aaa', bg: 'rgba(124,106,170,0.1)', dot: '#9b7fd6', Icon: Bell },
 }
 

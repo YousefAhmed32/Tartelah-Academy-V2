@@ -8,6 +8,9 @@ describe('toPublicTeacher', () => {
     gender: 'male',
     avatar: '/uploads/avatars/x.jpg',
     specialization: 'تجويد',
+    specializations: ['tajweed', 'hifz'],
+    audienceCategories: ['children', 'women'],
+    hourlyRate: 50,
     bioAr: 'نبذة',
     createdAt: new Date('2026-01-01'),
     // Sensitive fields that must never leak through the public projection
@@ -30,14 +33,16 @@ describe('toPublicTeacher', () => {
       gender: 'male',
       avatar: '/uploads/avatars/x.jpg',
       specialization: 'تجويد',
+      specializations: ['tajweed', 'hifz'],
+      audienceCategories: ['children', 'women'],
       bioAr: 'نبذة',
       createdAt: fullTeacher.createdAt,
     })
   })
 
-  test('never includes salary, email, phone, password, or internal account fields', () => {
+  test('never includes hourly rate, salary, email, phone, password, or internal account fields', () => {
     const pub = toPublicTeacher(fullTeacher)
-    for (const sensitiveKey of ['email', 'phone', 'password', 'salaryPerSession', 'refreshToken', 'passwordResetToken', 'meetingLinks', 'isActive']) {
+    for (const sensitiveKey of ['email', 'phone', 'password', 'salaryPerSession', 'hourlyRate', 'refreshToken', 'passwordResetToken', 'meetingLinks', 'isActive']) {
       expect(pub).not.toHaveProperty(sensitiveKey)
     }
   })
