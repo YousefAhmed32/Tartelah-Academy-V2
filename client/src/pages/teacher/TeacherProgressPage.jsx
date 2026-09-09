@@ -165,7 +165,7 @@ export default function TeacherProgressPage() {
                   style={
                     form.quality === q.value
                       ? { background: `${q.color}20`, color: q.color, border: `1px solid ${q.color}60` }
-                      : { border: '1px solid #e0d8f5', color: '#9b7fd6', background: 'transparent' }
+                      : { border: '1px solid #e0d8f5', color: '#7c6aaa', background: 'transparent' }
                   }
                 >
                   {q.label}

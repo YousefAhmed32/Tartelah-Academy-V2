@@ -262,22 +262,24 @@ describe('createTeacherWithStudents — credential modes', () => {
     expect(User.create).not.toHaveBeenCalled()
   })
 
-  test('a manual credential with requirePasswordChange defaulted (true) forces a change and returns no temp password', async () => {
+  // Phase 2 meeting addendum §1: manual mode's requirePasswordChange default
+  // flipped from true -> false.
+  test('a manual credential with requirePasswordChange defaulted (false) does not force a change and returns no temp password', async () => {
     User.create.mockResolvedValueOnce(mockCreatedUser({ _id: 't1', email: 'teacher@example.com' }))
     const result = await createTeacherWithStudents({
       teacher: { ...validTeacher, credential: { mode: 'manual', password: 'Abcdef12', passwordConfirm: 'Abcdef12' } }, actorId: 'admin1',
     })
-    expect(User.create.mock.calls[0][0]).toMatchObject({ password: 'Abcdef12', mustChangePassword: true })
+    expect(User.create.mock.calls[0][0]).toMatchObject({ password: 'Abcdef12', mustChangePassword: false })
     expect(result.temporaryPasswords.teacher).toBeUndefined()
   })
 
-  test('a manual credential with requirePasswordChange:false does not force a change', async () => {
+  test('a manual credential with requirePasswordChange:true forces a change', async () => {
     User.create.mockResolvedValueOnce(mockCreatedUser({ _id: 't1', email: 'teacher@example.com' }))
     await createTeacherWithStudents({
-      teacher: { ...validTeacher, credential: { mode: 'manual', password: 'Abcdef12', passwordConfirm: 'Abcdef12', requirePasswordChange: false } },
+      teacher: { ...validTeacher, credential: { mode: 'manual', password: 'Abcdef12', passwordConfirm: 'Abcdef12', requirePasswordChange: true } },
       actorId: 'admin1',
     })
-    expect(User.create.mock.calls[0][0]).toMatchObject({ mustChangePassword: false })
+    expect(User.create.mock.calls[0][0]).toMatchObject({ mustChangePassword: true })
   })
 
   test('a student with a weak manual password is rejected before any write', async () => {

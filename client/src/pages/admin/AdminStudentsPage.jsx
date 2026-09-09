@@ -1,324 +1,136 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Edit2, Phone, Mail, MessageCircle, KeyRound, Trash2, User, BookOpen, Star, Calendar, ExternalLink } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { User, Copy, CheckCircle2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
-import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
+import PasswordCredentialSection, { emptyCredential, validateCredentialValue, credentialPayload } from '../../components/ui/PasswordCredentialSection.jsx'
 import { formatDateAr } from '../../utils/date.js'
-import { getFileUrl } from '../../config/constants.js'
+import { getFileUrl, ROUTES } from '../../config/constants.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
-// ── Student CRM Side Panel ────────────────────────────────────────────────────
+// ── Create Student Modal ─────────────────────────────────────────────────────
 
-function InfoRow({ label, value, icon }) {
-  if (!value) return null
-  return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-none text-gray-400">{icon}</div>
-      <div>
-        <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-        <div className="text-sm font-semibold text-gray-800">{value}</div>
-      </div>
-    </div>
-  )
-}
-
-function QuickAction({ icon, label, color, onClick }) {
-  return (
-    <button onClick={onClick}
-      className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105"
-      style={{ background: `${color}10`, color }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}>{icon}</div>
-      <span className="text-[11px] font-semibold">{label}</span>
-    </button>
-  )
-}
-
-function EditStudentForm({ student, onSave, isSaving }) {
-  const [form, setForm] = useState({
-    firstNameAr: student.firstNameAr || '',
-    lastNameAr: student.lastNameAr || '',
-    email: student.email || '',
-    phone: student.phone || '',
-    bioAr: student.bioAr || '',
-    studentType: student.studentType || 'existing',
-  })
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSave(form)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 py-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">الاسم الأول</label>
-          <input className={inputCls} value={form.firstNameAr} onChange={e => set('firstNameAr', e.target.value)} required />
-        </div>
-        <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">الاسم الأخير</label>
-          <input className={inputCls} value={form.lastNameAr} onChange={e => set('lastNameAr', e.target.value)} required />
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-bold text-gray-400 mb-1 block">البريد الإلكتروني</label>
-        <input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} dir="ltr" />
-      </div>
-      <div>
-        <label className="text-xs font-bold text-gray-400 mb-1 block">رقم الهاتف</label>
-        <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} dir="ltr" />
-      </div>
-      <div>
-        <label className="text-xs font-bold text-gray-400 mb-1 block">نوع الطالب</label>
-        <div className="grid grid-cols-2 gap-2">
-          {[['existing', 'قديم'], ['new', 'جديد']].map(([v, l]) => (
-            <button key={v} type="button" onClick={() => set('studentType', v)}
-              className={`h-10 rounded-xl text-sm font-bold border transition-colors ${form.studentType === v ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'}`}>
-              {l}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-bold text-gray-400 mb-1 block">نبذة</label>
-        <textarea className={`${inputCls} h-20 resize-none py-2.5`} value={form.bioAr} onChange={e => set('bioAr', e.target.value)} />
-      </div>
-      <button type="submit" disabled={isSaving}
-        className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-        {isSaving && <Spinner size="sm" color="border-white" />}
-        حفظ التعديلات
-      </button>
-    </form>
-  )
-}
-
-function ResetPasswordForm({ studentId, onDone }) {
-  const [pw, setPw] = useState('')
-  const mut = useMutation({
-    mutationFn: () => api.post(`/admin/students/${studentId}/reset-password`, { newPassword: pw }).then(r => r.data),
-    onSuccess: () => { toast.success('تم إعادة تعيين كلمة المرور'); onDone() },
-    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
-  })
-  return (
-    <div className="py-4 space-y-3">
-      <p className="text-sm text-gray-500">أدخل كلمة المرور الجديدة للطالب</p>
-      <input type="password" className={inputCls} value={pw} onChange={e => setPw(e.target.value)} placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" dir="ltr" />
-      <button onClick={() => mut.mutate()} disabled={pw.length < 8 || mut.isPending}
-        className="w-full h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-        {mut.isPending && <Spinner size="sm" color="border-white" />}
-        تعيين كلمة المرور
-      </button>
-    </div>
-  )
-}
-
-function StudentCRMPanel({ student, onClose, onUpdate }) {
-  const [tab, setTab] = useState('info') // info | edit | reset
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
-  const qc = useQueryClient()
-
-  const updateMut = useMutation({
-    mutationFn: (data) => api.patch(`/admin/students/${student._id}`, data).then(r => r.data),
-    onSuccess: (res) => {
-      toast.success('تم تحديث بيانات الطالب')
-      qc.invalidateQueries({ queryKey: ['admin', 'students'] })
-      onUpdate(res.data)
-      setTab('info')
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
-  })
-
-  const toggleMut = useMutation({
-    mutationFn: (isActive) => api.patch(`/admin/students/${student._id}`, { isActive }).then(r => r.data),
-    onSuccess: (res) => {
-      toast.success(res.data?.isActive ? 'تم تفعيل الحساب' : 'تم إيقاف الحساب')
-      qc.invalidateQueries({ queryKey: ['admin', 'students'] })
-      onUpdate(res.data)
-    },
-    onError: () => toast.error('حدث خطأ'),
-  })
-
-  // Deactivating immediately blocks the student's access, so it gets a confirm
-  // step; reactivating is safe/reversible and stays a single click.
-  function requestToggle() {
-    if (student.isActive) setConfirmDeactivate(true)
-    else toggleMut.mutate(true)
-  }
-
-  const sc = student.isActive ? '#10b981' : '#ef4444'
-
-  const tabs = [
-    { key: 'info', label: 'الملف' },
-    { key: 'edit', label: 'تعديل' },
-    { key: 'reset', label: 'كلمة المرور' },
-  ]
-
-  return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={onClose} />
-      <motion.aside
-        initial={{ x: -480 }} animate={{ x: 0 }} exit={{ x: -480 }}
-        transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-        className="fixed left-0 top-0 bottom-0 z-50 w-[460px] max-w-full bg-white overflow-y-auto"
-        style={{ boxShadow: '4px 0 32px rgba(0,0,0,0.12)', direction: 'rtl' }}
-      >
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar src={getFileUrl(student.avatar)} firstName={student.firstNameAr} lastName={student.lastNameAr} size="md" />
-              <div>
-                <div className="font-heading font-bold text-gray-900 text-base">{student.firstNameAr} {student.lastNameAr}</div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: sc }} />
-                  <span className="text-xs font-semibold" style={{ color: sc }}>{student.isActive ? 'نشط' : 'موقوف'}</span>
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 mt-3 p-1 bg-gray-100 rounded-xl">
-            {tabs.map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`flex-1 py-1.5 rounded-[10px] text-xs font-bold transition-all ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 pb-6">
-          {tab === 'info' && (
-            <>
-              {/* Quick Actions */}
-              <div className="py-4 border-b border-gray-100">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">إجراءات سريعة</h3>
-                <div className="grid grid-cols-4 gap-2">
-                  {student.phone && <QuickAction icon={<Phone size={15} />} label="اتصال" color="#10b981" onClick={() => window.open(`tel:${student.phone}`)} />}
-                  {student.phone && <QuickAction icon={<MessageCircle size={15} />} label="واتساب" color="#25D366" onClick={() => window.open(`https://wa.me/${student.phone}`)} />}
-                  <QuickAction icon={<Mail size={15} />} label="رسالة" color="#7c3aed" onClick={() => window.open(`mailto:${student.email}`)} />
-                  <QuickAction
-                    icon={student.isActive ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M10 15V9M14 15V9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="m10 8 6 4-6 4V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>}
-                    label={student.isActive ? 'إيقاف' : 'تفعيل'}
-                    color={student.isActive ? '#ef4444' : '#10b981'}
-                    onClick={requestToggle}
-                  />
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="py-4 border-b border-gray-100">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">معلومات التواصل</h3>
-                <InfoRow label="البريد الإلكتروني" value={student.email} icon={<Mail size={14} />} />
-                <InfoRow label="رقم الهاتف" value={student.phone} icon={<Phone size={14} />} />
-              </div>
-
-              <div className="py-4 border-b border-gray-100">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">بيانات الحساب</h3>
-                <InfoRow label="تاريخ التسجيل" value={formatDateAr(student.createdAt)} icon={<Calendar size={14} />} />
-                <InfoRow label="نوع الطالب" value={student.studentType === 'new' ? 'طالب جديد' : 'طالب قديم'} icon={<User size={14} />} />
-                <InfoRow label="الدور" value="طالب" icon={<User size={14} />} />
-                {student.bioAr && <InfoRow label="نبذة" value={student.bioAr} icon={<BookOpen size={14} />} />}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-                <Link to={`/admin/students/${student._id}`}
-                  className="w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 bg-violet-50 text-violet-700 hover:bg-violet-100">
-                  <ExternalLink size={14} /> السجل الأكاديمي الكامل
-                </Link>
-                <button onClick={requestToggle} disabled={toggleMut.isPending}
-                  className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${student.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
-                  {toggleMut.isPending && <Spinner size="sm" color={student.isActive ? 'border-red-500' : 'border-emerald-600'} />}
-                  {student.isActive ? 'إيقاف حساب الطالب' : 'تفعيل حساب الطالب'}
-                </button>
-              </div>
-            </>
-          )}
-
-          {tab === 'edit' && (
-            <EditStudentForm student={student} onSave={(data) => updateMut.mutate(data)} isSaving={updateMut.isPending} />
-          )}
-
-          {tab === 'reset' && (
-            <ResetPasswordForm studentId={student._id} onDone={() => setTab('info')} />
-          )}
-        </div>
-      </motion.aside>
-
-      <ConfirmDialog
-        open={confirmDeactivate}
-        onClose={() => setConfirmDeactivate(false)}
-        onConfirm={() => { toggleMut.mutate(false); setConfirmDeactivate(false) }}
-        title="إيقاف حساب الطالب"
-        message={`سيتم إيقاف حساب "${student.firstNameAr} ${student.lastNameAr}" فوراً ولن يتمكن من تسجيل الدخول حتى يُعاد تفعيله. هل تريد المتابعة؟`}
-        confirmLabel="إيقاف الحساب"
-        variant="danger"
-      />
-    </>
-  )
-}
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
-
-const initialCreateForm = { firstNameAr: '', lastNameAr: '', email: '', phone: '', studentType: 'new', password: '' }
+const initialCreateForm = () => ({
+  firstNameAr: '',
+  lastNameAr: '',
+  email: '',
+  phone: '',
+  studentType: 'new',
+  credential: emptyCredential(),
+})
 
 function CreateStudentModal({ open, onClose }) {
   const qc = useQueryClient()
   const [form, setForm] = useState(initialCreateForm)
+  const [createdResult, setCreatedResult] = useState(null)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
   const mut = useMutation({
     mutationFn: (payload) => api.post('/admin/students', payload).then(r => r.data),
-    onSuccess: () => {
-      toast.success('تم إنشاء حساب الطالب')
+    onSuccess: (res) => {
+      toast.success('تم إنشاء حساب الطالب بنجاح')
       qc.invalidateQueries({ queryKey: ['admin', 'students'] })
-      onClose()
-      setForm(initialCreateForm)
+      const tempPass = res.data?.temporaryPassword || res.temporaryPassword
+      if (tempPass) {
+        setCreatedResult({
+          email: form.email,
+          temporaryPassword: tempPass,
+          name: `${form.firstNameAr} ${form.lastNameAr}`,
+        })
+      } else {
+        handleClose()
+      }
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
   })
 
+  function handleClose() {
+    setForm(initialCreateForm())
+    setCreatedResult(null)
+    onClose()
+  }
+
   function submit() {
     if (!form.firstNameAr.trim() || !form.lastNameAr.trim()) return toast.error('الاسم الأول واسم العائلة مطلوبان')
     if (!form.email.trim()) return toast.error('البريد الإلكتروني مطلوب')
-    mut.mutate(form)
+    const credErr = validateCredentialValue(form.credential)
+    if (credErr) return toast.error(credErr)
+
+    const payload = {
+      firstNameAr: form.firstNameAr.trim(),
+      lastNameAr: form.lastNameAr.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim() || undefined,
+      studentType: form.studentType,
+      credential: credentialPayload(form.credential),
+    }
+    mut.mutate(payload)
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard?.writeText(text)
+    toast.success('تم النسخ إلى الحافظة')
+  }
+
+  if (createdResult) {
+    return (
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title="تم إنشاء حساب الطالب بنجاح"
+        size="sm"
+        footer={<Button variant="purple" onClick={handleClose}>تم، إغلاق النافذة</Button>}
+      >
+        <div dir="rtl" className="space-y-4 text-center py-2">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 size={24} />
+          </div>
+          <div>
+            <h4 className="font-heading font-extrabold text-gray-900 text-base">{createdResult.name}</h4>
+            <p className="text-xs text-gray-500 mt-0.5">{createdResult.email}</p>
+          </div>
+          <div className="bg-violet-50/80 border border-violet-100 rounded-xl p-3 text-right space-y-1.5">
+            <div className="text-xs text-violet-700 font-bold">كلمة المرور المؤقتة المُولّدة:</div>
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-200">
+              <span className="font-mono text-sm font-bold text-gray-900 select-all">{createdResult.temporaryPassword}</span>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(createdResult.temporaryPassword)}
+                className="flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
+              >
+                <Copy size={13} /> نسخ
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-500">انسخ كلمة المرور هذه لتزويد الطالب بها لتسجيل دخوله الأول.</p>
+          </div>
+        </div>
+      </Modal>
+    )
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="إضافة طالب جديد" size="sm"
+    <Modal open={open} onClose={handleClose} title="إضافة طالب جديد" size="sm"
       footer={<>
-        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="ghost" onClick={handleClose}>إلغاء</Button>
         <Button variant="purple" onClick={submit} loading={mut.isPending}>إنشاء الحساب</Button>
       </>}>
-      <div className="space-y-3">
+      <div className="space-y-3" dir="rtl">
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-xs font-bold text-gray-400 mb-1 block">الاسم الأول</label><input className={inputCls} value={form.firstNameAr} onChange={e => set('firstNameAr', e.target.value)} /></div>
-          <div><label className="text-xs font-bold text-gray-400 mb-1 block">اسم العائلة</label><input className={inputCls} value={form.lastNameAr} onChange={e => set('lastNameAr', e.target.value)} /></div>
+          <div><label className="text-xs font-bold text-gray-500 mb-1 block">الاسم الأول *</label><input className={inputCls} value={form.firstNameAr} onChange={e => set('firstNameAr', e.target.value)} /></div>
+          <div><label className="text-xs font-bold text-gray-500 mb-1 block">اسم العائلة *</label><input className={inputCls} value={form.lastNameAr} onChange={e => set('lastNameAr', e.target.value)} /></div>
         </div>
-        <div><label className="text-xs font-bold text-gray-400 mb-1 block">البريد الإلكتروني</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} /></div>
-        <div><label className="text-xs font-bold text-gray-400 mb-1 block">رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+        <div><label className="text-xs font-bold text-gray-500 mb-1 block">البريد الإلكتروني *</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} /></div>
+        <div><label className="text-xs font-bold text-gray-500 mb-1 block">رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
         <div>
-          <label className="text-xs font-bold text-gray-400 mb-1 block">نوع الطالب</label>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">نوع الطالب</label>
           <div className="grid grid-cols-2 gap-2">
             {[['existing', 'قديم'], ['new', 'جديد']].map(([v, l]) => (
               <button key={v} type="button" onClick={() => set('studentType', v)}
@@ -328,19 +140,38 @@ function CreateStudentModal({ open, onClose }) {
             ))}
           </div>
         </div>
-        <div><label className="text-xs font-bold text-gray-400 mb-1 block">كلمة مرور (اختياري)</label><input type="password" className={inputCls} value={form.password} onChange={e => set('password', e.target.value)} /></div>
+        <div className="pt-2 border-t border-gray-100">
+          <PasswordCredentialSection
+            role="student"
+            value={form.credential}
+            onChange={(v) => set('credential', v)}
+          />
+        </div>
       </div>
     </Modal>
   )
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+// Clicking a student opens the one authoritative profile page directly
+// (`/admin/students/:id`) — there used to be an intermediate partial "quick
+// panel" drawer here whose "السجل الأكاديمي الكامل" link then took a second
+// click to reach a different page that still had no edit/reset-password/
+// activate controls of its own (those only lived in this drawer, and its
+// "تعديل الملف" link pointed at `?edit=...` on this very list, which never
+// read that param — a dead link). All of it is now one tabbed profile
+// (AdminStudentDetailPage.jsx: overview/subscription & wallet/academic/
+// transfers/account), so the list's only job is finding the student and
+// navigating straight to it.
 export default function AdminStudentsPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [studentTypeFilter, setStudentTypeFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'students', page, search, statusFilter, studentTypeFilter],
@@ -348,14 +179,19 @@ export default function AdminStudentsPage() {
     placeholderData: (prev) => prev,
   })
 
+  // Legacy deep-link support: /admin/students?edit=... used to open the side
+  // panel here (in practice, it never actually worked — nothing read this
+  // param); it now forwards straight to that student's own profile.
+  useEffect(() => {
+    const editId = searchParams.get('edit')
+    if (!editId) return
+    navigate(`${ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', editId)}?tab=account`, { replace: true })
+  }, [searchParams, navigate])
+
   const students = data?.data || []
 
-  const handlePanelUpdate = (updated) => {
-    if (updated && selected?._id === updated._id) setSelected(updated)
-  }
-
   return (
-    <div dir="rtl" className="space-y-5 ">
+    <div dir="rtl" className="space-y-5">
 
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -382,7 +218,7 @@ export default function AdminStudentsPage() {
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
           {[['', 'الكل'], ['active', 'نشطون'], ['inactive', 'موقوفون']].map(([k, l]) => (
             <button key={k} onClick={() => { setStatusFilter(k); setPage(1) }}
-              className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${statusFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${statusFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
               {l}
             </button>
           ))}
@@ -390,7 +226,7 @@ export default function AdminStudentsPage() {
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
           {[['', 'كل الأنواع'], ['existing', 'قدامى'], ['new', 'جدد']].map(([k, l]) => (
             <button key={k} onClick={() => { setStudentTypeFilter(k); setPage(1) }}
-              className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${studentTypeFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all ${studentTypeFilter === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
               {l}
             </button>
           ))}
@@ -403,36 +239,42 @@ export default function AdminStudentsPage() {
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-violet-600" /></div>
       ) : !students.length ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 text-gray-400">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 text-gray-500">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
             <User size={24} />
           </div>
-          <p className="font-semibold text-gray-500">لا توجد نتائج</p>
+          <p className="font-semibold text-gray-600">لا توجد نتائج</p>
         </div>
       ) : (
         <>
           {/* Mobile cards */}
           <div className="md:hidden space-y-2.5">
             {students.map((st) => (
-              <button key={st._id} onClick={() => setSelected(st)}
-                className="w-full text-start bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
-                <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 text-sm truncate">{st.firstNameAr} {st.lastNameAr}</div>
-                  <div className="text-xs text-gray-400 truncate mt-0.5">{st.email}</div>
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                      {st.isActive ? 'نشط' : 'موقوف'}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                      {st.studentType === 'new' ? 'جديد' : 'قديم'}
-                    </span>
-                    <span className="text-[10px] text-gray-400">{formatDateAr(st.createdAt)}</span>
+              <motion.div
+                key={st._id}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Link to={ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', st._id)}
+                  className="w-full text-start bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 block">
+                  <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 text-sm truncate">{st.firstNameAr} {st.lastNameAr}</div>
+                    <div className="text-xs text-gray-500 truncate mt-0.5">{st.email}</div>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        {st.isActive ? 'نشط' : 'موقوف'}
+                      </span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                        {st.studentType === 'new' ? 'جديد' : 'قديم'}
+                      </span>
+                      <span className="text-[10px] text-gray-500">{formatDateAr(st.createdAt)}</span>
+                    </div>
                   </div>
-                </div>
-                <Edit2 size={14} className="text-violet-400 flex-none" />
-              </button>
+                </Link>
+              </motion.div>
             ))}
           </div>
 
@@ -442,8 +284,8 @@ export default function AdminStudentsPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
-                    {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'النوع', 'الحالة', ''].map(h => (
-                      <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    {['الطالب', 'البريد الإلكتروني', 'الهاتف', 'تاريخ التسجيل', 'النوع', 'الحالة'].map(h => (
+                      <th key={h} className="text-right px-5 py-3.5 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -451,35 +293,29 @@ export default function AdminStudentsPage() {
                   {students.map((st) => (
                     <motion.tr key={st._id} whileHover={{ backgroundColor: '#FAFAFA' }}
                       className="border-b border-gray-50 cursor-pointer transition-colors"
-                      onClick={() => setSelected(st)}>
+                      onClick={() => navigate(ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', st._id))}>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="sm" />
                           <div>
                             <div className="font-semibold text-gray-900 text-sm">{st.firstNameAr} {st.lastNameAr}</div>
-                            {st.bioAr && <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-[160px]">{st.bioAr}</div>}
+                            {st.bioAr && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1 max-w-[160px]">{st.bioAr}</div>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4"><span className="text-sm text-gray-500">{st.email}</span></td>
-                      <td className="px-5 py-4"><span className="text-sm text-gray-500" dir="ltr">{st.phone || '—'}</span></td>
-                      <td className="px-5 py-4"><span className="text-sm text-gray-500">{formatDateAr(st.createdAt)}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-600">{st.email}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-600" dir="ltr">{st.phone || '—'}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-gray-600">{formatDateAr(st.createdAt)}</span></td>
                       <td className="px-5 py-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${st.studentType === 'new' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
                           {st.studentType === 'new' ? 'جديد' : 'قديم'}
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${st.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${st.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                           {st.isActive ? 'نشط' : 'موقوف'}
                         </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button onClick={e => { e.stopPropagation(); setSelected(st) }}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors px-3 py-1.5 rounded-lg hover:bg-violet-50">
-                          <Edit2 size={12} /> إدارة
-                        </button>
                       </td>
                     </motion.tr>
                   ))}
@@ -495,12 +331,6 @@ export default function AdminStudentsPage() {
           <Pagination current={page} total={data.totalPages} onChange={setPage} />
         </div>
       )}
-
-      <AnimatePresence>
-        {selected && (
-          <StudentCRMPanel student={selected} onClose={() => setSelected(null)} onUpdate={handlePanelUpdate} />
-        )}
-      </AnimatePresence>
 
       <CreateStudentModal open={showCreate} onClose={() => setShowCreate(false)} />
     </div>

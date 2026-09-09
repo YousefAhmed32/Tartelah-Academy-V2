@@ -1,4 +1,4 @@
-import { Calendar, FileText, Star, CreditCard, UserRound, CalendarDays, Wallet, Clock3, Bell, ClipboardCheck } from 'lucide-react'
+import { Calendar, FileText, Star, CreditCard, UserRound, CalendarDays, Wallet, Clock3, Bell, ClipboardCheck, Banknote, RefreshCw, ClipboardList, MessageSquareText } from 'lucide-react'
 
 // Single source of truth for Notification.type display (icon/color/label) —
 // shared by the bell dropdown, the full notification center, and the
@@ -13,6 +13,10 @@ export const NOTIFICATION_TYPE_CONFIG = {
   payment:      { label: 'دفع',    color: '#059669', bg: 'rgba(5,150,105,0.13)',  dot: '#059669', Icon: Wallet },
   attendance:   { label: 'حضور',   color: '#f59e0b', bg: 'rgba(245,158,11,0.13)', dot: '#f59e0b', Icon: Clock3 },
   assignment:   { label: 'إسناد',  color: '#7c3aed', bg: 'rgba(124,58,237,0.13)', dot: '#7c3aed', Icon: ClipboardCheck },
+  payroll:      { label: 'راتب',   color: '#16a34a', bg: 'rgba(22,163,74,0.13)',  dot: '#16a34a', Icon: Banknote },
+  renewal:      { label: 'تجديد',  color: '#0d9488', bg: 'rgba(13,148,136,0.13)', dot: '#0d9488', Icon: RefreshCw },
+  report:       { label: 'تقرير',  color: '#4f46e5', bg: 'rgba(79,70,229,0.13)',  dot: '#4f46e5', Icon: ClipboardList },
+  survey:       { label: 'استبيان', color: '#c026d3', bg: 'rgba(192,38,211,0.13)', dot: '#c026d3', Icon: MessageSquareText },
   system:       { label: 'نظام',   color: '#7c6aaa', bg: 'rgba(124,106,170,0.1)', dot: '#9b7fd6', Icon: Bell },
 }
 

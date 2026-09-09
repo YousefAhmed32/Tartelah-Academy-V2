@@ -16,6 +16,7 @@ const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
 const { isValidGender } = require('../config/teacherIdentity')
 const { validateTeacherProfileFields } = require('../config/teacherProfile')
+const { resolveCredentialInput, CredentialError } = require('../config/credentialMode')
 const { isValidAudienceCategoriesArray, isValidAudienceCategory } = require('../config/studentAudience')
 // Dynamic catalog-backed check (replaces the old static allow-list) — a
 // filter must accept any KNOWN subject, active or archived, so filtering by
@@ -24,6 +25,7 @@ const { isValidAudienceCategoriesArray, isValidAudienceCategory } = require('../
 const { isKnownKey } = require('../services/teachingSubject.service')
 const TeacherWorkingHours = require('../models/TeacherWorkingHours')
 const LessonWallet = require('../models/LessonWallet')
+const { resolveDatePreset } = require('../utils/datePresets')
 const crypto = require('crypto')
 
 const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -136,34 +138,40 @@ exports.getDashboardStats = async (req, res, next) => {
 
 exports.getReports = async (req, res, next) => {
   try {
+    const { preset, startDate, endDate } = req.query
+    const dateRange = resolveDatePreset(preset, startDate, endDate)
+    const { start: periodStart, end: periodEnd, compStart, compEnd, label: periodLabel, preset: resolvedPreset } = dateRange
+
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const TREND_MONTHS = 6
     const trendStart = new Date(now.getFullYear(), now.getMonth() - (TREND_MONTHS - 1), 1)
 
     const [
-      thisMonthRev, lastMonthRev, totalRev, totalSessions, thisMonthSessions, totalStudents,
-      activeStudents, newStudents, completedSessions, totalSessionsCount, cancelledSessionsCount,
-      attendanceByStatus, teacherPayrollStats,
+      periodRev, compRev, totalRev, totalSessions, periodSessions, totalStudents,
+      activeStudents, newStudents, completedSessions, periodCompletedSessions,
+      cancelledSessionsCount, periodCancelledSessionsCount,
+      periodAttendanceByStatus, allAttendanceByStatus, teacherPayrollStats,
       revenueTrendRaw, sessionsTrendRaw, studentsTrendRaw,
     ] = await Promise.all([
-      Subscription.aggregate([{ $match: { createdAt: { $gte: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
-      Subscription.aggregate([{ $match: { createdAt: { $gte: lastMonthStart, $lt: monthStart } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
+      Subscription.aggregate([{ $match: { createdAt: { $gte: periodStart, $lte: periodEnd } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
+      Subscription.aggregate([{ $match: { createdAt: { $gte: compStart, $lte: compEnd } } }, { $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
       Subscription.aggregate([{ $group: { _id: null, sum: { $sum: '$amountPaid' } } }]),
       Session.countDocuments(),
-      Session.countDocuments({ createdAt: { $gte: monthStart } }),
+      Session.countDocuments({ scheduledAt: { $gte: periodStart, $lte: periodEnd } }),
       User.countDocuments({ role: 'student' }),
       User.countDocuments({ role: 'student', isActive: true }),
-      User.countDocuments({ role: 'student', createdAt: { $gte: monthStart } }),
+      User.countDocuments({ role: 'student', createdAt: { $gte: periodStart, $lte: periodEnd } }),
       Session.countDocuments({ status: 'completed' }),
-      Session.countDocuments(),
+      Session.countDocuments({ scheduledAt: { $gte: periodStart, $lte: periodEnd }, status: 'completed' }),
       Session.countDocuments({ status: 'cancelled' }),
-      // Student attendance breakdown — org-wide, per status.
+      Session.countDocuments({ scheduledAt: { $gte: periodStart, $lte: periodEnd }, status: 'cancelled' }),
+      // Student attendance breakdown for current period
+      Attendance.aggregate([{ $match: { createdAt: { $gte: periodStart, $lte: periodEnd } } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      // Overall student attendance breakdown fallback
       Attendance.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-      // Teacher payroll/lateness — mirrors the payability policy in
-      // sessionIntelligence.service.js so the report never diverges from it.
+      // Teacher payroll/lateness for current period
       Session.aggregate([
+        { $match: { scheduledAt: { $gte: periodStart, $lte: periodEnd } } },
         { $group: {
           _id: null,
           payableSessions: { $sum: { $cond: [{ $eq: ['$payrollStatus', 'payable'] }, 1, 0] } },
@@ -171,9 +179,7 @@ exports.getReports = async (req, res, next) => {
           lateTeacherSessions: { $sum: { $cond: [{ $eq: ['$teacherAttendanceStatus', 'late'] }, 1, 0] } },
         } },
       ]),
-      // Real month-by-month series for the Reports page charts — replaces a
-      // previous frontend bug that fabricated these curves by distributing
-      // the current total across fixed, made-up per-month weights.
+      // Real month-by-month series for the Reports page charts
       Subscription.aggregate([
         { $match: { createdAt: { $gte: trendStart } } },
         { $group: { _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } }, sum: { $sum: '$amountPaid' } } },
@@ -188,15 +194,21 @@ exports.getReports = async (req, res, next) => {
       ]),
     ])
 
-    const thisM = thisMonthRev[0]?.sum || 0
-    const lastM = lastMonthRev[0]?.sum || 0
+    const thisM = periodRev[0]?.sum || 0
+    const lastM = compRev[0]?.sum || 0
     const growth = lastM > 0 ? Math.round(((thisM - lastM) / lastM) * 100) : 0
 
-    const attByStatus = Object.fromEntries(attendanceByStatus.map(a => [a._id, a.count]))
-    const totalAttendance = attendanceByStatus.reduce((sum, a) => sum + a.count, 0)
+    // Prefer period attendance if records exist, otherwise fallback to all-time
+    const activeAttSource = periodAttendanceByStatus.length ? periodAttendanceByStatus : allAttendanceByStatus
+    const attByStatus = Object.fromEntries(activeAttSource.map(a => [a._id, a.count]))
+    const totalAttendance = activeAttSource.reduce((sum, a) => sum + a.count, 0)
     const presentAttendance = (attByStatus.present || 0) + (attByStatus.late || 0)
     const attendanceRate = totalAttendance > 0 ? Math.round((presentAttendance / totalAttendance) * 100) : 0
     const payroll = teacherPayrollStats[0] || {}
+
+    const completionRate = periodSessions > 0
+      ? Math.round((periodCompletedSessions / periodSessions) * 100)
+      : (totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0)
 
     const topTeachers = await User.aggregate([
       { $match: { role: 'teacher', isActive: true } },
@@ -216,11 +228,28 @@ exports.getReports = async (req, res, next) => {
     ])
 
     sendSuccess(res, {
-      revenue: { total: totalRev[0]?.sum || 0, thisMonth: thisM, lastMonth: lastM, growth },
+      period: {
+        preset: resolvedPreset,
+        label: periodLabel,
+        startDate: periodStart.toISOString(),
+        endDate: periodEnd.toISOString(),
+        compStartDate: compStart.toISOString(),
+        compEndDate: compEnd.toISOString(),
+      },
+      revenue: {
+        total: totalRev[0]?.sum || 0,
+        thisMonth: thisM,
+        lastMonth: lastM,
+        periodRevenue: thisM,
+        compRevenue: lastM,
+        growth,
+      },
       sessions: {
-        total: totalSessions, thisMonth: thisMonthSessions,
-        completionRate: totalSessionsCount > 0 ? Math.round((completedSessions / totalSessionsCount) * 100) : 0,
-        cancelled: cancelledSessionsCount,
+        total: totalSessions,
+        thisMonth: periodSessions,
+        periodSessions,
+        completionRate,
+        cancelled: periodSessions > 0 ? periodCancelledSessionsCount : cancelledSessionsCount,
       },
       students: { total: totalStudents, active: activeStudents, new: newStudents },
       attendance: {
@@ -289,7 +318,7 @@ exports.updateStudent = async (req, res, next) => {
     if (req.body.studentType !== undefined && !['existing', 'new'].includes(req.body.studentType)) {
       return sendError(res, 'نوع الطالب يجب أن يكون "قديم" أو "جديد"', 400)
     }
-    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'studentType']
+    const allowed = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr', 'studentType', 'notes']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     const user = await User.findOneAndUpdate(
@@ -444,7 +473,7 @@ exports.getTeacher = async (req, res, next) => {
 const TEACHER_WRITABLE_FIELDS = [
   'firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr',
   'specialization', 'salaryPerSession', 'gender', 'category', 'specializations', 'audienceCategories',
-  'hourlyRate', 'availableShifts',
+  'hourlyRate', 'availableShifts', 'notes',
 ]
 
 exports.createTeacher = async (req, res, next) => {
@@ -473,19 +502,39 @@ exports.createTeacher = async (req, res, next) => {
     const profileError = await validateTeacherProfileFields(req.body)
     if (profileError) return sendError(res, profileError, 400)
 
+    // Standalone teacher creation (Phase 2 meeting addendum §1) — routed
+    // through the same three-mode credential resolver as every other
+    // student/teacher creation flow. Backward-compatible: a legacy flat
+    // `password` (or none at all, which used to silently fail User.create's
+    // required-field validation) is still accepted via resolveCredentialInput's
+    // fallback and now correctly falls back to secure auto-generation.
+    let resolved
+    try {
+      resolved = await resolveCredentialInput(req.body, 'credential', 'teacher')
+    } catch (err) {
+      if (err instanceof CredentialError || err.status) {
+        return sendError(res, err.message, err.status, err.field ? { field: err.field } : undefined)
+      }
+      throw err
+    }
+
     const fields = {}
     TEACHER_WRITABLE_FIELDS.forEach((f) => { if (req.body[f] !== undefined) fields[f] = req.body[f] })
-    if (req.body.password !== undefined) fields.password = req.body.password
-    const user = await User.create({ ...fields, role: 'teacher', createdBy: req.user._id })
+    const user = await User.create({
+      ...fields, role: 'teacher', password: resolved.passwordToStore,
+      mustChangePassword: resolved.mustChangePassword, createdBy: req.user._id,
+    })
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'admin.create_teacher',
       entity: 'User', entityId: user._id,
-      changes: { specializations: user.specializations, audienceCategories: user.audienceCategories, hourlyRate: user.hourlyRate },
+      changes: { specializations: user.specializations, audienceCategories: user.audienceCategories, hourlyRate: user.hourlyRate, credentialMode: resolved.mode },
       ip: req.ip,
     })
 
-    sendSuccess(res, user.toPublic(), 'تم إنشاء حساب المعلم', 201)
+    const responseData = user.toPublic()
+    if (resolved.temporaryPasswordToReturn) responseData.temporaryPassword = resolved.temporaryPasswordToReturn
+    sendSuccess(res, responseData, 'تم إنشاء حساب المعلم', 201)
   } catch (err) { next(err) }
 }
 
@@ -670,6 +719,7 @@ exports.getAllScheduleRules = async (req, res, next) => {
     const { page, limit, skip } = getPagination(req.query)
     const filter = {}
     if (req.query.teacherId) filter.teacherId = req.query.teacherId
+    if (req.query.studentId) filter.studentId = req.query.studentId
     if (req.query.status) filter.status = req.query.status
     const [data, total] = await Promise.all([
       ScheduleRule.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
@@ -761,4 +811,36 @@ exports.generateMoreScheduleRule = async (req, res, next) => {
 
     sendSuccess(res, { sessions, count: sessions.length }, `تم توليد ${sessions.length} حصة إضافية`)
   } catch (err) { next(err) }
+}
+
+// Admin: Bulk sync / update meeting links for a teacher's students
+exports.adminSyncTeacherMeetingLinks = async (req, res, next) => {
+  try {
+    const { id: teacherId } = req.params
+    const { meetingLink, meetingProvider, studentIds, saveToSavedLinks, label } = req.body
+    if (!meetingLink || typeof meetingLink !== 'string') {
+      return sendError(res, 'رابط الاجتماع مطلوب', 400)
+    }
+
+    const teacher = await User.findById(teacherId)
+    if (!teacher || teacher.role !== 'teacher') {
+      return sendError(res, 'المعلم غير موجود', 404)
+    }
+
+    const teacherCtrl = require('./teacher.controller')
+    const result = await teacherCtrl.executeSyncMeetingLinks({
+      teacherId,
+      meetingLink: meetingLink.trim(),
+      meetingProvider: meetingProvider || 'zoom',
+      studentIds,
+      saveToSavedLinks: !!saveToSavedLinks,
+      label,
+      actorId: req.user._id,
+      actorRole: req.user.role,
+    })
+
+    sendSuccess(res, result, 'تم تحديث وتعميم روابط المعلم بنجاح')
+  } catch (err) {
+    next(err)
+  }
 }

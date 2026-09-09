@@ -1,3 +1,5 @@
+const path = require('path')
+require('dotenv').config({ path: path.resolve(__dirname, '.env') })
 require('dotenv').config()
 const http = require('http')
 const express = require('express')
@@ -48,9 +50,13 @@ connectDB().then(async () => {
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')
     const { startTeacherAttendanceSweepJob } = require('./src/jobs/teacherAttendanceSweep.job')
+    const { startMonthlyReportJob } = require('./src/jobs/monthlyReport.job')
+    const { startSurveyTriggerJob } = require('./src/jobs/surveyTrigger.job')
     startSessionReminderJob()
     startSubscriptionExpiryJob()
     startTeacherAttendanceSweepJob()
+    startMonthlyReportJob()
+    startSurveyTriggerJob()
   }
 })
 

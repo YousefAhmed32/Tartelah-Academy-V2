@@ -22,7 +22,7 @@ export default function StatCard({ label, value, icon, color = '#7c3aed', bg, tr
         <div className={`font-heading font-bold text-2xl ${isDark ? 'text-white' : 'text-brand-textBody'}`}>
           {value}
         </div>
-        <div className={`text-sm mt-0.5 ${isDark ? 'text-brand-textMuted' : 'text-[#9b7fd6]'}`}>
+        <div className={`text-sm mt-0.5 ${isDark ? 'text-brand-textMuted' : 'text-[#7c6aaa]'}`}>
           {label}
         </div>
         {trend !== undefined && (

@@ -300,7 +300,7 @@ export default function TeacherHomeworkPage() {
           <div>
             <label className={LABEL}>
               الطلاب المعيّنون <span className="text-red-500">*</span>
-              {form.assignedTo.length > 0 && <span className="font-normal text-[#9b7fd6] mr-1">({form.assignedTo.length} محدد)</span>}
+              {form.assignedTo.length > 0 && <span className="font-normal text-[#7c6aaa] mr-1">({form.assignedTo.length} محدد)</span>}
             </label>
             {!students.length ? (
               <p className="text-sm text-amber-600 py-2">لا يوجد طلاب مُعيَّنون لك بعد</p>

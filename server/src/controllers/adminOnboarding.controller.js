@@ -40,9 +40,9 @@ exports.createStudent = async (req, res, next) => {
 
     let resolved
     try {
-      resolved = resolveCredentialInput({ credential, password }, 'credential')
+      resolved = await resolveCredentialInput({ credential, password }, 'credential', 'student')
     } catch (err) {
-      if (err instanceof CredentialError) return handleKnownError(err, res, next)
+      if (err instanceof CredentialError || err.status) return handleKnownError(err, res, next)
       throw err
     }
 
@@ -90,9 +90,9 @@ exports.addStudentToTeacher = async (req, res, next) => {
 
     let resolved
     try {
-      resolved = resolveCredentialInput({ credential, password }, 'credential')
+      resolved = await resolveCredentialInput({ credential, password }, 'credential', 'student')
     } catch (err) {
-      if (err instanceof CredentialError) return handleKnownError(err, res, next)
+      if (err instanceof CredentialError || err.status) return handleKnownError(err, res, next)
       throw err
     }
 

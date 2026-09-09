@@ -1,5 +1,26 @@
 const Session = require('../models/Session')
+const mongoose = require('mongoose')
 const { fromZonedTime } = require('date-fns-tz')
+
+let User
+try {
+  User = require('../models/User')
+} catch (_) {}
+
+function buildSessionTitle(titleTemplate, studentName, index, total) {
+  const countStr = total ? `${index} من ${total}` : `حصة ${index}`
+  if (!titleTemplate || titleTemplate === 'حصة') {
+    if (studentName) return `حصة ${studentName} (${countStr})`
+    return `حصة ${index}`
+  }
+  if (studentName && titleTemplate.includes(studentName)) {
+    return `${titleTemplate} (${countStr})`
+  }
+  if (studentName) {
+    return `${titleTemplate} — ${studentName} (${countStr})`
+  }
+  return `${titleTemplate} ${index}`
+}
 
 function pad2(n) { return String(n).padStart(2, '0') }
 
@@ -102,6 +123,38 @@ exports.generateSessionsFromRule = async (rule) => {
 
   const existing = await Session.countDocuments({ seriesId: rule._id })
 
+  let studentName = ''
+  if (rule.studentId && typeof rule.studentId === 'object' && rule.studentId.firstNameAr) {
+    studentName = `${rule.studentId.firstNameAr} ${rule.studentId.lastNameAr || ''}`.trim()
+  } else if (rule.studentName) {
+    studentName = rule.studentName
+  } else if (rule.studentId && mongoose.connection?.readyState === 1 && User) {
+    try {
+      const student = await User.findById(rule.studentId).select('firstNameAr lastNameAr name').lean()
+      if (student) {
+        studentName = student.firstNameAr
+          ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim()
+          : (student.name || '')
+      }
+    } catch (_) {}
+  }
+
+  let totalCount = rule.sessionsTotal || 0
+  if (!totalCount && rule.subscriptionId && mongoose.connection?.readyState === 1) {
+    try {
+      const Subscription = mongoose.model('Subscription')
+      const sub = await Subscription.findById(rule.subscriptionId)
+        .select('totalSessions packageId')
+        .populate('packageId', 'sessionsPerMonth')
+        .lean()
+      if (sub?.packageId?.sessionsPerMonth) {
+        totalCount = sub.packageId.sessionsPerMonth
+      } else if (sub?.totalSessions) {
+        totalCount = sub.totalSessions
+      }
+    } catch (_) {}
+  }
+
   const ops = dates.map((date, i) => ({
     updateOne: {
       filter: { seriesId: rule._id, scheduledAt: date },
@@ -111,7 +164,7 @@ exports.generateSessionsFromRule = async (rule) => {
           studentId: rule.studentId,
           subscriptionId: rule.subscriptionId,
           seriesId: rule._id,
-          titleAr: `${rule.titleTemplate || 'حصة'} ${existing + i + 1}`,
+          titleAr: buildSessionTitle(rule.titleTemplate, studentName, existing + i + 1, totalCount),
           scheduledAt: date,
           durationMinutes: rule.durationMinutes || 60,
           meetingLink: rule.meetingLink || '',

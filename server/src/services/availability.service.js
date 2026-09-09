@@ -111,17 +111,25 @@ function workingPeriodsForDay(dayEntry) {
  * and currently-reserved AssignmentRequests. `role` is 'teacherId' or
  * 'studentId' — the field name to match against in each collection.
  */
-async function loadBusyByDay({ userId, role, timezone, excludeAssignmentRequestId }) {
+async function loadBusyByDay({ userId, role, timezone, excludeAssignmentRequestId, excludeScheduleRuleIds }) {
   const busyByDay = Array.from({ length: 7 }, () => [])
+  // Excludes specific ScheduleRules (and every Session generated from them)
+  // from this user's own busy calculation — needed when re-validating a
+  // slot for a student/rule that is itself in the process of being moved
+  // (transfer.service.js): the student's own current, about-to-end rule at
+  // that exact day/time must never register as a conflict against itself.
+  const ruleExclusion = excludeScheduleRuleIds?.length ? { _id: { $nin: excludeScheduleRuleIds } } : {}
+  const seriesExclusion = excludeScheduleRuleIds?.length ? { seriesId: { $nin: excludeScheduleRuleIds } } : {}
 
   const [rules, sessions, reserved] = await Promise.all([
-    ScheduleRule.find({ [role]: userId, status: 'active' })
+    ScheduleRule.find({ [role]: userId, status: 'active', ...ruleExclusion })
       .select('daysOfWeek timeOfDay durationMinutes')
       .lean(),
     Session.find({
       [role]: userId,
       scheduledAt: { $gte: new Date(), $lte: new Date(Date.now() + EXCEPTION_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000) },
       status: { $nin: NON_BLOCKING_SESSION_STATUSES },
+      ...seriesExclusion,
     }).select('scheduledAt durationMinutes').lean(),
     AssignmentRequest.find({
       [role]: userId,
@@ -176,13 +184,13 @@ async function loadBusyByDay({ userId, role, timezone, excludeAssignmentRequestI
  * wide enough to CONTAIN the full lesson duration, not merely a free start
  * instant — a window narrower than durationMinutes is never returned.
  */
-async function getWeeklyAvailability({ teacherId, durationMinutes, timezone, excludeAssignmentRequestId }) {
+async function getWeeklyAvailability({ teacherId, durationMinutes, timezone, excludeAssignmentRequestId, excludeScheduleRuleIds }) {
   const workingHours = await TeacherWorkingHours.findOne({ teacherId }).lean()
   const settings = await getAcademySchedulingSettings()
   const tz = timezone || workingHours?.timezone || settings.timezone
   const buffer = settings.lessonBufferMinutes || 0
 
-  const busyByDay = await loadBusyByDay({ userId: teacherId, role: 'teacherId', timezone: tz, excludeAssignmentRequestId })
+  const busyByDay = await loadBusyByDay({ userId: teacherId, role: 'teacherId', timezone: tz, excludeAssignmentRequestId, excludeScheduleRuleIds })
 
   const days = []
   for (let dow = 0; dow <= 6; dow++) {
@@ -220,7 +228,7 @@ async function getWeeklyAvailability({ teacherId, durationMinutes, timezone, exc
  * ELSE's reservations while re-checking its own already-held slot (e.g. the
  * teacher accepting the exact slot their own pending request already holds).
  */
-async function checkAvailability({ teacherId, studentId, days, durationMinutes, timezone, excludeAssignmentRequestId }) {
+async function checkAvailability({ teacherId, studentId, days, durationMinutes, timezone, excludeAssignmentRequestId, excludeScheduleRuleIds }) {
   if (!Array.isArray(days) || !days.length) return { valid: false, conflicts: [{ reason: 'no_days_selected' }] }
 
   const settings = await getAcademySchedulingSettings()
@@ -229,8 +237,8 @@ async function checkAvailability({ teacherId, studentId, days, durationMinutes, 
   const buffer = settings.lessonBufferMinutes || 0
 
   const [teacherBusyByDay, studentBusyByDay] = await Promise.all([
-    loadBusyByDay({ userId: teacherId, role: 'teacherId', timezone: tz, excludeAssignmentRequestId }),
-    studentId ? loadBusyByDay({ userId: studentId, role: 'studentId', timezone: tz, excludeAssignmentRequestId }) : Promise.resolve(Array.from({ length: 7 }, () => [])),
+    loadBusyByDay({ userId: teacherId, role: 'teacherId', timezone: tz, excludeAssignmentRequestId, excludeScheduleRuleIds }),
+    studentId ? loadBusyByDay({ userId: studentId, role: 'studentId', timezone: tz, excludeAssignmentRequestId, excludeScheduleRuleIds }) : Promise.resolve(Array.from({ length: 7 }, () => [])),
   ])
 
   const conflicts = []
@@ -294,8 +302,8 @@ async function checkAvailability({ teacherId, studentId, days, durationMinutes, 
  * All candidates come from `getWeeklyAvailability()`'s real free windows, so
  * a suggestion is only ever returned if it is genuinely bookable right now.
  */
-async function suggestAlternativeSlots({ teacherId, days, durationMinutes, timezone, excludeAssignmentRequestId, maxResults = 3 }) {
-  const weekly = await getWeeklyAvailability({ teacherId, durationMinutes, timezone, excludeAssignmentRequestId })
+async function suggestAlternativeSlots({ teacherId, days, durationMinutes, timezone, excludeAssignmentRequestId, excludeScheduleRuleIds, maxResults = 3 }) {
+  const weekly = await getWeeklyAvailability({ teacherId, durationMinutes, timezone, excludeAssignmentRequestId, excludeScheduleRuleIds })
   const byDay = new Map(weekly.days.map((d) => [d.dayOfWeek, d.freeWindows.map((w) => ({ start: toMinutes(w.start), end: w.end === '24:00' ? 24 * 60 : toMinutes(w.end) }))]))
 
   const results = []

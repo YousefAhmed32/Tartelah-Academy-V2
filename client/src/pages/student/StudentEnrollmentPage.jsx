@@ -138,7 +138,7 @@ export default function StudentEnrollmentPage() {
               </svg>
             </div>
             <h2 className="font-heading font-bold text-2xl text-brand-textBody mb-2">تمت الموافقة!</h2>
-            <p className="text-[#9b7fd6] mb-4 leading-relaxed">
+            <p className="text-[#7c6aaa] mb-4 leading-relaxed">
               تم تفعيل اشتراكك في باقة{' '}
               <strong className="text-brand-textBody">{approvedRequest.packageId?.nameAr}</strong>
               . يمكنك الآن الوصول إلى جدولك الدراسي وحصصك.
@@ -242,7 +242,7 @@ export default function StudentEnrollmentPage() {
                 <div key={req._id} className="card-light p-4 flex items-center justify-between gap-3">
                   <div>
                     <div className="font-semibold text-sm text-brand-textBody">{req.packageId?.nameAr}</div>
-                    <div className="text-xs text-[#9b7fd6] mt-0.5">{formatDateAr(req.createdAt)}</div>
+                    <div className="text-xs text-[#7c6aaa] mt-0.5">{formatDateAr(req.createdAt)}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-brand-purple">{req.amount}</span>
@@ -300,12 +300,12 @@ function ActiveRequestCard({ request, proofFile, previewUrl, fileInputRef, onFil
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <Badge variant={cfg.color || 'warning'}>{cfg.label}</Badge>
-              <span className="text-xs text-[#9b7fd6]">{formatDateAr(request.createdAt)}</span>
+              <span className="text-xs text-[#7c6aaa]">{formatDateAr(request.createdAt)}</span>
             </div>
             <div className="font-heading font-bold text-lg text-brand-textBody">
               {request.packageId?.nameAr}
             </div>
-            <div className="text-sm text-[#9b7fd6] mt-0.5">{cfg.desc}</div>
+            <div className="text-sm text-[#7c6aaa] mt-0.5">{cfg.desc}</div>
             {request.adminNotes && (
               <div className="mt-2 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2.5 border border-red-100">
                 <span className="font-bold">ملاحظة الإدارة:</span> {request.adminNotes}
@@ -366,7 +366,7 @@ function ActiveRequestCard({ request, proofFile, previewUrl, fileInputRef, onFil
                   </button>
                   <button
                     onClick={() => { /* will be handled by fileInputRef click */ fileInputRef.current?.click() }}
-                    className="text-xs text-[#9b7fd6] hover:text-brand-purple"
+                    className="text-xs text-[#7c6aaa] hover:text-brand-purple"
                   >
                     تغيير الصورة
                   </button>
@@ -433,9 +433,9 @@ function PackageGrid({ packages, selected, onSelect }) {
   if (packages.length === 0) {
     return (
       <div className="text-center py-16 card-light">
-        <Package size={52} strokeWidth={1.3} color="#9b7fd6" className="mb-4 mx-auto" />
+        <Package size={52} strokeWidth={1.3} color="#7c6aaa" className="mb-4 mx-auto" />
         <h3 className="font-heading font-bold text-xl text-brand-textBody mb-2">لا توجد باقات متاحة</h3>
-        <p className="text-[#9b7fd6]">تواصل مع الإدارة للاستفسار عن البرامج المتاحة</p>
+        <p className="text-[#7c6aaa]">تواصل مع الإدارة للاستفسار عن البرامج المتاحة</p>
       </div>
     )
   }
@@ -457,10 +457,10 @@ function PackageGrid({ packages, selected, onSelect }) {
             )}
             <div className="mt-2">
               <h3 className="font-heading font-bold text-xl text-brand-textBody mb-1">{pkg.nameAr}</h3>
-              <p className="text-sm text-[#9b7fd6] mb-4">{pkg.descriptionAr}</p>
+              <p className="text-sm text-[#7c6aaa] mb-4">{pkg.descriptionAr}</p>
               <div className="flex items-baseline gap-1 mb-5">
                 <span className="font-heading font-extrabold text-3xl text-brand-purple">{pkg.price}</span>
-                <span className="text-sm text-[#9b7fd6]">/ شهر</span>
+                <span className="text-sm text-[#7c6aaa]">/ شهر</span>
               </div>
               <ul className="space-y-2 mb-5">
                 <li className="flex items-center gap-2 text-sm text-brand-textBody">
@@ -497,7 +497,7 @@ function PaymentForm({ pkg, form, onChange, onBack, onSubmit, submitting }) {
       {/* Selected package summary */}
       <div className="card-light p-4 mb-4 flex items-center justify-between">
         <div>
-          <div className="text-xs text-[#9b7fd6] mb-0.5">الباقة المختارة</div>
+          <div className="text-xs text-[#7c6aaa] mb-0.5">الباقة المختارة</div>
           <div className="font-heading font-bold text-brand-textBody">{pkg.nameAr}</div>
         </div>
         <div className="font-heading font-extrabold text-2xl text-brand-purple">{pkg.price}</div>
@@ -563,7 +563,7 @@ function PaymentForm({ pkg, form, onChange, onBack, onSubmit, submitting }) {
         <div className="flex gap-3 pt-2">
           <button
             onClick={onBack}
-            className="flex-1 py-2.5 rounded-xl border border-[#e0d8f5] text-[#9b7fd6] font-semibold text-sm hover:bg-[#faf9ff] transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-[#e0d8f5] text-[#7c6aaa] font-semibold text-sm hover:bg-[#faf9ff] transition-colors"
           >
             رجوع
           </button>

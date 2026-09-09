@@ -28,5 +28,8 @@ router.use('/media', require('./media.routes'))
 router.use('/roles', require('./roles.routes'))
 router.use('/permissions', require('./permissions.routes'))
 router.use('/teaching-subjects', require('./teachingSubject.routes'))
+router.use('/quran-reports', require('./quranReport.routes'))
+router.use('/monthly-reports', require('./monthlyReport.routes'))
+router.use('/surveys', require('./survey.routes'))
 
 module.exports = router

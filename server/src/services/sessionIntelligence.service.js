@@ -73,31 +73,31 @@ function computeConfidence(session, attendance) {
 function computePayrollStatus(session) {
   const cancelledOutcomes = ['cancelled_by_teacher', 'cancelled_by_admin', 'cancelled_by_student', 'rescheduled']
   if (['cancelled', 'rescheduled'].includes(session.status) || cancelledOutcomes.includes(session.outcome)) {
-    return { payrollStatus: 'excluded', reason: 'الحصة ملغاة أو معاد جدولتها — لا يُحتسب أجر' }
+    return { payrollStatus: 'excluded', reason: 'الحصة ملغاة أو معاد جدولتها — لا يُحتسب أجر', businessRule: 'session_cancelled_or_rescheduled' }
   }
 
   if (!RESOLVED_SESSION_STATUSES.includes(session.status)) {
-    return { payrollStatus: 'pending', reason: 'الحصة لم تُحسم بعد' }
+    return { payrollStatus: 'pending', reason: 'الحصة لم تُحسم بعد', businessRule: 'session_not_resolved' }
   }
 
   if (session.outcome === 'technical_issue') {
-    return { payrollStatus: 'pending_review', reason: 'تم الإبلاغ عن مشكلة تقنية — يحتاج مراجعة الإدارة' }
+    return { payrollStatus: 'pending_review', reason: 'تم الإبلاغ عن مشكلة تقنية — يحتاج مراجعة الإدارة', businessRule: 'technical_issue_reported' }
   }
 
   // Teacher checked in (on_time/late) and completed the session — payable
   // regardless of student attendance, per business policy.
   if (PAYABLE_CHECKIN_STATUSES.includes(session.teacherAttendanceStatus)) {
     if (session.outcome === 'no_students_attended') {
-      return { payrollStatus: 'payable', reason: 'حضر المعلم في موعده لكن لم يحضر الطالب — يُصرف أجر المعلم' }
+      return { payrollStatus: 'payable', reason: 'حضر المعلم في موعده لكن لم يحضر الطالب — يُصرف أجر المعلم', businessRule: 'teacher_present_student_absent' }
     }
-    return { payrollStatus: 'payable', reason: 'حضر المعلم في الوقت المحدد أو متأخراً وأكمل الحصة' }
+    return { payrollStatus: 'payable', reason: 'حضر المعلم في الوقت المحدد أو متأخراً وأكمل الحصة', businessRule: 'teacher_attended_full_session' }
   }
 
   if (session.teacherAttendanceStatus === 'excused') {
-    return { payrollStatus: 'pending_review', reason: 'غياب المعلم معذور — يحتاج قرار الإدارة' }
+    return { payrollStatus: 'pending_review', reason: 'غياب المعلم معذور — يحتاج قرار الإدارة', businessRule: 'teacher_excused_absence_pending_decision' }
   }
 
-  return { payrollStatus: 'non_payable', reason: 'المعلم لم يبدأ الحصة' }
+  return { payrollStatus: 'non_payable', reason: 'المعلم لم يبدأ الحصة', businessRule: 'teacher_did_not_start_session' }
 }
 
 const SIGNIFICANT_LATE_MINUTES = 30 // beyond ordinary lateness — worth a human glance, not just a badge

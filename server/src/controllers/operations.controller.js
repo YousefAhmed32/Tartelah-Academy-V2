@@ -18,6 +18,7 @@ const { logAction } = require('../services/audit.service')
 const { getOnlineCounts } = require('../services/socket.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
+const { resolveDatePreset } = require('../utils/datePresets')
 
 const MAX_RANGE_DAYS = 31
 const DEFAULT_REVIEW_WINDOW_DAYS = 14
@@ -158,12 +159,19 @@ exports.getLiveSummary = async (req, res, next) => {
 exports.getTimeline = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
-    const { date, teacherId, status, payrollStatus, needsReview } = req.query
+    const { date, startDate, endDate, preset, teacherId, status, payrollStatus, needsReview, hasMeetingLink } = req.query
 
     let filter
     if (date) {
       const d = new Date(date); d.setHours(0, 0, 0, 0)
       const dEnd = new Date(date); dEnd.setHours(23, 59, 59, 999)
+      filter = { scheduledAt: { $gte: d, $lte: dEnd } }
+    } else if (preset) {
+      const range = resolveDatePreset(preset, startDate, endDate)
+      filter = { scheduledAt: { $gte: range.start, $lte: range.end } }
+    } else if (startDate && endDate) {
+      const d = new Date(startDate); d.setHours(0, 0, 0, 0)
+      const dEnd = new Date(endDate); dEnd.setHours(23, 59, 59, 999)
       filter = { scheduledAt: { $gte: d, $lte: dEnd } }
     } else {
       const { from, to } = clampRange(req.query.dateFrom, req.query.dateTo, 3, 3)
@@ -172,6 +180,8 @@ exports.getTimeline = async (req, res, next) => {
     if (teacherId) filter.teacherId = teacherId
     if (status) filter.status = status
     if (payrollStatus) filter.payrollStatus = payrollStatus
+    if (hasMeetingLink === 'true') filter.meetingLink = { $exists: true, $ne: '' }
+    if (hasMeetingLink === 'false') filter.meetingLink = { $in: [null, ''] }
 
     const sessions = await Session.find(filter)
       .select(TIMELINE_SELECT)

@@ -86,10 +86,13 @@ async function releaseLesson(session, { reason, performedByRole = 'system', perf
 async function syncLessonConsumption(session, attendanceStatus, opts = {}) {
   const shouldConsume = CONSUMING_ATTENDANCE_STATUSES.includes(attendanceStatus)
   if (shouldConsume && !session.subscriptionConsumed) {
-    await consumeLesson(session, { reason: 'حضور الطالب — تم خصم الحصة', ...opts })
+    const { transaction } = await consumeLesson(session, { reason: 'حضور الطالب — تم خصم الحصة', ...opts })
+    return { action: 'consumed', transaction }
   } else if (!shouldConsume && session.subscriptionConsumed) {
-    await releaseLesson(session, { reason: 'تصحيح الحضور — تم إرجاع الحصة', ...opts })
+    const { transaction } = await releaseLesson(session, { reason: 'تصحيح الحضور — تم إرجاع الحصة', ...opts })
+    return { action: 'released', transaction }
   }
+  return { action: 'none', transaction: null }
 }
 
 /**

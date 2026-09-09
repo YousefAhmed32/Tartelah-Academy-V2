@@ -11,6 +11,7 @@ import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
 import Can from '../../components/shared/Can.jsx'
+import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',   bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -127,7 +128,23 @@ function SessionModal({ session, onClose, teachers, students }) {
           </Field>
 
           <Field label="الطالب *">
-            <select className={selectCls} value={form.studentId} onChange={e => set('studentId', e.target.value)} required>
+            <select
+              className={selectCls}
+              value={form.studentId}
+              onChange={e => {
+                const sId = e.target.value
+                const selectedStudent = students.find(s => s._id === sId)
+                const shouldAutoName = !form.titleAr || form.titleAr === 'حصة تلاوة' || form.titleAr.startsWith('حصة ')
+                setForm(prev => ({
+                  ...prev,
+                  studentId: sId,
+                  titleAr: shouldAutoName && selectedStudent
+                    ? `حصة ${selectedStudent.firstNameAr} ${selectedStudent.lastNameAr || ''}`.trim()
+                    : prev.titleAr,
+                }))
+              }}
+              required
+            >
               <option value="">اختر الطالب</option>
               {students.map(s => (
                 <option key={s._id} value={s._id}>{s.firstNameAr} {s.lastNameAr}</option>
@@ -136,7 +153,7 @@ function SessionModal({ session, onClose, teachers, students }) {
           </Field>
 
           <Field label="عنوان الحصة">
-            <input className={inputCls} value={form.titleAr} onChange={e => set('titleAr', e.target.value)} placeholder="حصة تلاوة" />
+            <input className={inputCls} value={form.titleAr} onChange={e => set('titleAr', e.target.value)} placeholder="مثال: حصة محمد أحمد" />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
@@ -321,7 +338,7 @@ function SessionRow({ session, onEdit, onReschedule, onCancel, onCorrect }) {
   return (
     <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
       <td className="px-5 py-3.5">
-        <div className="font-semibold text-gray-900 text-sm">{session.titleAr}</div>
+        <SessionTitleDisplay session={session} />
         {session.meetingLink && (
           <a href={session.meetingLink} target="_blank" rel="noopener noreferrer"
             className="text-xs text-violet-500 hover:text-violet-700 flex items-center gap-1 mt-0.5">
@@ -538,8 +555,8 @@ export default function AdminSessionsPage() {
                 <div key={s._id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-gray-900 text-sm truncate">{s.titleAr}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{formatDateAr(s.scheduledAt)} · {formatTimeAr(s.scheduledAt)} · {s.durationMinutes}د</div>
+                      <SessionTitleDisplay session={s} size="sm" />
+                      <div className="text-xs text-gray-400 mt-1">{formatDateAr(s.scheduledAt)} · {formatTimeAr(s.scheduledAt)} · {s.durationMinutes}د</div>
                     </div>
                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full flex-none ${sc.bg} ${sc.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />

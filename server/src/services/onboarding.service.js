@@ -88,9 +88,9 @@ async function validateTeacherPayload(teacher) {
   // account is created — the actual password is resolved again at write
   // time (see the write phase below).
   try {
-    resolveCredentialInput(teacher, 'teacher.credential')
+    await resolveCredentialInput(teacher, 'teacher.credential', 'teacher')
   } catch (err) {
-    if (err instanceof CredentialError) throw new OnboardingError(err.message, err.status, err.field)
+    if (err instanceof CredentialError || err.status) throw new OnboardingError(err.message, err.status || 400, err.field)
     throw err
   }
 }
@@ -121,9 +121,9 @@ async function validateStudentsPayload(students) {
       throw new OnboardingError(`تصنيف الطالب رقم ${idx + 1} غير صالح`, 400, `students.${idx}.gender`)
     }
     try {
-      resolveCredentialInput(student, `students.${idx}.credential`)
+      await resolveCredentialInput(student, `students.${idx}.credential`, 'student')
     } catch (err) {
-      if (err instanceof CredentialError) throw new OnboardingError(`الطالب رقم ${idx + 1}: ${err.message}`, err.status, `students.${idx}.credential`)
+      if (err instanceof CredentialError || err.status) throw new OnboardingError(`الطالب رقم ${idx + 1}: ${err.message}`, err.status || 400, `students.${idx}.credential`)
       throw err
     }
     if (student.package) {
@@ -248,7 +248,7 @@ async function createTeacherWithStudents({ clientRequestId, teacher, workingHour
   try {
     // ── Teacher account ──
     const teacherFields = pickAllowed(teacher, TEACHER_ALLOWED_FIELDS)
-    const teacherCredential = resolveCredentialInput(teacher, 'teacher.credential')
+    const teacherCredential = await resolveCredentialInput(teacher, 'teacher.credential', 'teacher')
     const teacherDoc = await User.create({
       ...teacherFields,
       email: normalizeEmail(teacher.email),
@@ -281,7 +281,7 @@ async function createTeacherWithStudents({ clientRequestId, teacher, workingHour
     for (const studentInput of studentsPayload) {
       const studentFields = pickAllowed(studentInput, STUDENT_ALLOWED_FIELDS)
       if (studentFields.gender === '') delete studentFields.gender // '' means "unspecified", not a value to store
-      const studentCredential = resolveCredentialInput(studentInput, 'students.credential')
+      const studentCredential = await resolveCredentialInput(studentInput, 'students.credential', 'student')
       const studentDoc = await User.create({
         ...studentFields,
         email: normalizeEmail(studentInput.email),

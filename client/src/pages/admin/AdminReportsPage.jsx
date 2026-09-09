@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -5,6 +6,7 @@ import {
   CalendarDays, Clock3, CheckCircle,
   Users, UserCheck, UserPlus,
   GraduationCap, Star, BarChart2 as ChartIcon,
+  Calendar,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -12,7 +14,9 @@ import {
 } from 'recharts'
 import api from '../../utils/api.js'
 import Spinner from '../../components/ui/Spinner.jsx'
+import DateRangePresetPicker from '../../components/shared/DateRangePresetPicker.jsx'
 import { formatCurrency, formatNumber } from '../../utils/format.js'
+import { formatDateAr } from '../../utils/date.js'
 
 // ── Sparkline ────────────────────────────────────────────────────────────────
 // `data` must be a real numeric series (see `trends.*` from GET /admin/reports
@@ -202,9 +206,17 @@ function TeacherCard({ teacher, rank }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminReportsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'reports'],
-    queryFn: () => api.get('/admin/reports').then(r => r.data.data),
+  const [dateFilter, setDateFilter] = useState({ preset: 'this_month', startDate: '', endDate: '' })
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['admin', 'reports', dateFilter.preset, dateFilter.startDate, dateFilter.endDate],
+    queryFn: () => {
+      const p = new URLSearchParams()
+      if (dateFilter.preset) p.set('preset', dateFilter.preset)
+      if (dateFilter.startDate) p.set('startDate', dateFilter.startDate)
+      if (dateFilter.endDate) p.set('endDate', dateFilter.endDate)
+      return api.get(`/admin/reports?${p}`).then(r => r.data.data)
+    },
     placeholderData: {
       revenue:     { total: 0, thisMonth: 0, lastMonth: 0, growth: 0 },
       sessions:    { total: 0, thisMonth: 0, completionRate: 0, cancelled: 0 },
@@ -224,6 +236,8 @@ export default function AdminReportsPage() {
     )
   }
 
+  const periodLabel = data?.period?.label || 'هذا الشهر'
+
   // Real month-by-month series from the backend (see getReports) — no
   // client-side fabrication.
   const revenueChart  = data?.trends?.revenue  || []
@@ -240,26 +254,46 @@ export default function AdminReportsPage() {
       <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
           <h1 className="font-heading font-bold text-2xl text-brand-textBody">التقارير والإحصاءات</h1>
-          <p className="text-[13px] text-brand-textMuted mt-1">نظرة شاملة على أداء المنصة وتحليل البيانات</p>
+          <p className="text-[13px] text-brand-textMuted mt-1">نظرة شاملة على أداء المنصة وتحليل البيانات الزمنية</p>
         </div>
         <div className="flex items-center gap-2 text-[12px] text-brand-textMuted bg-white rounded-2xl px-4 py-2.5 border border-gray-100 shadow-[0_2px_8px_-2px_rgba(31,17,71,0.06)]">
-          <ChartIcon size={13} className="text-brand-purple" />
-          <span className="font-body">بيانات محدثة</span>
+          {isFetching ? <Spinner size="xs" color="border-brand-purple" /> : <ChartIcon size={13} className="text-brand-purple" />}
+          <span className="font-body">{isFetching ? 'جاري التحديث...' : 'بيانات محدثة'}</span>
         </div>
+      </div>
+
+      {/* ── Date range presets & filter bar ─────────────────── */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+        <DateRangePresetPicker
+          value={dateFilter}
+          onChange={setDateFilter}
+          onReset={() => setDateFilter({ preset: 'this_month', startDate: '', endDate: '' })}
+        />
+        {data?.period && (
+          <div className="flex items-center gap-2 text-xs text-[#7c6aaa] pt-2 border-t border-gray-50 flex-wrap">
+            <span className="font-bold text-[#1f1147]">الفترة النشطة:</span>
+            <span className="px-2.5 py-0.5 rounded-lg bg-purple-50 text-brand-purple font-semibold">
+              {data.period.label}
+            </span>
+            <span className="text-[11px] text-gray-400">
+              ({formatDateAr(data.period.startDate)} — {formatDateAr(data.period.endDate)})
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Executive summary ────────────────────────────────── */}
       <section>
         <p className="text-[11px] font-semibold text-brand-purple uppercase tracking-widest mb-4 font-body">
-          الملخص التنفيذي
+          الملخص التنفيذي ({periodLabel})
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard
-            label="إجمالي الإيرادات"
-            value={formatCurrency(data?.revenue?.total)}
+            label={`إيرادات ${periodLabel}`}
+            value={formatCurrency(data?.revenue?.periodRevenue ?? data?.revenue?.thisMonth)}
             icon={DollarSign} color="#7c3aed" bg="#f5f3ff"
             trend={data?.revenue?.growth}
-            trendLabel="مقارنة بالشهر الماضي"
+            trendLabel="مقارنة بالفترة السابقة"
             sparkData={revenueSpark}
             delay={0}
           />
@@ -270,14 +304,14 @@ export default function AdminReportsPage() {
             delay={0.06}
           />
           <KpiCard
-            label="حصص هذا الشهر"
-            value={formatNumber(data?.sessions?.thisMonth)}
+            label={`حصص ${periodLabel}`}
+            value={formatNumber(data?.sessions?.periodSessions ?? data?.sessions?.thisMonth)}
             icon={CalendarDays} color="#E8C76A" bg="#fffbeb"
             sparkData={sessionsSpark}
             delay={0.12}
           />
           <KpiCard
-            label="معدل الحضور"
+            label={`معدل الحضور (${periodLabel})`}
             value={`${data?.attendance?.rate || 0}%`}
             icon={CheckCircle} color="#22c55e" bg="#f0fdf4"
             delay={0.18}
@@ -294,8 +328,8 @@ export default function AdminReportsPage() {
         />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
           <KpiCard label="الإجمالي الكلي"       value={formatCurrency(data?.revenue?.total)}     icon={DollarSign} color="#7c3aed" bg="#f5f3ff" delay={0} />
-          <KpiCard label="إيرادات هذا الشهر"     value={formatCurrency(data?.revenue?.thisMonth)} icon={Wallet}     color="#22c55e" bg="#f0fdf4" delay={0.05} />
-          <KpiCard label="إيرادات الشهر الماضي"  value={formatCurrency(data?.revenue?.lastMonth)} icon={Wallet}     color="#E8C76A" bg="#fffbeb" delay={0.1} />
+          <KpiCard label={`إيرادات ${periodLabel}`} value={formatCurrency(data?.revenue?.periodRevenue ?? data?.revenue?.thisMonth)} icon={Wallet} color="#22c55e" bg="#f0fdf4" delay={0.05} />
+          <KpiCard label="الفترة المقارنة"      value={formatCurrency(data?.revenue?.compRevenue ?? data?.revenue?.lastMonth)} icon={Wallet} color="#E8C76A" bg="#fffbeb" delay={0.1} />
           <KpiCard
             label="نسبة النمو"
             value={`${data?.revenue?.growth || 0}%`}
@@ -334,9 +368,9 @@ export default function AdminReportsPage() {
         />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
           <KpiCard label="إجمالي الحصص"   value={formatNumber(data?.sessions?.total)}          icon={CalendarDays} color="#E8C76A" bg="#fffbeb" sparkData={sessionsSpark}  delay={0} />
-          <KpiCard label="حصص هذا الشهر"  value={formatNumber(data?.sessions?.thisMonth)}      icon={Clock3}       color="#f97316" bg="#fff7ed"                           delay={0.06} />
-          <KpiCard label="نسبة الإكمال"   value={`${data?.sessions?.completionRate || 0}%`}    icon={CheckCircle}  color="#22c55e" bg="#f0fdf4"                           delay={0.12} />
-          <KpiCard label="حصص ملغاة"      value={formatNumber(data?.sessions?.cancelled)}      icon={CalendarDays} color="#ef4444" bg="#fef2f2"                           delay={0.18} />
+          <KpiCard label={`حصص ${periodLabel}`}  value={formatNumber(data?.sessions?.periodSessions ?? data?.sessions?.thisMonth)} icon={Clock3} color="#f97316" bg="#fff7ed" delay={0.06} />
+          <KpiCard label={`نسبة الإكمال (${periodLabel})`} value={`${data?.sessions?.completionRate || 0}%`} icon={CheckCircle} color="#22c55e" bg="#f0fdf4" delay={0.12} />
+          <KpiCard label={`حصص ملغاة (${periodLabel})`} value={formatNumber(data?.sessions?.cancelled)} icon={CalendarDays} color="#ef4444" bg="#fef2f2" delay={0.18} />
         </div>
         <ChartCard title="الحصص الشهرية" subtitle="توزيع الحصص على مدار العام">
           <ResponsiveContainer width="100%" height={240}>
@@ -390,7 +424,7 @@ export default function AdminReportsPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-5">
           <KpiCard label="إجمالي الطلاب"        value={formatNumber(data?.students?.total)}  icon={Users}     color="#3b82f6" bg="#eff6ff" sparkData={studentsSpark} delay={0} />
           <KpiCard label="الطلاب النشطون"        value={formatNumber(data?.students?.active)} icon={UserCheck} color="#22c55e" bg="#f0fdf4"                          delay={0.06} />
-          <KpiCard label="طلاب جدد هذا الشهر"   value={formatNumber(data?.students?.new)}   icon={UserPlus}  color="#8b5cf6" bg="#f5f3ff"                          delay={0.12} />
+          <KpiCard label={`طلاب جدد (${periodLabel})`} value={formatNumber(data?.students?.new)} icon={UserPlus} color="#8b5cf6" bg="#f5f3ff" delay={0.12} />
         </div>
         <ChartCard title="نمو الطلاب" subtitle="مسار تسجيل الطلاب الجدد">
           <ResponsiveContainer width="100%" height={240}>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>دليل قواعد الحصص وتوقيت الحضور — ترتيلة أونلاين</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Amiri:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 1920px;
+      height: 1080px;
+      background: linear-gradient(135deg, #0b0718 0%, #170f30 35%, #0f172a 100%);
+      font-family: 'Cairo', sans-serif;
+      color: #ffffff;
+      padding: 45px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient background glows */
+    .glow-1 {
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.28), transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .glow-2 {
+      position: absolute;
+      bottom: -150px;
+      left: 100px;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.2), transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .glow-3 {
+      position: absolute;
+      top: 30%;
+      left: 45%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(217, 119, 6, 0.15), transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding-bottom: 24px;
+      position: relative;
+      z-index: 2;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .logo-badge {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #7c3aed, #4c1d95);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(124, 58, 237, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .logo-badge svg {
+      width: 36px;
+      height: 36px;
+      color: #fbbf24;
+    }
+    .brand-text h1 {
+      font-size: 32px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-text h1 span.highlight {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-text p {
+      font-size: 16px;
+      color: #94a3b8;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    .badge-pill {
+      background: rgba(124, 58, 237, 0.2);
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      color: #c4b5fd;
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 12px #10b981;
+    }
+
+    /* Main Grid Timeline */
+    .timeline-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      position: relative;
+      z-index: 2;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .step-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    .step-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 5px;
+    }
+    .step-1::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    .step-2::before { background: linear-gradient(90deg, #10b981, #f59e0b); }
+    .step-3::before { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+    .step-4::before { background: linear-gradient(90deg, #10b981, #059669); }
+
+    .step-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .step-num {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+      color: #fff;
+    }
+    .step-1 .step-num { background: rgba(139, 92, 246, 0.25); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); }
+    .step-2 .step-num { background: rgba(245, 158, 11, 0.25); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .step-3 .step-num { background: rgba(6, 182, 212, 0.25); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.4); }
+    .step-4 .step-num { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    .step-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .step-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .step-title {
+      font-size: 21px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .step-subtitle {
+      font-size: 13px;
+      color: #cbd5e1;
+      font-weight: 600;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Visual Graphic inside each card */
+    .card-visual {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .badge-success {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .badge-purple {
+      background: rgba(139, 92, 246, 0.18);
+      color: #c4b5fd;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    /* Bullet Points */
+    .step-bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+    .bullet-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+    .step-1 .bullet-dot { background: #a78bfa; }
+    .step-2 .bullet-dot { background: #f59e0b; }
+    .step-3 .bullet-dot { background: #38bdf8; }
+    .step-4 .bullet-dot { background: #34d399; }
+
+    /* Footer / Bottom Rules Bar */
+    .footer-bar {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 18px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    .footer-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 17px;
+      font-weight: 800;
+      color: #fbbf24;
+    }
+    .rules-pills {
+      display: flex;
+      gap: 16px;
+    }
+    .rule-pill {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-green { color: #34d399; font-weight: 800; }
+    .tag-amber { color: #fbbf24; font-weight: 800; }
+    .tag-red { color: #f87171; font-weight: 800; }
+  </style>
+</head>
+<body>
+
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="glow-3"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand-section">
+      <div class="logo-badge">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>منصة ترتيلة للقرآن الكريم — <span class="highlight">قواعد الحصص والحضور</span></h1>
+        <p>المرجع الإرشادي الشامل للأكاديمية والمعلمين والطلاب • توثيق الحضور وحسابات التأخير والأجر</p>
+      </div>
+    </div>
+    <div class="badge-pill">
+      <div class="pulse-dot"></div>
+      نظام الجدولة الذكي • معتمد 2026
+    </div>
+  </header>
+
+  <!-- 4 Columns Timeline -->
+  <main class="timeline-container">
+
+    <!-- Card 1: Pre-Session -->
+    <div class="step-card step-1">
+      <div>
+        <div class="step-header">
+          <div class="step-num">01</div>
+          <div class="step-icon" style="color: #a78bfa;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+        <div class="step-title">قبل موعد الحصة (60 دقيقة)</div>
+        <div class="step-subtitle">نافذة التجهيز وإتاحة تسجيل الحضور</div>
+
+        <div class="card-visual">
+          <div class="status-badge badge-purple">
+            <span>⏱️ بدء نافذة الدخول</span>
+            <span>T - 60 دقيقة</span>
+          </div>
+          <div class="status-badge badge-success">
+            <span>🟢 الدخول المبكر</span>
+            <span>حاضر في الموعد (On-Time)</span>
+          </div>
+        </div>
+
+        <ul class="step-bullets">
+          <li><span class="bullet-dot"></span><span>يفتح زر <b>«تسجيل الحضور وبدء الحصة»</b> قبل الموعد بـ 60 دقيقة.</span></li>
+          <li><span class="bullet-dot"></span><span>المعلم الذي يدخل مبكراً يُسجله الخادم <b>حاضراً في الموعد</b> دون أي دقائق تأخير.</span></li>
+          <li><span class="bullet-dot"></span><span>يُمنع الدخول قبل أكثر من 60 دقيقة لمنع تداخل الحصص السابقة.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Card 2: Attendance Check -->
+    <div class="step-card step-2">
+      <div>
+        <div class="step-header">
+          <div class="step-num">02</div>
+          <div class="step-icon" style="color: #f59e0b;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+        <div class="step-title">بداية الحصة وقاعدة الـ 5 دقائق</div>
+        <div class="step-subtitle">فحص الانضباط واحتساب التأخير الآلي</div>
+
+        <div class="card-visual">
+          <div class="status-badge badge-success">
+            <span>سماح مرن (0 - 5 دقائق)</span>
+            <span>حاضر في الموعد ✔️</span>
+          </div>
+          <div class="status-badge badge-danger">
+            <span>بعد الدقيقة 5 (الدقيقة 6+)</span>
+            <span>متأخر (Late ⚠️)</span>
+          </div>
+        </div>
+
+        <ul class="step-bullets">
+          <li><span class="bullet-dot"></span><span><b>فترة سماح 5 دقائق:</b> لو بدأت الحصة 4:04 يُعتبر المعلم في موعده دون جزاء.</span></li>
+          <li><span class="bullet-dot"></span><span><b>من الدقيقة 6 فما فوق:</b> تُصنف حالة الحضور فوراً <b>(متأخر)</b> ويُحسب الوقت بالدقيقة.</span></li>
+          <li><span class="bullet-dot"></span><span>يصل إشعار فوري للمعلم ويُسجل وقت التأخير في تقارير الأداء الشهرية للإدارة.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Card 3: Live Session -->
+    <div class="step-card step-3">
+      <div>
+        <div class="step-header">
+          <div class="step-num">03</div>
+          <div class="step-icon" style="color: #06b6d4;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+        </div>
+        <div class="step-title">الحصة الجارية والعداد الحي</div>
+        <div class="step-subtitle">الربط بالفصل الافتراضي (Zoom / Meet)</div>
+
+        <div class="card-visual">
+          <div class="status-badge badge-success" style="background: rgba(6, 182, 212, 0.18); border-color: rgba(6, 182, 212, 0.3); color: #67e8f9;">
+            <span>🟢 الحالة الآن</span>
+            <span>جارية (Ongoing)</span>
+          </div>
+          <div class="status-badge badge-purple" style="font-family: monospace; font-size: 15px; letter-spacing: 1px;">
+            <span>⏱️ مدة الحصة الحالية</span>
+            <span style="color: #34d399; font-weight: 900;">28:45 دقيقة</span>
+          </div>
+        </div>
+
+        <ul class="step-bullets">
+          <li><span class="bullet-dot"></span><span>يتحول كارت الحصة في لوحة المعلم إلى <b>«الحصة جارية الآن»</b> بإطار أخضر بارز.</span></li>
+          <li><span class="bullet-dot"></span><span>يعمل <b>عدّاد زمني تصاعدي حي</b> يحسب المدة بالثواني منذ لحظة بدء الحصة.</span></li>
+          <li><span class="bullet-dot"></span><span>يفتح المعلم والطالب رابط الحصة المباشر في تبويب مستقل بنقرة واحدة.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Card 4: Wrap-up & Completion -->
+    <div class="step-card step-4">
+      <div>
+        <div class="step-header">
+          <div class="step-num">04</div>
+          <div class="step-icon" style="color: #10b981;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+          </div>
+        </div>
+        <div class="step-title">إنهاء الحصة والمحفظة والراتب</div>
+        <div class="step-subtitle">توثيق الحضور والخصم والتعويضات آلياً</div>
+
+        <div class="card-visual">
+          <div class="status-badge badge-success">
+            <span>محفظة الطالب</span>
+            <span>خصم حصة واحدة ✔️</span>
+          </div>
+          <div class="status-badge badge-purple">
+            <span>سجل رواتب المعلم</span>
+            <span>استحقاق الأجر المالي 💰</span>
+          </div>
+        </div>
+
+        <ul class="step-bullets">
+          <li><span class="bullet-dot"></span><span>يضغط المعلم <b>«إنهاء الحصة»</b> ويسجل حالة الطالب (حضر / غاب / عذر / تقييم).</span></li>
+          <li><span class="bullet-dot"></span><span>تُخصم الحصة تلقائياً من محفظة الطالب (`LessonWallet`) دون تدخل يدوي.</span></li>
+          <li><span class="bullet-dot"></span><span><b>أجر المعلم مستحق فوراً</b> ومستقل عن غياب الطالب طالما أن المعلم حضر في الموعد.</span></li>
+        </ul>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer / Operational Windows Policy -->
+  <footer class="footer-bar">
+    <div class="footer-title">
+      <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span>النوافذ المرنة بعد نهاية وقت الحصة:</span>
+    </div>
+
+    <div class="rules-pills">
+      <div class="rule-pill">
+        <span class="tag-green">أول 60 دقيقة:</span>
+        <span>فترة سماح عادية لإنهاء الحصة وتوثيقها دون تأخير</span>
+      </div>
+      <div class="rule-pill">
+        <span class="tag-amber">من 1 إلى 4 ساعات:</span>
+        <span>فترة إكمال ممتدة (تُقبل وتُوسم "إكمال متأخر")</span>
+      </div>
+      <div class="rule-pill">
+        <span class="tag-red">بعد 7 ساعات بلا تسجيل:</span>
+        <span>تتحول لغياب معلم وتُمنح <b>حصة تعويضية مجانية للطالب</b></span>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

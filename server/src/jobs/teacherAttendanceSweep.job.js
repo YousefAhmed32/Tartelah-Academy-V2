@@ -6,6 +6,7 @@ const { POLICY } = require('../config/attendancePolicy')
 const { computePayrollStatus } = require('../services/sessionIntelligence.service')
 const { handleTeacherNoShow } = require('../services/lessonDeduction.service')
 const payrollLedger = require('../services/payrollLedger.service')
+const { DEFAULT_ACADEMY_TIMEZONE } = require('../config/academyTimezone')
 
 // Graduated, forgiving sweep — see docs/INTELLIGENT_ATTENDANCE_SYSTEM.md
 // "Human-Centered Flexible Time Windows". A teacher is never punished the
@@ -55,6 +56,8 @@ async function sweepStale() {
           type: 'attendance',
           priority: 'medium',
           relatedId: session._id,
+          actionUrl: '/teacher/attendance',
+          metadata: { dedupeKey: `attendance:${session._id}:missed` },
         })
       }
       continue
@@ -66,12 +69,12 @@ async function sweepStale() {
     session.teacherAttendanceMarkedBy = 'system'
     session.outcome = 'teacher_absent'
     if (session.payrollStatusSetBy !== 'admin') {
-      const { payrollStatus, reason } = computePayrollStatus(session)
+      const { payrollStatus, reason, businessRule } = computePayrollStatus(session)
       session.payrollStatus = payrollStatus
       session.payrollStatusReason = reason
       session.payrollStatusSetBy = 'system'
       session.payrollStatusSetAt = now
-      await payrollLedger.recordEntry(session, { payrollStatus, reason })
+      await payrollLedger.recordEntry(session, { payrollStatus, reason, businessRule })
     }
     // Teacher no-show never costs the student a lesson and auto-grants a
     // compensation credit — see lessonDeduction.service.js.
@@ -86,6 +89,8 @@ async function sweepStale() {
       type: 'attendance',
       priority: 'high',
       relatedId: session._id,
+      actionUrl: '/teacher/attendance',
+      metadata: { dedupeKey: `attendance:${session._id}:no_show` },
     })
 
     const admins = await User.find({ role: 'admin', isActive: true }).select('_id')
@@ -97,6 +102,8 @@ async function sweepStale() {
         type: 'attendance',
         priority: 'urgent',
         relatedId: session._id,
+        actionUrl: '/admin/operations',
+        metadata: { dedupeKey: `attendance:${session._id}:admin_no_show_alert` },
       })))
     }
   }
@@ -111,7 +118,10 @@ function startTeacherAttendanceSweepJob() {
     } catch (err) {
       console.error('[CRON] Teacher attendance sweep error:', err.message)
     }
-  }, { timezone: 'Asia/Riyadh' })
+  // See monthlyReport.job.js — matches the academy's Africa/Cairo default
+  // instead of the legacy 'Asia/Riyadh' cron-trigger timezone (this job runs
+  // every 10 minutes so the zone barely matters here, kept consistent anyway).
+  }, { timezone: DEFAULT_ACADEMY_TIMEZONE })
 
   console.log('[CRON] Teacher attendance sweep job started (graduated: missed → no_show)')
 }

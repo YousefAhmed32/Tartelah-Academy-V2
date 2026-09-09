@@ -36,7 +36,7 @@ export default function LessonTransactionTable({ transactions }) {
         <thead>
           <tr className="border-b border-[#f0ecf8]">
             {['التاريخ', 'النوع', 'الكمية', 'الرصيد بعدها', 'السبب'].map(h => (
-              <th key={h} className="text-right px-4 py-2.5 text-xs font-semibold text-[#9b7fd6] whitespace-nowrap">{h}</th>
+              <th key={h} className="text-right px-4 py-2.5 text-xs font-semibold text-[#7c6aaa] whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
@@ -46,15 +46,15 @@ export default function LessonTransactionTable({ transactions }) {
             const isCredit = tx.amount > 0
             return (
               <tr key={tx._id} className="border-b border-[#f8f5ff]">
-                <td className="px-4 py-2.5 text-xs text-[#9b7fd6] whitespace-nowrap">
+                <td className="px-4 py-2.5 text-xs text-[#7c6aaa] whitespace-nowrap">
                   {formatDateAr(tx.createdAt)} · {formatTimeAr(tx.createdAt)}
                 </td>
                 <td className="px-4 py-2.5"><Badge variant={cfg.badge}>{cfg.label}</Badge></td>
-                <td className={`px-4 py-2.5 text-sm font-bold ${isCredit ? 'text-emerald-600' : tx.amount < 0 ? 'text-red-500' : 'text-[#9b7fd6]'}`}>
+                <td className={`px-4 py-2.5 text-sm font-bold ${isCredit ? 'text-emerald-600' : tx.amount < 0 ? 'text-red-500' : 'text-[#7c6aaa]'}`}>
                   {tx.amount > 0 ? '+' : ''}{formatNumber(tx.amount)}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-brand-textBody">{formatNumber(tx.balanceAfter)}</td>
-                <td className="px-4 py-2.5 text-xs text-[#9b7fd6] max-w-[220px] truncate">{tx.reason || '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-[#7c6aaa] max-w-[220px] truncate">{tx.reason || '—'}</td>
               </tr>
             )
           })}

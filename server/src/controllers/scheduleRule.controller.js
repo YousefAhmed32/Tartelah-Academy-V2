@@ -43,6 +43,10 @@ exports.createRule = async (req, res, next) => {
     if (!studentId) return sendError(res, 'studentId مطلوب', 400)
     if (!startDate) return sendError(res, 'startDate مطلوب', 400)
 
+    const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
+    const studentName = student ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student?.name || '')
+    const defaultTitle = studentName ? `حصة ${studentName}` : 'حصة'
+
     const rule = await ScheduleRule.create({
       teacherId,
       studentId,
@@ -56,13 +60,12 @@ exports.createRule = async (req, res, next) => {
       sessionsTotal: sessionsTotal || undefined,
       meetingLink: meetingLink || '',
       meetingProvider: meetingProvider || 'zoom',
-      titleTemplate: titleTemplate || 'حصة',
+      titleTemplate: titleTemplate || defaultTitle,
       notes,
     })
 
     const sessions = await scheduleService.generateSessionsFromRule(rule)
 
-    const student = await User.findById(studentId).select('firstNameAr lastNameAr')
     if (student) {
       await createNotification({
         userId: studentId,

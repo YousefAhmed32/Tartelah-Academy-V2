@@ -130,6 +130,35 @@ exports.transferLessons = async (req, res, next) => {
   } catch (err) { next(err) }
 }
 
+// Admin: grant a bonus lesson (a goodwill/incentive credit — distinct from a
+// compensation lesson, which specifically offsets a teacher-side disruption;
+// see grantCompensation below). Reuses wallet.service's existing 'bonus'
+// transaction type, which was already tracked on LessonWallet.bonusLessons
+// but had no admin-facing endpoint until this pass.
+exports.grantBonus = async (req, res, next) => {
+  try {
+    const { amount, reason } = req.body
+    const numAmount = Math.max(1, Number(amount) || 1)
+    if (!reason || !reason.trim()) return sendError(res, 'سبب حصة المكافأة مطلوب', 400)
+
+    const { transaction, wallet } = await walletService.applyTransaction({
+      studentId: req.params.studentId, type: 'bonus', amount: numAmount,
+      reason: reason.trim(), performedByRole: 'admin', performedBy: req.user._id,
+    })
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'wallet.bonus_grant',
+      entity: 'LessonWallet', entityId: wallet._id, changes: { amount: numAmount, reason }, ip: req.ip,
+    })
+    await createNotification({
+      userId: req.params.studentId, titleAr: 'حصة مكافأة',
+      bodyAr: `تم إضافة ${numAmount} حصة مكافأة إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
+    })
+
+    sendSuccess(res, { wallet, transaction }, 'تم منح حصة المكافأة')
+  } catch (err) { next(err) }
+}
+
 // Admin: manually grant a compensation lesson, independent of an automatic
 // teacher-cancellation/no-show trigger (see compensation.service.js).
 exports.grantCompensation = async (req, res, next) => {

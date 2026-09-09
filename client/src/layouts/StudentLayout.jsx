@@ -47,6 +47,7 @@ const NAV_GROUPS = [
       { to: ROUTES.STUDENT_SESSIONS,    label: 'حصصي',                   Icon: SessIcon  },
       { to: ROUTES.STUDENT_HOMEWORK,    label: 'الواجبات',               Icon: HwIcon    },
       { to: ROUTES.STUDENT_EVALUATIONS, label: 'التقييمات',              Icon: EvalIcon  },
+      { to: ROUTES.STUDENT_QURAN_REPORTS, label: 'تقارير حلقاتي',        Icon: AcadIcon  },
       { to: ROUTES.STUDENT_PROGRESS,    label: 'المستويات',              Icon: PrgIcon   },
     ],
   },

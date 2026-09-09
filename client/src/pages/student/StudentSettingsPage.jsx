@@ -68,7 +68,7 @@ export default function StudentSettingsPage() {
             />
             <div>
               <div className="font-heading font-bold text-brand-textBody">{user?.firstNameAr} {user?.lastNameAr}</div>
-              <div className="text-sm text-[#9b7fd6]">{user?.email}</div>
+              <div className="text-sm text-[#7c6aaa]">{user?.email}</div>
             </div>
           </div>
           <form onSubmit={handleProfile} className="space-y-4">

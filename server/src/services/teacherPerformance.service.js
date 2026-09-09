@@ -59,16 +59,16 @@ async function getAttendanceSummary(teacherId, { from, to } = {}) {
  * held against punctuality either.
  */
 async function getSalaryBreakdown(teacherId, { from, to } = {}) {
-  const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession')
+  const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession hourlyRate')
   if (!teacher) return null
-  const rate = teacher.salaryPerSession || 0
   const summary = await getAttendanceSummary(teacherId, { from, to })
   const { totalAmount, payableSessions } = await payrollLedger.getEarnedAmount(teacherId, { from, to })
 
   return {
     teacherId: teacher._id,
     teacherName: `${teacher.firstNameAr} ${teacher.lastNameAr}`,
-    salaryPerSession: rate,
+    salaryPerSession: teacher.salaryPerSession || 0, // legacy display field, no longer the payroll source
+    hourlyRate: teacher.hourlyRate || 0, // canonical payroll rate — see payrollLedger.service.js
     payableSessions,
     unpaidAbsences: summary.absent,
     excusedSessions: summary.excused,
@@ -85,9 +85,12 @@ function startOfWeek(d) {
   return date
 }
 
+// `amount` for each bucket is sourced from the real persisted ledger (see
+// payrollLedger.service.js), not `completed * a flat rate` — under the
+// hourly-payroll formula (rate x duration/60) two "completed" sessions of
+// different lengths are worth different amounts, so a flat multiply would
+// misreport the trend the moment a teacher has any mixed-duration sessions.
 async function getWeeklyTrend(teacherId, weeksBack = 8) {
-  const teacher = await User.findById(teacherId).select('salaryPerSession')
-  const rate = teacher?.salaryPerSession || 0
   const currentWeekStart = startOfWeek(new Date())
   const buckets = []
 
@@ -99,20 +102,19 @@ async function getWeeklyTrend(teacherId, weeksBack = 8) {
     to.setHours(23, 59, 59, 999)
 
     const summary = await getAttendanceSummary(teacherId, { from, to })
+    const { totalAmount } = await payrollLedger.getEarnedAmount(teacherId, { from, to })
     const completed = summary.on_time + summary.late
     buckets.push({
       label: `${from.getDate()}/${from.getMonth() + 1}`,
       from, to,
       completed, onTime: summary.on_time, late: summary.late, absent: summary.absent,
-      amount: completed * rate,
+      amount: totalAmount,
     })
   }
   return buckets
 }
 
 async function getMonthlyTrend(teacherId, monthsBack = 6) {
-  const teacher = await User.findById(teacherId).select('salaryPerSession')
-  const rate = teacher?.salaryPerSession || 0
   const now = new Date()
   const buckets = []
 
@@ -122,12 +124,13 @@ async function getMonthlyTrend(teacherId, monthsBack = 6) {
     const to = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
 
     const summary = await getAttendanceSummary(teacherId, { from, to })
+    const { totalAmount } = await payrollLedger.getEarnedAmount(teacherId, { from, to })
     const completed = summary.on_time + summary.late
     buckets.push({
       label: MONTHS_AR[d.getMonth()],
       year: d.getFullYear(),
       completed, onTime: summary.on_time, late: summary.late, absent: summary.absent,
-      amount: completed * rate,
+      amount: totalAmount,
     })
   }
   return buckets
@@ -159,14 +162,14 @@ async function getOrgWidePerformance({ from, to, search, page = 1, limit = 20 } 
 
   const total = await User.countDocuments(filter)
   const teachers = await User.find(filter)
-    .select('firstNameAr lastNameAr avatar gender email salaryPerSession isActive')
+    .select('firstNameAr lastNameAr avatar gender email salaryPerSession hourlyRate isActive')
     .sort({ firstNameAr: 1 })
     .skip((page - 1) * limit)
     .limit(limit)
 
   const rows = await Promise.all(teachers.map(async (t) => {
     const summary = await getAttendanceSummary(t._id, { from, to })
-    const payableSessions = summary.on_time + summary.late
+    const { totalAmount } = await payrollLedger.getEarnedAmount(t._id, { from, to })
     return {
       _id: t._id,
       firstNameAr: t.firstNameAr,
@@ -176,8 +179,9 @@ async function getOrgWidePerformance({ from, to, search, page = 1, limit = 20 } 
       email: t.email,
       isActive: t.isActive,
       salaryPerSession: t.salaryPerSession || 0,
+      hourlyRate: t.hourlyRate || 0,
       ...summary,
-      totalAmount: payableSessions * (t.salaryPerSession || 0),
+      totalAmount,
     }
   }))
 
@@ -211,7 +215,7 @@ async function correctAttendance(sessionId, { status, notes, payrollStatus, payr
     session.payrollStatusReason = payrollStatusReason || 'تصحيح يدوي من الإدارة'
     session.payrollStatusSetBy = 'admin'
     session.payrollStatusSetAt = new Date()
-    await payrollLedger.recordEntry(session, { payrollStatus, reason: session.payrollStatusReason, createdBy: correctedBy })
+    await payrollLedger.recordEntry(session, { payrollStatus, reason: session.payrollStatusReason, businessRule: 'admin_manual_correction', createdBy: correctedBy })
   }
 
   await session.save()
@@ -227,9 +231,8 @@ async function correctAttendance(sessionId, { status, notes, payrollStatus, payr
  * reflects real recorded entries rather than a live recount.
  */
 async function getPayrollReadiness(teacherId, { from, to } = {}) {
-  const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession')
+  const teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession hourlyRate')
   if (!teacher) return null
-  const rate = teacher.salaryPerSession || 0
 
   const [sessionRows, ledgerRows] = await Promise.all([
     Session.aggregate([
@@ -261,7 +264,8 @@ async function getPayrollReadiness(teacherId, { from, to } = {}) {
   return {
     teacherId: teacher._id,
     teacherName: `${teacher.firstNameAr} ${teacher.lastNameAr}`,
-    salaryPerSession: rate,
+    salaryPerSession: teacher.salaryPerSession || 0,
+    hourlyRate: teacher.hourlyRate || 0,
     ...counts,
     estimatedAmount,
     currency: 'EGP',

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Timer, Link2, X } from 'lucide-react'
+import { Calendar, Clock, Timer, Link2, X, CheckCircle2, Wallet, Gift } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -9,8 +9,9 @@ import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
-import { SESSION_STATUS, MEETING_PROVIDERS } from '../../config/constants.js'
+import { SESSION_STATUS, SESSION_OUTCOME, MEETING_PROVIDERS } from '../../config/constants.js'
 
 // A student can cancel their own upcoming session. Cancelling at least 12h
 // before the scheduled time returns the lesson credit in full; cancelling
@@ -63,6 +64,7 @@ const tabs = [
 
 export default function StudentSessionsPage() {
   const [tab, setTab] = useState('upcoming')
+  const [showGuide, setShowGuide] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['sessions', tab],
@@ -72,7 +74,15 @@ export default function StudentSessionsPage() {
 
   return (
     <div dir="rtl">
-      <PageHeader title="حصصي" subtitle="جميع الحصص الدراسية" />
+      <PageHeader title="حصصي" subtitle="جميع الحصص الدراسية"
+        actions={
+          <button onClick={() => setShowGuide(true)}
+            className="text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-2 rounded-xl transition-colors">
+            كيف تعمل الحصة؟
+          </button>
+        }
+      />
+      {showGuide && <SessionLifecycleGuide role="student" onClose={() => setShowGuide(false)} />}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-[#f0ecf8] p-1 rounded-xl w-fit">
@@ -80,7 +90,7 @@ export default function StudentSessionsPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-5 py-2 rounded-[10px] text-sm font-semibold transition-all ${tab === t.key ? 'bg-white text-brand-textBody shadow-sm' : 'text-[#9b7fd6] hover:text-brand-textBody'}`}
+            className={`px-5 py-2 rounded-[10px] text-sm font-semibold transition-all ${tab === t.key ? 'bg-white text-brand-textBody shadow-sm' : 'text-[#7c6aaa] hover:text-brand-textBody'}`}
           >
             {t.label}
           </button>
@@ -111,6 +121,12 @@ function SessionRow({ session }) {
   const status = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled
   const provider = MEETING_PROVIDERS[session.meetingProvider]
   const canCancel = CANCELLABLE_SESSION_STATUSES.includes(session.status) && isFuture(session.scheduledAt)
+  const outcome = session.outcome && session.outcome !== 'pending_review' ? SESSION_OUTCOME[session.outcome] : null
+  // The teacher checking in (session.controller.js#startSession) is
+  // operational evidence only — never claimed here as proof the lesson
+  // actually happened, just that the teacher declared readiness/joined
+  // through the platform. See docs/SESSION_LIFECYCLE_GUIDE_AR.md.
+  const teacherCheckedIn = ['ongoing', 'completed'].includes(session.status) && ['on_time', 'late'].includes(session.teacherAttendanceStatus)
 
   return (
     <div className="card-light p-5 flex items-center gap-4 flex-wrap">
@@ -123,12 +139,33 @@ function SessionRow({ session }) {
 
       <div className="flex-1 min-w-0">
         <div className="font-heading font-bold text-brand-textBody">{session.titleAr || session.title}</div>
-        <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-[#9b7fd6]">
+        <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-[#7c6aaa]">
           <span className="flex items-center gap-1"><Calendar size={13} strokeWidth={1.8} /> {formatDateAr(session.scheduledAt)}</span>
           <span className="flex items-center gap-1"><Clock size={13} strokeWidth={1.8} /> {formatTimeAr(session.scheduledAt)}</span>
           <span className="flex items-center gap-1"><Timer size={13} strokeWidth={1.8} /> {session.durationMinutes} دقيقة</span>
           {provider && <span className="flex items-center gap-1" style={{ color: provider.color }}><Link2 size={13} strokeWidth={1.8} /> {provider.label}</span>}
+          {teacherCheckedIn && (
+            <span className="flex items-center gap-1 text-emerald-600 font-semibold"><CheckCircle2 size={13} strokeWidth={1.8} /> سجّل المعلم حضوره</span>
+          )}
         </div>
+        {/* Recorded outcome + wallet effect — real fields already on the
+            session document, never a second guess of what the teacher
+            recorded. Payroll/compensation amounts are deliberately excluded
+            (private to the academy/teacher). */}
+        {(outcome || session.status === 'completed') && (
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px]">
+            {outcome && <span className="font-semibold" style={{ color: outcome.color }}>{outcome.label}</span>}
+            {session.status === 'completed' && (
+              <span className="flex items-center gap-1 text-gray-500">
+                <Wallet size={12} strokeWidth={1.8} />
+                {session.subscriptionConsumed ? 'خُصمت حصة من رصيدك' : 'لم تُخصم حصة من رصيدك'}
+              </span>
+            )}
+            {session.compensationRequired && (
+              <span className="flex items-center gap-1 text-emerald-600 font-semibold"><Gift size={12} strokeWidth={1.8} /> أُضيفت حصة تعويضية لرصيدك</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

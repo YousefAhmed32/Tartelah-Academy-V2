@@ -3,9 +3,12 @@ const Session = require('../models/Session')
 const User = require('../models/User')
 const { createNotification } = require('../services/notification.service')
 const { sendSessionReminderEmail } = require('../services/email.service')
+const { DEFAULT_ACADEMY_TIMEZONE } = require('../config/academyTimezone')
 
-const sentReminders = new Set()
-
+// Dedup is delegated to notification.service's dedupeKey check (a DB lookup,
+// not the in-memory Set this used to use) — durable across server restarts
+// and correct with multiple server instances, unlike a process-local Set
+// that also grew unboundedly for the life of the process.
 async function sendReminders(hoursAhead, labelAr) {
   const now = new Date()
   const from = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000 - 5 * 60 * 1000)
@@ -17,12 +20,9 @@ async function sendReminders(hoursAhead, labelAr) {
   }).populate('studentId teacherId', 'firstNameAr lastNameAr email')
 
   for (const session of sessions) {
-    const key = `${session._id}_${hoursAhead}h`
-    if (sentReminders.has(key)) continue
-    sentReminders.add(key)
-
     const student = session.studentId
     const teacher = session.teacherId
+    const dedupeSuffix = `${session._id}:${hoursAhead}h`
 
     await createNotification({
       userId: student._id,
@@ -31,6 +31,8 @@ async function sendReminders(hoursAhead, labelAr) {
       type: 'session',
       priority: hoursAhead <= 0.25 ? 'urgent' : hoursAhead <= 1 ? 'high' : 'medium',
       relatedId: session._id,
+      actionUrl: '/student/sessions',
+      metadata: { dedupeKey: `session-reminder:${dedupeSuffix}` },
     })
 
     await createNotification({
@@ -40,6 +42,8 @@ async function sendReminders(hoursAhead, labelAr) {
       type: 'session',
       priority: hoursAhead <= 0.25 ? 'urgent' : hoursAhead <= 1 ? 'high' : 'medium',
       relatedId: session._id,
+      actionUrl: '/teacher/sessions',
+      metadata: { dedupeKey: `session-reminder:${dedupeSuffix}` },
     })
 
     if (hoursAhead === 24) {
@@ -63,7 +67,9 @@ function startSessionReminderJob() {
     } catch (err) {
       console.error('[CRON] Session reminder error:', err.message)
     }
-  }, { timezone: 'Asia/Riyadh' })
+  // See monthlyReport.job.js — matches the academy's Africa/Cairo default
+  // instead of the legacy 'Asia/Riyadh' cron-trigger timezone.
+  }, { timezone: DEFAULT_ACADEMY_TIMEZONE })
 
   console.log('[CRON] Session reminder job started')
 }

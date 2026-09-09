@@ -61,7 +61,7 @@ export default function Footer() {
                 <img src="/images/logo.jpg" alt="ترتيلة" style={{ width: 50, height: 50, borderRadius: 13, objectFit: 'cover', border: '1px solid rgba(212,175,55,.4)', boxShadow: '0 6px 18px rgba(0,0,0,.4)' }} />
                 <div style={{ lineHeight: 1.18 }}>
                   <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 18, color: '#F3E6C0' }}>ترتيلة</div>
-                  <div style={{ fontSize: 10, letterSpacing: 3, fontWeight: 600, color: '#9b7fd6' }}>ONLINE</div>
+                  <div style={{ fontSize: 10, letterSpacing: 3, fontWeight: 600, color: '#7c6aaa' }}>ONLINE</div>
                 </div>
               </Link>
               <p style={{ color: '#a89ec8', fontSize: 14.5, lineHeight: 1.85, maxWidth: 260 }}>{footerDesc}</p>
@@ -106,7 +106,7 @@ export default function Footer() {
                 <ContactItem Icon={MessageCircle}  label="واتساب" href={`https://api.whatsapp.com/send/?phone=${whatsapp}`} />
                 <ContactItem Icon={Play}           label={youtube} href={`https://youtube.com/${youtube.startsWith('@') ? youtube : '@'+youtube}`} />
                 <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.2)' }}>
-                  <div style={{ fontSize: 11, color: '#9b7fd6', marginBottom: 4, fontWeight: 600 }}>ساعات العمل</div>
+                  <div style={{ fontSize: 11, color: '#7c6aaa', marginBottom: 4, fontWeight: 600 }}>ساعات العمل</div>
                   <div style={{ fontSize: 13.5, color: '#c9bce8' }}>{workingHours}</div>
                 </div>
               </div>

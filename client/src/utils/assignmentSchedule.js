@@ -147,8 +147,25 @@ export function addMinutesToTime(hhmm, minutes) {
  */
 export function formatTimeArabic12(hhmm) {
   if (hhmm === '24:00' || hhmm === '00:00') return 'منتصف الليل'
-  if (!isValidTimeString(hhmm)) return ''
-  let [h, m] = hhmm.split(':').map(Number)
+  return formatTimeArabic12Strict(hhmm)
+}
+
+/**
+ * Same Arabic 12-hour formatting, but ALWAYS numeric — never substitutes the
+ * word "منتصف الليل" for 00:00/24:00. Use this (not `formatTimeArabic12`) for
+ * a SPECIFIC bookable instant — a slot picker's start time, a selected
+ * value, a range's start/end — anywhere the neighboring value is also
+ * numeric (e.g. "12:00 ص – 12:30 ص"). Mixing the two ever produced the exact
+ * confusing pairing the UX brief flagged: one slot rendered as the word
+ * "منتصف الليل" while the very next 30-minute slot rendered as "12:30 ص",
+ * even though both are the same kind of value. `formatTimeArabic12` itself
+ * stays reserved for describing a working-hours WINDOW BOUNDARY (e.g. "من
+ * 6:00 م إلى منتصف الليل"), where the word is genuinely clearer.
+ */
+export function formatTimeArabic12Strict(hhmm) {
+  const normalized = hhmm === '24:00' ? '00:00' : hhmm
+  if (!isValidTimeString(normalized)) return ''
+  let [h, m] = normalized.split(':').map(Number)
   const period = h >= 12 ? 'م' : 'ص'
   h = h % 12
   if (h === 0) h = 12
@@ -520,4 +537,78 @@ export function localScheduleConflicts(days, durationMinutes, freeWindowsByDay, 
     }
   }
   return conflicts
+}
+
+export const CURRICULUM_LABELS_AR = {
+  tajweed: 'التجويد',
+  hifz: 'الحفظ',
+  nazra: 'النظر',
+  arabic: 'اللغة العربية',
+  quran: 'القرآن الكريم',
+  other: 'أخرى',
+}
+
+export function formatScheduleDays(days) {
+  if (!Array.isArray(days) || !days.length) return 'غير محدد'
+  return [...days].sort((a, b) => a.dayOfWeek - b.dayOfWeek).map((d) => dayLabel(d.dayOfWeek)).join('، ')
+}
+
+export function formatScheduleTimes(days) {
+  if (!Array.isArray(days) || !days.length) return 'غير محدد'
+  const uniqueTimes = [...new Set(days.map((d) => d.time))]
+  if (uniqueTimes.length === 1) return formatTimeArabic12(uniqueTimes[0])
+  return [...days].sort((a, b) => a.dayOfWeek - b.dayOfWeek).map((d) => `${dayLabel(d.dayOfWeek)} ${formatTimeArabic12(d.time)}`).join('، ')
+}
+
+export function buildAssignmentMessagePreview({
+  teacherName,
+  studentGender,
+  studentName,
+  studentAge,
+  curriculum,
+  curriculumLabelOverride,
+  scheduleDays,
+  scheduleTimes,
+  lessonDurationMinutes,
+  teachingType = 'individual',
+  startDate,
+}) {
+  const introPhrase = studentGender === 'male' ? 'طالب جديد' : studentGender === 'female' ? 'طالبة جديدة' : 'طالب/طالبة جديد/جديدة'
+  const dataLabel = studentGender === 'male' ? 'الطالب' : studentGender === 'female' ? 'الطالبة' : 'الطالب/الطالبة'
+  const dataPossessive = studentGender === 'male' ? 'بياناته' : studentGender === 'female' ? 'بياناتها' : 'بياناته/بياناتها'
+  const daysText = Array.isArray(scheduleDays) ? formatScheduleDays(scheduleDays) : (scheduleDays || 'غير محدد')
+  const timesText = Array.isArray(scheduleTimes) ? formatScheduleTimes(scheduleTimes) : (scheduleTimes || 'غير محدد')
+  const startDateText = startDate ? new Date(startDate).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : 'غير محدد'
+  const curriculumText = curriculumLabelOverride || CURRICULUM_LABELS_AR[curriculum] || curriculum || 'القرآن الكريم'
+  const durationText = durationLabel(lessonDurationMinutes)
+  const teachingTypeText = teachingType === 'group' ? 'حصص جماعية' : 'حصص فردية'
+
+  return `السلام عليكم ورحمة الله وبركاته 🌷
+
+أ. ${teacherName || 'المعلم الفاضل'}
+حفظكم الله ورعاكم 🤍
+
+نحيطكم علمًا بأنه تمت إضافة ${introPhrase} إلى جدول حضرتكم، و${dataPossessive} كالتالي:
+
+━━━━━━━━━━━━━━━━━━
+👤 بيانات ${dataLabel}
+━━━━━━━━━━━━━━━━━━
+
+🌸 الاسم: ${studentName || '—'}
+🎂 العمر: ${studentAge || 'غير محدد'}
+📖 المنهج: ${curriculumText}
+
+━━━━━━━━━━━━━━━━━━
+🗓️ بيانات الحلقة
+━━━━━━━━━━━━━━━━━━
+
+📅 الأيام: ${daysText}
+⏰ الموعد: ${timesText}
+⏱️ مدة الحصة: ${durationText}
+📚 نوع التدريس: ${teachingTypeText}
+📆 تاريخ البداية: ${startDateText}
+
+نسأل الله أن يبارك في هذه الحلقة، وينفعكم وينفع بها، ويكتب لكم الأجر والتوفيق في تعليم كتاب الله 🤍
+
+جزاكم الله خيرًا وبارك في علمكم وجهودكم 🌹`
 }

@@ -27,8 +27,8 @@ export default function StudentSchedulePage() {
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>
       ) : !sessions.length ? (
         <div className="card-light p-10 text-center">
-          <Calendar size={44} strokeWidth={1.3} color="#9b7fd6" className="mb-3 mx-auto" />
-          <p className="text-[#9b7fd6]">لا توجد حصص مجدولة قادمة</p>
+          <Calendar size={44} strokeWidth={1.3} color="#7c6aaa" className="mb-3 mx-auto" />
+          <p className="text-[#7c6aaa]">لا توجد حصص مجدولة قادمة</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -37,7 +37,7 @@ export default function StudentSchedulePage() {
             const today = isToday(date)
             return (
               <div key={dateStr}>
-                <div className={`flex items-center gap-3 mb-3 ${today ? 'text-brand-purple' : 'text-[#9b7fd6]'}`}>
+                <div className={`flex items-center gap-3 mb-3 ${today ? 'text-brand-purple' : 'text-[#7c6aaa]'}`}>
                   <span className="font-heading font-bold">{getDayNameAr(date)}</span>
                   <span className="text-sm">{formatDateAr(date)}</span>
                   {today && <Badge variant="purple" dot>اليوم</Badge>}
@@ -47,12 +47,12 @@ export default function StudentSchedulePage() {
                     <div key={s._id} className={`card-light p-4 flex items-center gap-4 ${today ? 'border-brand-purple/20' : ''}`}>
                       <div className="w-16 text-center flex-none">
                         <div className="font-heading font-bold text-brand-textBody text-base">{formatTimeAr(s.scheduledAt)}</div>
-                        <div className="text-xs text-[#9b7fd6]">{s.durationMinutes} د</div>
+                        <div className="text-xs text-[#7c6aaa]">{s.durationMinutes} د</div>
                       </div>
                       <div className="w-px h-10 bg-[#e8e0f5] flex-none" />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-brand-textBody">{s.titleAr || s.title}</div>
-                        <div className="text-xs text-[#9b7fd6] mt-0.5">{s.courseId?.nameAr}</div>
+                        <div className="text-xs text-[#7c6aaa] mt-0.5">{s.courseId?.nameAr}</div>
                       </div>
                       {s.meetingLink && (
                         <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="btn-gold text-xs py-2 px-4">انضم</a>

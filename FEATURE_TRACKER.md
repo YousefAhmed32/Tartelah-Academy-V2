@@ -2,7 +2,77 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
-## Phase 2 Change Requests — Reservation Holds, Flexible Alternative Schedules, Notification Deep Links, Admin Profiles — 2026-08-31 (latest)
+## UX Hardening Pass — Session Lifecycle Docs, Teacher Daily Focus, Check-in Window, Wizard Progress, Student Transparency — 2026-09-08 (latest)
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry. Phase 1 of a large 5-work-package UX brief (onboarding wizard, premium schedule builder, teacher/student/admin lesson lifecycle UX, lifecycle audit+docs) — delivered the packages completable end-to-end with real verification; the largest items (full drag-and-drop weekly planner, `ScheduleReservationLock` concurrency hardening, full multi-student onboarding workspace rebuild) are explicitly scoped out with a documented reason, not silently skipped.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Canonical lesson lifecycle doc + guide | ✅ | `docs/SESSION_LIFECYCLE_GUIDE_AR.md` traced directly from executable code; new reusable role-aware `SessionLifecycleGuide.jsx` ("كيف تعمل الحصة؟"), wired into teacher/student/admin session pages |
+| Cron trigger timezone drift | ✅ fixed | All 5 cron jobs used the legacy `'Asia/Riyadh'` default instead of the academy's actual `Africa/Cairo` setting — fixed to use the canonical `DEFAULT_ACADEMY_TIMEZONE` |
+| Teacher "اليوم" daily-focus view | ✅ | New default landing tab: always-expanded hero session with live countdown, grouped agenda (الآن/القادمة/تحتاج استكمالًا/المنتهية), missing-Quran-report queue merged in |
+| Backend check-in window enforcement | ✅ fixed | `startSession` had zero window enforcement — any session could be checked into at any time via direct API call. Now rejects (400) a non-admin check-in >60min before scheduled start; frontend shows a genuine "not open yet" readiness state with countdown instead of a misleadingly-enabled button |
+| Post-completion finish receipt | ✅ | `FinishReceiptModal.jsx` — real attendance/outcome/wallet-effect/payroll-status/homework/evaluation summary; backend `finishSession` now returns real `walletEffect` |
+| Ambiguous slot-time formatting | ✅ fixed | `formatTimeArabic12Strict` — the exact "12:30 ص vs منتصف الليل" bug the brief named, for every slot-instant display |
+| Onboarding wizard progress sidebar | ✅ | Wider container + desktop sidebar: data-derived completion %, error-aware vertical stepper, per-stage checklist. Full multi-student workspace rebuild NOT done this pass |
+| Student session transparency | ✅ | Session rows show teacher check-in / outcome / wallet effect (existing fields, zero new queries); payroll amounts deliberately excluded |
+| Verification | ✅ | Backend `npx jest` 554/554 (+13 new). Frontend `npx vitest run` 82/82 (+6 new). `npm run build` 0 errors. `eslint` 0 errors on every touched file. Live-browser verification against real seeded data (dev-login, all 3 roles) — countdown math, queue merging, guide modal, student history enrichment all confirmed correct |
+| Not done this pass | — | Full drag-and-drop weekly planner (Package B); `ScheduleReservationLock` partial-overlap concurrency hardening; full onboarding multi-student workspace rebuild (in-place edit, cross-admin session list UI, accessible confirm dialogs, full blur-validation error summary); live pointer/keyboard interaction QA of the schedule picker and 320-1920px screenshots (browser-automation tooling in this environment could not produce a real wide viewport or reliable coordinate clicks this session — verified via DOM queries + code review instead) |
+
+## Admin UI Quality Pass — Responsive, Typography/Contrast, Unified Profiles, Combobox — 2026-09-05
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Typography: missing font weight | ✅ | Tajawal 600 (what `font-semibold` actually requests) was never loaded, forcing browser-synthesized bold everywhere — added to the Google Fonts request |
+| Contrast: shared muted-text token | ✅ | `text-[#9b7fd6]` (~3.28:1, fails AA) was the de-facto muted-text color across the whole light-theme app — 44 occurrences/37 files replaced with the already-established `#7c6aaa` (~4.66:1, passes AA) in one shared-token pass |
+| Responsive: narrow forms on wide screens | ✅ | `AdminPayrollPage` period detail + `AdminTeacherReplacementPage` (both steps) — hardcoded `max-w-4xl` single columns restructured into responsive multi-column layouts that use the freed width for real content |
+| Searchable teacher/student combobox | ✅ | New `PersonCombobox.jsx` (same established pattern as `TeachingSubjectCombobox.jsx`) replaces every native `<select>` fetching up to 500 teachers — `AdminTeacherReplacementPage` (source+target) and `StudentTransferModal` (target teacher) |
+| Unified teacher profile | ✅ | Merged the `AdminTeachersPage` drawer (info/performance/hours/edit/reset-password) and the separate, incomplete `AdminTeacherProfilePage` into one tabbed authoritative profile: نظرة عامة/الطلاب/الأداء/الرواتب/الحساب, deep-linkable via `?tab=`. List click now navigates straight there |
+| Unified student profile | ✅ | Same merge for `AdminStudentsPage`'s drawer + `AdminStudentDetailPage`: نظرة عامة/الاشتراك والمحفظة (new: real wallet ledger, renewal history)/الأكاديمي (existing sub-tabs unchanged)/النقل (new: real transfer history, previously never surfaced)/الحساب. Fixed a real dead link (`?edit=` never read by the list page) |
+| Backend: additive support for the above | ✅ | `User.notes` made writable (existed, wasn't exposed); `renewal.controller.js` gained a validated `studentId` filter; `transfer.service.js#getStudentTransferHistory` now populates teacher names (was returning raw ObjectIds, unused until now); `AdminMonthlyReportsPage`/`AdminQuranReportsPage` read `?teacherId=`/`?studentId=` from the URL |
+| Verification | ✅ | Backend `npx jest` 528/528 (no regressions). Frontend `npx vitest run` 76/76. `npm run build` 0 errors. `eslint` 0 errors/0 new warnings on every touched file. Live API verification against the real dev DB (all new/changed endpoints, `notes` round-trip, permission-boundary 403 for a teacher token on admin student routes) |
+| Not done this pass | — | No live-browser visual/RTL/keyboard/mobile QA (Chrome extension not connected either time it was checked) — verified structurally + at the API layer only. Other listed pages (Sessions, Operations Center, Subscriptions, Schedule Rules, Settings) got the shared contrast-token fix automatically but were not individually re-audited for layout at each breakpoint. Surveys not added to either unified profile (no studentId/teacherId filter on that endpoint yet) |
+
+## Notification Hub Hardening — Central Registry, Dedup, Legacy-Safe Detail View — 2026-09-05 (latest)
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry. The notification system was already largely built (real-time, click-to-navigate, archive/bulk) from 2026-07-11 and 2026-08-31 — this pass closed the remaining gaps against the fuller "reliable, actionable hub" brief.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Centralized destination/validation registry | ✅ | `server/src/config/notificationDestinations.js` — every `actionUrl` validated at write time against a whitelist mirroring the frontend `ROUTES`; unsafe/unknown values dropped + logged, never persisted. Frontend mirror `isSafeInternalPath` guards every `navigate(actionUrl)` call |
+| Dead link found + fixed | ✅ | `teacherReplacement.service.js` pointed at `/admin/transfers/batches/:id`, never a real route — fixed to `/admin/teachers/replace/:id`, caught by the new validator |
+| Structured entity metadata | ✅ | `Notification.entityType` (additive), auto-filled from `type` via a central default map when a producer doesn't set one |
+| Cron/dedup idempotency | ✅ | `metadata.dedupeKey` opt-in check in `notification.service.js` (single + batch). Wired into `teacherAttendanceSweep.job.js`, `subscriptionExpiry.job.js` (replaced a fragile title-regex dedup, added a missing guard on the "expired" branch), `sessionReminder.job.js` (replaced a restart-losing in-memory `Set`) |
+| Attendance alerts previously had **no destination at all** | ✅ fixed | The exact "generic, doesn't take you anywhere" complaint from the brief's screenshots — teacher missed/no_show and admin no-show-alert notifications had zero `actionUrl`. Now `/teacher/attendance` and `/admin/operations` |
+| Non-actionable notifications show full details | ✅ | New `NotificationDetailModal.jsx`, opened by the bell, the Center, and the dashboard widget whenever there's no safe `actionUrl` — previously a dead click |
+| Notification Center: missing type filters | ✅ | `payroll`/`renewal`/`report`/`survey` existed as real, already-linked notification types since 2026-09-01 but had no icon/color config or filter tab — rendered as generic "نظام", unfilterable. Fixed |
+| Notification Center: pagination | ✅ | Bounded "load more" (steps of 50) replacing the flat unpaginated 100-item cap, using the backend's existing `page`/`limit` params |
+| Verification | ✅ | Backend `npx jest` 528/528 (+9 new). Frontend `npx vitest run` 76/76 (+7 new). `npm run build` 0 errors. Live data-layer verification against the real dev DB via `dev-login` (22/22 checks: actionUrl validation, dedup single+batch, legacy-doc compatibility) + real REST calls (existing legacy rows render safely, `mark-all-read` verified end-to-end) |
+| Not done this pass | — | No live-browser/visual/RTL QA (Chrome extension not connected this session — see honest limitation in `SESSION_HANDOFF.md`); no new drawer/panel (dedicated per-role routes already give SPA-fast access from the bell, judged sufficient); no new highlighted-row deep-linking for session/homework/evaluation notifications (consistent with the 2026-08-31 pass's proportionality call) |
+
+## Phase 2 Remaining Scope — Payroll, Adjustments, Renewal, Reports, Survey, Profile Consolidation — 2026-09-01
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry. Delivers the remainder of `PHASE_2_CHANGE_REQUESTS_AR.md` end-to-end.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Hourly teacher payroll | ✅ | `TeacherPayrollEntry`/`TeacherPayrollPeriod` — `sessionPay = hourlyRateSnapshot × payableDurationMinutes ÷ 60`, snapshotted at record time, void+supersede chain for corrections after approval/payment, full period lifecycle (open→pending_review→approved→paid). `payroll.view/manage/approve/pay/export` permissions (approve/pay excluded from default admin). `AdminPayrollPage.jsx` + `TeacherPayrollPage.jsx` |
+| Bonuses/deductions/settlements | ✅ | `financialAdjustment.service.js` — reversal-based (never void+offset double-cancel). Students via wallet bonus, teachers via payroll ledger adjustment. No employee entity fabricated — schema escape hatch documented instead |
+| Subscription renewal | ✅ | `SubscriptionRenewalRequest` + `renewal.service.js` (transfer-first ordering, reuses the existing `transferService`, compensating rollback). Student renewal modal + history on `StudentSubscriptionPage.jsx`; `AdminSubscriptionRenewalsPage.jsx`. Never auto-renews/charges |
+| Quran session report lifecycle | ✅ | `QuranSessionReport` (draft→submitted→correction_requested→approved), references Memorization/Revision/Evaluation by `sessionId` rather than duplicating. Teacher/admin/student pages |
+| Missing-report + monthly tracking | ✅ | `reportTracking.service.js` — bounded, indexed, academy-timezone-aware daily/monthly completion queries |
+| Monthly teacher report | ✅ | `MonthlyTeacherReport` persisted snapshot (never live-recomputed), auto-drafted by `jobs/monthlyReport.job.js` on month close, full review lifecycle |
+| Evaluation/renewal survey | ✅ | `Survey` + `jobs/surveyTrigger.job.js`, configurable `surveyLeadDays` lead time, idempotent via unique index, links to the real renewal flow rather than a second parallel one |
+| Teacher-facing student detail page | ✅ | Was flagged missing in the 2026-08-31 pass (see "Not done this pass" below) — `GET /teachers/me/students/:studentId` (ownership-checked) + `TeacherStudentDetailPage.jsx`, linked from `TeacherStudentsPage.jsx`. Financial/cross-teacher data excluded by design |
+| Admin student/teacher profile consolidation | ✅ | Quran-reports tab + renewal-requests link on student detail; payroll periods + Quran/monthly-report links on teacher profile |
+| Notification deep-link audit | ✅ fixed | Found 3 notifications (`monthlyReport`×2, `quranReport`×1) pointing at nonexistent `/admin|teacher/…/:id` detail routes — neither list page supports per-item deep-linking. Retargeted to the real list routes; added 2 previously-missing notifications (survey-due, monthly-report-auto-generated) |
+| Permission/audit/pagination cross-check | ✅ | All new permission keys registered + correctly default-granted/excluded; `logAction` coverage matches the existing student-self-service-unlogged / admin-action-logged convention; every new admin list endpoint paginated |
+| Verification | ✅ | Backend `npx jest` 519/519 (45 suites). Frontend `npm run build` 0 errors |
+| Not done this pass | — | No live-browser QA on the ~10 new screens (backend tests + build only); `generateAllForMonth` has no batching (fine at current scale, needs chunking well before 500+ teachers); cron jobs verified by reading, not observed firing live |
+
+## Phase 2 Change Requests — Reservation Holds, Flexible Alternative Schedules, Notification Deep Links, Admin Profiles — 2026-08-31
 
 Full detail in `SESSION_HANDOFF.md`'s matching entry. Delivered against `PHASE_2_CHANGE_REQUESTS_AR.md` items #1 (reservation completeness), #2 (flexible alternative schedule), and the admin-profile/notification/assignment-UX requests layered on top of the already-complete §17 assignment workflow.
 
@@ -878,6 +948,26 @@ Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
 
 ---
 
+## Phase 2 Meeting Addendum (2026-09-01) — Credential Defaults, Subscription Pause/Resume, Student Transfer, Teacher Replacement
+
+Full details, architectural decisions, and real bugs found/fixed during integration verification: `PHASE_2_CHANGE_REQUESTS_AR.md` §22.
+
+| Item | Status | Notes |
+|---|---|---|
+| Role-specific academy default passwords (encrypted at rest, dedicated key) | ✅ | New `CredentialDefaults` collection, AES-256-GCM, never in AcademySettings (that endpoint is public) |
+| Third credential mode `academy_default` wired into every creation flow | ✅ | Single chokepoint (`resolveCredentialInput`) — onboarding wizard, incremental session, standalone student, add-student-to-teacher, standalone teacher |
+| `requirePasswordChange` default changed: false for manual/academy_default, true (fixed) for auto | ✅ | Explicit behavior change per this addendum |
+| Dedicated `credentials.manage_defaults` permission, not default-granted | ✅ | Same conservative pattern as `admins.create` |
+| Admin settings UI to configure/replace/clear defaults (never displays stored value) | ✅ | New tab in `AdminSettingsPage.jsx` |
+| Complete subscription pause/resume lifecycle | ✅ | `SubscriptionPause` audit-history model (not overwriting wallet's single freeze slot), wallet balance preserved, schedule rules + future sessions paused/cancelled without financial impact, endDate extended by exact paused duration on resume |
+| Pause/resume idempotency + admin UI (AdminSubscriptionsPage) | ✅ | Double-pause/double-resume safe no-ops; preview-before-confirm; history view |
+| Single active-student transfer between teachers | ✅ | `transfer.service.js` — real availability re-check, alternative-slot suggestions, history preserved under old teacher, wallet untouched |
+| Bulk whole-teacher-replacement batches | ✅ | `teacherReplacement.service.js` reuses the single-transfer primitive per student; classification (ready/conflict/missing_data), bounded+resumable processing, retry/cancel, optional source-teacher deactivation only on full success |
+| Dedicated step-based bulk-replacement page (not a modal) | ✅ | `AdminTeacherReplacementPage.jsx` — setup/preview → conflict resolution → run/monitor |
+| New permissions `transfers.view`/`transfers.execute`/`subscriptions.pause_resume` | ✅ | Backend-enforced on every new route |
+| Automated verification | ✅ | 447 backend tests (mocked-model unit tests, +4 from the live-QA fixes below) + a full real-MongoDB integration rehearsal (credential defaults, pause/resume, transfer, bulk batch) that found and fixed 3 real bugs before sign-off; frontend production build clean |
+| Live-browser QA pass (2026-09-01, recovery session) | ✅ | Full walkthrough against the real dev stack — academy defaults, teacher+student creation, pause/resume, single transfer (conflict+alternative), bulk replacement (conflict resolution+run+deactivation). Found & fixed 3 more real bugs: academy-default password silently fell back to auto/forced-change when the admin never opened the "تسجيل الدخول" tab (wizard + add-student modal); a 409 console/network error burst on every subscription pause (stale query invalidation); batch review always showed a partial student id instead of the full name. Also closed the documented multi-conflicting-rule limitation — each conflicting rule now resolves to its own alternative slot instead of one shared slot for all. Details: `SESSION_HANDOFF.md`'s 2026-09-01 recovery entry. |
+
 ## Summary
 
 | Phase | Total | Complete | Remaining |
@@ -903,4 +993,5 @@ Full detail in `docs/TEACHER_IDENTITY_AND_TEACHERS_PAGE_REFACTOR.md`.
 | **Full-Platform Seeder, Live Audit & Documentation Pass** | **10** | **10** | **0** |
 | **Notification Center Redesign & UX/Product Audit** | **13** | **13** | **0** |
 | **Operations Center Full Audit & Rebuild** | **14** | **14** | **0** |
-| **TOTAL** | **317** | **317** | **0** |
+| **Phase 2 Meeting Addendum (Credentials/Pause-Resume/Transfer)** | **12** | **12** | **0** |
+| **TOTAL** | **329** | **329** | **0** |

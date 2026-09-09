@@ -64,6 +64,14 @@ JWT_REFRESH_SECRET=<a DIFFERENT 32+ random string — never reuse the access sec
 JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 
+# Academy default student/teacher passwords (Phase 2 meeting addendum §1) —
+# a THIRD independent secret, never reused from the two above. Must decode
+# to exactly 32 bytes (base64 or hex). Generate with:
+# node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+# Without this set, the "academy default password" credential mode is
+# simply unavailable — manual/auto account creation are unaffected.
+CREDENTIAL_DEFAULTS_KEY=<32-byte base64 or hex — independent from JWT secrets>
+
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=<real sending address>
@@ -87,6 +95,7 @@ OPENAI_CHAT_MODEL=gpt-5.4-mini
 **Never commit `server/.env`.** It's already gitignored.
 
 - `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` must be two independent random values — this is intentional (compromising one token type never compromises the other). Do not collapse them into a single shared secret.
+- `CREDENTIAL_DEFAULTS_KEY` must also be independent from both JWT secrets — rotating it invalidates any already-configured academy default password (an admin would need to re-enter it from Settings → كلمات المرور الافتراضية), but never touches per-user login (every real user password is bcrypt-hashed separately and is completely unaffected by this key).
 - File uploads (avatars, course/article images, homework, payment proofs) live in MongoDB GridFS — there is no local `uploads/` directory to provision and no S3/Cloudinary dependency to configure.
 - There is no payment gateway (Stripe or otherwise) and no WhatsApp Business API integration in this codebase today — don't add credentials for services that aren't wired up.
 

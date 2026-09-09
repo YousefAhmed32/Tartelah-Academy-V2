@@ -6,13 +6,17 @@ const NotificationSchema = new mongoose.Schema({
   title:     { type: String },
   bodyAr:    { type: String },
   body:      { type: String },
-  type:      { type: String, enum: ['session', 'homework', 'evaluation', 'subscription', 'enrollment', 'payment', 'schedule', 'system', 'attendance', 'assignment'], default: 'system' },
+  type:      { type: String, enum: ['session', 'homework', 'evaluation', 'subscription', 'enrollment', 'payment', 'schedule', 'system', 'attendance', 'assignment', 'payroll', 'renewal', 'report', 'survey'], default: 'system' },
   priority:  { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
   isRead:    { type: Boolean, default: false },
   readAt:    { type: Date },
   isArchived:  { type: Boolean, default: false },
   archivedAt:  { type: Date },
   relatedId: { type: mongoose.Schema.Types.ObjectId },
+  // Human-readable label for what `relatedId` actually points at (e.g.
+  // "Session", "AssignmentRequest") — additive, optional. Older documents
+  // without it remain valid; the frontend falls back to `type` for display.
+  entityType: { type: String },
   actionUrl: { type: String },
   metadata:  { type: mongoose.Schema.Types.Mixed },
 }, { timestamps: true })

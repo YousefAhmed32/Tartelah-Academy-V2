@@ -10,7 +10,7 @@ import WeekdayChipSelector from './WeekdayChipSelector.jsx'
 import ScheduleSlotPicker from './ScheduleSlotPicker.jsx'
 import {
   DURATION_OPTIONS, TEACHING_TYPE_OPTIONS, FREQUENCY_OPTIONS,
-  FREQUENCIES_WITH_WEEKDAY_PICKER, conflictLabel, dayLabel, formatTimeArabic12,
+  FREQUENCIES_WITH_WEEKDAY_PICKER, conflictLabel, dayLabel, formatTimeArabic12Strict,
   computeLocalFreeWindows, localScheduleConflicts, deriveScheduleDays,
   buildSuggestions, computeUpcomingOccurrences, validateScheduleDates,
   generateTimeSlots,
@@ -67,13 +67,13 @@ function WeeklySummaryCard({ schedule, days, timezoneLabel, studentType }) {
           {days.map((d) => (
             <li key={d.dayOfWeek} className="text-xs text-gray-600 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-none" />
-              <span className="font-semibold text-gray-800">{dayLabel(d.dayOfWeek)}</span> — {formatTimeArabic12(d.time)}
+              <span className="font-semibold text-gray-800">{dayLabel(d.dayOfWeek)}</span> — {formatTimeArabic12Strict(d.time)}
             </li>
           ))}
         </ul>
       ) : (
         <p className="text-xs text-gray-600">
-          {schedule.frequency === 'daily' ? 'كل يوم' : `نفس يوم الشهر (${startDateArabic(schedule.startDate) || '—'})`} — {formatTimeArabic12(schedule.singleTime)}
+          {schedule.frequency === 'daily' ? 'كل يوم' : `نفس يوم الشهر (${startDateArabic(schedule.startDate) || '—'})`} — {formatTimeArabic12Strict(schedule.singleTime)}
         </p>
       )}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-500 pt-1 border-t border-gray-200">
@@ -113,8 +113,12 @@ function MonthlyPreviewDrawer({ schedule, days }) {
               {occurrences.map((o, i) => (
                 <li key={i} className="text-xs text-gray-600 flex items-center justify-between bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
                   <span>{o.date.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                  <span className="font-bold text-violet-700">{formatTimeArabic12(o.time)}</span>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5">مخطط جديد</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-violet-700">{formatTimeArabic12Strict(o.time)}</span>
+                    <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100/90 rounded-full px-2 py-0.5">
+                      حصة {i + 1} من {occurrences.length}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>

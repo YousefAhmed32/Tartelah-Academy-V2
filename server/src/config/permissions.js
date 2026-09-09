@@ -76,6 +76,51 @@ const ALL_PERMISSIONS = [
   // reorder.
   'curricula.view',
   'curricula.manage',
+  // Academy-wide default student/teacher passwords (Phase 2 meeting
+  // addendum §1) — deliberately its own permission, not folded into
+  // settings.update: replacing the shared operational password for new
+  // accounts is a materially more sensitive action than editing site
+  // content/contact settings, and must be grantable/revocable independently.
+  'credentials.manage_defaults',
+  // Complete subscription pause/resume lifecycle (Phase 2 meeting addendum
+  // §2) — distinct from subscriptions.manage's general CRUD so the
+  // higher-impact pause/resume action (wallet freeze + schedule pause +
+  // future-session handling) can be scoped separately if desired; both
+  // 'admin' and any role already holding subscriptions.manage get it below.
+  'subscriptions.pause_resume',
+  // Active-student transfer and whole-teacher replacement (Phase 2 meeting
+  // addendum §3–§4).
+  'transfers.view',
+  'transfers.execute',
+  // Hourly teacher payroll + financial adjustments (Phase 2 §6–§7). `.view`
+  // covers browsing the ledger/periods/reports; `.manage` covers recording
+  // bonuses/deductions/settlements and reopening a period for correction.
+  // `.approve`/`.pay` are deliberately separate, higher-risk actions — same
+  // "must be explicitly granted, never auto-inherited even by a plain admin"
+  // treatment as `assignments.override`/`credentials.manage_defaults` below,
+  // since they represent an actual sign-off on releasing real money.
+  // `.export` covers the print/export capability, kept independent so it can
+  // be granted to a read-only finance role without also granting `.manage`.
+  'payroll.view',
+  'payroll.manage',
+  'payroll.approve',
+  'payroll.pay',
+  'payroll.export',
+  // Quran session reports (Phase 2 §10) — teachers create/submit their own
+  // (ownership-checked, no permission system involved for them, same
+  // convention as every other teacher-facing surface); `.view`/`.manage`
+  // here are for the ADMIN review side only (request correction/approve).
+  'quranReports.view',
+  'quranReports.manage',
+  // Monthly teacher reports (Phase 2 §11) — same split: teachers
+  // review/submit their own draft, admins review/approve via these.
+  'monthlyReports.view',
+  'monthlyReports.manage',
+  // Evaluation/renewal survey (Phase 2 §13) — admin-only; teachers never get
+  // a permission here at all (see models/Survey.js's privacy doc-comment —
+  // raw responses are not a teacher-facing surface in this pass).
+  'surveys.view',
+  'surveys.manage',
 ]
 
 // Internal role identifiers (User.role). Stable — never rename these values,
@@ -135,10 +180,23 @@ const DEFAULT_PERMISSIONS_BY_ROLE = {
     'enrollments.view', 'enrollments.manage',
     'assignments.view', 'assignments.manage',
     'curricula.view', 'curricula.manage',
-    // 'assignments.override' deliberately excluded even for a plain 'admin'
-    // account — the immediate-assignment-without-teacher-approval bypass
+    // Subscription pause/resume and student transfer/teacher-replacement are
+    // natural extensions of the subscriptions.manage/teachers.manage/
+    // students.manage authority a plain 'admin' already holds above.
+    'subscriptions.pause_resume',
+    'transfers.view', 'transfers.execute',
+    'payroll.view', 'payroll.manage', 'payroll.export',
+    'quranReports.view', 'quranReports.manage',
+    'monthlyReports.view', 'monthlyReports.manage',
+    'surveys.view', 'surveys.manage',
+    // 'assignments.override', 'credentials.manage_defaults', and
+    // 'payroll.approve'/'payroll.pay' deliberately excluded even for a plain
+    // 'admin' account — the immediate-assignment-without-teacher-approval
+    // bypass, replacing the academy's shared default password for new
+    // accounts, and actually signing off on releasing real payroll money,
     // must always be explicitly granted (or held via isPrimaryAdmin), never
-    // auto-inherited, per the brief's "disabled by default" requirement.
+    // auto-inherited, per the brief's "disabled by default" requirement for
+    // sensitive/high-impact authority.
   ],
   [ROLES.ASSISTANT_ADMIN]: [
     'users.view', 'dashboard.view', 'content.view', 'content.create', 'content.update', 'content.publish',

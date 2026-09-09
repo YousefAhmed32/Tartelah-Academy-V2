@@ -25,7 +25,7 @@ export default function Select({
       >
         <RadixSelect.Value placeholder={placeholder} />
         <RadixSelect.Icon>
-          <ChevronDown size={16} className="text-[#9b7fd6] flex-none" />
+          <ChevronDown size={16} className="text-[#7c6aaa] flex-none" />
         </RadixSelect.Icon>
       </RadixSelect.Trigger>
 

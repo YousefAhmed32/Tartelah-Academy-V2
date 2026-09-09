@@ -454,7 +454,7 @@ export default function HomePage() {
             <img src="/images/logo.jpg" alt="ترتيلة أونلاين" style={{ width: 46, height: 46, borderRadius: 13, objectFit: 'cover', border: '1px solid rgba(212,175,55,.4)' }} />
             <div style={{ lineHeight: 1.18 }}>
               <div style={{ color: '#F3E6C0', fontFamily: 'Cairo', fontWeight: 800, fontSize: 16 }}>ترتيلة</div>
-              <div style={{ color: '#9b7fd6', fontSize: 10, letterSpacing: 3, fontWeight: 600 }}>ONLINE</div>
+              <div style={{ color: '#7c6aaa', fontSize: 10, letterSpacing: 3, fontWeight: 600 }}>ONLINE</div>
             </div>
           </div>
           <nav style={{ display: 'flex', gap: 'clamp(16px,2.4vw,30px)', flexWrap: 'wrap', fontSize: 15 }}>

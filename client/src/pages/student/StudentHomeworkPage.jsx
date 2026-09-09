@@ -88,8 +88,8 @@ export default function StudentHomeworkPage() {
               <div key={hw._id} className="card-light p-5 flex items-start justify-between gap-4 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <div className="font-heading font-bold text-brand-textBody">{hw.titleAr || hw.title}</div>
-                  {hw.descriptionAr && <p className="text-sm text-[#9b7fd6] mt-1 line-clamp-2">{hw.descriptionAr}</p>}
-                  <div className="text-xs text-[#9b7fd6] mt-2">تاريخ التسليم: {formatDateAr(hw.dueDate)}</div>
+                  {hw.descriptionAr && <p className="text-sm text-[#7c6aaa] mt-1 line-clamp-2">{hw.descriptionAr}</p>}
+                  <div className="text-xs text-[#7c6aaa] mt-2">تاريخ التسليم: {formatDateAr(hw.dueDate)}</div>
                   {mySubmission?.grade !== undefined && (
                     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-lg">
                       <span className="text-xs font-bold text-amber-600 flex items-center gap-1"><Star size={12} strokeWidth={0} fill="#d97706" /> {mySubmission.grade}/10</span>
@@ -131,7 +131,7 @@ export default function StudentHomeworkPage() {
       >
         <div className="space-y-4" dir="rtl">
           {selected?.descriptionAr && (
-            <div className="p-4 rounded-xl bg-[#f8f5ff] text-sm text-[#9b7fd6]">{selected.descriptionAr}</div>
+            <div className="p-4 rounded-xl bg-[#f8f5ff] text-sm text-[#7c6aaa]">{selected.descriptionAr}</div>
           )}
 
           <div>
@@ -144,7 +144,7 @@ export default function StudentHomeworkPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-semibold text-brand-textBody">المرفقات</label>
-              <span className="text-xs text-[#9b7fd6]">{files.length}/{MAX_FILES} ملف · حتى {MAX_SIZE_MB} MB</span>
+              <span className="text-xs text-[#7c6aaa]">{files.length}/{MAX_FILES} ملف · حتى {MAX_SIZE_MB} MB</span>
             </div>
 
             {/* Existing files */}
@@ -154,7 +154,7 @@ export default function StudentHomeworkPage() {
                   <div key={i} className="flex items-center gap-2 p-2.5 bg-[#f8f5ff] rounded-xl">
                     {f.type.startsWith('image/') ? <ImageIcon size={14} className="text-violet-500 flex-none" /> : <FileText size={14} className="text-violet-500 flex-none" />}
                     <span className="flex-1 text-xs text-brand-textBody truncate">{f.name}</span>
-                    <span className="text-xs text-[#9b7fd6]">{(f.size / 1024).toFixed(0)} KB</span>
+                    <span className="text-xs text-[#7c6aaa]">{(f.size / 1024).toFixed(0)} KB</span>
                     <button onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 p-0.5"><X size={12} /></button>
                   </div>
                 ))}
@@ -165,7 +165,7 @@ export default function StudentHomeworkPage() {
               <>
                 <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,audio/*,video/mp4" className="hidden" onChange={handleFileChange} />
                 <button onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3 border-2 border-dashed border-[#d0c4f0] rounded-xl text-sm text-[#9b7fd6] hover:border-brand-purple hover:text-brand-purple transition-colors flex items-center justify-center gap-2">
+                  className="w-full py-3 border-2 border-dashed border-[#d0c4f0] rounded-xl text-sm text-[#7c6aaa] hover:border-brand-purple hover:text-brand-purple transition-colors flex items-center justify-center gap-2">
                   <Paperclip size={14} />
                   أضف ملف (صورة، PDF، صوت)
                 </button>

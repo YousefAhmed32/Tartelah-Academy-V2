@@ -16,5 +16,6 @@ router.post('/:studentId/freeze', requirePermission('subscriptions.manage'), ctr
 router.post('/:studentId/resume', requirePermission('subscriptions.manage'), ctrl.resumeWallet)
 router.post('/:studentId/transfer', requirePermission('subscriptions.manage'), ctrl.transferLessons)
 router.post('/:studentId/compensation', requirePermission('subscriptions.manage'), ctrl.grantCompensation)
+router.post('/:studentId/bonus', requirePermission('subscriptions.manage'), ctrl.grantBonus)
 
 module.exports = router

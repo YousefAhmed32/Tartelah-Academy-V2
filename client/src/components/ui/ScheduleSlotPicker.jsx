@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Clock, ChevronDown, AlertTriangle, CheckCircle2, LockKeyhole, Sparkles, TimerReset } from 'lucide-react'
 import {
-  formatTimeArabic12, addMinutesToTime, describeAvailability, generateTimeSlots,
+  formatTimeArabic12Strict, addMinutesToTime, describeAvailability, generateTimeSlots,
   groupSlotsByPeriod, PERIOD_LABELS_AR, buildSlotStatusMap,
 } from '../../utils/assignmentSchedule.js'
 
@@ -58,7 +58,7 @@ export default function ScheduleSlotPicker({
       >
         <span className="flex items-center gap-1.5 min-w-0 truncate">
           <Clock size={14} className="flex-none" />
-          {value ? `${formatTimeArabic12(value)} ← ${formatTimeArabic12(addMinutesToTime(value, durationMinutes))}` : 'اختر موعدًا'}
+          {value ? `${formatTimeArabic12Strict(value)} ← ${formatTimeArabic12Strict(addMinutesToTime(value, durationMinutes))}` : 'اختر موعدًا'}
         </span>
         <ChevronDown size={15} className={`flex-none transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -118,7 +118,7 @@ export default function ScheduleSlotPicker({
                               disabled={!available}
                               onClick={() => pick(t)}
                               aria-pressed={selected}
-                              aria-label={`${formatTimeArabic12(t)} — ${statusLabel}`}
+                              aria-label={`${formatTimeArabic12Strict(t)} — ${statusLabel}`}
                               title={available ? 'موعد متاح' : reserved ? 'محجوز مؤقتًا — طلب آخر بانتظار الموافقة على هذا الموعد' : 'موعد محجوز أو ضمن الفترة الفاصلة'}
                               className={`min-h-10 px-2 rounded-lg text-xs font-bold border transition-colors inline-flex items-center justify-center gap-1
                                 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500
@@ -132,7 +132,7 @@ export default function ScheduleSlotPicker({
                                 }`}
                             >
                               {available ? <CheckCircle2 size={11} aria-hidden="true" /> : reserved ? <TimerReset size={11} aria-hidden="true" /> : <LockKeyhole size={11} aria-hidden="true" />}
-                              {formatTimeArabic12(t)}
+                              {formatTimeArabic12Strict(t)}
                             </button>
                           )
                         })}

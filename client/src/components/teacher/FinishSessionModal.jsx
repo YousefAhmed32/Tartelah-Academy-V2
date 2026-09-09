@@ -16,7 +16,11 @@ const LBL = 'block text-xs font-bold text-brand-textBody mb-1.5'
 // evaluation — one save button, one backend call (/sessions/:id/finish).
 // Shared by the Sessions page and the Home Dashboard's current-session card
 // so the finish workflow is identical no matter where it's launched from.
-export default function FinishSessionModal({ session, onClose, qc }) {
+// `onFinished(data)` — optional — receives the full finish response
+// (session/attendance/evaluation/homework/walletEffect) so the caller can
+// show a concise post-completion receipt (see FinishReceiptModal.jsx)
+// instead of the action just silently closing with a toast.
+export default function FinishSessionModal({ session, onClose, qc, onFinished }) {
   const [attendanceStatus, setAttendanceStatus] = useState('')
   const [attendanceNotes, setAttendanceNotes] = useState('')
   const [teacherNotes, setTeacherNotes] = useState('')
@@ -37,13 +41,15 @@ export default function FinishSessionModal({ session, onClose, qc }) {
       homework: addHomework && hwTitle && hwDue ? { titleAr: hwTitle, descriptionAr: hwDesc, dueDate: hwDue } : undefined,
       evaluation: addEval ? { type: evalType, score: Number(evalScore), notesAr: evalNotes } : undefined,
     }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success('تم حفظ الحصة وإنهاؤها بنجاح')
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'history'] })
       qc.invalidateQueries({ queryKey: ['teacher', 'students'] })
       qc.invalidateQueries({ queryKey: ['teacher', 'dashboard'] })
+      qc.invalidateQueries({ queryKey: ['teacher', 'quran-reports', 'overdue'] })
       onClose()
+      onFinished?.(res.data.data)
     },
     onError: () => toast.error('حدث خطأ أثناء الحفظ'),
   })
@@ -61,7 +67,7 @@ export default function FinishSessionModal({ session, onClose, qc }) {
           <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div>
             <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
-            <div className="text-xs text-[#9b7fd6]">{session.titleAr}</div>
+            <div className="text-xs text-[#7c6aaa]">{session.titleAr}</div>
           </div>
         </div>
 

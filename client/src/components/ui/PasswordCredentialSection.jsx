@@ -1,19 +1,60 @@
-import { KeyRound, Wand2 } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { KeyRound, Wand2, Building2 } from 'lucide-react'
 import Input from './Input.jsx'
+import { credentialDefaultsService } from '../../services/credentialDefaults.service.js'
 
-// "تسجيل الدخول وكلمة المرور" — Phase 2 Part 2 §1–§2. Exactly two supported
-// modes (no academy-wide/shared password exists): automatic secure
-// generation, or an administrator-typed initial password. Used by the
-// teacher-and-students onboarding wizard, the "Add student" flow, and the
-// standalone student-creation form — one shared component so validation
+// "تسجيل الدخول وكلمة المرور" — Phase 2 Part 2 §1–§2, extended by the Phase 2
+// meeting addendum §1 into three modes. Used by the teacher-and-students
+// onboarding wizard, the "Add student" flow, the standalone student-creation
+// form, and standalone teacher creation — one shared component so validation
 // feedback and copy never drift between call sites.
 //
-// `value` shape: { mode: 'auto'|'manual', password, passwordConfirm, requirePasswordChange }
-// The backend re-validates everything here again — this component only
-// gives immediate feedback; it is never the actual security boundary.
-export default function PasswordCredentialSection({ value, onChange, compact = false }) {
+// `value` shape: { mode: 'academy_default'|'auto'|'manual', password, passwordConfirm, requirePasswordChange }
+// `role` ('student'|'teacher') is REQUIRED — it determines which academy
+// default (if any) this picker offers. The backend re-validates everything
+// here again — this component only gives immediate feedback and resolves
+// nothing itself; it never sends a password for 'academy_default' mode, only
+// the mode string — the server resolves the protected value authoritatively.
+//
+// For a multi-student onboarding run where each student is a fresh form
+// (Phase 2 addendum §1's "apply consistently without retyping the password
+// for every student"), pass a `resetKey` that changes with every new student
+// (e.g. how many have been saved so far) as this component's React `key` —
+// remounting is what correctly resets the "has the admin made an explicit
+// choice for THIS student yet" flag below without any fragile heuristic.
+export default function PasswordCredentialSection({ value, onChange, role, compact = false }) {
   const set = (patch) => onChange({ ...value, ...patch })
   const mode = value.mode || 'auto'
+  const touchedRef = useRef(false)
+
+  const { data: availability } = useQuery({
+    queryKey: ['credentialDefaults', 'availability'],
+    queryFn: () => credentialDefaultsService.getAvailability().then((r) => r.data.data),
+    staleTime: 60_000,
+  })
+  const defaultAvailable = !!availability?.[role]
+
+  // "Use academy default password" is selected by default when the role has
+  // a configured default — but only until the admin makes an explicit choice
+  // (any button click) for this instance, and only once (first successful
+  // availability fetch, which may resolve after mount).
+  useEffect(() => {
+    if (touchedRef.current) return
+    if (defaultAvailable && mode !== 'academy_default') {
+      set({ mode: 'academy_default', requirePasswordChange: false, password: '', passwordConfirm: '' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultAvailable])
+
+  const selectMode = (nextMode) => {
+    touchedRef.current = true
+    set({
+      mode: nextMode,
+      password: '', passwordConfirm: '',
+      requirePasswordChange: nextMode === 'auto', // auto→true, academy_default/manual→false (meeting addendum §1)
+    })
+  }
 
   const passwordTooShort = mode === 'manual' && value.password && value.password.length < 8
   const passwordWeak = mode === 'manual' && value.password && value.password.length >= 8 && !/[A-Za-z]/.test(value.password)
@@ -25,42 +66,60 @@ export default function PasswordCredentialSection({ value, onChange, compact = f
         <KeyRound size={13} /> تسجيل الدخول وكلمة المرور
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => set({ mode: 'auto', password: '', passwordConfirm: '' })}
+          onClick={() => defaultAvailable && selectMode('academy_default')}
+          disabled={!defaultAvailable}
+          title={defaultAvailable ? undefined : 'لم يتم إعداد كلمة مرور افتراضية لهذا الدور بعد — يمكن إعدادها من إعدادات الأكاديمية'}
           className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
-            mode === 'auto' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
+            !defaultAvailable ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+              : mode === 'academy_default' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
           }`}
         >
-          <Wand2 size={13} /> إنشاء تلقائي آمن
+          <Building2 size={13} /> كلمة مرور الأكاديمية
         </button>
         <button
           type="button"
-          onClick={() => set({ mode: 'manual' })}
+          onClick={() => selectMode('manual')}
           className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
             mode === 'manual' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
           }`}
         >
           <KeyRound size={13} /> كلمة مرور يدوية
         </button>
+        <button
+          type="button"
+          onClick={() => selectMode('auto')}
+          className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
+            mode === 'auto' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
+          }`}
+        >
+          <Wand2 size={13} /> إنشاء تلقائي
+        </button>
       </div>
 
-      {mode === 'auto' ? (
+      {mode === 'academy_default' && (
+        <p className="text-[11px] text-gray-400 leading-relaxed">
+          سيُستخدم رمز الدخول الموحّد الذي حدّدته الأكاديمية لهذا النوع من الحسابات — هذه كلمة مرور مشتركة تُستخدم تشغيليًا للحسابات الجديدة، ولا تُعرض هنا لأي سبب. يمكن للطالب/المعلم تغييرها لاحقًا من إعداداته.
+        </p>
+      )}
+      {mode === 'auto' && (
         <p className="text-[11px] text-gray-400 leading-relaxed">
           سيُنشئ النظام كلمة مرور مؤقتة قوية تلقائيًا وتُعرض مرة واحدة فقط بعد الإنشاء. سيُطلب تغييرها عند أول تسجيل دخول.
         </p>
-      ) : (
+      )}
+      {mode === 'manual' && (
         <div className="space-y-2">
           <Input
             label="كلمة المرور" variant="light" type="password"
-            value={value.password || ''} onChange={(e) => set({ password: e.target.value })}
+            value={value.password || ''} onChange={(e) => { touchedRef.current = true; set({ password: e.target.value }) }}
             error={passwordTooShort ? 'يجب أن تكون 8 أحرف على الأقل' : passwordWeak ? 'يجب أن تحتوي على حرف ورقم على الأقل' : undefined}
             autoComplete="new-password"
           />
           <Input
             label="تأكيد كلمة المرور" variant="light" type="password"
-            value={value.passwordConfirm || ''} onChange={(e) => set({ passwordConfirm: e.target.value })}
+            value={value.passwordConfirm || ''} onChange={(e) => { touchedRef.current = true; set({ passwordConfirm: e.target.value }) }}
             error={mismatch ? 'كلمتا المرور غير متطابقتين' : undefined}
             autoComplete="new-password"
           />
@@ -70,11 +129,13 @@ export default function PasswordCredentialSection({ value, onChange, compact = f
       <label className="flex items-center gap-2 text-xs text-gray-600 font-semibold cursor-pointer select-none">
         <input
           type="checkbox"
-          checked={value.requirePasswordChange !== false}
-          onChange={(e) => set({ requirePasswordChange: e.target.checked })}
-          className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+          checked={value.requirePasswordChange === true}
+          onChange={(e) => { touchedRef.current = true; set({ requirePasswordChange: e.target.checked }) }}
+          disabled={mode === 'auto'}
+          className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400 disabled:opacity-50"
         />
-        مطالبة بتغيير كلمة المرور عند أول تسجيل دخول (موصى به)
+        مطالبة بتغيير كلمة المرور عند أول تسجيل دخول
+        {mode === 'auto' && <span className="text-gray-400 font-normal">(مفعّلة دائمًا مع الإنشاء التلقائي)</span>}
       </label>
     </div>
   )
@@ -85,7 +146,7 @@ export default function PasswordCredentialSection({ value, onChange, compact = f
  * regardless. Returns an Arabic error string, or null when valid. */
 export function validateCredentialValue(value) {
   const mode = value?.mode || 'auto'
-  if (mode === 'auto') return null
+  if (mode === 'auto' || mode === 'academy_default') return null
   const pw = value.password || ''
   if (pw.length < 8) return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'
   if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) return 'يجب أن تحتوي كلمة المرور على حرف ورقم على الأقل'
@@ -98,8 +159,9 @@ export function emptyCredential() {
 }
 
 /** Builds the exact `credential` object the backend API expects — never
- * includes the raw password fields for auto mode. */
+ * includes the raw password fields for auto/academy_default modes. */
 export function credentialPayload(value) {
-  if (!value || value.mode !== 'manual') return { mode: 'auto' }
-  return { mode: 'manual', password: value.password, passwordConfirm: value.passwordConfirm, requirePasswordChange: value.requirePasswordChange !== false }
+  if (!value || value.mode === 'auto') return { mode: 'auto' }
+  if (value.mode === 'academy_default') return { mode: 'academy_default', requirePasswordChange: value.requirePasswordChange === true }
+  return { mode: 'manual', password: value.password, passwordConfirm: value.passwordConfirm, requirePasswordChange: value.requirePasswordChange === true }
 }

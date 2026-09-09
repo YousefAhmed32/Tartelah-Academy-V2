@@ -1,46 +1,71 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import {
   ArrowRight, Mail, Phone, Wallet, GraduationCap, Users, Calendar, Plus, Clock,
   User, KeyRound, CalendarClock, Lock, History, ClipboardCheck, TrendingUp,
+  Settings, LayoutGrid, FileText, Power, PowerOff, MessageCircle, StickyNote,
+  Video, RefreshCw, ExternalLink, Gift, RotateCcw, SlidersHorizontal,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
+import Badge from '../../components/ui/Badge.jsx'
+import BulkSyncLinksModal from '../../components/teacher/BulkSyncLinksModal.jsx'
+import TeacherAdjustmentModal from '../../components/admin/TeacherAdjustmentModal.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
+import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import WorkingHoursEditor from '../../components/ui/WorkingHoursEditor.jsx'
+import GenderSegmentedControl from '../../components/ui/GenderSegmentedControl.jsx'
+import SpecializationsMultiSelect from '../../components/ui/SpecializationsMultiSelect.jsx'
+import AudienceCategoriesMultiSelect from '../../components/ui/AudienceCategoriesMultiSelect.jsx'
+import ShiftsMultiSelect from '../../components/ui/ShiftsMultiSelect.jsx'
 import PasswordCredentialSection, { emptyCredential, validateCredentialValue, credentialPayload } from '../../components/ui/PasswordCredentialSection.jsx'
 import StudentScheduleSection, { emptySchedule } from '../../components/ui/StudentScheduleSection.jsx'
-import { formatDateAr } from '../../utils/date.js'
+import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
+import { exportReportToPDF } from '../../utils/exportUtils.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { resolveTeacherIdentity } from '../../utils/teacherIdentity.js'
-import { subjectLabel } from '../../utils/teacherProfile.js'
+import { subjectLabel, teacherShiftsLabel } from '../../utils/teacherProfile.js'
 import { useTeachingSubjects } from '../../hooks/useTeachingSubjects.js'
+import { payrollService } from '../../services/payroll.service.js'
 import { audienceCategoriesLabel } from '../../utils/studentAudience.js'
 import { buildDefaultWorkingHours, summarizeWorkingHoursDays } from '../../utils/workingHours.js'
 import { useAuthStore } from '../../store/authStore.js'
 import { deriveScheduleDays, validateScheduleForSubmit } from '../../utils/assignmentSchedule.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
-const labelCls = 'text-xs font-bold text-gray-400 mb-1 block'
+const labelCls = 'text-xs font-bold text-gray-500 mb-1 block'
 
 function InfoRow({ label, value, icon }) {
   if (!value) return null
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-none text-gray-400">{icon}</div>
-      <div>
-        <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-        <div className="text-sm font-semibold text-gray-800">{value}</div>
+      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-none text-gray-500">{icon}</div>
+      <div className="min-w-0">
+        <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+        <div className="text-sm font-semibold text-gray-800 break-words">{value}</div>
       </div>
     </div>
   )
 }
+
+// ── Tabs (deep-linkable via ?tab=) ────────────────────────────────────────────
+
+const TABS = [
+  { key: 'overview',    label: 'نظرة عامة',    Icon: LayoutGrid },
+  { key: 'students',    label: 'الطلاب',        Icon: Users },
+  { key: 'performance', label: 'الأداء',        Icon: TrendingUp },
+  { key: 'payroll',     label: 'الرواتب',       Icon: Wallet, permission: 'payroll.view' },
+  { key: 'account',     label: 'الحساب',        Icon: Settings },
+]
+
+// ── Add Student (unchanged from the previous full-profile page) ──────────────
 
 const ADD_STUDENT_TABS = [
   { key: 'info', label: 'البيانات', Icon: User },
@@ -133,12 +158,9 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
         <Button variant="purple" onClick={submit} loading={mut.isPending}>إضافة الطالب</Button>
       </>}>
       <div className="space-y-3">
-        {/* Locked teacher context — never editable here; a genuine "change
-            teacher" affordance would be a separate, deliberate action
-            outside this continuation flow's scope. */}
         {teacherContext && (
           <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 flex items-start gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-none text-gray-400">
+            <span className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-none text-gray-500">
               <Lock size={13} />
             </span>
             <div className="min-w-0 text-xs">
@@ -155,7 +177,7 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
         <div className="flex gap-1.5 border-b border-gray-100 pb-2">
           {ADD_STUDENT_TABS.map((t) => (
             <button key={t.key} type="button" onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t.key ? 'bg-violet-50 text-violet-700' : 'text-gray-400 hover:text-gray-600'}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t.key ? 'bg-violet-50 text-violet-700' : 'text-gray-500 hover:text-gray-600'}`}>
               <t.Icon size={13} /> {t.label}
             </button>
           ))}
@@ -208,9 +230,9 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
           </div>
         )}
 
-        {tab === 'credential' && (
-          <PasswordCredentialSection value={form.credential} onChange={(v) => set('credential', v)} compact />
-        )}
+        <div className={tab === 'credential' ? '' : 'hidden'}>
+          <PasswordCredentialSection value={form.credential} onChange={(v) => set('credential', v)} role="student" compact />
+        </div>
 
         {tab === 'schedule' && (
           <StudentScheduleSection
@@ -222,6 +244,8 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
     </Modal>
   )
 }
+
+// ── Overview tab ───────────────────────────────────────────────────────────
 
 function WorkingHoursCard({ teacherId, initialDays }) {
   const qc = useQueryClient()
@@ -252,7 +276,7 @@ function WorkingHoursCard({ teacherId, initialDays }) {
         <div className="space-y-3">
           <WorkingHoursEditor value={days} onChange={setDays} disabled={mut.isPending} />
           <div className="flex gap-2">
-            <button onClick={() => setEditing(false)} className="flex-1 h-9 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold">إلغاء</button>
+            <button onClick={() => setEditing(false)} className="flex-1 h-9 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold">إلغاء</button>
             <button onClick={() => mut.mutate({ days })} disabled={mut.isPending}
               className="flex-1 h-9 rounded-xl bg-violet-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
               {mut.isPending && <Spinner size="sm" color="border-white" />} حفظ
@@ -266,23 +290,78 @@ function WorkingHoursCard({ teacherId, initialDays }) {
   )
 }
 
-// Assigned/pending students, completed/upcoming lessons, and compensation
-// consolidated on one profile (Phase 2 change request #4) — reuses existing
-// endpoints rather than a new aggregate one: the teacher-profile payload
-// already carries `recentSessions`/`scheduleRules` (previously fetched but
-// never rendered), the assignment-requests list is filtered client-side to
-// this teacher's pending queue, and salary/attendance comes from the
-// existing (admin-only, `reports.view`-gated) teacher-performance endpoint.
+function OverviewTab({ teacher, workingHours, scheduleRules, subjects, id, onSyncLinks }) {
+  const specializations = teacher.specializations?.length ? teacher.specializations : (teacher.category ? [teacher.category] : [])
+  const weeklySessionCount = (scheduleRules || []).reduce((sum, r) => sum + (r.daysOfWeek?.length || (r.frequency === 'daily' ? 7 : 1)), 0)
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-gray-900 mb-1">معلومات التواصل والمهنة</h3>
+          <InfoRow label="البريد الإلكتروني" value={teacher.email} icon={<Mail size={14} />} />
+          <InfoRow label="رقم الهاتف" value={teacher.phone} icon={<Phone size={14} />} />
+          <InfoRow label="تخصصات التدريس" value={specializations.map((s) => subjectLabel(subjects, s)).filter(Boolean).join('، ') || null} icon={<GraduationCap size={14} />} />
+          <InfoRow label="الفئات المستهدفة" value={audienceCategoriesLabel(teacher.audienceCategories)} icon={<Users size={14} />} />
+          <InfoRow label="سعر ساعة التدريس" value={teacher.hourlyRate ? formatCurrency(teacher.hourlyRate, 'EGP') : null} icon={<Wallet size={14} />} />
+          <InfoRow label="أوقات الشيفت المتاحة" value={teacherShiftsLabel(teacher.availableShifts)} icon={<Calendar size={14} />} />
+          <InfoRow label="نبذة" value={teacher.bioAr} icon={<FileText size={14} />} />
+          <InfoRow label="تاريخ الانضمام" value={formatDateAr(teacher.createdAt)} icon={<Calendar size={14} />} />
+          <InfoRow label="عبء العمل الأسبوعي" value={weeklySessionCount ? `${weeklySessionCount} حصة/أسبوع عبر ${scheduleRules?.length || 0} جدول دوري نشط` : null} icon={<TrendingUp size={14} />} />
+          {teacher.notes && <InfoRow label="ملاحظات إدارية" value={teacher.notes} icon={<StickyNote size={14} />} />}
+        </div>
 
-const SESSION_STATUS_LABELS_AR = {
-  scheduled: { label: 'قادمة', color: '#0891b2' },
-  ongoing: { label: 'جارية', color: '#7c3aed' },
-  completed: { label: 'مكتملة', color: '#059669' },
-  cancelled: { label: 'ملغاة', color: '#6b7280' },
-  rescheduled: { label: 'أُجّلت', color: '#d97706' },
-  missed: { label: 'فائتة', color: '#dc2626' },
-  no_show: { label: 'غياب', color: '#dc2626' },
+        {/* Meeting Links & Sync Card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <Video size={16} className="text-violet-600" />
+              روابط الاجتماعات والفصول الافتراضية
+            </h3>
+            <button
+              type="button"
+              onClick={onSyncLinks}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw size={13} />
+              تعميم / تحديث الرابط
+            </button>
+          </div>
+          {teacher.meetingLinks?.length > 0 ? (
+            <div className="space-y-2">
+              {teacher.meetingLinks.map((ml, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-none" />
+                    <span className="font-bold text-gray-800 truncate">{ml.label || ml.title || (ml.provider === 'meet' ? 'Google Meet' : 'Zoom')}</span>
+                    <a href={ml.link} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 truncate max-w-[200px]" dir="ltr">
+                      {ml.link}
+                    </a>
+                  </div>
+                  <a
+                    href={ml.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-gray-600 p-1 flex-none"
+                    title="فتح الرابط"
+                  >
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 py-1">
+              لم يقم المعلم بتسجيل روابط مسبقة. يمكنك تعميم رابط جديد على طلابه بالضغط على الزر أعلاه.
+            </p>
+          )}
+        </div>
+      </div>
+      <WorkingHoursCard teacherId={id} initialDays={workingHours?.days} />
+    </div>
+  )
 }
+
+// ── Students tab ───────────────────────────────────────────────────────────
 
 function PendingRequestsCard({ teacherId }) {
   const { data } = useQuery({
@@ -315,104 +394,665 @@ function PendingRequestsCard({ teacherId }) {
   )
 }
 
-function RecentSessionsCard({ sessions }) {
-  if (!sessions?.length) return null
+function StudentsTab({ teacherId, students, onAddStudent, onSyncLinks }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3"><History size={16} className="text-violet-600" /> آخر الحصص</h3>
-      <div className="space-y-2">
-        {sessions.slice(0, 8).map((s) => {
-          const cfg = SESSION_STATUS_LABELS_AR[s.status] || { label: s.status, color: '#6b7280' }
-          return (
-            <div key={s._id} className="flex items-center justify-between gap-2 text-xs py-1.5 border-b border-gray-50 last:border-0">
-              <span className="text-gray-700 truncate">{s.studentId?.firstNameAr} {s.studentId?.lastNameAr}</span>
-              <span className="text-gray-400 flex-none">{formatDateAr(s.scheduledAt)}</span>
-              <span className="font-bold flex-none" style={{ color: cfg.color }}>{cfg.label}</span>
-            </div>
-          )
-        })}
+    <div className="space-y-5">
+      <PendingRequestsCard teacherId={teacherId} />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2"><Users size={16} className="text-violet-600" /> الطلاب المسندون ({students?.length || 0})</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={onSyncLinks}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors">
+              <RefreshCw size={14} /> تعميم / تحديث الرابط
+            </button>
+            <button onClick={onAddStudent}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm">
+              <Plus size={14} /> إضافة طالب
+            </button>
+          </div>
+        </div>
+
+        {!students?.length ? (
+          <div className="py-12 text-center text-gray-500">
+            <Users size={28} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm font-semibold">لا يوجد طلاب مسندون لهذا المعلم بعد</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+            {students.map((s) => (
+              <Link
+                key={s.subscriptionId || `schedule-${s.student?._id}`}
+                to={s.student?._id ? ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', s.student._id) : '#'}
+                className="rounded-xl border border-gray-100 p-3.5 flex items-center justify-between gap-3 hover:border-violet-300 hover:bg-violet-50/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar src={getFileUrl(s.student?.avatar)} firstName={s.student?.firstNameAr} lastName={s.student?.lastNameAr} size="sm" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-900 text-sm truncate">{s.student?.firstNameAr} {s.student?.lastNameAr}</div>
+                    <div className="text-xs text-gray-500 truncate">{s.status === 'schedule_only' ? 'جدول بدون اشتراك بعد' : (s.package?.nameAr || 'بدون باقة')}</div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-none">
+                  {s.student?.studentType && (
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.student.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                      {s.student.studentType === 'new' ? 'طالب جديد' : 'طالب قديم'}
+                    </span>
+                  )}
+                  {s.status !== 'schedule_only' && <span className="text-sm font-bold text-emerald-600">{s.wallet?.remaining ?? 0} حصة</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// Compensation/payable totals — sensitive, admin-only data (guarded by the
-// same `reports.view` permission the payroll/report screens already use;
-// never shown to a plain-permission admin, and never reachable by a
-// teacher, who has no route to this page at all).
-function CompensationCard({ teacherId, hourlyRate }) {
-  const { hasPermission } = useAuthStore()
-  const allowed = hasPermission('reports.view')
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'teacher-performance', 'summary', teacherId],
-    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/summary`).then((r) => r.data.data),
-    enabled: allowed,
+// ── Performance tab (absorbed from the old teacher-list drawer) ────────────
+
+const SESSION_STATUS_LABELS_AR = {
+  scheduled: { label: 'قادمة', color: '#0891b2' },
+  ongoing: { label: 'جارية', color: '#7c3aed' },
+  completed: { label: 'مكتملة', color: '#059669' },
+  cancelled: { label: 'ملغاة', color: '#6b7280' },
+  rescheduled: { label: 'أُجّلت', color: '#d97706' },
+  missed: { label: 'فائتة', color: '#dc2626' },
+  no_show: { label: 'غياب', color: '#dc2626' },
+}
+
+function getPeriodRange(preset) {
+  const now = new Date()
+  if (preset === 'week') {
+    const from = new Date(now); from.setDate(now.getDate() - now.getDay()); from.setHours(0, 0, 0, 0)
+    return { from: from.toISOString(), to: now.toISOString(), label: 'هذا الأسبوع' }
+  }
+  if (preset === 'quarter') {
+    const from = new Date(now); from.setMonth(now.getMonth() - 3)
+    return { from: from.toISOString(), to: now.toISOString(), label: 'آخر 3 أشهر' }
+  }
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  return { from: from.toISOString(), to: now.toISOString(), label: 'هذا الشهر' }
+}
+
+const CORRECTION_OPTIONS = [
+  { value: 'on_time', label: 'في الموعد' },
+  { value: 'late', label: 'متأخر' },
+  { value: 'absent', label: 'غائب' },
+  { value: 'excused', label: 'معذور' },
+]
+
+function AttendanceCorrectionMenu({ session }) {
+  const [open, setOpen] = useState(false)
+  const qc = useQueryClient()
+  const mut = useMutation({
+    mutationFn: (status) => api.patch(`/teacher-performance/admin/session/${session._id}/attendance`, { status }),
+    onSuccess: () => {
+      toast.success('تم تحديث الحضور')
+      qc.invalidateQueries({ queryKey: ['admin', 'teacher-performance'] })
+      setOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
   })
-  if (!allowed) return null
-  const salary = data?.salary
-  const attendance = data?.attendance
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3"><Wallet size={16} className="text-violet-600" /> الأداء والمستحقات</h3>
-      {isLoading ? (
-        <div className="flex justify-center py-6"><Spinner color="border-violet-600" /></div>
-      ) : !salary ? (
-        <p className="text-xs text-gray-400">لا تتوفر بيانات بعد</p>
-      ) : (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-xl bg-gray-50 p-3">
-              <div className="text-lg font-extrabold text-emerald-600">{formatCurrency(salary.totalAmount, salary.currency)}</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">إجمالي المستحق (فترة محدودة)</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <div className="text-lg font-extrabold text-gray-800">{salary.payableSessions ?? 0}</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">عدد الحصص المستحقة</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <div className="text-lg font-extrabold text-gray-800">{attendance?.completionRate ?? 0}%</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">نسبة الالتزام بالحصص</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <div className="text-lg font-extrabold text-gray-800">{attendance?.punctualityRate ?? 0}%</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">نسبة الالتزام بالموعد</div>
-            </div>
-          </div>
-          {!!hourlyRate && (
-            <div className="rounded-xl border border-gray-100 p-3">
-              <div className="text-[11px] font-bold text-gray-400 mb-1.5">قيمة الحصة حسب المدة (سعر الساعة × المدة ÷ 60)</div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[30, 45, 60, 90].map((mins) => (
-                  <div key={mins} className="text-center rounded-lg bg-gray-50 py-1.5">
-                    <div className="text-xs font-bold text-gray-800">{formatCurrency(Math.round(hourlyRate * mins / 60), 'EGP')}</div>
-                    <div className="text-[10px] text-gray-400">{mins} د</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+    <div className="relative">
+      <button onClick={() => setOpen((p) => !p)} className="text-[10px] font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+        تصحيح
+      </button>
+      {open && (
+        <div className="absolute left-0 top-6 z-10 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-32">
+          {CORRECTION_OPTIONS.map((o) => (
+            <button key={o.value} onClick={() => mut.mutate(o.value)} disabled={mut.isPending}
+              className="w-full text-right px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+              {o.label}
+            </button>
+          ))}
         </div>
       )}
     </div>
   )
 }
 
+function PerformanceTab({ teacherId, recentSessions }) {
+  const [period, setPeriod] = useState('month')
+  const periodRange = useMemo(() => getPeriodRange(period), [period])
+
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'summary', teacherId, periodRange.from, periodRange.to],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/summary`, { params: { from: periodRange.from, to: periodRange.to } }).then((r) => r.data.data),
+  })
+  const { data: trend } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'trend', teacherId],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/trend`, { params: { range: 'weekly' } }).then((r) => r.data.data),
+  })
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ['admin', 'teacher-performance', 'attendance', teacherId, periodRange.from, periodRange.to],
+    queryFn: () => api.get(`/teacher-performance/admin/${teacherId}/attendance`, { params: { from: periodRange.from, to: periodRange.to, limit: 10 } }).then((r) => r.data.data),
+  })
+
+  async function handleExport() {
+    if (!summary?.salary) return toast.error('لا توجد بيانات')
+    await exportReportToPDF({
+      title: 'تقرير أداء المعلم',
+      subtitle: `${summary.salary.teacherName} — الفترة: ${periodRange.label}`,
+      meta: `تم إنشاء التقرير في ${formatDateAr(new Date())}`,
+      columns: [{ key: 'label', label: 'البند' }, { key: 'value', label: 'القيمة' }],
+      rows: [
+        { label: 'إجمالي الحصص', value: summary.attendance.totalSessions },
+        { label: 'نسبة الالتزام بالمواعيد', value: `${summary.attendance.punctualityRate}%` },
+        { label: 'نسبة الإكمال', value: `${summary.attendance.completionRate}%` },
+        { label: 'حصص مستحقة الدفع', value: summary.salary.payableSessions },
+        { label: 'غياب بدون أجر', value: summary.salary.unpaidAbsences },
+        { label: 'سعر الحصة', value: formatCurrency(summary.salary.salaryPerSession, 'EGP') },
+      ],
+      summary: `الإجمالي المستحق: ${formatCurrency(summary.salary.totalAmount, 'EGP')}`,
+      filename: 'تقرير-أداء-المعلم',
+    })
+    toast.success('تم إنشاء ملف PDF')
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
+            {[['week', 'أسبوع'], ['month', 'شهر'], ['quarter', '3 أشهر']].map(([k, l]) => (
+              <button key={k} onClick={() => setPeriod(k)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${period === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-800 transition-colors">
+            <FileText size={13} /> تصدير PDF
+          </button>
+        </div>
+
+        {summaryLoading ? <div className="flex justify-center py-10"><Spinner color="border-violet-600" /></div> : (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col items-center p-4 rounded-xl bg-emerald-50">
+                <div className="font-heading font-extrabold text-2xl text-emerald-700">{summary?.attendance?.punctualityRate ?? 0}%</div>
+                <div className="text-xs text-emerald-600 mt-0.5">الالتزام بالموعد</div>
+              </div>
+              <div className="flex flex-col items-center p-4 rounded-xl bg-violet-50">
+                <div className="font-heading font-extrabold text-2xl text-violet-700">{summary?.attendance?.completionRate ?? 0}%</div>
+                <div className="text-xs text-violet-600 mt-0.5">نسبة الإكمال</div>
+              </div>
+              <div className="flex flex-col items-center p-4 rounded-xl bg-blue-50 min-w-0 w-full">
+                <div className="font-heading font-extrabold text-lg text-blue-700 whitespace-nowrap" dir="ltr">{formatCurrency(summary?.salary?.totalAmount || 0, 'EGP')}</div>
+                <div className="text-xs text-blue-600 mt-0.5">الراتب المستحق (الفترة)</div>
+              </div>
+            </div>
+
+            {trend?.length > 0 && (
+              <div className="mt-5">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">اتجاه الحضور (أسبوعي)</h4>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={trend} barSize={14}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f0fc" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip />
+                    <Bar dataKey="onTime" name="في الموعد" stackId="a" fill="#22c55e" />
+                    <Bar dataKey="late" name="متأخر" stackId="a" fill="#f59e0b" />
+                    <Bar dataKey="absent" name="غياب" stackId="a" fill="#ef4444" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h4 className="text-sm font-bold text-gray-800 mb-3">سجل الحضور (الفترة المحددة)</h4>
+          {historyLoading ? <Spinner size="sm" color="border-violet-600" /> : !history?.sessions?.length ? (
+            <p className="text-xs text-gray-500 py-3">لا توجد سجلات لهذه الفترة</p>
+          ) : (
+            <div className="space-y-1.5">
+              {history.sessions.map((s) => (
+                <div key={s._id} className="flex items-center justify-between gap-2 py-2 border-b border-gray-50 last:border-0">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-gray-700 truncate">{s.studentId?.firstNameAr} {s.studentId?.lastNameAr}</div>
+                    <div className="text-[10px] text-gray-500">{formatDateAr(s.scheduledAt)} • {formatTimeAr(s.scheduledAt)}</div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-none">
+                    <Badge variant={s.teacherAttendanceStatus === 'on_time' ? 'success' : s.teacherAttendanceStatus === 'late' ? 'warning' : s.teacherAttendanceStatus === 'absent' ? 'danger' : 'gray'}>
+                      {{ on_time: 'في الموعد', late: 'متأخر', absent: 'غائب', excused: 'معذور' }[s.teacherAttendanceStatus] || s.teacherAttendanceStatus || 'قيد الانتظار'}
+                    </Badge>
+                    <AttendanceCorrectionMenu session={s} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={15} className="text-violet-600" /> آخر الحصص</h4>
+          {!recentSessions?.length ? (
+            <p className="text-xs text-gray-500 py-3">لا توجد حصص بعد</p>
+          ) : (
+            <div className="space-y-1.5">
+              {recentSessions.slice(0, 10).map((s) => {
+                const cfg = SESSION_STATUS_LABELS_AR[s.status] || { label: s.status, color: '#6b7280' }
+                return (
+                  <div key={s._id} className="flex items-center justify-between gap-2 text-xs py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-gray-700 truncate">{s.studentId?.firstNameAr} {s.studentId?.lastNameAr}</span>
+                    <span className="text-gray-500 flex-none">{formatDateAr(s.scheduledAt)}</span>
+                    <span className="font-bold flex-none" style={{ color: cfg.color }}>{cfg.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Payroll tab ──────────────────────────────────────────────────────────────
+
+function PayrollTab({ teacherId, teacherName, hourlyRate }) {
+  const { hasPermission } = useAuthStore()
+  const canViewPayroll = hasPermission('payroll.view')
+  const canManagePayroll = hasPermission('payroll.manage')
+  const qc = useQueryClient()
+
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false)
+  const [reversingEntry, setReversingEntry] = useState(null)
+  const [reverseReason, setReverseReason] = useState('')
+
+  const { data: payrollPeriods } = useQuery({
+    queryKey: ['admin', 'payroll', 'teacher-periods', teacherId],
+    queryFn: () => payrollService.listTeacherPeriods(teacherId, { limit: 12 }).then((r) => r.data.data.rows),
+    enabled: canViewPayroll,
+  })
+
+  const { data: adjustmentsData, isLoading: adjustmentsLoading } = useQuery({
+    queryKey: ['admin', 'payroll', 'adjustments', teacherId],
+    queryFn: () => payrollService.listAdjustments({ teacherId, limit: 30 }).then((r) => r.data.data),
+    enabled: canViewPayroll,
+  })
+
+  const reverseMut = useMutation({
+    mutationFn: async ({ entryId, reason }) => {
+      if (!reason?.trim()) throw new Error('يرجى كتابة سبب إلغاء الحركة المالية')
+      return payrollService.reverseAdjustment(entryId, reason.trim())
+    },
+    onSuccess: () => {
+      toast.success('تم إلغاء الحركة المالية وتوثيق العكس بنجاح')
+      qc.invalidateQueries({ queryKey: ['admin', 'payroll', 'teacher-periods', teacherId] })
+      qc.invalidateQueries({ queryKey: ['admin', 'payroll', 'adjustments', teacherId] })
+      setReversingEntry(null)
+      setReverseReason('')
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err.message || 'حدث خطأ أثناء إلغاء الحركة')
+    },
+  })
+
+  if (!canViewPayroll) {
+    return <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-sm text-gray-500">لا تملك صلاحية عرض بيانات الرواتب.</div>
+  }
+
+  const adjustments = adjustmentsData?.rows || adjustmentsData?.adjustments || []
+
+  return (
+    <div className="space-y-5">
+      {/* Header with Quick Action */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="font-heading font-bold text-gray-900 text-base">إدارة مستحقات ورواتب المعلم</h3>
+          <p className="text-xs text-gray-500 mt-0.5">تسجيل المكافآت التشجيعية، الخصومات والجزاءات، وحساب الحصص الإضافية</p>
+        </div>
+
+        {canManagePayroll && (
+          <Button
+            variant="purple"
+            size="sm"
+            onClick={() => setShowAdjustmentModal(true)}
+            icon={<SlidersHorizontal size={14} />}
+          >
+            إجراء مالي (مكافأة / خصم / حصة)
+          </Button>
+        )}
+      </div>
+
+      {/* 2-Col: Hourly Rate breakdown + Payroll Periods */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2"><Wallet size={16} className="text-violet-600" /> سعر الحصة حسب المدة</h3>
+          {!hourlyRate ? (
+            <p className="text-xs text-gray-500">لم يتم تحديد سعر ساعة تدريس لهذا المعلم بعد.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              {[30, 45, 60, 90].map((mins) => (
+                <div key={mins} className="text-center rounded-lg bg-gray-50 py-2">
+                  <div className="text-sm font-bold text-gray-800">{formatCurrency(Math.round(hourlyRate * mins / 60), 'EGP')}</div>
+                  <div className="text-[11px] text-gray-500">{mins} د</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 pt-2 border-t border-gray-100">
+            {hasPermission('monthlyReports.view') && (
+              <Link to={`${ROUTES.ADMIN_MONTHLY_REPORTS}?teacherId=${teacherId}`} className="flex-1 text-center text-xs font-bold text-violet-600 border border-violet-100 rounded-lg py-2 hover:bg-violet-50">التقارير الشهرية</Link>
+            )}
+            {hasPermission('quranReports.view') && (
+              <Link to={`${ROUTES.ADMIN_QURAN_REPORTS}?teacherId=${teacherId}`} className="flex-1 text-center text-xs font-bold text-violet-600 border border-violet-100 rounded-lg py-2 hover:bg-violet-50">تقارير الحلقات</Link>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-900">فترات الراتب الشهرية</h3>
+            <Link to={ROUTES.ADMIN_PAYROLL} className="text-xs font-bold text-violet-600 hover:text-violet-800">عرض لوحة الرواتب</Link>
+          </div>
+          {!payrollPeriods?.length ? (
+            <p className="text-xs text-gray-500 py-3">لا توجد فترات راتب بعد لهذا المعلم</p>
+          ) : (
+            <div className="space-y-1.5 max-h-52 overflow-y-auto">
+              {payrollPeriods.map((p) => (
+                <Link key={p._id} to={ROUTES.ADMIN_PAYROLL_PERIOD.replace(':periodId', p._id)}
+                  className="flex items-center justify-between text-sm rounded-lg px-2.5 py-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-gray-700 font-semibold">{p.periodKey}</span>
+                  <span className="flex items-center gap-2">
+                    <Badge variant={{ open: 'gray', pending_review: 'warning', approved: 'blue', paid: 'success' }[p.status] || 'gray'}>
+                      {{ open: 'مفتوحة', pending_review: 'بانتظار المراجعة', approved: 'معتمدة', paid: 'مدفوعة' }[p.status] || p.status}
+                    </Badge>
+                    <span className="font-bold text-gray-900" dir="ltr">{formatCurrency(p.netPayable, 'EGP')}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Adjustments & Bonuses Ledger Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h3 className="font-heading font-bold text-gray-900 text-sm">سجل المكافآت والخصومات والتسويات المالية</h3>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">
+              {adjustments.length}
+            </span>
+          </div>
+          {canManagePayroll && (
+            <button
+              type="button"
+              onClick={() => setShowAdjustmentModal(true)}
+              className="text-xs font-bold text-violet-600 hover:text-violet-800 flex items-center gap-1 transition-colors"
+            >
+              <Plus size={13} /> إضافة حركة جديدة
+            </button>
+          )}
+        </div>
+
+        {adjustmentsLoading ? (
+          <div className="flex justify-center py-8"><Spinner color="border-violet-600" /></div>
+        ) : !adjustments.length ? (
+          <div className="text-center py-8 text-xs text-gray-500 border border-dashed border-gray-200 rounded-xl">
+            لا توجد مكافآت أو خصومات مسجلة لهذا المعلم بعد.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-right">
+              <thead>
+                <tr className="border-b border-gray-100 text-gray-400 font-bold">
+                  <th className="pb-2.5 pr-2">التاريخ</th>
+                  <th className="pb-2.5">النوع</th>
+                  <th className="pb-2.5">القيمة</th>
+                  <th className="pb-2.5">السبب والتفاصيل</th>
+                  <th className="pb-2.5">بواسطة</th>
+                  <th className="pb-2.5 text-center">الإجراء</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {adjustments.map((entry) => {
+                  const isBonus = entry.type === 'bonus' || entry.amount > 0
+                  const isReversal = entry.type === 'reversal' || !!entry.reversedBy
+                  return (
+                    <tr key={entry._id} className="hover:bg-gray-50/70 transition-colors">
+                      <td className="py-3 pr-2 text-gray-500 whitespace-nowrap">
+                        {formatDateAr(entry.createdAt)}
+                      </td>
+                      <td className="py-3 whitespace-nowrap">
+                        <Badge variant={entry.type === 'bonus' ? 'success' : entry.type === 'penalty' ? 'danger' : 'purple'}>
+                          {entry.type === 'bonus' ? 'مكافأة +' : entry.type === 'penalty' ? 'خصم -' : 'تسوية'}
+                        </Badge>
+                      </td>
+                      <td className="py-3 font-bold whitespace-nowrap" dir="ltr">
+                        <span className={isBonus ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                          {entry.amount > 0 ? `+${entry.amount}` : entry.amount} EGP
+                        </span>
+                      </td>
+                      <td className="py-3 text-gray-700 max-w-xs">
+                        <div className="truncate font-medium">{entry.reason || '—'}</div>
+                        {entry.periodId?.periodKey && (
+                          <span className="text-[10px] text-gray-400">فترة: {entry.periodId.periodKey}</span>
+                        )}
+                      </td>
+                      <td className="py-3 text-gray-500 whitespace-nowrap">
+                        {entry.createdBy?.firstNameAr ? `${entry.createdBy.firstNameAr} ${entry.createdBy.lastNameAr || ''}` : 'الإدارة'}
+                      </td>
+                      <td className="py-3 text-center whitespace-nowrap">
+                        {canManagePayroll && !isReversal && (
+                          <button
+                            type="button"
+                            onClick={() => setReversingEntry(entry)}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="إلغاء / عكس هذه الحركة"
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                        {isReversal && (
+                          <span className="text-[10px] font-bold text-gray-400">معكوسة</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Adjustment Modal */}
+      {showAdjustmentModal && (
+        <TeacherAdjustmentModal
+          open={showAdjustmentModal}
+          onClose={() => setShowAdjustmentModal(false)}
+          teacherId={teacherId}
+          teacherName={teacherName}
+          hourlyRate={hourlyRate}
+        />
+      )}
+
+      {/* Reversal Confirmation Modal */}
+      {reversingEntry && (
+        <Modal
+          open={Boolean(reversingEntry)}
+          onClose={() => setReversingEntry(null)}
+          title="إلغاء حركة مالية (عكس القيد)"
+          size="sm"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <Button variant="ghost" onClick={() => setReversingEntry(null)} disabled={reverseMut.isPending}>
+                تراجع
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => reverseMut.mutate({ entryId: reversingEntry._id, reason: reverseReason })}
+                loading={reverseMut.isPending}
+                disabled={!reverseReason.trim()}
+              >
+                تأكيد الإلغاء والعكس
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-xs" dir="rtl">
+            <p className="text-gray-600 leading-relaxed">
+              سيتم إنشاء حركة عكسية تلغي أثر هذه الحركة المالية بالكامل بقيمة{' '}
+              <b className="text-gray-900 font-bold" dir="ltr">{reversingEntry.amount} EGP</b>.
+            </p>
+            <div>
+              <label className="text-xs font-bold text-gray-600 mb-1 block">سبب الإلغاء (إلزامي للتوثيق):</label>
+              <input
+                type="text"
+                className="field-light w-full"
+                placeholder="اكتب سبب إلغاء هذه الحركة..."
+                value={reverseReason}
+                onChange={(e) => setReverseReason(e.target.value)}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Account tab (edit / reset password / activate-deactivate — absorbed
+//    from the old teacher-list drawer, the only place these used to live) ──
+
+function AccountTab({ teacher, onUpdate }) {
+  const qc = useQueryClient()
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const [form, setForm] = useState(() => ({
+    firstNameAr: teacher.firstNameAr || '', lastNameAr: teacher.lastNameAr || '',
+    email: teacher.email || '', phone: teacher.phone || '', specialization: teacher.specialization || '',
+    bioAr: teacher.bioAr || '', notes: teacher.notes || '', salaryPerSession: teacher.salaryPerSession || '',
+    gender: teacher.gender || '',
+    specializations: teacher.specializations?.length ? teacher.specializations : (teacher.category ? [teacher.category] : []),
+    audienceCategories: teacher.audienceCategories || [], hourlyRate: teacher.hourlyRate ?? '',
+    availableShifts: teacher.availableShifts || [],
+  }))
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+  const [pw, setPw] = useState('')
+
+  const updateMut = useMutation({
+    mutationFn: (data) => api.patch(`/admin/teachers/${teacher._id}`, data).then((r) => r.data),
+    onSuccess: (res) => { toast.success('تم تحديث بيانات المعلم'); qc.invalidateQueries({ queryKey: ['admin', 'teacher-profile', teacher._id] }); qc.invalidateQueries({ queryKey: ['admin', 'teachers'] }); onUpdate(res.data) },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+  const toggleMut = useMutation({
+    mutationFn: (isActive) => api.patch(`/admin/teachers/${teacher._id}`, { isActive }).then((r) => r.data),
+    onSuccess: (res) => { toast.success(res.data?.isActive ? 'تم تفعيل الحساب' : 'تم إيقاف الحساب'); qc.invalidateQueries({ queryKey: ['admin', 'teacher-profile', teacher._id] }); qc.invalidateQueries({ queryKey: ['admin', 'teachers'] }); onUpdate(res.data) },
+    onError: () => toast.error('حدث خطأ'),
+  })
+  const resetPwMut = useMutation({
+    mutationFn: () => api.post(`/admin/teachers/${teacher._id}/reset-password`, { newPassword: pw }).then((r) => r.data),
+    onSuccess: () => { toast.success('تم إعادة تعيين كلمة المرور'); setPw('') },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
+  })
+
+  function requestToggle() {
+    if (teacher.isActive) setConfirmDeactivate(true)
+    else toggleMut.mutate(true)
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+        <h3 className="font-bold text-gray-900 mb-1">تعديل بيانات المعلم</h3>
+        <GenderSegmentedControl value={form.gender} onChange={(v) => set('gender', v)} />
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className={labelCls}>الاسم الأول</label><input className={inputCls} value={form.firstNameAr} onChange={(e) => set('firstNameAr', e.target.value)} /></div>
+          <div><label className={labelCls}>الاسم الأخير</label><input className={inputCls} value={form.lastNameAr} onChange={(e) => set('lastNameAr', e.target.value)} /></div>
+        </div>
+        <div><label className={labelCls}>البريد الإلكتروني</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className={labelCls}>رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+          <div><label className={labelCls}>الراتب / الحصة (قديم، اختياري)</label><input type="number" className={inputCls} value={form.salaryPerSession} onChange={(e) => set('salaryPerSession', e.target.value)} placeholder="0" /></div>
+        </div>
+        <SpecializationsMultiSelect value={form.specializations} onChange={(v) => set('specializations', v)} required />
+        <AudienceCategoriesMultiSelect value={form.audienceCategories} onChange={(v) => set('audienceCategories', v)} />
+        <div><label className={labelCls}>سعر ساعة التدريس</label><input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate} onChange={(e) => set('hourlyRate', e.target.value)} placeholder="0" /></div>
+        <ShiftsMultiSelect value={form.availableShifts} onChange={(v) => set('availableShifts', v)} />
+        <div><label className={labelCls}>نبذة (تظهر للطلاب)</label><textarea className={`${inputCls} h-16 resize-none py-2`} value={form.bioAr} onChange={(e) => set('bioAr', e.target.value)} /></div>
+        <div>
+          <label className={labelCls}>ملاحظات إدارية (داخلية، لا تظهر للمعلم)</label>
+          <textarea className={`${inputCls} h-16 resize-none py-2`} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="ملاحظات للفريق الإداري فقط..." />
+        </div>
+        <button onClick={() => updateMut.mutate(form)} disabled={updateMut.isPending}
+          className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+          {updateMut.isPending && <Spinner size="sm" color="border-white" />} حفظ التعديلات
+        </button>
+      </div>
+
+      <div className="space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2"><KeyRound size={16} className="text-violet-600" /> إعادة تعيين كلمة المرور</h3>
+          <p className="text-xs text-gray-500">أدخل كلمة مرور جديدة للمعلم — سيُطلب منه تسجيل الدخول بها.</p>
+          <input type="password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" dir="ltr" />
+          <button onClick={() => resetPwMut.mutate()} disabled={pw.length < 8 || resetPwMut.isPending}
+            className="w-full h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+            {resetPwMut.isPending && <Spinner size="sm" color="border-white" />} تعيين كلمة المرور
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+          <h3 className="font-bold text-gray-900">حالة الحساب</h3>
+          <p className="text-xs text-gray-500">
+            {teacher.isActive ? 'الحساب نشط حاليًا ويستطيع المعلم الدخول وإدارة حصصه.' : 'الحساب موقوف حاليًا — لا يستطيع المعلم الدخول.'}
+          </p>
+          <button onClick={requestToggle} disabled={toggleMut.isPending}
+            className={`w-full h-11 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${teacher.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+            {toggleMut.isPending ? <Spinner size="sm" color={teacher.isActive ? 'border-red-500' : 'border-emerald-600'} /> : (teacher.isActive ? <PowerOff size={15} /> : <Power size={15} />)}
+            {teacher.isActive ? 'إيقاف حساب المعلم' : 'تفعيل حساب المعلم'}
+          </button>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirmDeactivate}
+        onClose={() => setConfirmDeactivate(false)}
+        onConfirm={() => { toggleMut.mutate(false); setConfirmDeactivate(false) }}
+        title="إيقاف حساب المعلم"
+        message={`سيتم إيقاف حساب "${teacher.firstNameAr} ${teacher.lastNameAr}" فوراً، ولن يتمكن من الدخول أو إدارة حصصه حتى يُعاد تفعيله. هل تريد المتابعة؟`}
+        confirmLabel="إيقاف الحساب"
+        variant="danger"
+      />
+    </div>
+  )
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────
+
 export default function AdminTeacherProfilePage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showAddStudent, setShowAddStudent] = useState(false)
+  const [showBulkSync, setShowBulkSync] = useState(false)
+  const { hasPermission } = useAuthStore()
   const { data: subjects = [] } = useTeachingSubjects()
+  const qc = useQueryClient()
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'teacher-profile', id],
     queryFn: () => api.get(`/admin/teachers/${id}`).then((r) => r.data.data),
   })
 
+  const tab = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview'
+  function setTab(key) {
+    const next = new URLSearchParams(searchParams)
+    if (key === 'overview') next.delete('tab')
+    else next.set('tab', key)
+    setSearchParams(next)
+  }
+
   // Continuation from the onboarding wizard's success page
-  // (`/admin/teachers/:id?action=add`) — only auto-opens once the teacher is
-  // actually confirmed to exist on the backend (never before `data` loads),
-  // and the query flag is stripped immediately so a later back/forward
-  // navigation doesn't reopen it unexpectedly.
+  // (`/admin/teachers/:id?action=add`).
   useEffect(() => {
     if (!isLoading && !isError && data && searchParams.get('action') === 'add') {
       setShowAddStudent(true)
@@ -420,101 +1060,103 @@ export default function AdminTeacherProfilePage() {
       next.delete('action')
       setSearchParams(next, { replace: true })
     }
-  }, [isLoading, isError, data, searchParams, setSearchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isError, data])
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner color="border-violet-600" /></div>
   if (isError || !data) return <ErrorState title="تعذّر تحميل الملف الإداري للمعلم" onRetry={refetch} />
 
   const { teacher, students, workingHours, recentSessions, scheduleRules } = data
-  const weeklySessionCount = (scheduleRules || []).reduce((sum, r) => sum + (r.daysOfWeek?.length || (r.frequency === 'daily' ? 7 : 1)), 0)
   const identity = resolveTeacherIdentity(teacher)
   const specializations = teacher.specializations?.length ? teacher.specializations : (teacher.category ? [teacher.category] : [])
+  const statusColor = teacher.isActive ? '#10b981' : '#ef4444'
+
+  function handleUpdate(updated) {
+    if (!updated) return
+    qc.setQueryData(['admin', 'teacher-profile', id], (old) => old ? { ...old, teacher: { ...old.teacher, ...updated } } : old)
+  }
 
   return (
     <div dir="rtl" className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Link to={ROUTES.ADMIN_TEACHERS} className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-          <ArrowRight size={18} />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="font-heading font-extrabold text-2xl text-gray-900 truncate">{teacher.firstNameAr} {teacher.lastNameAr}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">الملف الإداري الكامل للمعلم</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-1 space-y-5">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar src={identity.displayAvatar} firstName={teacher.firstNameAr} lastName={teacher.lastNameAr} size="lg" />
-              <div>
-                <div className="font-bold text-gray-900">{teacher.firstNameAr} {teacher.lastNameAr}</div>
-                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${teacher.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {teacher.isActive ? 'نشط' : 'موقوف'}
-                </span>
-              </div>
+      {/* Header */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <Link to={ROUTES.ADMIN_TEACHERS} className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors flex-none">
+            <ArrowRight size={18} />
+          </Link>
+          <Avatar src={identity.displayAvatar} firstName={teacher.firstNameAr} lastName={teacher.lastNameAr} size="lg" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-heading font-extrabold text-xl sm:text-2xl text-gray-900 truncate">{teacher.firstNameAr} {teacher.lastNameAr}</h1>
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: `${statusColor}18`, color: statusColor }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+                {teacher.isActive ? 'نشط' : 'موقوف'}
+              </span>
+              {!teacher.gender && <Badge variant="warning">التصنيف غير محدد</Badge>}
             </div>
-            <InfoRow label="البريد الإلكتروني" value={teacher.email} icon={<Mail size={14} />} />
-            <InfoRow label="رقم الهاتف" value={teacher.phone} icon={<Phone size={14} />} />
-            <InfoRow label="تخصصات التدريس" value={specializations.map((s) => subjectLabel(subjects, s)).filter(Boolean).join('، ') || null} icon={<GraduationCap size={14} />} />
-            <InfoRow label="الفئات المستهدفة" value={audienceCategoriesLabel(teacher.audienceCategories)} icon={<Users size={14} />} />
-            <InfoRow label="سعر ساعة التدريس" value={teacher.hourlyRate ? formatCurrency(teacher.hourlyRate, 'EGP') : null} icon={<Wallet size={14} />} />
-            <InfoRow label="تاريخ الانضمام" value={formatDateAr(teacher.createdAt)} icon={<Calendar size={14} />} />
-            <InfoRow label="عبء العمل الأسبوعي" value={weeklySessionCount ? `${weeklySessionCount} حصة/أسبوع عبر ${scheduleRules?.length || 0} جدول دوري نشط` : null} icon={<TrendingUp size={14} />} />
+            <p className="text-sm text-gray-500 mt-1">
+              {specializations.map((s) => subjectLabel(subjects, s)).filter(Boolean).join('، ') || 'بدون تخصص محدد'}
+              {' · '}عضو منذ {formatDateAr(teacher.createdAt)}
+            </p>
+            <div className="flex items-center gap-4 mt-3 flex-wrap">
+              <div className="text-center"><div className="font-heading font-extrabold text-lg text-violet-700">{students?.length || 0}</div><div className="text-[11px] text-gray-500">طالب</div></div>
+              <div className="text-center"><div className="font-heading font-extrabold text-lg text-amber-600">{(recentSessions || []).length}</div><div className="text-[11px] text-gray-500">آخر الحصص</div></div>
+              {!!teacher.hourlyRate && <div className="text-center"><div className="font-heading font-extrabold text-lg text-emerald-600">{formatCurrency(teacher.hourlyRate, 'EGP')}</div><div className="text-[11px] text-gray-500">/ ساعة</div></div>}
+            </div>
           </div>
-
-          <WorkingHoursCard teacherId={id} initialDays={workingHours?.days} />
-          <CompensationCard teacherId={id} hourlyRate={teacher.hourlyRate} />
-          <PendingRequestsCard teacherId={id} />
-        </div>
-
-        <div className="lg:col-span-2 space-y-5">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2"><Users size={16} className="text-violet-600" /> الطلاب المسندون ({students?.length || 0})</h3>
-              <button onClick={() => setShowAddStudent(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors">
-                <Plus size={14} /> إضافة طالب
+          <div className="hidden sm:flex flex-col gap-2 flex-none">
+            {teacher.email && (
+              <button onClick={() => window.open(`mailto:${teacher.email}`)} title="مراسلة" className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors">
+                <Mail size={15} />
               </button>
-            </div>
-
-            {!students?.length ? (
-              <div className="py-12 text-center text-gray-400">
-                <Users size={28} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-semibold">لا يوجد طلاب مسندون لهذا المعلم بعد</p>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {students.map((s) => (
-                  <Link
-                    key={s.subscriptionId || `schedule-${s.student?._id}`}
-                    to={s.student?._id ? ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', s.student._id) : '#'}
-                    className="rounded-xl border border-gray-100 p-3.5 flex items-center justify-between gap-3 flex-wrap hover:border-violet-300 hover:bg-violet-50/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar src={getFileUrl(s.student?.avatar)} firstName={s.student?.firstNameAr} lastName={s.student?.lastNameAr} size="sm" />
-                      <div className="min-w-0">
-                        <div className="font-semibold text-gray-900 text-sm truncate">{s.student?.firstNameAr} {s.student?.lastNameAr}</div>
-                        <div className="text-xs text-gray-400 truncate">{s.status === 'schedule_only' ? 'جدول بدون اشتراك بعد' : (s.package?.nameAr || 'بدون باقة')}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-none">
-                      {s.student?.studentType && (
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.student.studentType === 'new' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                          {s.student.studentType === 'new' ? 'طالب جديد' : 'طالب قديم'}
-                        </span>
-                      )}
-                      {s.status !== 'schedule_only' && <span className="text-sm font-bold text-emerald-600">{s.wallet?.remaining ?? 0} حصة</span>}
-                    </div>
-                  </Link>
-                ))}
-              </div>
+            )}
+            {teacher.phone && (
+              <button onClick={() => window.open(`https://wa.me/${teacher.phone}`)} title="واتساب" className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                <MessageCircle size={15} />
+              </button>
             )}
           </div>
+        </div>
 
-          <RecentSessionsCard sessions={recentSessions} />
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
+          {TABS.filter((t) => !t.permission || hasPermission(t.permission)).map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-bold whitespace-nowrap transition-all ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+              <t.Icon size={14} /> {t.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Tab content */}
+      {tab === 'overview' && (
+        <OverviewTab
+          teacher={teacher}
+          workingHours={workingHours}
+          scheduleRules={scheduleRules}
+          subjects={subjects}
+          id={id}
+          onSyncLinks={() => setShowBulkSync(true)}
+        />
+      )}
+      {tab === 'students' && (
+        <StudentsTab
+          teacherId={id}
+          students={students}
+          onAddStudent={() => setShowAddStudent(true)}
+          onSyncLinks={() => setShowBulkSync(true)}
+        />
+      )}
+      {tab === 'performance' && <PerformanceTab teacherId={id} recentSessions={recentSessions} />}
+      {tab === 'payroll' && hasPermission('payroll.view') && (
+        <PayrollTab
+          teacherId={id}
+          teacherName={`${teacher.firstNameAr} ${teacher.lastNameAr}`}
+          hourlyRate={teacher.hourlyRate}
+        />
+      )}
+      {tab === 'account' && <AccountTab teacher={teacher} onUpdate={handleUpdate} />}
 
       <AddStudentModal
         teacherId={id} open={showAddStudent} onClose={() => setShowAddStudent(false)}
@@ -525,6 +1167,17 @@ export default function AdminTeacherProfilePage() {
           studentsCount: students?.length || 0,
         }}
       />
+
+      {showBulkSync && (
+        <BulkSyncLinksModal
+          open={showBulkSync}
+          onClose={() => setShowBulkSync(false)}
+          isAdmin={true}
+          teacherId={id}
+          preloadedStudents={students?.map((s) => s.student || s).filter(Boolean)}
+          savedLinks={teacher.meetingLinks}
+        />
+      )}
     </div>
   )
 }

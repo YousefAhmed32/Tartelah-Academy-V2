@@ -111,7 +111,7 @@ export default function StudentDashboardPage() {
             <h1 className="font-heading font-extrabold text-[28px] lg:text-[32px] text-brand-textBody leading-tight">
               أهلاً، {user?.firstNameAr || user?.firstName}
             </h1>
-            <p className="text-[#9b7fd6] mt-1 text-[15px]">{getArabicDate()}</p>
+            <p className="text-[#7c6aaa] mt-1 text-[15px]">{getArabicDate()}</p>
           </div>
           {/* Ayah card */}
           <div
@@ -296,7 +296,7 @@ function NoSessionEmptyCard({ hasSubscription }) {
         <div className="font-heading font-bold text-xl text-brand-textBody mb-1">
           لا توجد حصص قادمة
         </div>
-        <p className="text-[#9b7fd6] text-sm mb-4">
+        <p className="text-[#7c6aaa] text-sm mb-4">
           {hasSubscription
             ? 'لم يتم جدولة حصص قادمة بعد. تواصل مع معلمك لتحديد موعد.'
             : 'انضم إلى برنامج ترتيلة لبدء رحلتك مع القرآن الكريم.'
@@ -336,7 +336,7 @@ function QuickStat({ label, value, color, icon }) {
       </div>
       <div className="min-w-0">
         <div className="font-heading font-bold text-2xl text-brand-textBody truncate">{value}</div>
-        <div className="text-[13px] text-[#9b7fd6] mt-0.5 truncate">{label}</div>
+        <div className="text-[13px] text-[#7c6aaa] mt-0.5 truncate">{label}</div>
       </div>
     </motion.div>
   )
@@ -380,10 +380,10 @@ function LearningJourneyCard({ memPct, juz, stats }) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="font-heading font-extrabold text-2xl text-brand-textBody">{memPct}%</div>
-              <div className="text-[10px] text-[#9b7fd6]">مكتمل</div>
+              <div className="text-[10px] text-[#7c6aaa]">مكتمل</div>
             </div>
           </div>
-          <div className="text-[13px] text-[#9b7fd6] text-center">تقدم الحفظ</div>
+          <div className="text-[13px] text-[#7c6aaa] text-center">تقدم الحفظ</div>
         </div>
 
         {/* Stats grid */}
@@ -397,9 +397,9 @@ function LearningJourneyCard({ memPct, juz, stats }) {
             <div key={i} className="rounded-[14px] p-3.5" style={{ background: '#f8f5ff' }}>
               <div className="font-heading font-bold text-xl" style={{ color: item.color }}>
                 {item.value}
-                {item.suffix && <span className="text-[11px] font-normal text-[#9b7fd6] mr-1">{item.suffix}</span>}
+                {item.suffix && <span className="text-[11px] font-normal text-[#7c6aaa] mr-1">{item.suffix}</span>}
               </div>
-              <div className="text-[12px] text-[#9b7fd6] mt-0.5">{item.label}</div>
+              <div className="text-[12px] text-[#7c6aaa] mt-0.5">{item.label}</div>
             </div>
           ))}
         </div>
@@ -407,7 +407,7 @@ function LearningJourneyCard({ memPct, juz, stats }) {
 
       {/* Progress bar */}
       <div className="mt-5">
-        <div className="flex justify-between text-[12px] text-[#9b7fd6] mb-2">
+        <div className="flex justify-between text-[12px] text-[#7c6aaa] mb-2">
           <span>تقدم الحفظ الكلي</span>
           <span>{stats?.memorization?.surahsCompleted || 0} / 114 سورة</span>
         </div>
@@ -452,7 +452,7 @@ function UpcomingSessionsCard({ sessions }) {
             </svg>
           </div>
           <p className="font-semibold text-brand-textBody mb-1">لا توجد حصص قادمة</p>
-          <p className="text-sm text-[#9b7fd6] mb-3">تواصل مع معلمك لجدولة حصصك</p>
+          <p className="text-sm text-[#7c6aaa] mb-3">تواصل مع معلمك لجدولة حصصك</p>
           <Link to={ROUTES.STUDENT_SCHEDULE} className="text-sm font-bold text-brand-purple">
             عرض الجدول الدراسي
           </Link>
@@ -485,7 +485,7 @@ function SessionRow({ session }) {
         <div className="font-semibold text-brand-textBody text-sm truncate">
           {session.titleAr || session.title || 'حصة قرآن'}
         </div>
-        <div className="text-xs text-[#9b7fd6] mt-0.5">
+        <div className="text-xs text-[#7c6aaa] mt-0.5">
           {formatDateAr(session.scheduledAt)} · {formatTimeAr(session.scheduledAt)}
         </div>
       </div>
@@ -527,15 +527,15 @@ function SessionPackageCard({ stats }) {
       <div className="grid grid-cols-3 gap-2 mb-4">
         <div className="text-center">
           <div className="font-heading font-extrabold text-2xl text-brand-textBody">{purchased}</div>
-          <div className="text-[11px] text-[#9b7fd6] mt-0.5">مُشتراة</div>
+          <div className="text-[11px] text-[#7c6aaa] mt-0.5">مُشتراة</div>
         </div>
         <div className="text-center">
           <div className="font-heading font-extrabold text-2xl text-gray-400">{consumed}</div>
-          <div className="text-[11px] text-[#9b7fd6] mt-0.5">مُستهلكة</div>
+          <div className="text-[11px] text-[#7c6aaa] mt-0.5">مُستهلكة</div>
         </div>
         <div className="text-center">
           <div className="font-heading font-extrabold text-2xl text-emerald-600">{remaining}</div>
-          <div className="text-[11px] text-[#9b7fd6] mt-0.5">متبقية</div>
+          <div className="text-[11px] text-[#7c6aaa] mt-0.5">متبقية</div>
         </div>
       </div>
 
@@ -549,7 +549,7 @@ function SessionPackageCard({ stats }) {
         />
       </div>
 
-      <div className="flex gap-4 mt-3.5 text-[12px] text-[#9b7fd6]">
+      <div className="flex gap-4 mt-3.5 text-[12px] text-[#7c6aaa]">
         <span>تأخّر: <b className="text-amber-600">{stats?.lateCount || 0}</b></span>
         <span>غياب: <b className="text-red-500">{stats?.absentCount || 0}</b></span>
         <span>إلغاء: <b className="text-gray-500">{stats?.cancelledSessions || 0}</b></span>
@@ -652,7 +652,7 @@ function RecentEvalsCard({ evals }) {
               <path d="M5 4h14v16l-7-3-7 3V4Z" stroke="#7c3aed" strokeWidth="1.7" strokeLinejoin="round"/>
             </svg>
           </div>
-          <p className="text-sm text-[#9b7fd6]">لا توجد تقييمات حتى الآن</p>
+          <p className="text-sm text-[#7c6aaa]">لا توجد تقييمات حتى الآن</p>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -661,7 +661,7 @@ function RecentEvalsCard({ evals }) {
               <div className="text-sm text-brand-textBody font-semibold min-w-0 truncate">{ev.type}</div>
               <div className="flex items-center gap-1.5 flex-none">
                 <div className="font-heading font-bold text-brand-purple text-base">{ev.score}</div>
-                <div className="text-xs text-[#9b7fd6]">/ ١٠</div>
+                <div className="text-xs text-[#7c6aaa]">/ ١٠</div>
               </div>
             </div>
           ))}

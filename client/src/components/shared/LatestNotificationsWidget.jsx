@@ -1,18 +1,18 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, ChevronLeft } from 'lucide-react'
 import { useNotificationStore } from '../../store/notificationStore.js'
 import { timeFromNow } from '../../utils/date.js'
 import { NOTIFICATION_TYPE_CONFIG } from '../../config/notificationTypes.js'
+import { isSafeInternalPath } from '../../utils/notificationUrl.js'
+import NotificationDetailModal from '../notifications/NotificationDetailModal.jsx'
 import { ROUTES } from '../../config/constants.js'
 import api from '../../utils/api.js'
 
-// Where a notification's click should navigate, per role and type — the
-// notification model has an `actionUrl` field for a precise deep link, but
-// nothing in the codebase sets it yet, so this type-based fallback is what
-// actually fires in practice today. Kept intentionally coarse (section
-// pages, not single-item deep links) since no per-item detail routes exist
-// for sessions/homework/etc. in this app yet.
+// Coarse type-based fallback used only when a notification predates
+// `actionUrl` (an older stored row) — every current producer sets a precise
+// `actionUrl`, which always takes priority below.
 const TYPE_ROUTES = {
   teacher: {
     session: ROUTES.TEACHER_SESSIONS, schedule: ROUTES.TEACHER_SESSIONS, attendance: ROUTES.TEACHER_SESSIONS,
@@ -39,14 +39,16 @@ export default function LatestNotificationsWidget({ role, viewAllPath, limit = 5
   const navigate = useNavigate()
   const { notifications, markRead } = useNotificationStore()
   const items = notifications.slice(0, limit)
+  const [detailNotif, setDetailNotif] = useState(null)
 
   function handleClick(notif) {
     if (!notif.isRead) {
       markRead(notif._id)
       api.patch(`/notifications/${notif._id}/read`).catch(() => {})
     }
-    const dest = notif.actionUrl || TYPE_ROUTES[role]?.[notif.type]
+    const dest = (notif.actionUrl && isSafeInternalPath(notif.actionUrl)) ? notif.actionUrl : TYPE_ROUTES[role]?.[notif.type]
     if (dest) navigate(dest)
+    else setDetailNotif(notif)
   }
 
   return (
@@ -73,7 +75,7 @@ export default function LatestNotificationsWidget({ role, viewAllPath, limit = 5
             <Bell size={20} strokeWidth={1.6} color="#c0b4de" />
           </div>
           <p className="text-sm font-semibold text-brand-textBody">لا توجد إشعارات</p>
-          <p className="text-xs text-[#9b7fd6] mt-0.5">ستظهر إشعاراتك هنا فور وصولها</p>
+          <p className="text-xs text-[#7c6aaa] mt-0.5">ستظهر إشعاراتك هنا فور وصولها</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -110,7 +112,7 @@ export default function LatestNotificationsWidget({ role, viewAllPath, limit = 5
                       {isUnread && <span className="w-2 h-2 rounded-full flex-none" style={{ background: cfg.dot }} />}
                     </div>
                     {notif.bodyAr && (
-                      <p className="text-xs text-[#9b7fd6] truncate mt-0.5">{notif.bodyAr}</p>
+                      <p className="text-xs text-[#7c6aaa] truncate mt-0.5">{notif.bodyAr}</p>
                     )}
                     <span className="text-[11px] text-[#c0b4de] mt-1 block">{timeFromNow(notif.createdAt)}</span>
                   </div>
@@ -120,6 +122,8 @@ export default function LatestNotificationsWidget({ role, viewAllPath, limit = 5
           </AnimatePresence>
         </div>
       )}
+
+      {detailNotif && <NotificationDetailModal notif={detailNotif} onClose={() => setDetailNotif(null)} />}
     </div>
   )
 }

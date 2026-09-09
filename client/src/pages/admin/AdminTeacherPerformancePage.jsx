@@ -337,11 +337,11 @@ export default function AdminTeacherPerformancePage() {
                     </td>
                     <td className="px-5 py-3.5 font-semibold text-gray-700">{t.completionRate}%</td>
                     <td className="px-5 py-3.5">
-                      {t.absent > 0 ? <span className="text-xs font-bold text-red-600">{t.absent}</span> : <span className="text-xs text-gray-300">0</span>}
+                      {t.absent > 0 ? <span className="text-xs font-bold text-red-600">{t.absent}</span> : <span className="text-xs text-gray-500">0</span>}
                     </td>
                     <td className="px-5 py-3.5 font-heading font-bold text-gray-900 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(t.totalAmount, 'EGP')}</td>
                     <td className="px-5 py-3.5">
-                      <button onClick={() => navigate(`${ROUTES.ADMIN_TEACHERS}?teacherId=${t._id}`)}
+                      <button onClick={() => navigate(`${ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', t._id)}?tab=performance`)}
                         className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors whitespace-nowrap">
                         عرض الملف ←
                       </button>

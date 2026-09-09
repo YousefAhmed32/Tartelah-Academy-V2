@@ -207,6 +207,15 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
   }
 
   const groups = groupDaysByTime(doc.schedule.days)
+  let studentName = ''
+  try {
+    const student = await User.findById(doc.studentId).select('firstNameAr lastNameAr name')
+    if (student) {
+      studentName = student.firstNameAr ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student.name || '')
+    }
+  } catch (_) {}
+  const ruleTitle = studentName ? `حصة ${studentName}` : 'حصة'
+
   const createdRuleIds = []
   const createdSessionIds = []
   try {
@@ -224,7 +233,7 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
         durationMinutes: doc.lessonDurationMinutes,
         startDate: doc.schedule.startDate, endDate: doc.schedule.endDate || undefined,
         timezone: doc.schedule.timezone || availability.timezone,
-        titleTemplate: 'حصة', status: 'active', notes: doc.adminNotes,
+        titleTemplate: ruleTitle, status: 'active', notes: doc.adminNotes,
       })
       createdRuleIds.push(rule._id)
       const sessions = await generateSessionsFromRule(rule)

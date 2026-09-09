@@ -3,14 +3,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink, Check, AlertCircle, UserPlus, Clock } from 'lucide-react'
+import {
+  Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink,
+  Check, AlertCircle, UserPlus, Clock, BookOpen, Link2, CalendarClock,
+  XCircle, RefreshCw,
+} from 'lucide-react'
 import api from '../../utils/api.js'
+import { quranReportService } from '../../services/quranReport.service.js'
 import { useAuthStore } from '../../store/authStore.js'
 import { useNotificationStore } from '../../store/notificationStore.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
+import BulkSyncLinksModal from '../../components/teacher/BulkSyncLinksModal.jsx'
+import TeacherGeneralLinkBanner from '../../components/teacher/TeacherGeneralLinkBanner.jsx'
+import EditSessionLinkModal from '../../components/teacher/EditSessionLinkModal.jsx'
+import RescheduleSessionModal from '../../components/teacher/RescheduleSessionModal.jsx'
+import CancelSessionModal from '../../components/teacher/CancelSessionModal.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr, timeFromNow } from '../../utils/date.js'
@@ -76,6 +86,9 @@ function QuickActionBtn({ Icon, label, onClick, color = '#7c3aed' }) {
 function NextSessionCard({ session }) {
   const countdown = useCountdown(session?.scheduledAt)
   const qc = useQueryClient()
+  const [showEditLink, setShowEditLink] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [showCancel, setShowCancel] = useState(false)
 
   const startMutation = useMutation({
     mutationFn: () => api.patch(`/sessions/${session._id}/start`),
@@ -111,12 +124,12 @@ function NextSessionCard({ session }) {
     <div className="rounded-2xl p-6 relative overflow-hidden bg-white border border-gray-100 shadow-sm">
       <div className="absolute top-0 end-0 w-32 h-32 rounded-full opacity-[0.06]" style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', transform: 'translate(30%, -30%)' }} />
 
-      <div className="flex items-start gap-4 mb-5 relative">
+      <div className="flex items-start gap-4 mb-4 relative">
         <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="md" />
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-bold mb-1 text-violet-600">الحصة القادمة</div>
           <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
-          <div className="text-sm mt-0.5 text-gray-500">
+          <div className="text-sm mt-0.5 text-gray-500 truncate">
             {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}
           </div>
           <div className="text-xs mt-1 text-gray-400">
@@ -125,10 +138,27 @@ function NextSessionCard({ session }) {
         </div>
       </div>
 
+      {/* Missing Link Warning Banner */}
+      {!session.meetingLink && (
+        <div className="rounded-xl p-3 bg-amber-50/90 border border-amber-200 mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 min-w-0">
+            <AlertCircle size={15} className="text-amber-600 flex-none" />
+            <span className="truncate">لم يتم تعيين رابط لهذه الحصة</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowEditLink(true)}
+            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors flex-none shadow-sm"
+          >
+            تعيين رابط
+          </button>
+        </div>
+      )}
+
       {countdown.expired ? (
         <div className="text-center text-sm font-bold text-emerald-600 mb-4">الحصة جارية الآن</div>
       ) : (
-        <div className="flex items-center justify-center gap-3 mb-5">
+        <div className="flex items-center justify-center gap-3 mb-4">
           {[
             { value: countdown.h, label: 'ساعة' },
             { value: countdown.m, label: 'دقيقة' },
@@ -144,15 +174,77 @@ function NextSessionCard({ session }) {
         </div>
       )}
 
-      {session.meetingLink && (
+      {/* Main Action Button */}
+      {session.meetingLink ? (
         <button
           onClick={handleJoin}
           disabled={startMutation.isPending}
-          className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-2.5 disabled:opacity-60"
+          className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
         >
-          <Video size={16} strokeWidth={1.8} />
-          {canCheckIn ? 'تسجيل الحضور وفتح الفصل' : 'فتح الفصل الخارجي'}
+          <Video size={16} strokeWidth={2} />
+          {canCheckIn ? 'تسجيل الحضور وبدء الحصة' : 'فتح الفصل الخارجي'}
         </button>
+      ) : (
+        <button
+          onClick={() => setShowEditLink(true)}
+          className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
+        >
+          <Video size={16} strokeWidth={2} />
+          إضافة رابط وبدء الحصة
+        </button>
+      )}
+
+      {/* Secondary Actions Toolbar: Edit Link, Reschedule, Cancel */}
+      <div className="grid grid-cols-3 gap-2 mt-2.5">
+        <button
+          type="button"
+          onClick={() => setShowEditLink(true)}
+          className="py-2 px-1.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center gap-1.5 transition-colors"
+          title="تعديل رابط الحصة وتعميمه"
+        >
+          <Link2 size={13} className="text-violet-600 flex-none" />
+          <span className="truncate">تعديل الرابط</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowReschedule(true)}
+          className="py-2 px-1.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center gap-1.5 transition-colors"
+          title="إعادة جدولة الحصة"
+        >
+          <CalendarClock size={13} className="text-amber-600 flex-none" />
+          <span className="truncate">إعادة جدولة</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowCancel(true)}
+          className="py-2 px-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50/70 hover:bg-rose-100 border border-rose-100 flex items-center justify-center gap-1.5 transition-colors"
+          title="إلغاء الحصة"
+        >
+          <XCircle size={13} className="text-rose-500 flex-none" />
+          <span className="truncate">إلغاء</span>
+        </button>
+      </div>
+
+      {showEditLink && (
+        <EditSessionLinkModal
+          open={showEditLink}
+          onClose={() => setShowEditLink(false)}
+          session={session}
+        />
+      )}
+      {showReschedule && (
+        <RescheduleSessionModal
+          open={showReschedule}
+          onClose={() => setShowReschedule(false)}
+          session={session}
+        />
+      )}
+      {showCancel && (
+        <CancelSessionModal
+          open={showCancel}
+          onClose={() => setShowCancel(false)}
+          session={session}
+        />
       )}
     </div>
   )
@@ -252,6 +344,44 @@ function teachingTypeLabel(value) {
 // awaiting this teacher's approval — placed right after the greeting so it's
 // impossible to miss, per the brief. Renders nothing when there are no
 // pending requests (no large empty dashboard block).
+// Daily Quran-report completion progress (Phase 2 §11) — shown only when
+// there's something to report on today (no empty-state clutter, same
+// convention as PendingAssignmentSection below); turns into a positive
+// confirmation once every completed session today has a submitted report.
+function QuranReportProgressSection() {
+  const navigate = useNavigate()
+  const { data, isLoading } = useQuery({
+    queryKey: ['teacher', 'quran-reports', 'daily-progress'],
+    queryFn: () => quranReportService.getMyDailyProgress().then((r) => r.data.data),
+  })
+  if (isLoading || !data || data.total === 0) return null
+
+  return (
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
+      <div className={`rounded-2xl p-4 border ${data.allDone ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <BookOpen size={16} className={data.allDone ? 'text-emerald-600' : 'text-amber-600'} />
+            <span className={`text-sm font-bold ${data.allDone ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {data.allDone ? `أُنجزت جميع تقارير اليوم (${data.total})` : `تقارير الحلقات اليوم: ${data.reportedCount} من ${data.total}`}
+            </span>
+          </div>
+          {!data.allDone && (
+            <div className="flex flex-wrap gap-1.5">
+              {data.missing.slice(0, 4).map((m) => (
+                <button key={m.sessionId} onClick={() => navigate(ROUTES.TEACHER_QURAN_REPORT.replace(':sessionId', m.sessionId))}
+                  className="text-xs bg-white px-2.5 py-1 rounded-full border border-amber-200 font-semibold text-amber-700 hover:bg-amber-100">
+                  {m.studentName}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 function PendingAssignmentSection() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -373,6 +503,7 @@ function ActionItem({ icon, title, count, color, onClick }) {
 export default function TeacherDashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const [showBulkSync, setShowBulkSync] = useState(false)
 
   const { data: stats = DEFAULT_STATS, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['teacher', 'dashboard'],
@@ -430,6 +561,7 @@ export default function TeacherDashboardPage() {
 
       {/* New-student assignment requests awaiting this teacher's approval —
           placed high, right after the greeting, per the brief. */}
+      <QuranReportProgressSection />
       <PendingAssignmentSection />
 
       {/* Unscheduled students alert */}
@@ -448,6 +580,9 @@ export default function TeacherDashboardPage() {
           </span>
         </motion.div>
       )}
+
+      {/* General Meeting Link Hero Section (outside of Next Session card) */}
+      <TeacherGeneralLinkBanner />
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -470,13 +605,28 @@ export default function TeacherDashboardPage() {
 
           {/* Quick Actions */}
           <div>
-            <h2 className="font-heading font-bold text-gray-900 text-base mb-3">إجراء سريع</h2>
-            <div className="flex gap-3">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading font-bold text-gray-900 text-base">إجراء سريع</h2>
+              <button
+                type="button"
+                onClick={() => setShowBulkSync(true)}
+                className="text-xs font-bold text-violet-600 hover:text-violet-800 flex items-center gap-1 transition-colors"
+              >
+                <RefreshCw size={12} /> تجديد الروابط
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
               <QuickActionBtn
                 Icon={Calendar}
                 label="حصة جديدة"
                 onClick={() => navigate(ROUTES.TEACHER_SESSIONS)}
                 color="#7c3aed"
+              />
+              <QuickActionBtn
+                Icon={RefreshCw}
+                label="تجديد الرابط العام"
+                onClick={() => setShowBulkSync(true)}
+                color="#0891b2"
               />
               <QuickActionBtn
                 Icon={Star}
@@ -637,6 +787,13 @@ export default function TeacherDashboardPage() {
           )}
         </div>
       </div>
+
+      {showBulkSync && (
+        <BulkSyncLinksModal
+          open={showBulkSync}
+          onClose={() => setShowBulkSync(false)}
+        />
+      )}
     </div>
   )
 }

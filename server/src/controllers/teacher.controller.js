@@ -4,6 +4,11 @@ const Evaluation = require('../models/Evaluation')
 const User = require('../models/User')
 const LessonWallet = require('../models/LessonWallet')
 const ScheduleRule = require('../models/ScheduleRule')
+const Memorization = require('../models/Memorization')
+const Revision = require('../models/Revision')
+const QuranSessionReport = require('../models/QuranSessionReport')
+const { createNotifications } = require('../services/notification.service')
+const { logAction } = require('../services/audit.service')
 const { sendSuccess, sendError } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
 const { toPublicTeacher } = require('../utils/teacherPublic')
@@ -157,6 +162,69 @@ exports.getMyStudents = async (req, res, next) => {
   }
 }
 
+// Single-student detail for a teacher's own roster (Phase 2 §8). Ownership
+// is enforced the same way as getMyStudents' roster scope — an active
+// Subscription OR an active ScheduleRule with this teacher — so a teacher
+// can never open a student they are not currently assigned to. Unlike the
+// admin detail page, this deliberately excludes cross-teacher session/
+// evaluation/report history and Subscription pricing — only what this
+// teacher needs to teach the student, scoped to teacherId throughout.
+exports.getMyStudentDetail = async (req, res, next) => {
+  try {
+    const teacherId = req.user._id
+    const { studentId } = req.params
+
+    const [sub, scheduleRule] = await Promise.all([
+      Subscription.findOne({ teacherId, studentId, status: 'active' }).populate('packageId', 'nameAr'),
+      ScheduleRule.findOne({ teacherId, studentId, status: 'active' }),
+    ])
+    if (!sub && !scheduleRule) return sendError(res, 'هذا الطالب غير مسجل ضمن طلابك الحاليين', 403)
+
+    const student = await User.findOne({ _id: studentId, role: 'student' })
+    if (!student) return sendError(res, 'الطالب غير موجود', 404)
+
+    const now = new Date()
+    const [
+      attendanceAgg, wallet, upcomingSessions, recentSessions,
+      evaluations, memorizations, revisions, reports,
+    ] = await Promise.all([
+      Session.aggregate([
+        { $match: { teacherId, studentId: student._id, status: { $ne: 'cancelled' } } },
+        { $group: {
+          _id: null,
+          total: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+          missed: { $sum: { $cond: [{ $in: ['$status', ['missed', 'no_show']] }, 1, 0] } },
+        } },
+      ]),
+      LessonWallet.findOne({ studentId: student._id }),
+      Session.find({ teacherId, studentId: student._id, status: 'scheduled', scheduledAt: { $gte: now } })
+        .sort({ scheduledAt: 1 }).limit(5),
+      Session.find({ teacherId, studentId: student._id, scheduledAt: { $lt: now } })
+        .sort({ scheduledAt: -1 }).limit(10),
+      Evaluation.find({ teacherId, studentId: student._id }).sort({ createdAt: -1 }).limit(10),
+      Memorization.find({ teacherId, studentId: student._id }).sort({ recordedAt: -1 }).limit(10),
+      Revision.find({ teacherId, studentId: student._id }).sort({ recordedAt: -1 }).limit(10),
+      QuranSessionReport.find({ teacherId, studentId: student._id }).sort({ createdAt: -1 }).limit(10),
+    ])
+
+    const att = attendanceAgg[0] || { total: 0, completed: 0, missed: 0 }
+
+    sendSuccess(res, {
+      student: student.toPublic(),
+      subscriptionId: sub?._id || null,
+      packageName: sub?.packageId?.nameAr || null,
+      scheduleStatus: sub ? 'active' : 'schedule_only',
+      attendanceRate: att.total > 0 ? Math.round((att.completed / att.total) * 100) : 0,
+      lessonsCompleted: att.completed, lessonsMissed: att.missed,
+      walletRemaining: wallet ? wallet.remaining : null,
+      upcomingSessions, recentSessions, evaluations, memorizations, revisions, reports,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 exports.getMyStats = async (req, res, next) => {
   try {
     const teacherId = req.user._id
@@ -231,6 +299,128 @@ exports.removeLink = async (req, res, next) => {
   try {
     await User.findByIdAndUpdate(req.user._id, { $pull: { meetingLinks: { _id: req.params.linkId } } })
     sendSuccess(res, null, 'تم حذف الرابط')
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Shared execution helper for bulk-syncing meeting links across active schedule rules
+ * and future sessions. Used by both teacher self-service and admin management.
+ */
+exports.executeSyncMeetingLinks = async ({
+  teacherId,
+  meetingLink,
+  meetingProvider = 'zoom',
+  studentIds,
+  saveToSavedLinks = false,
+  label,
+  actorId,
+  actorRole,
+}) => {
+  let targetStudentIds = Array.isArray(studentIds) ? studentIds.filter(Boolean) : []
+
+  // If no specific students were selected or 'all' is passed, find all active students for this teacher
+  if (targetStudentIds.length === 0 || targetStudentIds.includes('all')) {
+    const [rulesStudents, futureSessionsStudents] = await Promise.all([
+      ScheduleRule.find({ teacherId, status: { $ne: 'ended' } }).distinct('studentId'),
+      Session.find({ teacherId, scheduledAt: { $gte: new Date() }, status: 'scheduled' }).distinct('studentId'),
+    ])
+    const set = new Set([...rulesStudents.map(String), ...futureSessionsStudents.map(String)])
+    targetStudentIds = Array.from(set)
+  }
+
+  let updatedRulesCount = 0
+  let updatedSessionsCount = 0
+
+  if (targetStudentIds.length > 0) {
+    const [resRules, resSessions] = await Promise.all([
+      ScheduleRule.updateMany(
+        { teacherId, studentId: { $in: targetStudentIds }, status: { $ne: 'ended' } },
+        { $set: { meetingLink, meetingProvider } }
+      ),
+      Session.updateMany(
+        { teacherId, studentId: { $in: targetStudentIds }, status: 'scheduled', scheduledAt: { $gte: new Date() } },
+        { $set: { meetingLink, meetingProvider } }
+      ),
+    ])
+    updatedRulesCount = resRules.modifiedCount
+    updatedSessionsCount = resSessions.modifiedCount
+
+    // Send notifications to affected students
+    const notifications = targetStudentIds.map(stId => ({
+      userId: stId,
+      titleAr: 'تحديث رابط الحصص الدراسية',
+      bodyAr: 'قام معلمكم بتحديث رابط الحصص الدراسية إلى الرابط الجديد.',
+      type: 'session',
+      priority: 'high',
+      actionUrl: '/student/sessions',
+    }))
+    await createNotifications(notifications)
+  }
+
+  // Optionally save into teacher's saved links (promoted to primary at index 0)
+  if (saveToSavedLinks) {
+    const teacherUser = await User.findById(teacherId)
+    if (teacherUser) {
+      if (!teacherUser.meetingLinks) teacherUser.meetingLinks = []
+      const existingIdx = teacherUser.meetingLinks.findIndex((l) => l.link === meetingLink)
+      if (existingIdx !== -1) {
+        teacherUser.meetingLinks.splice(existingIdx, 1)
+      }
+      teacherUser.meetingLinks.unshift({
+        provider: meetingProvider,
+        label: label || (meetingProvider === 'meet' ? 'Google Meet' : meetingProvider === 'zoom' ? 'Zoom' : 'رابط المحاضرات العام'),
+        link: meetingLink,
+        _id: new (require('mongoose').Types.ObjectId)(),
+      })
+      await teacherUser.save()
+    }
+  }
+
+  logAction({
+    actorId,
+    actorRole,
+    action: 'teacher.bulk_sync_meeting_links',
+    entity: 'User',
+    entityId: teacherId,
+    changes: {
+      meetingLink,
+      meetingProvider,
+      affectedStudentsCount: targetStudentIds.length,
+      updatedRulesCount,
+      updatedSessionsCount,
+    },
+  })
+
+  return {
+    updatedRulesCount,
+    updatedSessionsCount,
+    affectedStudentsCount: targetStudentIds.length,
+  }
+}
+
+// Teacher: Bulk sync / update meeting link across all or selected students
+exports.syncMeetingLinks = async (req, res, next) => {
+  try {
+    const { meetingLink, meetingProvider, studentIds, saveToSavedLinks, label } = req.body
+    if (!meetingLink || typeof meetingLink !== 'string') {
+      return sendError(res, 'رابط الاجتماع مطلوب', 400)
+    }
+
+    const teacherId = req.user._id
+    const result = await exports.executeSyncMeetingLinks({
+      teacherId,
+      meetingLink: meetingLink.trim(),
+      meetingProvider: meetingProvider || 'zoom',
+      studentIds,
+      saveToSavedLinks: !!saveToSavedLinks,
+      label,
+      actorId: req.user._id,
+      actorRole: req.user.role,
+    })
+
+    sendSuccess(res, result, 'تم تحديث وتعميم روابط الحصص بنجاح')
   } catch (err) {
     next(err)
   }

@@ -18,7 +18,7 @@ export default function EmptyState({ icon, title, description, action, variant =
         {title}
       </h3>
       {description && (
-        <p className={`text-sm max-w-sm ${isDark ? 'text-brand-textMuted' : 'text-[#9b7fd6]'}`}>
+        <p className={`text-sm max-w-sm ${isDark ? 'text-brand-textMuted' : 'text-[#7c6aaa]'}`}>
           {description}
         </p>
       )}

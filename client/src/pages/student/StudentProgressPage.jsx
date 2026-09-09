@@ -34,7 +34,7 @@ export default function StudentProgressPage() {
               <span className="pill pill-purple">{memorization.length} سجل</span>
             </div>
             {!memorization.length ? (
-              <div className="text-center py-8 text-[#9b7fd6] text-sm">لا يوجد سجل حفظ حتى الآن</div>
+              <div className="text-center py-8 text-[#7c6aaa] text-sm">لا يوجد سجل حفظ حتى الآن</div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scroll">
                 {memorization.map((r) => (
@@ -44,11 +44,11 @@ export default function StudentProgressPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-brand-textBody text-sm">{SURAH_NAMES[r.surahNumber - 1] || `سورة ${r.surahNumber}`}</div>
-                      <div className="text-xs text-[#9b7fd6]">آية {r.fromAyah} - {r.toAyah}</div>
+                      <div className="text-xs text-[#7c6aaa]">آية {r.fromAyah} - {r.toAyah}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-xs font-bold" style={{ color: qualityColor[r.quality] }}>{qualityLabel[r.quality]}</span>
-                      <span className="text-xs text-[#9b7fd6]">{formatDateAr(r.recordedAt)}</span>
+                      <span className="text-xs text-[#7c6aaa]">{formatDateAr(r.recordedAt)}</span>
                     </div>
                   </div>
                 ))}
@@ -63,7 +63,7 @@ export default function StudentProgressPage() {
               <span className="pill pill-success">{revision.length} سجل</span>
             </div>
             {!revision.length ? (
-              <div className="text-center py-8 text-[#9b7fd6] text-sm">لا يوجد سجل مراجعة حتى الآن</div>
+              <div className="text-center py-8 text-[#7c6aaa] text-sm">لا يوجد سجل مراجعة حتى الآن</div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scroll">
                 {revision.map((r) => (
@@ -73,11 +73,11 @@ export default function StudentProgressPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-brand-textBody text-sm">{SURAH_NAMES[r.surahNumber - 1] || `سورة ${r.surahNumber}`}</div>
-                      <div className="text-xs text-[#9b7fd6]">آية {r.fromAyah} - {r.toAyah}</div>
+                      <div className="text-xs text-[#7c6aaa]">آية {r.fromAyah} - {r.toAyah}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-xs font-bold" style={{ color: qualityColor[r.quality] }}>{qualityLabel[r.quality]}</span>
-                      <span className="text-xs text-[#9b7fd6]">{formatDateAr(r.recordedAt)}</span>
+                      <span className="text-xs text-[#7c6aaa]">{formatDateAr(r.recordedAt)}</span>
                     </div>
                   </div>
                 ))}

@@ -291,7 +291,7 @@ export default function AdminSuccessStoriesPage() {
         <div className="space-y-5">
           {/* Display mode selector */}
           <div className="card-light p-5">
-            <div className="text-xs font-bold uppercase tracking-widest text-[#9b7fd6] mb-3">طريقة العرض</div>
+            <div className="text-xs font-bold uppercase tracking-widest text-[#7c6aaa] mb-3">طريقة العرض</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { key: 'cards', label: 'ثلاث بطاقات', desc: 'أفضل معلم / أفضل طالب / أفضل إنجاز كبطاقات منفصلة' },
@@ -315,7 +315,7 @@ export default function AdminSuccessStoriesPage() {
                     </div>
                     <span className="font-semibold text-sm text-brand-textBody">{opt.label}</span>
                   </div>
-                  <p className="text-xs text-[#9b7fd6]">{opt.desc}</p>
+                  <p className="text-xs text-[#7c6aaa]">{opt.desc}</p>
                 </button>
               ))}
             </div>

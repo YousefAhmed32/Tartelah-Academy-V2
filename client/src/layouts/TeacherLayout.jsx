@@ -76,6 +76,11 @@ const NAV_GROUPS = [
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="17" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.8"/></svg>
       },
       {
+        // Monthly teacher reports (Phase 2 §12).
+        to: ROUTES.TEACHER_MONTHLY_REPORTS, label: 'التقارير الشهرية',
+        icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 13h4M8 17h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
         to: ROUTES.TEACHER_NOTIFICATIONS, label: 'الإشعارات', notification: true,
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10 21a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
@@ -124,19 +129,30 @@ export default function TeacherLayout() {
     <>
       {/* Academy Identity */}
       <div className="px-3 pb-5 mb-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-3 px-2 pt-4 pb-5 flex-none">
-          <div
-            className="flex-none w-[44px] h-[44px] rounded-[13px] overflow-hidden flex items-center justify-center"
-            style={{ border: '1.5px solid rgba(212,175,55,0.5)', background: 'rgba(20,5,46,0.5)' }}
-          >
-            <img src="/logo-png.png" alt="Tartelah" className="w-full h-full object-contain p-1" />
-          </div>
-          <div style={{ lineHeight: 1.2 }}>
-            <div className="font-heading font-extrabold text-[20px] text-white">ترتيلة</div>
-            <div className="text-[10px] font-semibold tracking-wide" style={{ color: '#E8C76A', letterSpacing: '0.08em' }}>
-              Tartelah Online
+        <div className="flex items-center justify-between px-2 pt-4 pb-5 flex-none">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex-none w-[44px] h-[44px] rounded-[13px] overflow-hidden flex items-center justify-center"
+              style={{ border: '1.5px solid rgba(212,175,55,0.5)', background: 'rgba(20,5,46,0.5)' }}
+            >
+              <img src="/logo-png.png" alt="Tartelah" className="w-full h-full object-contain p-1" />
+            </div>
+            <div style={{ lineHeight: 1.2 }}>
+              <div className="font-heading font-extrabold text-[20px] text-white">ترتيلة</div>
+              <div className="text-[10px] font-semibold tracking-wide" style={{ color: '#E8C76A', letterSpacing: '0.08em' }}>
+                Tartelah Online
+              </div>
             </div>
           </div>
+          <button
+            onClick={() => setDrawerOpen(false)}
+            className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="إغلاق القائمة"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
 
         {/* Teacher Profile Card */}
@@ -242,8 +258,12 @@ export default function TeacherLayout() {
             <motion.aside
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className="fixed inset-y-0 end-0 z-40 w-[268px] flex flex-col py-5 px-3 lg:hidden"
-              style={{ background: 'linear-gradient(195deg, #22103f, #180a32)' }}
+              className="fixed inset-y-0 right-0 z-40 w-[268px] flex flex-col py-5 px-3 lg:hidden"
+              style={{
+                background: 'linear-gradient(195deg, #22103f, #180a32)',
+                boxShadow: '-6px 0 30px rgba(0,0,0,0.35)',
+                direction: 'rtl',
+              }}
             >
               <SidebarContent />
             </motion.aside>

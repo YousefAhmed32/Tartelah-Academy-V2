@@ -25,7 +25,7 @@ export default function Pagination({ page, pages, total, onPageChange, className
 
       {getPages().map((p, i) =>
         p === '...' ? (
-          <span key={`dots-${i}`} className="w-9 h-9 flex items-center justify-center text-[#9b7fd6] text-sm">…</span>
+          <span key={`dots-${i}`} className="w-9 h-9 flex items-center justify-center text-[#7c6aaa] text-sm">…</span>
         ) : (
           <button
             key={p}
@@ -50,7 +50,7 @@ export default function Pagination({ page, pages, total, onPageChange, className
       </button>
 
       {total !== undefined && (
-        <span className="text-sm text-[#9b7fd6] mr-2">إجمالي: {total}</span>
+        <span className="text-sm text-[#7c6aaa] mr-2">إجمالي: {total}</span>
       )}
     </div>
   )

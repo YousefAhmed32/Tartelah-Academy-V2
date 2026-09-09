@@ -11,6 +11,11 @@ const AcademySettingsSchema = new mongoose.Schema({
   // before and after every booked lesson (Phase 2 Part 2 §4's "configured
   // lesson buffer"). 0 = no buffer, preserving today's behavior by default.
   lessonBufferMinutes: { type: Number, default: 0, min: 0, max: 120 },
+  // Administrator-configurable lead time (days before a subscription's
+  // endDate) for triggering the evaluation/renewal survey (Phase 2 §13) —
+  // see jobs/surveyTrigger.job.js. Not sensitive (unlike CredentialDefaults),
+  // so it lives directly on this document like every other academy setting.
+  surveyLeadDays: { type: Number, default: 7, min: 1, max: 60 },
   academyNameAr: { type: String, default: 'ترتيلة للتعليم الإسلامي' },
   academyNameEn: { type: String, default: 'Tartelah Academy' },
   taglineAr: { type: String, default: 'تعلم القرآن الكريم بأيسر الطرق' },

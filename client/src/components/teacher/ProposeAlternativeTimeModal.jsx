@@ -13,7 +13,7 @@ import { subjectLabel } from '../../utils/teacherProfile.js'
 import { formatDateAr } from '../../utils/date.js'
 import {
   DAY_LABELS_AR, dayLabel, durationLabel, TEACHING_TYPE_OPTIONS,
-  formatTimeArabic12, generateTimeSlots,
+  formatTimeArabic12Strict, generateTimeSlots,
 } from '../../utils/assignmentSchedule.js'
 
 function teachingTypeLabel(value) {
@@ -183,7 +183,7 @@ export default function ProposeAlternativeTimeModal({ request, onClose, onSubmit
                     const removed = !selectedDayOfWeeks.includes(d.dayOfWeek)
                     return (
                       <li key={d.dayOfWeek} className={`text-xs font-semibold flex items-center gap-1.5 ${removed ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
-                        <CalendarClock size={12} className="flex-none" /> {dayLabel(d.dayOfWeek)} — {formatTimeArabic12(d.time)}
+                        <CalendarClock size={12} className="flex-none" /> {dayLabel(d.dayOfWeek)} — {formatTimeArabic12Strict(d.time)}
                         {removed && <span className="text-[10px] font-bold text-red-400 no-underline">سيُحذف</span>}
                       </li>
                     )
@@ -201,7 +201,7 @@ export default function ProposeAlternativeTimeModal({ request, onClose, onSubmit
                       const invalid = invalidDayOfWeeks.includes(d.dayOfWeek)
                       return (
                         <li key={d.dayOfWeek} className="text-xs font-semibold text-gray-800 flex items-center gap-1.5">
-                          <CalendarClock size={12} className="flex-none text-violet-500" /> {dayLabel(d.dayOfWeek)} — {formatTimeArabic12(d.time)}
+                          <CalendarClock size={12} className="flex-none text-violet-500" /> {dayLabel(d.dayOfWeek)} — {formatTimeArabic12Strict(d.time)}
                           {invalid ? (
                             <span className="text-[10px] font-bold text-red-500">غير متاح</span>
                           ) : kind === 'added' ? (
@@ -235,7 +235,7 @@ export default function ProposeAlternativeTimeModal({ request, onClose, onSubmit
                         }`}
                       >
                         <div className={`text-sm font-bold flex items-center gap-1 ${active ? 'text-white' : 'text-gray-900'}`}>
-                          {active ? <Check size={13} /> : <Plus size={13} />} {dayLabel(s.dayOfWeek)} — {formatTimeArabic12(s.time)}
+                          {active ? <Check size={13} /> : <Plus size={13} />} {dayLabel(s.dayOfWeek)} — {formatTimeArabic12Strict(s.time)}
                         </div>
                       </button>
                     )

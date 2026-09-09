@@ -2,6 +2,7 @@ const Session = require('../models/Session')
 const Attendance = require('../models/Attendance')
 const Evaluation = require('../models/Evaluation')
 const Homework = require('../models/Homework')
+const ScheduleRule = require('../models/ScheduleRule')
 const User = require('../models/User')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
@@ -24,12 +25,12 @@ function isOwnerOrAdmin(session, user) {
 // so a payroll run has something real to read instead of a live recount.
 async function applySystemPayrollStatus(session) {
   if (session.payrollStatusSetBy === 'admin') return
-  const { payrollStatus, reason } = computePayrollStatus(session)
+  const { payrollStatus, reason, businessRule } = computePayrollStatus(session)
   session.payrollStatus = payrollStatus
   session.payrollStatusReason = reason
   session.payrollStatusSetBy = 'system'
   session.payrollStatusSetAt = new Date()
-  await payrollLedger.recordEntry(session, { payrollStatus, reason })
+  await payrollLedger.recordEntry(session, { payrollStatus, reason, businessRule })
 }
 
 const ATTENDANCE_STATUS_LABEL_AR = {
@@ -39,9 +40,17 @@ const ATTENDANCE_STATUS_LABEL_AR = {
 
 exports.createSession = async (req, res, next) => {
   try {
-    const { studentId, titleAr, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
+    const { studentId, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
+    let { titleAr } = req.body
     const teacherId = req.user._id
     await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
+
+    if (!titleAr || titleAr === 'حصة' || titleAr === 'حصة تلاوة') {
+      const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
+      const studentName = student ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student?.name || '')
+      titleAr = studentName ? `حصة ${studentName}` : (titleAr || 'حصة تلاوة')
+    }
+
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt, durationMinutes,
       meetingLink, meetingProvider, notes,
@@ -165,8 +174,26 @@ exports.startSession = async (req, res, next) => {
       return sendError(res, 'لا يمكن بدء هذه الحصة', 400)
     }
 
-    const wasAutoFlagged = session.status === 'missed' || session.status === 'no_show'
     const now = new Date()
+
+    // A teacher must never be able to check in to a session that is still
+    // far in the future — the check-in window opens PRE_SESSION_ACCESS_MINUTES
+    // before the scheduled start (see attendancePolicy.js). The frontend
+    // already hides/disables the button for this state, but the backend is
+    // the actual authority — never trust the client's clock or state alone.
+    // Admins are exempt (a legitimate correction/testing path already gated
+    // by isOwnerOrAdmin above).
+    if (req.user.role !== 'admin') {
+      const preWindow = getSessionWindow(session.scheduledAt, session.durationMinutes, now)
+      if (preWindow.phase === 'upcoming') {
+        return sendError(res, `لا يمكن بدء الحصة الآن — يفتح تسجيل الحضور قبل الموعد بـ ${Math.round((session.scheduledAt.getTime() - preWindow.preSessionOpensAt.getTime()) / 60000)} دقيقة`, 400, {
+          earliestCheckInAt: preWindow.preSessionOpensAt,
+          scheduledAt: session.scheduledAt,
+        })
+      }
+    }
+
+    const wasAutoFlagged = session.status === 'missed' || session.status === 'no_show'
     const { status, lateMinutes } = classifyCheckIn(session.scheduledAt, now)
 
     session.status = 'ongoing'
@@ -370,8 +397,10 @@ exports.finishSession = async (req, res, next) => {
     await applySystemPayrollStatus(session)
 
     // Wallet consumption follows the student's recorded attendance — see
-    // lessonDeduction.service.js for the full deduction matrix.
-    await lessonDeduction.syncLessonConsumption(session, attendanceStatus, { performedByRole: req.user.role, performedBy: req.user._id })
+    // lessonDeduction.service.js for the full deduction matrix. Captured
+    // (rather than discarded) so the finish response can show the teacher a
+    // concrete receipt of the balance effect instead of a silent side effect.
+    const consumptionResult = await lessonDeduction.syncLessonConsumption(session, attendanceStatus, { performedByRole: req.user.role, performedBy: req.user._id })
     await session.save()
 
     // 3) Optional evaluation.
@@ -425,7 +454,17 @@ exports.finishSession = async (req, res, next) => {
       }, ip: req.ip,
     })
 
-    sendSuccess(res, { session, attendance, evaluation: createdEvaluation, homework: createdHomework }, 'تم حفظ الحصة وإنهاؤها بنجاح')
+    // Concrete, honest receipt data — never a fabricated "saved successfully"
+    // with no visible effect. amount/balanceAfter come straight from the
+    // real LessonTransaction created above (or null if nothing changed,
+    // e.g. an excused absence that was never consuming to begin with).
+    const walletEffect = consumptionResult.transaction
+      ? { action: consumptionResult.action, amount: consumptionResult.transaction.amount, balanceAfter: consumptionResult.transaction.balanceAfter }
+      : { action: 'none', amount: 0, balanceAfter: null }
+
+    sendSuccess(res, {
+      session, attendance, evaluation: createdEvaluation, homework: createdHomework, walletEffect,
+    }, 'تم حفظ الحصة وإنهاؤها بنجاح')
   } catch (err) {
     next(err)
   }
@@ -544,6 +583,80 @@ exports.rescheduleSession = async (req, res, next) => {
   }
 }
 
+// Teacher or Admin: update meeting link for a single session or cascade to student's future sessions
+exports.updateSessionMeetingLink = async (req, res, next) => {
+  try {
+    const { meetingLink, meetingProvider, applyToFuture } = req.body
+    const session = await Session.findById(req.params.id)
+    if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
+    if (!isOwnerOrAdmin(session, req.user)) {
+      return sendError(res, 'غير مصرح لك بتعديل هذه الحصة', 403)
+    }
+
+    const previousLink = session.meetingLink
+    session.meetingLink = meetingLink || ''
+    if (meetingProvider) session.meetingProvider = meetingProvider
+    await session.save()
+
+    let updatedFutureCount = 0
+    if (applyToFuture) {
+      const futureRes = await Session.updateMany(
+        {
+          studentId: session.studentId,
+          teacherId: session.teacherId,
+          scheduledAt: { $gte: session.scheduledAt },
+          status: 'scheduled',
+          _id: { $ne: session._id },
+        },
+        {
+          $set: {
+            meetingLink: meetingLink || '',
+            ...(meetingProvider ? { meetingProvider } : {}),
+          },
+        }
+      )
+      updatedFutureCount = futureRes.modifiedCount
+
+      await ScheduleRule.updateMany(
+        { studentId: session.studentId, teacherId: session.teacherId, status: { $ne: 'ended' } },
+        {
+          $set: {
+            meetingLink: meetingLink || '',
+            ...(meetingProvider ? { meetingProvider } : {}),
+          },
+        }
+      )
+    }
+
+    if (meetingLink && meetingLink !== previousLink) {
+      await createNotification({
+        userId: session.studentId,
+        titleAr: 'تحديث رابط الحصة',
+        bodyAr: `تم تحديث رابط حصة "${session.titleAr}" مع المعلم.`,
+        type: 'session',
+        priority: 'medium',
+        relatedId: session._id,
+        actionUrl: '/student/sessions',
+      })
+    }
+
+    logAction({
+      actorId: req.user._id,
+      actorRole: req.user.role,
+      action: 'session.update_meeting_link',
+      entity: 'Session',
+      entityId: session._id,
+      changes: { meetingLink, meetingProvider, applyToFuture, updatedFutureCount },
+      ip: req.ip,
+    })
+
+    sendSuccess(res, { session, updatedFutureCount }, 'تم تحديث رابط الحصة بنجاح')
+  } catch (err) {
+    next(err)
+  }
+}
+
 exports.getTeacherSessions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
@@ -583,8 +696,16 @@ exports.adminUpdateSession = async (req, res, next) => {
 // Admin: create session (can assign any teacher/student)
 exports.adminCreateSession = async (req, res, next) => {
   try {
-    const { studentId, teacherId, titleAr, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
+    const { studentId, teacherId, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
+    let { titleAr } = req.body
     await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
+
+    if (!titleAr || titleAr === 'حصة' || titleAr === 'حصة تلاوة') {
+      const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
+      const studentName = student ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student?.name || '')
+      titleAr = studentName ? `حصة ${studentName}` : (titleAr || 'حصة تلاوة')
+    }
+
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt,
       durationMinutes: durationMinutes || 60,

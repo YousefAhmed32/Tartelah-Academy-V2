@@ -810,6 +810,22 @@ Teacher persisted immediately → Student 1 booked Sunday 12:00 (60 min) → Stu
 
 ---
 
+## Phase 2 Remaining Scope — Payroll, Adjustments, Renewal, Reports, Survey (2026-09-01)
+
+Full narrative in `SESSION_HANDOFF.md`'s matching entry. Architectural decisions worth preserving beyond the code itself:
+
+**Snapshot-vs-live, applied consistently.** Two new models are deliberately *frozen snapshots*, not live-recomputed views: `TeacherPayrollPeriod` (once `approved`/`paid`, its totals are the historical record — a later adjustment to an underlying entry never silently changes an already-approved period; it must go through the void+supersede chain instead) and `MonthlyTeacherReport` (generated once per teacher per month from `teacherPerformance`/`payrollPeriod`/`reportTracking`, then persisted — reopening it for regeneration is an explicit action, never an automatic side-effect of new sessions happening). This mirrors the existing Evaluation/Session snapshot-field precedent rather than introducing a new pattern.
+
+**Payroll correction chain.** `payrollLedger.service.js#recordEntry` branches on the existing entry's status: a `pending`/`draft`-equivalent entry is corrected in place (no history pollution for routine same-day fixes); an `approved`/`paid` entry is voided (`voided: true`, kept for audit) and a new entry created with `supersedes`/`supersededBy` pointing at each other — so a payroll period's paid history is provably immutable while still allowing genuine corrections.
+
+**Idempotent daily/monthly cron triggers.** Both `surveyTrigger.job.js` (daily) and `monthlyReport.job.js` (monthly) rely on a unique index + duplicate-key catch as the idempotency mechanism (`Survey.subscriptionId` unique; `MonthlyTeacherReport{teacherId,periodKey}` implicit via `findOne`-then-create) rather than a pre-check-then-create race — safe under concurrent/retried cron runs without a distributed lock, consistent with the standalone-MongoDB (no transactions) constraint documented earlier in this file.
+
+**Teacher-facing student detail — ownership check, not a role check.** `GET /teachers/me/students/:studentId` doesn't just check `role === 'teacher'`; it requires an *active* `Subscription` or `ScheduleRule` naming that exact `teacherId`+`studentId` pair before returning anything, and every downstream query (sessions/evaluations/memorization/revision/reports) is additionally filtered to `teacherId` — so a teacher literally cannot see another teacher's history for a shared student, and loses access the moment the assignment ends. This is a stricter scope than the admin equivalent (`AdminStudentDetailPage`) by design, per the task's explicit "no cross-teacher history" requirement.
+
+**No employee entity.** The schema has no standalone `Employee` model. Bonuses/deductions/settlements were scoped to the two entities that already exist and already have a value ledger — students (`LessonWallet`) and teachers (`TeacherPayrollEntry`) — rather than inventing an employee record with no corresponding UI, auth, or scheduling surface anywhere else in the platform.
+
+---
+
 ## API Architecture
 
 ### Base URL: `/api/v1`

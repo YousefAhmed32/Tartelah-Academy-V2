@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart, GraduationCap, Archive, ArchiveRestore, Plus, Loader2 } from 'lucide-react'
+import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart, GraduationCap, Archive, ArchiveRestore, Plus, Loader2, GripVertical, ArrowUpDown } from 'lucide-react'
+import { motion, Reorder } from 'framer-motion'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Button from '../../components/ui/Button.jsx'
@@ -12,7 +13,9 @@ import ImageUploadField from '../../components/ui/ImageUploadField.jsx'
 import { getFileUrl } from '../../config/constants.js'
 import {
   useAdminTeachingSubjects, useCreateTeachingSubject, useArchiveTeachingSubject, useUnarchiveTeachingSubject,
+  useReorderTeachingSubjects,
 } from '../../hooks/useTeachingSubjects.js'
+import { credentialDefaultsService } from '../../services/credentialDefaults.service.js'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 
@@ -319,9 +322,17 @@ function CurriculaTab() {
   const createMutation = useCreateTeachingSubject()
   const archiveMutation = useArchiveTeachingSubject()
   const unarchiveMutation = useUnarchiveTeachingSubject()
+  const reorderMutation = useReorderTeachingSubjects()
+  const [items, setItems] = useState([])
   const [newNameAr, setNewNameAr] = useState('')
   const [newNameEn, setNewNameEn] = useState('')
   const [pendingId, setPendingId] = useState(null)
+
+  useEffect(() => {
+    if (subjects?.length) {
+      setItems(subjects)
+    }
+  }, [subjects])
 
   async function handleCreate() {
     const trimmed = newNameAr.trim()
@@ -352,6 +363,18 @@ function CurriculaTab() {
     }
   }
 
+  function handleReorder(newOrder) {
+    setItems(newOrder)
+    const orderedIds = newOrder.map((s) => s._id)
+    reorderMutation.mutate(orderedIds, {
+      onSuccess: () => toast.success('تم حفظ الترتيب الجديد بنجاح'),
+      onError: (err) => {
+        toast.error(err?.response?.data?.message || 'فشل حفظ الترتيب')
+        setItems(subjects)
+      },
+    })
+  }
+
   return (
     <div className="space-y-5">
       {canManage && (
@@ -377,36 +400,159 @@ function CurriculaTab() {
       <Section title="كل المناهج التعليمية" icon={GraduationCap}>
         {isLoading ? (
           <div className="flex justify-center py-8"><Spinner color="border-brand-purple" /></div>
-        ) : !subjects.length ? (
+        ) : !items.length ? (
           <p className="text-sm text-gray-400 text-center py-6">لا توجد مناهج بعد</p>
         ) : (
-          <div className="space-y-2">
-            {subjects.map((s) => (
-              <div key={s._id} className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${s.isActive ? 'border-gray-100 bg-white' : 'border-gray-100 bg-gray-50'}`}>
-                <div className="min-w-0">
-                  <div className={`font-bold text-sm truncate ${s.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
-                    {s.nameAr}{s.nameEn ? ` (${s.nameEn})` : ''}
-                    {s.isSystem && <span className="ms-2 text-[10px] font-bold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">أساسي</span>}
-                  </div>
-                  <div className={`text-[11px] mt-0.5 ${s.isActive ? 'text-emerald-600' : 'text-gray-400'}`}>{s.isActive ? 'نشط' : 'مؤرشف'}</div>
-                </div>
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => toggleArchive(s)}
-                    disabled={pendingId === s._id}
-                    className={`flex-none min-h-[44px] px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 disabled:opacity-60 ${
-                      s.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    {pendingId === s._id ? <Loader2 size={14} className="animate-spin" /> : (s.isActive ? <Archive size={14} /> : <ArchiveRestore size={14} />)}
-                    {s.isActive ? 'أرشفة' : 'إعادة تفعيل'}
-                  </button>
-                )}
+          <div className="space-y-3">
+            {canManage && items.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs text-violet-600 bg-violet-50/70 border border-violet-100 rounded-xl p-2.5">
+                <ArrowUpDown size={14} className="flex-none" />
+                <span>ميزة السحب والإفلات مُفعلة: يمكنك الإمساك بأي منهج وسحبه للأعلى أو الأسفل لإعادة ترتيب ظهوره عبر النظام.</span>
               </div>
-            ))}
+            )}
+            <Reorder.Group axis="y" values={items} onReorder={handleReorder} className="space-y-2">
+              {items.map((s) => (
+                <Reorder.Item
+                  key={s._id}
+                  value={s}
+                  dragListener={canManage}
+                  whileDrag={{ scale: 1.02, boxShadow: '0 10px 25px -5px rgba(124, 58, 237, 0.15)', zIndex: 30 }}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-xl border select-none transition-shadow ${
+                    s.isActive ? 'border-gray-100 bg-white shadow-sm' : 'border-gray-100 bg-gray-50/80'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {canManage && (
+                      <div
+                        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-violet-600 p-1.5 rounded-lg hover:bg-violet-50 transition-colors flex-none"
+                        title="اسحب لإعادة الترتيب"
+                      >
+                        <GripVertical size={16} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className={`font-bold text-sm truncate ${s.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                        {s.nameAr}{s.nameEn ? ` (${s.nameEn})` : ''}
+                        {s.isSystem && <span className="ms-2 text-[10px] font-bold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">أساسي</span>}
+                      </div>
+                      <div className={`text-[11px] mt-0.5 ${s.isActive ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        {s.isActive ? 'نشط' : 'مؤرشف'}
+                      </div>
+                    </div>
+                  </div>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => toggleArchive(s)}
+                      disabled={pendingId === s._id}
+                      className={`flex-none min-h-[40px] px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 disabled:opacity-60 transition-colors ${
+                        s.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {pendingId === s._id ? <Loader2 size={14} className="animate-spin" /> : (s.isActive ? <Archive size={14} /> : <ArchiveRestore size={14} />)}
+                      {s.isActive ? 'أرشفة' : 'إعادة تفعيل'}
+                    </button>
+                  )}
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
           </div>
         )}
+      </Section>
+    </div>
+  )
+}
+
+// ── Credential Defaults Tab (Phase 2 meeting addendum §1) ──────────────────────
+// Manages the academy-wide default student/teacher passwords. Never displays
+// the stored password after saving — only whether one is configured, and who/
+// when it was last replaced. Gated end-to-end by 'credentials.manage_defaults'
+// (route-level on the backend; tab visibility here is convenience only).
+
+function CredentialDefaultRow({ role, label, status, cryptoConfigured }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [pw, setPw] = useState({ password: '', passwordConfirm: '' })
+
+  const saveMut = useMutation({
+    mutationFn: () => credentialDefaultsService.setDefault(role, pw.password, pw.passwordConfirm).then(r => r.data),
+    onSuccess: () => {
+      toast.success('تم حفظ كلمة المرور الافتراضية')
+      qc.invalidateQueries({ queryKey: ['credentialDefaults'] })
+      setEditing(false)
+      setPw({ password: '', passwordConfirm: '' })
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
+  })
+
+  const clearMut = useMutation({
+    mutationFn: () => credentialDefaultsService.clearDefault(role).then(r => r.data),
+    onSuccess: () => { toast.success('تم إلغاء التفعيل'); qc.invalidateQueries({ queryKey: ['credentialDefaults'] }) },
+    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
+  })
+
+  return (
+    <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div className="font-bold text-gray-800 text-sm">{label}</div>
+          {status?.configured ? (
+            <div className="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> مُفعّلة
+              {status.updatedAt && <span className="text-gray-400 font-normal">— آخر تحديث {new Date(status.updatedAt).toLocaleDateString('ar-EG')}</span>}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400 font-semibold mt-0.5">غير مُفعّلة — لن يظهر خيار "كلمة مرور الأكاديمية" لهذا الدور</div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {status?.configured && (
+            <Button variant="ghost" size="sm" onClick={() => clearMut.mutate()} loading={clearMut.isPending}>إلغاء التفعيل</Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setEditing((v) => !v)}>{status?.configured ? 'استبدال' : 'إعداد'}</Button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="space-y-2 pt-2 border-t border-gray-100">
+          <p className="text-[11px] text-amber-600 font-semibold">
+            هذا التغيير يسري فقط على الحسابات التي تُنشأ بعد الحفظ — لن يتأثر أي حساب موجود حاليًا.
+          </p>
+          <Input label="كلمة المرور الافتراضية الجديدة" type="password" variant="light"
+            value={pw.password} onChange={(e) => setPw((p) => ({ ...p, password: e.target.value }))} autoComplete="new-password" />
+          <Input label="تأكيد كلمة المرور" type="password" variant="light"
+            value={pw.passwordConfirm} onChange={(e) => setPw((p) => ({ ...p, passwordConfirm: e.target.value }))} autoComplete="new-password" />
+          <Button variant="purple" size="sm" onClick={() => saveMut.mutate()} loading={saveMut.isPending} disabled={!cryptoConfigured}>حفظ</Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CredentialDefaultsTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['credentialDefaults', 'status'],
+    queryFn: () => credentialDefaultsService.getStatus().then(r => r.data.data),
+  })
+
+  if (isLoading) return <div className="flex justify-center py-12"><Spinner /></div>
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <Section title="كلمات المرور الافتراضية للأكاديمية" icon={Lock}>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          كلمة مرور تشغيلية مشتركة تُستخدم كخيار عند إنشاء حسابات الطلاب أو المعلمين الجدد، بدلًا من كتابة كلمة مرور يدويًا أو توليد كلمة عشوائية لكل حساب.
+          لا تُعرض كلمة المرور المخزّنة أبدًا بعد حفظها — فقط حالة التفعيل. كل حساب يحصل على كلمة مرور مُشفّرة (hash) خاصة به رغم استخدام نفس النص الأصلي.
+        </p>
+        {!data?.cryptoConfigured && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-semibold">
+            لم يتم إعداد مفتاح التشفير (CREDENTIAL_DEFAULTS_KEY) على الخادم — لا يمكن حفظ كلمات مرور افتراضية حتى يُضاف هذا المتغير البيئي.
+          </div>
+        )}
+        <div className="space-y-3">
+          <CredentialDefaultRow role="student" label="كلمة مرور الطلاب الافتراضية" status={data?.student} cryptoConfigured={data?.cryptoConfigured} />
+          <CredentialDefaultRow role="teacher" label="كلمة مرور المعلمين الافتراضية" status={data?.teacher} cryptoConfigured={data?.cryptoConfigured} />
+        </div>
       </Section>
     </div>
   )
@@ -418,6 +564,7 @@ const ALL_TABS = [
   { key: 'profile', label: 'حسابي', icon: User },
   { key: 'academy', label: 'إعدادات الأكاديمية', icon: Building2 },
   { key: 'curricula', label: 'المناهج التعليمية', icon: GraduationCap, permission: 'curricula.view' },
+  { key: 'credentials', label: 'كلمات المرور الافتراضية', icon: Lock, permission: 'credentials.manage_defaults' },
 ]
 
 export default function AdminSettingsPage() {
@@ -445,6 +592,7 @@ export default function AdminSettingsPage() {
       {activeTab === 'profile' && <ProfileTab />}
       {activeTab === 'academy' && <AcademyTab />}
       {activeTab === 'curricula' && <CurriculaTab />}
+      {activeTab === 'credentials' && <CredentialDefaultsTab />}
     </div>
   )
 }

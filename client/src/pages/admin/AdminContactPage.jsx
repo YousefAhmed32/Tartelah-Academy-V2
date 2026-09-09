@@ -197,7 +197,7 @@ export default function AdminContactPage() {
         <div style={{ display: 'flex', gap: 1, background: '#f0ecf8', borderRadius: 12, padding: 4 }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => { setStatus(t.key); setPage(1) }}
-              style={{ padding: '8px 16px', borderRadius: 9, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all .2s', background: status === t.key ? '#fff' : 'transparent', color: status === t.key ? '#1A0447' : '#9b7fd6', boxShadow: status === t.key ? '0 2px 8px rgba(0,0,0,.08)' : 'none', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Cairo' }}>
+              style={{ padding: '8px 16px', borderRadius: 9, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all .2s', background: status === t.key ? '#fff' : 'transparent', color: status === t.key ? '#1A0447' : '#7c6aaa', boxShadow: status === t.key ? '0 2px 8px rgba(0,0,0,.08)' : 'none', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Cairo' }}>
               {t.label}
               {t.count !== undefined && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 20, background: status === t.key ? '#7c3aed' : '#e9e4f6', color: status === t.key ? '#fff' : '#7c3aed' }}>

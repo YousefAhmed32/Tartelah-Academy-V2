@@ -1,16 +1,34 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Modal from '../../components/ui/Modal.jsx'
 import ProgressRing from '../../components/shared/ProgressRing.jsx'
 import WalletBalanceCard from '../../components/shared/WalletBalanceCard.jsx'
 import LessonTransactionTable from '../../components/shared/LessonTransactionTable.jsx'
+import { renewalService } from '../../services/renewal.service.js'
+import { surveyService } from '../../services/survey.service.js'
+import SurveyPromptModal from '../../components/student/SurveyPromptModal.jsx'
 import { formatDateAr } from '../../utils/date.js'
-import { ROUTES } from '../../config/constants.js'
+import { formatCurrency } from '../../utils/format.js'
+import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { QK } from '../../services/queryKeys.js'
+
+const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
+const RENEWAL_STATUS_LABELS = {
+  pending: { label: 'بانتظار رفع إثبات الدفع', variant: 'gray' },
+  under_review: { label: 'قيد المراجعة', variant: 'warning' },
+  approved: { label: 'تم التجديد', variant: 'success' },
+  rejected: { label: 'مرفوض', variant: 'danger' },
+  cancelled: { label: 'ملغى', variant: 'gray' },
+  expired: { label: 'منتهي الصلاحية', variant: 'gray' },
+}
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },
@@ -19,6 +37,11 @@ const fadeUp = (delay = 0) => ({
 })
 
 export default function StudentSubscriptionPage() {
+  const [renewOpen, setRenewOpen] = useState(false)
+  const { data: pendingSurvey } = useQuery({
+    queryKey: ['student', 'survey', 'pending'],
+    queryFn: () => surveyService.getMyPending().then(r => r.data.data).catch(() => null),
+  })
   const { data, isLoading } = useQuery({
     queryKey: QK.MY_SUBSCRIPTION,
     queryFn: () => api.get('/subscriptions/me').then(r => r.data.data).catch(() => null),
@@ -122,13 +145,13 @@ export default function StudentSubscriptionPage() {
                     <div className="font-semibold text-sm" style={{ color: urgency === 'expired' ? '#ef4444' : '#d97706' }}>
                       {urgency === 'expired' ? 'انتهى اشتراكك' : `اشتراكك سينتهي خلال ${daysLeft} أيام`}
                     </div>
-                    <div className="text-xs text-[#9b7fd6] mt-0.5">
+                    <div className="text-xs text-[#7c6aaa] mt-0.5">
                       {urgency === 'expired' ? 'سجّل في برنامج جديد للاستمرار' : 'تواصل مع الإدارة لتجديد اشتراكك'}
                     </div>
                   </div>
-                  <Link to={ROUTES.STUDENT_ENROLLMENT} className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex-none mr-auto">
+                  <button onClick={() => setRenewOpen(true)} className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex-none mr-auto">
                     تجديد
-                  </Link>
+                  </button>
                 </div>
               )}
 
@@ -140,7 +163,7 @@ export default function StudentSubscriptionPage() {
                   { label: 'الحصص المتبقية',     value: `${walletData?.wallet?.remaining ?? data.sessionsRemaining ?? 0} حصة` },
                 ].map((item, i) => (
                   <div key={i} className="p-4 rounded-[14px]" style={{ background: '#f8f5ff' }}>
-                    <div className="text-xs text-[#9b7fd6] mb-1">{item.label}</div>
+                    <div className="text-xs text-[#7c6aaa] mb-1">{item.label}</div>
                     <div className="font-heading font-bold text-brand-textBody">{item.value}</div>
                   </div>
                 ))}
@@ -148,7 +171,7 @@ export default function StudentSubscriptionPage() {
 
               {/* Days progress bar */}
               <div className="mt-5">
-                <div className="flex justify-between text-xs text-[#9b7fd6] mb-2">
+                <div className="flex justify-between text-xs text-[#7c6aaa] mb-2">
                   <span>{daysUsed} يوم مضى</span>
                   <span>{daysLeft} يوم متبقي</span>
                 </div>
@@ -179,25 +202,25 @@ export default function StudentSubscriptionPage() {
               color={urgency === 'ok' ? undefined : urgency === 'warning' ? '#f59e0b' : '#ef4444'}
             >
               <div className="font-heading font-extrabold text-3xl text-brand-textBody">{daysLeft}</div>
-              <div className="text-[11px] text-[#9b7fd6]">يوم</div>
+              <div className="text-[11px] text-[#7c6aaa]">يوم</div>
             </ProgressRing>
 
             <div>
               <div className="font-heading font-bold text-lg text-brand-textBody">أيام متبقية</div>
-              <div className="text-sm text-[#9b7fd6] mt-1">من أصل {totalDays} يوم</div>
+              <div className="text-sm text-[#7c6aaa] mt-1">من أصل {totalDays} يوم</div>
             </div>
 
             <div
               className="w-full py-3 px-4 rounded-[14px] text-center"
               style={{ background: '#f8f5ff', border: '1px solid #ede8f7' }}
             >
-              <div className="text-xs text-[#9b7fd6] mb-1">ينتهي في</div>
+              <div className="text-xs text-[#7c6aaa] mb-1">ينتهي في</div>
               <div className="font-semibold text-sm text-brand-textBody">{formatDateAr(data.endDate)}</div>
             </div>
 
-            <Link to={ROUTES.STUDENT_ENROLLMENT} className="w-full text-center py-2.5 rounded-xl text-sm font-bold text-brand-purple hover:text-brand-purpleDark transition-colors" style={{ background: 'rgba(124,58,237,0.06)' }}>
+            <button onClick={() => setRenewOpen(true)} className="w-full text-center py-2.5 rounded-xl text-sm font-bold text-brand-purple hover:text-brand-purpleDark transition-colors" style={{ background: 'rgba(124,58,237,0.06)' }}>
               + تجديد الاشتراك
-            </Link>
+            </button>
           </div>
         </motion.div>
       </div>
@@ -232,7 +255,7 @@ export default function StudentSubscriptionPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-[14px]" style={{ background: 'rgba(232,199,106,0.08)', border: '1px solid rgba(232,199,106,0.2)' }}>
               <div className="font-semibold text-sm text-brand-textBody mb-2">التحويل البنكي</div>
-              <div className="text-sm text-[#9b7fd6] space-y-1">
+              <div className="text-sm text-[#7c6aaa] space-y-1">
                 <div>البنك: <span className="font-semibold text-brand-textBody">بنك الراجحي</span></div>
                 <div>IBAN: <span className="font-semibold text-brand-textBody text-xs">SA00 0000 0000 0000 0000 0000</span></div>
                 <div>الاسم: <span className="font-semibold text-brand-textBody">أكاديمية ترتيلة</span></div>
@@ -240,8 +263,8 @@ export default function StudentSubscriptionPage() {
             </div>
             <div className="p-4 rounded-[14px]" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
               <div className="font-semibold text-sm text-brand-textBody mb-2">خطوات التجديد</div>
-              <ol className="text-sm text-[#9b7fd6] space-y-1 list-none">
-                {['حوّل المبلغ عبر التطبيق البنكي', 'سجّل في برنامج من القائمة الجانبية', 'ارفع صورة إثبات الدفع', 'انتظر موافقة الإدارة'].map((step, i) => (
+              <ol className="text-sm text-[#7c6aaa] space-y-1 list-none">
+                {['حوّل المبلغ عبر التطبيق البنكي', 'اضغط "تجديد" أعلاه واختر الباقة', 'ارفع صورة إثبات الدفع', 'انتظر موافقة الإدارة'].map((step, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="font-bold text-brand-purple text-xs mt-0.5 flex-none w-4">{i + 1}.</span>
                     {step}
@@ -254,14 +277,119 @@ export default function StudentSubscriptionPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.4A8 8 0 1 1 21 12Z" stroke="#7c3aed" strokeWidth="1.7" strokeLinejoin="round"/>
             </svg>
-            <p className="text-sm text-[#9b7fd6]">
+            <p className="text-sm text-[#7c6aaa]">
               للاستفسار والدعم تواصل معنا عبر{' '}
               <span className="font-bold text-brand-purple">support@tartelah.com</span>
             </p>
           </div>
         </div>
       </motion.div>
+
+      <RenewalHistorySection />
+      {renewOpen && <RenewalModal subscription={data} onClose={() => setRenewOpen(false)} />}
+      {pendingSurvey && <SurveyPromptModal survey={pendingSurvey} onClose={() => {}} />}
     </div>
+  )
+}
+
+// ── Renewal request modal (Phase 2 §9) ──────────────────────────────────────
+// Two-step: submit the request (package/teacher choice + notes), then
+// immediately upload the payment proof for it — the request stays "بانتظار
+// رفع إثبات الدفع" until that happens, matching EnrollmentRequest's
+// identical pending -> under_review transition.
+function RenewalModal({ subscription, onClose }) {
+  const qc = useQueryClient()
+  const [step, setStep] = useState('form') // 'form' | 'proof'
+  const [packageId, setPackageId] = useState(subscription.packageId?._id || '')
+  const [studentNotes, setStudentNotes] = useState('')
+  const [createdRequest, setCreatedRequest] = useState(null)
+  const [proofFile, setProofFile] = useState(null)
+
+  const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: () => api.get('/packages').then(r => r.data.data) })
+
+  const submitMut = useMutation({
+    mutationFn: () => renewalService.submitRequest(subscription._id, {
+      packageId: packageId || subscription.packageId?._id,
+      studentNotes: studentNotes.trim() || undefined,
+    }),
+    onSuccess: (res) => { setCreatedRequest(res.data.data); setStep('proof') },
+    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
+  })
+  const proofMut = useMutation({
+    mutationFn: () => renewalService.uploadProof(createdRequest._id, proofFile),
+    onSuccess: () => {
+      toast.success('تم إرسال طلب التجديد — بانتظار مراجعة الإدارة')
+      qc.invalidateQueries({ queryKey: ['student', 'renewal-requests'] })
+      onClose()
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
+  })
+
+  if (step === 'proof') {
+    return (
+      <Modal open onClose={onClose} title="رفع إثبات الدفع"
+        footer={<>
+          <Button variant="ghost" onClick={onClose}>لاحقًا</Button>
+          <Button variant="purple" loading={proofMut.isPending} disabled={!proofFile} onClick={() => proofMut.mutate()}>رفع وإرسال</Button>
+        </>}>
+        <div dir="rtl" className="space-y-3">
+          <p className="text-xs text-gray-500">تم إنشاء طلب التجديد. ارفع صورة إثبات الدفع (تحويل بنكي) لإرساله للمراجعة.</p>
+          <input type="file" accept="image/*,.pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} className={inputCls} />
+        </div>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal open onClose={onClose} title="طلب تجديد الاشتراك"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="purple" loading={submitMut.isPending} onClick={() => submitMut.mutate()}>إرسال الطلب</Button>
+      </>}>
+      <div dir="rtl" className="space-y-4">
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">الباقة</label>
+          <select className={inputCls} value={packageId} onChange={(e) => setPackageId(e.target.value)}>
+            {(packages || []).map((p) => <option key={p._id} value={p._id}>{p.nameAr} — {formatCurrency(p.price)}</option>)}
+          </select>
+        </div>
+        <div className="rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
+          سيستمر اشتراكك مع نفس المعلم ونفس الجدول الحالي. لتغيير المعلم أو الموعد، تواصل مع الإدارة بعد التجديد.
+        </div>
+        <div>
+          <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظات (اختياري)</label>
+          <textarea className={`${inputCls} h-20 py-2 resize-none`} value={studentNotes} onChange={(e) => setStudentNotes(e.target.value)} />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function RenewalHistorySection() {
+  const { data: requests } = useQuery({ queryKey: ['student', 'renewal-requests'], queryFn: () => renewalService.getMyRequests().then(r => r.data.data) })
+  if (!requests?.length) return null
+  return (
+    <motion.div {...fadeUp(0.12)} className="mt-6">
+      <div className="card-light p-6">
+        <h3 className="font-heading font-bold text-base text-brand-textBody mb-4">طلبات التجديد</h3>
+        <div className="space-y-2">
+          {requests.map((r) => (
+            <div key={r._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#f8f5ff' }}>
+              <div>
+                <div className="text-sm font-semibold text-brand-textBody">{r.requestedPackageId?.nameAr}</div>
+                <div className="text-xs text-[#7c6aaa]">{formatDateAr(r.createdAt)}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {r.paymentProofId && (
+                  <a href={getFileUrl(r.paymentProofId)} target="_blank" rel="noreferrer" className="text-xs font-bold text-brand-purple">إثبات الدفع</a>
+                )}
+                <Badge variant={RENEWAL_STATUS_LABELS[r.status]?.variant}>{RENEWAL_STATUS_LABELS[r.status]?.label}</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -290,7 +418,7 @@ function EmptySubscription() {
           <h2 className="font-heading font-bold text-2xl text-brand-textBody mb-2">
             لا يوجد اشتراك فعال
           </h2>
-          <p className="text-[#9b7fd6] mb-6 leading-relaxed">
+          <p className="text-[#7c6aaa] mb-6 leading-relaxed">
             ابدأ رحلتك مع ترتيلة أونلاين وتعلم القرآن الكريم مع أفضل المعلمين المتخصصين
           </p>
 

@@ -42,6 +42,7 @@ const StudentEvaluationsPage = lazy(() => import('./pages/student/StudentEvaluat
 const StudentProgressPage = lazy(() => import('./pages/student/StudentProgressPage.jsx'))
 const StudentAcademicPage = lazy(() => import('./pages/student/StudentAcademicPage.jsx'))
 const StudentSubscriptionPage = lazy(() => import('./pages/student/StudentSubscriptionPage.jsx'))
+const StudentQuranReportsPage = lazy(() => import('./pages/student/StudentQuranReportsPage.jsx'))
 const StudentEnrollmentPage = lazy(() => import('./pages/student/StudentEnrollmentPage.jsx'))
 const StudentNotificationsPage = lazy(() => import('./pages/student/StudentNotificationsPage.jsx'))
 const StudentSettingsPage = lazy(() => import('./pages/student/StudentSettingsPage.jsx'))
@@ -49,6 +50,7 @@ const StudentSettingsPage = lazy(() => import('./pages/student/StudentSettingsPa
 // Teacher
 const TeacherDashboardPage = lazy(() => import('./pages/teacher/TeacherDashboardPage.jsx'))
 const TeacherStudentsPage = lazy(() => import('./pages/teacher/TeacherStudentsPage.jsx'))
+const TeacherStudentDetailPage = lazy(() => import('./pages/teacher/TeacherStudentDetailPage.jsx'))
 const TeacherSessionsPage = lazy(() => import('./pages/teacher/TeacherSessionsPage.jsx'))
 const TeacherAttendancePage = lazy(() => import('./pages/teacher/TeacherAttendancePage.jsx'))
 const TeacherEvaluationsPage = lazy(() => import('./pages/teacher/TeacherEvaluationsPage.jsx'))
@@ -56,6 +58,9 @@ const TeacherHomeworkPage = lazy(() => import('./pages/teacher/TeacherHomeworkPa
 const TeacherProgressPage = lazy(() => import('./pages/teacher/TeacherProgressPage.jsx'))
 const TeacherLinksPage = lazy(() => import('./pages/teacher/TeacherLinksPage.jsx'))
 const TeacherPerformancePage = lazy(() => import('./pages/teacher/TeacherPerformancePage.jsx'))
+const TeacherPayrollPage = lazy(() => import('./pages/teacher/TeacherPayrollPage.jsx'))
+const TeacherQuranReportPage = lazy(() => import('./pages/teacher/TeacherQuranReportPage.jsx'))
+const TeacherMonthlyReportsPage = lazy(() => import('./pages/teacher/TeacherMonthlyReportsPage.jsx'))
 const TeacherNotificationsPage = lazy(() => import('./pages/teacher/TeacherNotificationsPage.jsx'))
 const TeacherSettingsPage = lazy(() => import('./pages/teacher/TeacherSettingsPage.jsx'))
 const TeacherAssignmentRequestsPage = lazy(() => import('./pages/teacher/TeacherAssignmentRequestsPage.jsx'))
@@ -68,6 +73,12 @@ const AdminTeachersPage = lazy(() => import('./pages/admin/AdminTeachersPage.jsx
 const AdminTeacherOnboardingWizardPage = lazy(() => import('./pages/admin/AdminTeacherOnboardingWizardPage.jsx'))
 const AdminTeacherProfilePage = lazy(() => import('./pages/admin/AdminTeacherProfilePage.jsx'))
 const AdminAssignmentRequestsPage = lazy(() => import('./pages/admin/AdminAssignmentRequestsPage.jsx'))
+const AdminTeacherReplacementPage = lazy(() => import('./pages/admin/AdminTeacherReplacementPage.jsx'))
+const AdminPayrollPage = lazy(() => import('./pages/admin/AdminPayrollPage.jsx'))
+const AdminSubscriptionRenewalsPage = lazy(() => import('./pages/admin/AdminSubscriptionRenewalsPage.jsx'))
+const AdminQuranReportsPage = lazy(() => import('./pages/admin/AdminQuranReportsPage.jsx'))
+const AdminMonthlyReportsPage = lazy(() => import('./pages/admin/AdminMonthlyReportsPage.jsx'))
+const AdminSurveysPage = lazy(() => import('./pages/admin/AdminSurveysPage.jsx'))
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage.jsx'))
 const AdminCoursesPage = lazy(() => import('./pages/admin/AdminCoursesPage.jsx'))
 const AdminSessionsPage = lazy(() => import('./pages/admin/AdminSessionsPage.jsx'))
@@ -178,6 +189,7 @@ export default function App() {
           <Route path={ROUTES.STUDENT_PROGRESS} element={<StudentProgressPage />} />
           <Route path={ROUTES.STUDENT_ACADEMIC} element={<StudentAcademicPage />} />
           <Route path={ROUTES.STUDENT_SUBSCRIPTION} element={<StudentSubscriptionPage />} />
+          <Route path={ROUTES.STUDENT_QURAN_REPORTS} element={<StudentQuranReportsPage />} />
           <Route path={ROUTES.STUDENT_ENROLLMENT} element={<StudentEnrollmentPage />} />
           <Route path={ROUTES.STUDENT_NOTIFICATIONS} element={<StudentNotificationsPage />} />
           <Route path={ROUTES.STUDENT_SETTINGS} element={<StudentSettingsPage />} />
@@ -187,6 +199,7 @@ export default function App() {
         <Route element={<TeacherLayout />}>
           <Route path={ROUTES.TEACHER_DASHBOARD} element={<TeacherDashboardPage />} />
           <Route path={ROUTES.TEACHER_STUDENTS} element={<TeacherStudentsPage />} />
+          <Route path={ROUTES.TEACHER_STUDENT_DETAIL} element={<TeacherStudentDetailPage />} />
           <Route path={ROUTES.TEACHER_SESSIONS} element={<TeacherSessionsPage />} />
           <Route path={ROUTES.TEACHER_ATTENDANCE} element={<TeacherAttendancePage />} />
           <Route path={ROUTES.TEACHER_EVALUATIONS} element={<TeacherEvaluationsPage />} />
@@ -194,6 +207,10 @@ export default function App() {
           <Route path={ROUTES.TEACHER_PROGRESS} element={<TeacherProgressPage />} />
           <Route path={ROUTES.TEACHER_LINKS} element={<TeacherLinksPage />} />
           <Route path={ROUTES.TEACHER_PERFORMANCE} element={<TeacherPerformancePage />} />
+          <Route path={ROUTES.TEACHER_PAYROLL} element={<TeacherPayrollPage />} />
+          <Route path={ROUTES.TEACHER_PAYROLL_PERIOD} element={<TeacherPayrollPage />} />
+          <Route path={ROUTES.TEACHER_QURAN_REPORT} element={<TeacherQuranReportPage />} />
+          <Route path={ROUTES.TEACHER_MONTHLY_REPORTS} element={<TeacherMonthlyReportsPage />} />
           <Route path={ROUTES.TEACHER_NOTIFICATIONS} element={<TeacherNotificationsPage />} />
           <Route path={ROUTES.TEACHER_SETTINGS} element={<TeacherSettingsPage />} />
           <Route path={ROUTES.TEACHER_ASSIGNMENT_REQUESTS} element={<TeacherAssignmentRequestsPage />} />
@@ -214,6 +231,14 @@ export default function App() {
           <Route path={ROUTES.ADMIN_TEACHER_PROFILE} element={<RequirePermission permission="teachers.view"><AdminTeacherProfilePage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_ASSIGNMENT_REQUESTS} element={<RequirePermission permission="assignments.view"><AdminAssignmentRequestsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_ASSIGNMENT_REQUEST_DETAIL} element={<RequirePermission permission="assignments.view"><AdminAssignmentRequestsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHER_REPLACEMENT} element={<RequirePermission permission="transfers.view"><AdminTeacherReplacementPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_TEACHER_REPLACEMENT_BATCH} element={<RequirePermission permission="transfers.view"><AdminTeacherReplacementPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_PAYROLL} element={<RequirePermission permission="payroll.view"><AdminPayrollPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_PAYROLL_PERIOD} element={<RequirePermission permission="payroll.view"><AdminPayrollPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SUBSCRIPTION_RENEWALS} element={<RequirePermission permission="subscriptions.view"><AdminSubscriptionRenewalsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_QURAN_REPORTS} element={<RequirePermission permission="quranReports.view"><AdminQuranReportsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_MONTHLY_REPORTS} element={<RequirePermission permission="monthlyReports.view"><AdminMonthlyReportsPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SURVEYS} element={<RequirePermission permission="surveys.view"><AdminSurveysPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_ADMINS} element={<RequirePermission permission="users.view"><AdminAdminsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_COURSES} element={<RequirePermission permission="courses.view"><AdminCoursesPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_COURSE_NEW} element={<RequirePermission permission="courses.manage"><AdminCourseFormPage /></RequirePermission>} />

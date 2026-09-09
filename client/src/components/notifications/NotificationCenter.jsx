@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,12 +6,15 @@ import {
   Calendar, FileText, Star, CreditCard, UserRound,
   Bell, LayoutGrid, Inbox, Search, CircleCheck, Clock3,
   Archive, ArchiveRestore, CalendarClock, Tag, ChevronDown, ChevronLeft, ClipboardCheck,
+  Banknote, RefreshCw, ClipboardList, MessageSquareText,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../shared/PageHeader.jsx'
 import Spinner from '../ui/Spinner.jsx'
 import { timeFromNow } from '../../utils/date.js'
 import { useNotificationStore } from '../../store/notificationStore.js'
+import { isSafeInternalPath } from '../../utils/notificationUrl.js'
+import NotificationDetailModal from './NotificationDetailModal.jsx'
 import {
   NOTIFICATION_TYPE_CONFIG as TYPE_CONFIG,
   NOTIFICATION_PRIORITY_CONFIG as PRIORITY_CONFIG,
@@ -27,8 +30,16 @@ const FILTER_TABS = [
   { key: 'subscription', label: 'الاشتراك',     Icon: CreditCard  },
   { key: 'assignment',   label: 'الإسناد',      Icon: ClipboardCheck },
   { key: 'attendance',   label: 'الحضور',       Icon: Clock3      },
+  { key: 'payroll',      label: 'الراتب',       Icon: Banknote    },
+  { key: 'renewal',      label: 'التجديد',      Icon: RefreshCw   },
+  { key: 'report',       label: 'التقارير',     Icon: ClipboardList },
+  { key: 'survey',       label: 'الاستبيانات',  Icon: MessageSquareText },
   { key: 'system',       label: 'النظام',       Icon: Bell        },
 ]
+
+// Bounded initial fetch — "load more" grows it in fixed steps instead of
+// ever fetching the whole (unbounded) history in one request.
+const PAGE_SIZE = 50
 
 function groupByDate(notifications) {
   const todayStr = new Date().toDateString()
@@ -70,23 +81,35 @@ export default function NotificationCenter({ theme = 'light' }) {
   const [selected, setSelected] = useState(new Set())
   const [groupMode, setGroupMode] = useState('day') // 'day' | 'category'
   const [showArchived, setShowArchived] = useState(false)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
+  const [detailNotif, setDetailNotif] = useState(null)
   const qc = useQueryClient()
   const isDark = theme === 'dark'
   const { markRead, markUnread, markAllRead, removeNotification } = useNotificationStore()
 
+  // Reset the bounded page size whenever the visible set changes shape —
+  // otherwise "load more" on one filter would leak into a much larger,
+  // confusing fetch after switching tabs.
+  useEffect(() => {
+    setPageSize(PAGE_SIZE)
+  }, [filter, showArchived])
+
   const { data: raw = {}, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ['notifications', 'center', filter, showArchived],
+    queryKey: ['notifications', 'center', filter, showArchived, pageSize],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: 100, isArchived: showArchived ? 'true' : 'false' })
+      const params = new URLSearchParams({ limit: pageSize, isArchived: showArchived ? 'true' : 'false' })
       if (filter === 'unread') params.set('isRead', 'false')
       else if (filter !== 'all') params.set('type', filter)
       const r = await api.get(`/notifications?${params}`)
       return r.data?.data || {}
     },
     staleTime: 30 * 1000,
+    placeholderData: (prev) => prev,
   })
 
   const notifications = Array.isArray(raw?.notifications) ? raw.notifications : []
+  const total = typeof raw?.total === 'number' ? raw.total : notifications.length
+  const hasMore = notifications.length < total
 
   const filtered = useMemo(() => {
     if (!search.trim()) return notifications
@@ -152,7 +175,7 @@ export default function NotificationCenter({ theme = 'light' }) {
     if (notif.isRead) return
     markRead(notif._id)
     api.patch(`/notifications/${notif._id}/read`).catch(() => {})
-    qc.setQueryData(['notifications', 'center', filter, showArchived], old => ({
+    qc.setQueryData(['notifications', 'center', filter, showArchived, pageSize], old => ({
       ...old,
       notifications: (old?.notifications || []).map(n => n._id === notif._id ? { ...n, isRead: true } : n),
     }))
@@ -162,7 +185,7 @@ export default function NotificationCenter({ theme = 'light' }) {
     if (!notif.isRead) return
     markUnread(notif._id)
     api.patch(`/notifications/${notif._id}/unread`).catch(() => {})
-    qc.setQueryData(['notifications', 'center', filter, showArchived], old => ({
+    qc.setQueryData(['notifications', 'center', filter, showArchived, pageSize], old => ({
       ...old,
       notifications: (old?.notifications || []).map(n => n._id === notif._id ? { ...n, isRead: false } : n),
     }))
@@ -171,7 +194,7 @@ export default function NotificationCenter({ theme = 'light' }) {
   function handleDelete(id) {
     removeNotification(id)
     api.delete(`/notifications/${id}`).catch(() => {})
-    qc.setQueryData(['notifications', 'center', filter, showArchived], old => ({
+    qc.setQueryData(['notifications', 'center', filter, showArchived, pageSize], old => ({
       ...old,
       notifications: (old?.notifications || []).filter(n => n._id !== id),
     }))
@@ -183,12 +206,17 @@ export default function NotificationCenter({ theme = 'light' }) {
 
   // Clicking a notification's content marks it read AND navigates straight
   // to the record it references — never a passive "mark read" tap. A
-  // notification without an `actionUrl` (older rows, or a type with no
-  // deep-link target) safely just marks read; the destination page itself
-  // handles a since-deleted/inaccessible record.
+  // notification without a (safe) `actionUrl` — older rows, a type with no
+  // deep-link target, or a legacy value that fails the internal-path guard
+  // — opens a detail view with its full content instead of doing nothing;
+  // the destination page itself handles a since-deleted/inaccessible record.
   function handleActivate(notif) {
     handleMarkRead(notif)
-    if (notif.actionUrl) navigate(notif.actionUrl)
+    if (notif.actionUrl && isSafeInternalPath(notif.actionUrl)) {
+      navigate(notif.actionUrl)
+    } else {
+      setDetailNotif(notif)
+    }
   }
 
   function toggleSelect(id) {
@@ -300,7 +328,7 @@ export default function NotificationCenter({ theme = 'light' }) {
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all"
               style={{
                 background: groupMode === opt.key ? (isDark ? '#E8C76A' : '#fff') : 'transparent',
-                color: groupMode === opt.key ? (isDark ? '#1d0a3f' : '#7c3aed') : (isDark ? 'rgba(255,255,255,0.5)' : '#9b7fd6'),
+                color: groupMode === opt.key ? (isDark ? '#1d0a3f' : '#7c3aed') : (isDark ? 'rgba(255,255,255,0.5)' : '#7c6aaa'),
                 boxShadow: groupMode === opt.key && !isDark ? '0 1px 4px rgba(124,58,237,0.15)' : 'none',
               }}
             >
@@ -359,7 +387,7 @@ export default function NotificationCenter({ theme = 'light' }) {
       {/* Select-all + Bulk Actions Bar */}
       {filtered.length > 0 && (
         <div className="flex items-center justify-between mb-3 px-1">
-          <button onClick={toggleSelectAll} className="flex items-center gap-2 text-xs font-semibold" style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#9b7fd6' }}>
+          <button onClick={toggleSelectAll} className="flex items-center gap-2 text-xs font-semibold" style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#7c6aaa' }}>
             <span
               className="w-4 h-4 rounded flex items-center justify-center transition-all"
               style={{
@@ -406,7 +434,7 @@ export default function NotificationCenter({ theme = 'light' }) {
               <button onClick={() => bulkDeleteMutation.mutate(selected)} className="text-xs font-semibold px-3 py-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
                 حذف
               </button>
-              <button onClick={() => setSelected(new Set())} className="text-xs font-semibold px-3 py-1 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : '#f0ecf8', color: isDark ? 'rgba(255,255,255,0.5)' : '#9b7fd6' }}>
+              <button onClick={() => setSelected(new Set())} className="text-xs font-semibold px-3 py-1 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : '#f0ecf8', color: isDark ? 'rgba(255,255,255,0.5)' : '#7c6aaa' }}>
                 إلغاء
               </button>
             </div>
@@ -436,7 +464,7 @@ export default function NotificationCenter({ theme = 'light' }) {
           <p className="font-bold text-sm mb-1" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#1d0a3f' }}>
             تعذّر تحميل الإشعارات
           </p>
-          <p className="text-xs mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#9b7fd6' }}>
+          <p className="text-xs mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#7c6aaa' }}>
             حدث خطأ أثناء الاتصال بالخادم
           </p>
           <button
@@ -483,8 +511,30 @@ export default function NotificationCenter({ theme = 'light' }) {
               </div>
             </div>
           ))}
+
+          {/* Bounded loading — grows the fetch in fixed steps instead of one
+              unbounded request; only shown while a search isn't narrowing
+              the already-fetched page (search is client-side over what's
+              loaded, so "load more" stays meaningful under it too). */}
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setPageSize(s => s + PAGE_SIZE)}
+                disabled={isFetching}
+                className="text-xs font-bold px-5 py-2.5 rounded-xl transition-all disabled:opacity-60"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f0ecf8',
+                  color: isDark ? 'rgba(255,255,255,0.7)' : '#7c3aed',
+                }}
+              >
+                {isFetching ? 'جارٍ التحميل...' : `تحميل المزيد (${notifications.length} من ${total})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {detailNotif && <NotificationDetailModal notif={detailNotif} onClose={() => setDetailNotif(null)} />}
     </div>
   )
 }
@@ -494,7 +544,7 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
   const pri = PRIORITY_CONFIG[notif.priority] || PRIORITY_CONFIG.medium
   const isUnread = !notif.isRead
   const isUrgent = notif.priority === 'urgent' && isUnread
-  const isActionable = !!notif.actionUrl
+  const isActionable = !!notif.actionUrl && isSafeInternalPath(notif.actionUrl)
 
   return (
     <motion.div
@@ -576,7 +626,7 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
         {notif.bodyAr && (
           <p
             className="text-[12px] line-clamp-2 mb-2"
-            style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#9b7fd6' }}
+            style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#7c6aaa' }}
           >
             {notif.bodyAr}
           </p>
@@ -621,7 +671,7 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
             style={{ background: isDark ? 'rgba(255,255,255,0.07)' : '#f5f3ff' }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: isDark ? '#9b7fd6' : '#7c3aed' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: isDark ? '#7c6aaa' : '#7c3aed' }}>
               <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
@@ -644,8 +694,8 @@ function NotificationCard({ notif, isDark, isSelected, isArchivedView, onToggleS
           style={{ background: isDark ? 'rgba(255,255,255,0.07)' : '#f5f3ff' }}
         >
           {isArchivedView
-            ? <ArchiveRestore size={13} style={{ color: isDark ? '#9b7fd6' : '#7c3aed' }} />
-            : <Archive size={13} style={{ color: isDark ? '#9b7fd6' : '#7c3aed' }} />}
+            ? <ArchiveRestore size={13} style={{ color: isDark ? '#7c6aaa' : '#7c3aed' }} />
+            : <Archive size={13} style={{ color: isDark ? '#7c6aaa' : '#7c3aed' }} />}
         </button>
         <button
           onClick={onDelete}

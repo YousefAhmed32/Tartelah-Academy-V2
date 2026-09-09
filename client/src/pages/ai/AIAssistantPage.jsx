@@ -109,14 +109,14 @@ export default function AIAssistantPage() {
                 <p style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                 {msg.sources?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-[#e8e0f5]">
-                    <p className="text-xs font-semibold text-[#9b7fd6] mb-1">المصادر:</p>
+                    <p className="text-xs font-semibold text-[#7c6aaa] mb-1">المصادر:</p>
                     {msg.sources.map((s, j) => (
-                      <p key={j} className="text-xs text-[#9b7fd6]">• {s}</p>
+                      <p key={j} className="text-xs text-[#7c6aaa]">• {s}</p>
                     ))}
                   </div>
                 )}
               </div>
-              <span className="text-xs text-[#9b7fd6]/60">{timeFromNow(msg.timestamp)}</span>
+              <span className="text-xs text-[#7c6aaa]/60">{timeFromNow(msg.timestamp)}</span>
             </div>
           </div>
         ))}
@@ -125,7 +125,7 @@ export default function AIAssistantPage() {
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-none bg-purple-gradient text-white font-bold text-sm">م</div>
             <div className="bg-[#f8f5ff] p-4 rounded-[18px] flex items-center gap-2">
               <Spinner size="sm" color="border-brand-purple" />
-              <span className="text-sm text-[#9b7fd6]">يفكر...</span>
+              <span className="text-sm text-[#7c6aaa]">يفكر...</span>
             </div>
           </div>
         )}

@@ -46,20 +46,72 @@ const ACTION_LABELS = {
   // Subscriptions & enrollment
   'subscription.create': { label: 'إنشاء اشتراك', badge: 'success' },
   'subscription.update': { label: 'تعديل اشتراك', badge: 'purple' },
+  'subscription.pause': { label: 'إيقاف اشتراك مؤقتاً', badge: 'warning' },
+  'subscription.resume': { label: 'استئناف اشتراك', badge: 'success' },
   'enrollment.approved': { label: 'الموافقة على طلب تسجيل', badge: 'success' },
   'enrollment.rejected': { label: 'رفض طلب تسجيل', badge: 'danger' },
-  // Aliases for older seeded/dev records that predate the approved/rejected naming
   'enrollment.approve': { label: 'الموافقة على طلب تسجيل', badge: 'success' },
   'enrollment.reject': { label: 'رفض طلب تسجيل', badge: 'danger' },
 
   // Scheduling
   'schedule_rule.create': { label: 'إنشاء جدول دوري', badge: 'success' },
+  'schedule_rule.admin_update': { label: 'تعديل جدول دوري', badge: 'purple' },
+  'schedule_rule.admin_delete': { label: 'حذف جدول دوري', badge: 'danger' },
+  'schedule_rule.admin_generate_more': { label: 'توليد حصص إضافية', badge: 'success' },
 
   // Review queue (Operations Center)
   'review.start_review': { label: 'بدء مراجعة حصة', badge: 'purple' },
   'review.resolve': { label: 'اعتماد مراجعة حصة', badge: 'success' },
   'review.dismiss': { label: 'تجاهل تنبيه مراجعة', badge: 'gray' },
   'review.reopen': { label: 'إعادة فتح مراجعة', badge: 'warning' },
+
+  // Monthly Teacher Reports
+  'monthlyReport.submit': { label: 'تسليم تقرير شهري', badge: 'purple' },
+  'monthlyReport.generate': { label: 'توليد تقرير شهري', badge: 'purple' },
+  'monthlyReport.generate_all': { label: 'توليد تقارير شهرية للجميع', badge: 'purple' },
+  'monthlyReport.request_completion': { label: 'طلب إكمال تقرير شهري', badge: 'warning' },
+  'monthlyReport.reviewed': { label: 'مراجعة تقرير شهري', badge: 'info' },
+  'monthlyReport.approve': { label: 'اعتماد تقرير شهري', badge: 'success' },
+
+  // Quran Session Reports
+  'quranReport.submit': { label: 'تسليم تقرير حلقة', badge: 'purple' },
+  'quranReport.request_correction': { label: 'طلب تصحيح تقرير حلقة', badge: 'warning' },
+  'quranReport.approve': { label: 'اعتماد تقرير حلقة', badge: 'success' },
+
+  // Teacher Payroll
+  'payroll.submit_period': { label: 'رفع مسير رواتب', badge: 'purple' },
+  'payroll.approve_period': { label: 'اعتماد مسير رواتب', badge: 'success' },
+  'payroll.settle_period': { label: 'تسوية وصرف رواتب', badge: 'success' },
+  'payroll.create_adjustment': { label: 'إضافة تسوية مالية', badge: 'warning' },
+  'payroll.delete_adjustment': { label: 'حذف تسوية مالية', badge: 'danger' },
+
+  // Assignment Requests
+  'assignment.create': { label: 'إنشاء طلب إسناد', badge: 'purple' },
+  'assignment.activate': { label: 'تفعيل إسناد الطالب', badge: 'success' },
+  'assignment.accept': { label: 'قبول طلب الإسناد', badge: 'success' },
+  'assignment.reject': { label: 'رفض طلب الإسناد', badge: 'danger' },
+  'assignment.time_change': { label: 'طلب تغيير موعد الإسناد', badge: 'warning' },
+  'assignment.edit_resend': { label: 'تعديل وإعادة إرسال الإسناد', badge: 'purple' },
+  'assignment.reassign': { label: 'إعادة إسناد لمعلم آخر', badge: 'warning' },
+  'assignment.cancel': { label: 'إلغاء طلب الإسناد', badge: 'danger' },
+
+  // Transfers & Replacements
+  'transfer.student': { label: 'نقل طالب لمعلم آخر', badge: 'purple' },
+  'transfer.teacher': { label: 'استبدال معلم لجميع طلابه', badge: 'warning' },
+
+  // Credentials
+  'credentials.set_default_password': { label: 'تعيين كلمة مرور افتراضية', badge: 'warning' },
+  'credentials.clear_default_password': { label: 'إلغاء كلمة المرور الافتراضية', badge: 'danger' },
+
+  // Onboarding & Admin User Management
+  'admin.create_student': { label: 'إنشاء حساب طالب', badge: 'success' },
+  'admin.add_student_to_teacher': { label: 'إضافة طالب للمعلم', badge: 'success' },
+  'admin.create_subscription': { label: 'إنشاء اشتراك جديد', badge: 'success' },
+  'onboarding.create_teacher_with_students': { label: 'تسجيل معلم مع طلابه', badge: 'success' },
+  'teacher.update_working_hours': { label: 'تعديل ساعات عمل المعلم', badge: 'purple' },
+  'admin.create_teacher': { label: 'إنشاء حساب معلم', badge: 'success' },
+  'admin.update_teacher': { label: 'تعديل بيانات المعلم', badge: 'purple' },
+  'admin.update_teacher_hourly_rate': { label: 'تعديل سعر حصة المعلم', badge: 'warning' },
 
   // Articles CMS
   'article.create': { label: 'إنشاء مقال', badge: 'success' },
@@ -71,6 +123,53 @@ const ACTION_LABELS = {
   'article.restore': { label: 'استعادة مقال', badge: 'success' },
 }
 
+const ENTITY_LABELS_AR = {
+  User: 'مستخدم',
+  Session: 'حصة',
+  Evaluation: 'تقييم',
+  Attendance: 'سجل حضور',
+  Subscription: 'اشتراك',
+  EnrollmentRequest: 'طلب تسجيل',
+  ScheduleRule: 'جدول دوري',
+  Article: 'مقال',
+  MonthlyTeacherReport: 'تقرير شهري',
+  QuranSessionReport: 'تقرير حلقة',
+  AssignmentRequest: 'طلب إسناد',
+  TeacherPayrollPeriod: 'مسير رواتب',
+  TeachingSubject: 'مادة دراسية',
+  TeacherWorkingHours: 'ساعات عمل',
+  SubscriptionPause: 'إيقاف اشتراك',
+  SubscriptionRenewalRequest: 'طلب تجديد',
+}
+
+const ACTION_SUMMARIES_AR = {
+  'monthlyReport.reviewed': 'تمت مراجعة التقرير الشهري للمعلم والتحقق من كشف الحصص',
+  'monthlyReport.approve': 'تم اعتماد التقرير الشهري وإقراره نهائياً',
+  'monthlyReport.submit': 'قام المعلم بتسليم التقرير الشهري للإدارة',
+  'monthlyReport.request_completion': 'طُلب من المعلم استكمال ومراجعة بيانات التقرير الشهري',
+  'monthlyReport.generate': 'تم توليد التقرير الشهري واحتساب إحصائيات المعلم',
+  'monthlyReport.generate_all': 'تم توليد التقارير الشهرية لكافة المعلمين',
+  'quranReport.approve': 'تمت مراجعة واعتماد تقرير الحلقة القرآنية',
+  'quranReport.request_correction': 'طُلب من المعلم تصحيح وتدقيق بيانات تقرير الحلقة',
+  'quranReport.submit': 'تم رفع تقرير الحلقة القرآنية وملاحظات التجويد',
+  'payroll.approve_period': 'تم اعتماد مسير رواتب المعلمين للشهر',
+  'payroll.settle_period': 'تمت تسوية وصرف مستحقات المعلمين بالكامل',
+  'payroll.submit_period': 'تم رفع مسير الرواتب للاعتماد',
+  'assignment.accept': 'وافق المعلم على إسناد الطالب وبدء التدريس',
+  'assignment.reject': 'اعتذر المعلم عن قبول إسناد الطالب',
+  'assignment.time_change': 'طلب المعلم مواعيد بديلة لتجنب التعارض',
+  'assignment.activate': 'تم تفعيل جدول الحصص والاشتراك للطالب بنجاح',
+  'assignment.create': 'تم إنشاء وإرسال طلب إسناد جديد للمعلم',
+  'assignment.cancel': 'تم إلغاء طلب الإسناد',
+  'subscription.pause': 'تم إيقاف الاشتراك مؤقتاً بناءً على طلب المشترك',
+  'subscription.resume': 'تم استئناف تفعيل اشتراك الطالب واحتساب الحصص',
+  'subscription.create': 'تم إنشاء وتفعيل اشتراك جديد',
+  'credentials.set_default_password': 'تم ضبط كلمة مرور افتراضية موحدة للنظام',
+  'credentials.clear_default_password': 'تم إلغاء كلمة المرور الافتراضية للنظام',
+  'transfer.student': 'تم نقل الطالب إلى جدول المعلم الجديد',
+  'transfer.teacher': 'تم تنفيذ عملية استبدال المعلم لطلابه',
+}
+
 const FIELD_LABELS_AR = {
   status: 'الحالة', notes: 'ملاحظات', payrollStatus: 'حالة الاستحقاق', payrollStatusReason: 'السبب',
   reason: 'السبب', outcome: 'النتيجة', reviewState: 'حالة المراجعة', note: 'ملاحظة',
@@ -80,6 +179,11 @@ const FIELD_LABELS_AR = {
   finalize: 'اعتماد نهائي', sessionCount: 'عدد الحصص', title: 'العنوان',
   teacherAttendanceStatus: 'حضور المعلم', isFinalized: 'الاعتماد النهائي',
   subscriptionId: 'الاشتراك', field: 'الحقل', action: 'الإجراء',
+  periodKey: 'الفترة الشهرية', year: 'السنة', month: 'الشهر',
+  scheduledSessions: 'الحصص المجدولة', completedSessions: 'الحصص المكتملة',
+  grossEntitlement: 'إجمالي الاستحقاق', netPayable: 'صافي المستحق',
+  proposedSchedule: 'المواعيد المقترحة', studentType: 'نوع الطالب',
+  lessonDurationMinutes: 'مدة الحصة بالدقائق', specialization: 'التخصص',
 }
 
 // Translates enum-style values found across the schema (Session/Subscription/
@@ -94,6 +198,8 @@ const VALUE_LABELS_AR = {
   active: 'نشط', expired: 'منتهي', paused: 'متوقف مؤقتاً',
   draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
   submitted: 'مُسلَّم', graded: 'مُقيَّم', returned: 'مُعاد', closed: 'مغلق',
+  reviewed: 'مُراجَع', needs_completion: 'بحاجة لإكمال', correction_requested: 'مطلوب تصحيح',
+  time_change_requested: 'مطلوب تعديل موعد', reassigned: 'مُعاد إسناده',
   new: 'جديدة', read: 'مقروءة', replied: 'تم الرد',
   under_review: 'قيد المراجعة', approved: 'موافق عليه', rejected: 'مرفوض',
   dropped: 'منسحب',
@@ -104,12 +210,16 @@ const VALUE_LABELS_AR = {
 
 const ENTITY_OPTIONS = [
   { value: 'all', label: 'كل الكيانات' },
-  { value: 'User', label: 'المستخدمون' },
+  { value: 'MonthlyTeacherReport', label: 'التقارير الشهرية' },
+  { value: 'QuranSessionReport', label: 'تقارير الحلقات' },
   { value: 'Session', label: 'الحصص' },
-  { value: 'Evaluation', label: 'التقييمات' },
   { value: 'Attendance', label: 'الحضور' },
-  { value: 'Subscription', label: 'الاشتراكات' },
+  { value: 'User', label: 'المستخدمون' },
+  { value: 'AssignmentRequest', label: 'طلبات الإسناد' },
   { value: 'EnrollmentRequest', label: 'طلبات التسجيل' },
+  { value: 'Subscription', label: 'الاشتراكات' },
+  { value: 'TeacherPayrollPeriod', label: 'مسيرات الرواتب' },
+  { value: 'Evaluation', label: 'التقييمات' },
   { value: 'ScheduleRule', label: 'الجداول الدورية' },
   { value: 'Article', label: 'المقالات' },
 ]
@@ -152,31 +262,34 @@ function summarizeChanges(log) {
   if (log.action === 'reset_password') return 'تم تغيير كلمة المرور'
 
   const c = log.changes
-  if (!c || typeof c !== 'object') return null
+  if (c && typeof c === 'object') {
+    if (c.before && c.after && typeof c.before === 'object' && typeof c.after === 'object') {
+      const parts = []
+      for (const key of Object.keys(c.after)) {
+        if (c.before[key] !== c.after[key]) {
+          const line = describeField(key, c.after[key], c.before[key])
+          if (line) parts.push(line)
+        }
+      }
+      if (parts.length) return parts.join(' • ')
+    }
 
-  if (c.before && c.after && typeof c.before === 'object' && typeof c.after === 'object') {
     const parts = []
-    for (const key of Object.keys(c.after)) {
-      if (c.before[key] !== c.after[key]) {
-        const line = describeField(key, c.after[key], c.before[key])
+    for (const [key, val] of Object.entries(c)) {
+      if (val === undefined) continue
+      if (val && typeof val === 'object' && ('from' in val || 'to' in val)) {
+        const line = describeField(key, val.to, val.from)
+        if (line) parts.push(line)
+      } else if (typeof val !== 'object') {
+        const line = describeField(key, val)
         if (line) parts.push(line)
       }
     }
-    return parts.length ? parts.join(' • ') : null
+    if (parts.length) return parts.join(' • ')
   }
 
-  const parts = []
-  for (const [key, val] of Object.entries(c)) {
-    if (val === undefined) continue
-    if (val && typeof val === 'object' && ('from' in val || 'to' in val)) {
-      const line = describeField(key, val.to, val.from)
-      if (line) parts.push(line)
-    } else if (typeof val !== 'object') {
-      const line = describeField(key, val)
-      if (line) parts.push(line)
-    }
-  }
-  return parts.length ? parts.join(' • ') : null
+  // Natural language description fallback for actions that store no explicit delta
+  return ACTION_SUMMARIES_AR[log.action] || null
 }
 
 export default function AdminAuditLogsPage() {
@@ -225,7 +338,7 @@ export default function AdminAuditLogsPage() {
           <Select size="sm" value={action} onValueChange={(v) => { setAction(v); setPage(1) }} options={ACTION_OPTIONS} />
         </div>
         {stats?.topAction && (
-          <div className="flex items-center gap-2 text-xs text-[#9b7fd6] mr-auto">
+          <div className="flex items-center gap-2 text-xs text-[#7c6aaa] mr-auto">
             <TrendingUp size={14} />
             الأكثر تكراراً: <span className="font-semibold text-brand-textBody">{topActionLabel}</span> ({stats.topAction.count})
           </div>
@@ -238,7 +351,7 @@ export default function AdminAuditLogsPage() {
         <>
           <div className="card-light overflow-hidden">
             {!logs.length ? (
-              <div className="text-center py-12 text-[#9b7fd6]">
+              <div className="text-center py-12 text-[#7c6aaa]">
                 <Shield size={36} className="mx-auto mb-3 opacity-40" />
                 لا توجد أنشطة مسجلة
               </div>
@@ -248,7 +361,7 @@ export default function AdminAuditLogsPage() {
                   <thead className="sticky top-0 z-10 bg-white">
                     <tr className="border-b border-[#f0ecf8]">
                       {['الوقت', 'المنفذ', 'الإجراء', 'التفاصيل', 'الكيان', 'IP'].map(h => (
-                        <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#9b7fd6] bg-white">{h}</th>
+                        <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-[#7c6aaa] bg-white">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -256,21 +369,23 @@ export default function AdminAuditLogsPage() {
                     {logs.map(log => {
                       const cfg = ACTION_LABELS[log.action] || { label: log.action, badge: 'gray' }
                       const summary = summarizeChanges(log)
+                      const entityName = ENTITY_LABELS_AR[log.entity] || log.entity
                       return (
                         <tr key={log._id} className="border-b border-[#f8f5ff] hover:bg-[#faf9ff] transition-colors align-top">
-                          <td className="px-4 py-3 text-xs text-[#9b7fd6] whitespace-nowrap">{formatDateTimeAr(log.createdAt)}</td>
+                          <td className="px-4 py-3 text-xs text-[#7c6aaa] whitespace-nowrap">{formatDateTimeAr(log.createdAt)}</td>
                           <td className="px-4 py-3">
                             <div className="text-sm font-semibold text-brand-textBody">{log.actorId?.firstNameAr} {log.actorId?.lastNameAr}</div>
-                            <div className="text-xs text-[#9b7fd6]">{log.actorRole}</div>
+                            <div className="text-xs text-[#7c6aaa]">{log.actorRole}</div>
                           </td>
                           <td className="px-4 py-3"><Badge variant={cfg.badge}>{cfg.label}</Badge></td>
                           <td className="px-4 py-3 text-xs text-brand-textBody max-w-xs">
                             <span className="line-clamp-2" title={summary || undefined}>{summary || '—'}</span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-[#9b7fd6] whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]" title={`${log.entity} ${log.entityId ? `#${log.entityId.toString().slice(-6)}` : ''}`}>
-                            {log.entity} {log.entityId ? `#${log.entityId.toString().slice(-6)}` : ''}
+                          <td className="px-4 py-3 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[160px]" title={`${entityName} ${log.entityId ? `#${log.entityId.toString().slice(-6)}` : ''}`}>
+                            <span className="font-medium text-brand-textBody">{entityName}</span>
+                            {log.entityId && <span className="text-xs text-[#7c6aaa] mr-1 font-mono">#{log.entityId.toString().slice(-6)}</span>}
                           </td>
-                          <td className="px-4 py-3 text-xs text-[#9b7fd6] font-mono whitespace-nowrap">{log.ip || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-[#7c6aaa] font-mono whitespace-nowrap">{log.ip || '—'}</td>
                         </tr>
                       )
                     })}

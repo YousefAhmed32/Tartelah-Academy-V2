@@ -42,27 +42,27 @@ export default function StudentEvaluationsPage() {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <div className="font-heading font-bold text-brand-textBody">{typeLabels[ev.type] || ev.type}</div>
-                    <div className="text-xs text-[#9b7fd6] mt-0.5">{formatDateAr(ev.createdAt)}</div>
+                    <div className="text-xs text-[#7c6aaa] mt-0.5">{formatDateAr(ev.createdAt)}</div>
                   </div>
                   <div className="text-center">
                     <div className="font-heading font-extrabold text-2xl" style={{ color: grade.color }}>{ev.score}</div>
-                    <div className="text-xs text-[#9b7fd6]">من ١٠</div>
+                    <div className="text-xs text-[#7c6aaa]">من ١٠</div>
                   </div>
                 </div>
                 <div className="w-full bg-[#f0ecf8] rounded-full h-1.5 mb-3">
                   <div className="h-1.5 rounded-full transition-all" style={{ width: `${ev.score * 10}%`, background: grade.color }} />
                 </div>
-                {ev.notesAr && <p className="text-sm text-[#9b7fd6] leading-relaxed">{ev.notesAr}</p>}
+                {ev.notesAr && <p className="text-sm text-[#7c6aaa] leading-relaxed">{ev.notesAr}</p>}
                 {ev.strengths?.length > 0 && (
                   <div className="mt-3">
                     <span className="text-xs font-semibold text-emerald-600">نقاط القوة: </span>
-                    <span className="text-xs text-[#9b7fd6]">{ev.strengths.join(' • ')}</span>
+                    <span className="text-xs text-[#7c6aaa]">{ev.strengths.join(' • ')}</span>
                   </div>
                 )}
                 {ev.improvements?.length > 0 && (
                   <div className="mt-1.5">
                     <span className="text-xs font-semibold text-amber-600">للتحسين: </span>
-                    <span className="text-xs text-[#9b7fd6]">{ev.improvements.join(' • ')}</span>
+                    <span className="text-xs text-[#7c6aaa]">{ev.improvements.join(' • ')}</span>
                   </div>
                 )}
               </div>

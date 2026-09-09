@@ -72,3 +72,11 @@ export function useUnarchiveTeachingSubject() {
     onSuccess: invalidate,
   })
 }
+
+export function useReorderTeachingSubjects() {
+  const invalidate = useInvalidateSubjects()
+  return useMutation({
+    mutationFn: (orderedIds) => api.patch('/admin/teaching-subjects/reorder', { orderedIds }).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}

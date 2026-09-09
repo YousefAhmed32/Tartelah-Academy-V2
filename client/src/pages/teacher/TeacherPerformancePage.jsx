@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -20,7 +21,7 @@ import { SkeletonStatRow, SkeletonChart, SkeletonRows } from '../../components/u
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatCurrency, toArray } from '../../utils/format.js'
 import { exportRowsToCSV, exportReportToPDF } from '../../utils/exportUtils.js'
-import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
+import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
 
 // ── Period presets ──────────────────────────────────────────────────────────
 
@@ -352,7 +353,7 @@ function SalaryTab({ periodRange, salary, isLoading }) {
         { key: 'value', label: 'القيمة' },
       ],
       rows: [
-        { label: 'سعر الحصة', value: formatCurrency(salary.salaryPerSession, 'EGP') },
+        { label: 'سعر الساعة', value: formatCurrency(salary.hourlyRate, 'EGP') },
         { label: 'الحصص المستحقة الدفع', value: salary.payableSessions },
         { label: 'حصص الغياب غير مدفوعة', value: salary.unpaidAbsences },
         { label: 'حصص معذورة', value: salary.excusedSessions },
@@ -375,8 +376,11 @@ function SalaryTab({ periodRange, salary, isLoading }) {
           <div className="text-xs font-semibold mb-1 text-violet-600">الراتب المستحق — {periodRange.label}</div>
           <div className="font-heading font-extrabold text-4xl text-gray-900 mb-1 whitespace-nowrap" dir="ltr" style={{ textAlign: 'right' }}>{formatCurrency(salary.totalAmount, 'EGP')}</div>
           <div className="text-sm text-gray-500">
-            {salary.payableSessions} حصة × <span dir="ltr">{formatCurrency(salary.salaryPerSession, 'EGP')}</span>
+            {salary.payableSessions} حصة — سعر الساعة <span dir="ltr">{formatCurrency(salary.hourlyRate, 'EGP')}</span>
           </div>
+          <Link to={ROUTES.TEACHER_PAYROLL} className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-violet-600 hover:text-violet-700">
+            عرض التفاصيل بالساعة لكل فترة راتب ‹
+          </Link>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,12 +6,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNotificationStore } from '../../store/notificationStore.js'
 import { timeFromNow } from '../../utils/date.js'
 import { NOTIFICATION_TYPE_CONFIG as TYPE_CONFIG } from '../../config/notificationTypes.js'
+import { isSafeInternalPath } from '../../utils/notificationUrl.js'
+import NotificationDetailModal from '../notifications/NotificationDetailModal.jsx'
 import api from '../../utils/api.js'
 
 export default function NotificationBell({ theme = 'light', viewAllPath }) {
   const navigate = useNavigate()
   const dropdownRef = useRef(null)
   const qc = useQueryClient()
+  const [detailNotif, setDetailNotif] = useState(null)
 
   const {
     unreadCount,
@@ -55,14 +58,21 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
   // Clicking a notification marks it read AND navigates straight to the
   // record it references (the request/lesson/subscription/etc. `actionUrl`
   // points at) — never just a passive "mark read" tap. A notification
-  // without an `actionUrl` (older rows, or a type with no deep-link target)
-  // safely falls back to marking read only; the destination page itself
-  // handles a since-deleted/inaccessible record (its own not-found/
-  // permission-denied state), so no extra guard is needed here.
+  // without a (safe) `actionUrl` — older rows, a type with no deep-link
+  // target, or a legacy value that fails the internal-path guard — opens a
+  // detail view with its full content instead of doing nothing; the
+  // destination page itself handles a since-deleted/inaccessible record
+  // (its own not-found/permission-denied state), so no extra guard is
+  // needed on the actionable path.
   function handleActivate(notif) {
     handleMarkRead(notif)
-    closeDropdown()
-    if (notif.actionUrl) navigate(notif.actionUrl)
+    if (notif.actionUrl && isSafeInternalPath(notif.actionUrl)) {
+      closeDropdown()
+      navigate(notif.actionUrl)
+    } else {
+      closeDropdown()
+      setDetailNotif(notif)
+    }
   }
 
   function handleViewAll() {
@@ -194,7 +204,7 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
                     </svg>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#9b7fd6' }}>
+                    <p className="text-sm font-semibold" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : '#7c6aaa' }}>
                       لا توجد إشعارات
                     </p>
                     <p className="text-[11px] mt-0.5" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#c0b4de' }}>
@@ -266,6 +276,8 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {detailNotif && <NotificationDetailModal notif={detailNotif} onClose={() => setDetailNotif(null)} />}
     </div>
   )
 }
@@ -273,7 +285,7 @@ export default function NotificationBell({ theme = 'light', viewAllPath }) {
 function NotifItem({ notif, isDark, onActivate }) {
   const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.system
   const isUnread = !notif.isRead
-  const isActionable = !!notif.actionUrl
+  const isActionable = !!notif.actionUrl && isSafeInternalPath(notif.actionUrl)
 
   return (
     <button

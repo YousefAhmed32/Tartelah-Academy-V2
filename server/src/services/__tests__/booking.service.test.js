@@ -40,6 +40,8 @@ describe('booking.service.assertNoConflict', () => {
     const filter = Session.findOne.mock.calls[0][0]
     expect(filter.$or).toEqual([{ teacherId: 't1' }, { studentId: 's1' }])
     expect(filter.status.$nin).toContain('cancelled')
+    expect(filter.status.$nin).toContain('rescheduled')
+    expect(filter.$expr.$gt[1]).toBeInstanceOf(Date)
   })
 
   test('excludes the session being rescheduled from its own conflict check', async () => {

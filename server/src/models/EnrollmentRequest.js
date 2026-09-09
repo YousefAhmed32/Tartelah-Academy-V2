@@ -28,6 +28,7 @@ const EnrollmentRequestSchema = new mongoose.Schema({
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date },
   subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
+  assignmentRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'AssignmentRequest' },
 }, { timestamps: true })
 
 EnrollmentRequestSchema.index({ studentId: 1, status: 1 })

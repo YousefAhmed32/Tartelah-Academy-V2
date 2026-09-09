@@ -61,6 +61,11 @@ const NAV_GROUPS = [
         to: ROUTES.ADMIN_ASSIGNMENT_REQUESTS, label: 'طلبات إسناد الطلاب', assignmentRequests: true, permission: 'assignments.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
+      {
+        // Bulk whole-teacher replacement (Phase 2 meeting addendum §4).
+        to: ROUTES.ADMIN_TEACHER_REPLACEMENT, label: 'استبدال معلم', permission: 'transfers.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 2l4 4-4 4M21 6H9a4 4 0 0 0-4 4v1M7 22l-4-4 4-4M3 18h12a4 4 0 0 0 4-4v-1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      },
     ]
   },
   {
@@ -85,6 +90,26 @@ const NAV_GROUPS = [
       {
         to: ROUTES.ADMIN_SUBSCRIPTIONS, label: 'الاشتراكات', permission: 'subscriptions.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.8"/><path d="M6 14h4M14 14h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
+        // Subscription renewal review queue (Phase 2 §9).
+        to: ROUTES.ADMIN_SUBSCRIPTION_RENEWALS, label: 'طلبات التجديد', permission: 'subscriptions.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M21 3v6h-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      },
+      {
+        // Quran session report review + missing-report tracking (Phase 2 §10–§11).
+        to: ROUTES.ADMIN_QURAN_REPORTS, label: 'تقارير الحلقات', permission: 'quranReports.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
+      },
+      {
+        // Monthly teacher reports (Phase 2 §12).
+        to: ROUTES.ADMIN_MONTHLY_REPORTS, label: 'التقارير الشهرية', permission: 'monthlyReports.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M3 9h18M8 13h4M8 17h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
+        // Evaluation/renewal survey (Phase 2 §13).
+        to: ROUTES.ADMIN_SURVEYS, label: 'استبيانات التقييم', permission: 'surveys.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
     ]
   },
@@ -119,6 +144,11 @@ const NAV_GROUPS = [
       {
         to: ROUTES.ADMIN_TEACHER_PERFORMANCE, label: 'أداء المعلمين', permission: 'reports.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9 8.5 11 10.5 15.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      },
+      {
+        // Hourly teacher payroll + financial adjustments (Phase 2 §6–§7).
+        to: ROUTES.ADMIN_PAYROLL, label: 'الرواتب', permission: 'payroll.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.6"/><path d="M6.5 9.5h.01M17.5 14.5h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
       },
       {
         to: ROUTES.ADMIN_NOTIFICATIONS, label: 'الإشعارات', notification: true, permission: 'notifications.view',
@@ -349,8 +379,8 @@ export default function AdminLayout() {
             <motion.aside
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className="fixed inset-y-0 end-0 z-40 w-[260px] bg-white lg:hidden"
-              style={{ boxShadow: '-4px 0 24px rgba(0,0,0,0.12)' }}
+              className="fixed inset-y-0 right-0 z-40 w-[260px] bg-white lg:hidden"
+              style={{ boxShadow: '-4px 0 24px rgba(0,0,0,0.12)', direction: 'rtl' }}
             >
               <SidebarContent />
             </motion.aside>

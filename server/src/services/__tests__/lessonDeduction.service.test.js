@@ -63,6 +63,25 @@ describe('syncLessonConsumption — attendance-driven deduction', () => {
     }))
     expect(session.subscriptionConsumed).toBe(false)
   })
+
+  // The return value (not just the session mutation) is what
+  // session.controller.js#finishSession now surfaces as the teacher's
+  // post-completion receipt (walletEffect) — see FinishReceiptModal.jsx.
+  test('returns {action, transaction} describing what actually happened', async () => {
+    walletService.applyTransaction.mockResolvedValue({ transaction: { _id: 'tx1', amount: -1, balanceAfter: 7 }, alreadyApplied: false })
+    const consumed = makeSession()
+    const consumedResult = await lessonDeduction.syncLessonConsumption(consumed, 'present')
+    expect(consumedResult).toEqual({ action: 'consumed', transaction: { _id: 'tx1', amount: -1, balanceAfter: 7 } })
+
+    walletService.applyTransaction.mockResolvedValue({ transaction: { _id: 'tx2', amount: 1, balanceAfter: 8 }, alreadyApplied: false })
+    const released = makeSession({ subscriptionConsumed: true, lessonConsumedTransactionId: 'tx1', lessonConsumptionSeq: 1 })
+    const releasedResult = await lessonDeduction.syncLessonConsumption(released, 'excused')
+    expect(releasedResult).toEqual({ action: 'released', transaction: { _id: 'tx2', amount: 1, balanceAfter: 8 } })
+
+    const noop = makeSession()
+    const noopResult = await lessonDeduction.syncLessonConsumption(noop, 'excused')
+    expect(noopResult).toEqual({ action: 'none', transaction: null })
+  })
 })
 
 describe('handleCancellation — the full cancellation matrix', () => {

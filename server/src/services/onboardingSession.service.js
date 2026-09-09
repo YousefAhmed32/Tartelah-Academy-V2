@@ -88,7 +88,7 @@ async function startOnboardingSession({ clientRequestId, teacher, workingHours, 
   if (existingEmail) throw new OnboardingError('البريد الإلكتروني مسجل مسبقاً', 409, 'teacher.email')
 
   const teacherFields = pickAllowed(teacher, TEACHER_ALLOWED_FIELDS)
-  const teacherCredential = resolveCredentialInput(teacher, 'teacher.credential')
+  const teacherCredential = await resolveCredentialInput(teacher, 'teacher.credential', 'teacher')
 
   let teacherDoc = null
   let workingHoursDoc = null
@@ -184,7 +184,7 @@ async function saveStudentToSession({ sessionId, clientRequestId, student, actor
 
   const studentFields = pickAllowed(student, STUDENT_ALLOWED_FIELDS)
   if (studentFields.gender === '') delete studentFields.gender
-  const studentCredential = resolveCredentialInput(student, 'credential')
+  const studentCredential = await resolveCredentialInput(student, 'credential', 'student')
 
   let studentDoc = null
   let subscriptionResult = null

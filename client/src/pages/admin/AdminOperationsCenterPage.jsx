@@ -6,16 +6,21 @@ import {
   Radio, Clock, UserX, Link2Off, Timer, ClipboardCheck, CheckCircle2, Ban,
   ShieldAlert, ChevronDown, RefreshCw, Eye, Check, X, AlertTriangle, Wifi,
   TrendingUp, Users, Wallet, ArrowLeft, Send, ListChecks, CalendarClock,
+  Table as TableIcon, LayoutGrid, SlidersHorizontal, RotateCcw,
 } from 'lucide-react'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import Modal from '../../components/ui/Modal.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
+import DateRangePresetPicker from '../../components/shared/DateRangePresetPicker.jsx'
+import OperationsTableView from '../../components/admin/OperationsTableView.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { formatDateAr, formatTimeAr, formatDateTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, ROUTES, getFileUrl } from '../../config/constants.js'
@@ -333,79 +338,7 @@ function TimelineRow({ session }) {
   )
 }
 
-function TimelineTab({ initialFilters = {} }) {
-  const [date, setDate] = useState('')
-  const [teacherId, setTeacherId] = useState('')
-  const [status, setStatus] = useState(initialFilters.status || '')
-  const [payrollStatus, setPayrollStatus] = useState('')
-  const [needsReview, setNeedsReview] = useState(!!initialFilters.needsReview)
-  const [page, setPage] = useState(1)
-
-  const { data: teachers = [] } = useQuery({
-    queryKey: ['admin', 'teachers', 'all'],
-    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data),
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['admin', 'operations', 'timeline', date, teacherId, status, payrollStatus, needsReview, page],
-    queryFn: () => {
-      const p = new URLSearchParams({ page, limit: 20 })
-      if (date) p.set('date', date)
-      if (teacherId) p.set('teacherId', teacherId)
-      if (status) p.set('status', status)
-      if (payrollStatus) p.set('payrollStatus', payrollStatus)
-      if (needsReview) p.set('needsReview', 'true')
-      return api.get(`/operations/timeline?${p}`).then(r => r.data)
-    },
-    placeholderData: (prev) => prev,
-  })
-
-  const sessions = data?.data || []
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-wrap items-center gap-2.5">
-        <input type="date" className={inputCls} value={date} onChange={e => { setDate(e.target.value); setPage(1) }} />
-        <select className={inputCls} value={teacherId} onChange={e => { setTeacherId(e.target.value); setPage(1) }}>
-          <option value="">كل المعلمين</option>
-          {teachers.map(t => <option key={t._id} value={t._id}>{t.firstNameAr} {t.lastNameAr}</option>)}
-        </select>
-        <select className={inputCls} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
-          <option value="">كل الحالات</option>
-          {Object.entries(SESSION_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select className={inputCls} value={payrollStatus} onChange={e => { setPayrollStatus(e.target.value); setPage(1) }}>
-          <option value="">كل حالات الاستحقاق</option>
-          {Object.entries(PAYROLL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <button onClick={() => { setNeedsReview(p => !p); setPage(1) }}
-          className={`h-9 px-3 rounded-xl text-sm font-semibold border transition-colors ${needsReview ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-          يحتاج مراجعة فقط
-        </button>
-        {!date && <span className="text-xs text-gray-400">افتراضياً: آخر 3 أيام + القادمة 3 أيام</span>}
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center py-16"><Spinner color="border-violet-600" /></div>
-      ) : isError ? (
-        <ErrorState onRetry={refetch} isRetrying={isFetching} />
-      ) : !sessions.length ? (
-        <EmptyState title="لا توجد حصص مطابقة" description="جرّب تغيير الفلاتر أو النطاق الزمني" />
-      ) : (
-        <div className="space-y-2">
-          {sessions.map(s => <TimelineRow key={s._id} session={s} />)}
-        </div>
-      )}
-
-      {data?.totalPages > 1 && (
-        <div className="flex justify-center"><Pagination current={page} total={data.totalPages} onChange={setPage} /></div>
-      )}
-    </div>
-  )
-}
-
-// ── Review Queue tab ─────────────────────────────────────────────────────────
+// ── Inline Correction Form ──────────────────────────────────────────────────
 
 const ATT_STATUSES = ['pending', 'on_time', 'late', 'absent', 'excused']
 
@@ -443,6 +376,236 @@ function InlineCorrectionForm({ session, onDone }) {
         className="w-full h-9 rounded-xl text-sm font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60">
         {mut.isPending ? '...' : 'حفظ التصحيح'}
       </button>
+    </div>
+  )
+}
+
+function TimelineTab({ initialFilters = {}, onGoToReview }) {
+  const [viewMode, setViewMode] = useState('table') // 'table' | 'cards'
+  const [dateFilter, setDateFilter] = useState({ preset: 'today', startDate: '', endDate: '' })
+  const [teacherId, setTeacherId] = useState('')
+  const [status, setStatus] = useState(initialFilters.status || '')
+  const [payrollStatus, setPayrollStatus] = useState('')
+  const [needsReview, setNeedsReview] = useState(!!initialFilters.needsReview)
+  const [hasMeetingLink, setHasMeetingLink] = useState('')
+  const [page, setPage] = useState(1)
+  const [selectedCorrectionSession, setSelectedCorrectionSession] = useState(null)
+
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['admin', 'teachers', 'all'],
+    queryFn: () => api.get('/admin/teachers?limit=100').then(r => r.data.data),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: [
+      'admin', 'operations', 'timeline',
+      dateFilter.preset, dateFilter.startDate, dateFilter.endDate,
+      teacherId, status, payrollStatus, needsReview, hasMeetingLink, page,
+    ],
+    queryFn: () => {
+      const p = new URLSearchParams({ page, limit: 20 })
+      if (dateFilter.preset) p.set('preset', dateFilter.preset)
+      if (dateFilter.startDate) p.set('startDate', dateFilter.startDate)
+      if (dateFilter.endDate) p.set('endDate', dateFilter.endDate)
+      if (teacherId) p.set('teacherId', teacherId)
+      if (status) p.set('status', status)
+      if (payrollStatus) p.set('payrollStatus', payrollStatus)
+      if (needsReview) p.set('needsReview', 'true')
+      if (hasMeetingLink) p.set('hasMeetingLink', hasMeetingLink)
+      return api.get(`/operations/timeline?${p}`).then(r => r.data)
+    },
+    placeholderData: (prev) => prev,
+  })
+
+  const sessions = data?.data || []
+  const totalCount = data?.total || sessions.length
+
+  const activeTeacher = teachers.find(t => t._id === teacherId)
+  const hasActiveFilters = !!(
+    (dateFilter.preset && dateFilter.preset !== 'today') ||
+    dateFilter.startDate ||
+    teacherId ||
+    status ||
+    payrollStatus ||
+    needsReview ||
+    hasMeetingLink
+  )
+
+  const clearAllFilters = () => {
+    setDateFilter({ preset: 'today', startDate: '', endDate: '' })
+    setTeacherId('')
+    setStatus('')
+    setPayrollStatus('')
+    setNeedsReview(false)
+    setHasMeetingLink('')
+    setPage(1)
+  }
+
+  const onTimeCount = useMemo(() => sessions.filter(s => s.teacherAttendanceStatus === 'on_time').length, [sessions])
+  const reviewCount = useMemo(() => sessions.filter(s => !!s.reviewAssessment).length, [sessions])
+  const missingLinkCount = useMemo(() => sessions.filter(s => !s.meetingLink).length, [sessions])
+
+  return (
+    <div className="space-y-4">
+      {/* Date preset selector */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+        <DateRangePresetPicker
+          value={dateFilter}
+          onChange={f => { setDateFilter(f); setPage(1) }}
+          onReset={() => { setDateFilter({ preset: 'today', startDate: '', endDate: '' }); setPage(1) }}
+        />
+      </div>
+
+      {/* Filter controls + View Mode Switcher */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={inputCls} value={teacherId} onChange={e => { setTeacherId(e.target.value); setPage(1) }}>
+            <option value="">كل المعلمين</option>
+            {teachers.map(t => <option key={t._id} value={t._id}>{t.firstNameAr} {t.lastNameAr}</option>)}
+          </select>
+          <select className={inputCls} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
+            <option value="">كل الحالات</option>
+            {Object.entries(SESSION_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <select className={inputCls} value={payrollStatus} onChange={e => { setPayrollStatus(e.target.value); setPage(1) }}>
+            <option value="">كل حالات الاستحقاق</option>
+            {Object.entries(PAYROLL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <select className={inputCls} value={hasMeetingLink} onChange={e => { setHasMeetingLink(e.target.value); setPage(1) }}>
+            <option value="">كل روابط الاجتماعات</option>
+            <option value="true">برابط اجتماع فقط</option>
+            <option value="false">بدون رابط فقط</option>
+          </select>
+          <button onClick={() => { setNeedsReview(p => !p); setPage(1) }}
+            className={`h-9 px-3 rounded-xl text-xs font-bold border transition-colors ${needsReview ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
+            يحتاج مراجعة فقط
+          </button>
+        </div>
+
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl border border-gray-200">
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white text-[#1f1147] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+          >
+            <TableIcon size={13} />
+            <span>عرض الجدول</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'cards' ? 'bg-white text-[#1f1147] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+          >
+            <LayoutGrid size={13} />
+            <span>عرض البطاقات</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Active filters bar (Zero-confusion) */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 flex-wrap p-2.5 bg-[#fbf9fe] rounded-xl border border-[#ece3fa]">
+          <span className="text-xs font-bold text-[#5d4a82] flex items-center gap-1">
+            <SlidersHorizontal size={13} /> الفلاتر النشطة:
+          </span>
+          {dateFilter.preset && dateFilter.preset !== 'today' && (
+            <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
+              الفترة: {dateFilter.preset}
+              <button onClick={() => setDateFilter({ preset: 'today', startDate: '', endDate: '' })} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          {activeTeacher && (
+            <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
+              المعلم: {activeTeacher.firstNameAr} {activeTeacher.lastNameAr}
+              <button onClick={() => setTeacherId('')} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          {status && (
+            <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
+              الحالة: {SESSION_STATUS[status]?.label || status}
+              <button onClick={() => setStatus('')} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          {payrollStatus && (
+            <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
+              الراتب: {PAYROLL_STATUS[payrollStatus]?.label || payrollStatus}
+              <button onClick={() => setPayrollStatus('')} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          {hasMeetingLink && (
+            <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
+              {hasMeetingLink === 'false' ? 'بدون رابط اجتماع' : 'برابط اجتماع'}
+              <button onClick={() => setHasMeetingLink('')} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          {needsReview && (
+            <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg border border-amber-200 font-semibold">
+              يحتاج مراجعة فقط
+              <button onClick={() => setNeedsReview(false)} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          )}
+          <button onClick={clearAllFilters} className="text-xs font-bold text-red-600 hover:text-red-800 ms-auto flex items-center gap-1">
+            <RotateCcw size={12} /> مسح الكل
+          </button>
+        </div>
+      )}
+
+      {/* Quick summary stats strip */}
+      <div className="flex items-center gap-3 flex-wrap text-xs text-[#7c6aaa] px-1 bg-white p-2.5 rounded-xl border border-gray-100">
+        <span>إجمالي الحصص: <b className="text-[#1f1147]">{totalCount}</b></span>
+        <span>•</span>
+        <span className="text-emerald-700 font-semibold">حضر بالموعد: <b>{onTimeCount}</b></span>
+        <span>•</span>
+        <span className="text-amber-700 font-semibold">تحتاج مراجعة: <b>{reviewCount}</b></span>
+        {missingLinkCount > 0 && (
+          <>
+            <span>•</span>
+            <span className="text-red-600 font-semibold">بلا رابط: <b>{missingLinkCount}</b></span>
+          </>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-16"><Spinner color="border-violet-600" /></div>
+      ) : isError ? (
+        <ErrorState onRetry={refetch} isRetrying={isFetching} />
+      ) : !sessions.length ? (
+        <EmptyState
+          title="لا توجد حصص مطابقة"
+          description="جرّب تغيير الفلاتر أو اختيار فترة زمنية أوسع"
+          action={hasActiveFilters ? { label: 'إعادة ضبط الفلاتر', onClick: clearAllFilters } : undefined}
+        />
+      ) : viewMode === 'table' ? (
+        <OperationsTableView
+          sessions={sessions}
+          onOpenCorrection={setSelectedCorrectionSession}
+          onOpenReview={onGoToReview}
+        />
+      ) : (
+        <div className="space-y-2">
+          {sessions.map(s => <TimelineRow key={s._id} session={s} />)}
+        </div>
+      )}
+
+      {data?.totalPages > 1 && (
+        <div className="flex justify-center"><Pagination current={page} total={data.totalPages} onChange={setPage} /></div>
+      )}
+
+      {/* Modal for direct attendance/payroll correction */}
+      <Modal
+        open={!!selectedCorrectionSession}
+        onClose={() => setSelectedCorrectionSession(null)}
+        title={`تصحيح الحضور والراتب: ${selectedCorrectionSession?.titleAr || ''}`}
+      >
+        {selectedCorrectionSession && (
+          <InlineCorrectionForm
+            session={selectedCorrectionSession}
+            onDone={() => setSelectedCorrectionSession(null)}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
@@ -568,6 +731,7 @@ export default function AdminOperationsCenterPage() {
   const [tab, setTab] = useState('live')
   const [timelineFilters, setTimelineFilters] = useState({})
   const [timelineKey, setTimelineKey] = useState(0)
+  const [showGuide, setShowGuide] = useState(false)
 
   const TABS = [
     { key: 'live', label: 'الآن' },
@@ -587,7 +751,15 @@ export default function AdminOperationsCenterPage() {
 
   return (
     <div dir="rtl" className="space-y-5 ">
-      <PageHeader title="مركز العمليات" subtitle="نظرة تشغيلية فورية على الأكاديمية — ما يحدث الآن وما يحتاج إجراءً" />
+      <PageHeader title="مركز العمليات" subtitle="نظرة تشغيلية فورية على الأكاديمية — ما يحدث الآن وما يحتاج إجراءً"
+        actions={
+          <button onClick={() => setShowGuide(true)}
+            className="text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-2 rounded-xl transition-colors">
+            كيف تعمل الحصة؟
+          </button>
+        }
+      />
+      {showGuide && <SessionLifecycleGuide role="admin" onClose={() => setShowGuide(false)} />}
 
       <div className="flex gap-1.5 p-1 rounded-xl w-fit bg-gray-100">
         {TABS.map(t => (
@@ -599,7 +771,7 @@ export default function AdminOperationsCenterPage() {
       </div>
 
       {tab === 'live' && <LiveTab onGoToTimeline={goToTimeline} onGoToReview={goToReview} />}
-      {tab === 'timeline' && <TimelineTab key={timelineKey} initialFilters={timelineFilters} />}
+      {tab === 'timeline' && <TimelineTab key={timelineKey} initialFilters={timelineFilters} onGoToReview={goToReview} />}
       {tab === 'review' && <ReviewQueueTab />}
     </div>
   )

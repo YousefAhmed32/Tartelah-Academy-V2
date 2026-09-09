@@ -28,8 +28,8 @@ export default function StudentAcademicPage() {
               <h2 className="font-heading font-bold text-brand-textBody text-lg mb-5">باقاتي الدراسية</h2>
               {!data?.programs?.length ? (
                 <div className="text-center py-10">
-                  <BookOpen size={44} strokeWidth={1.3} color="#9b7fd6" className="mb-3 mx-auto" />
-                  <p className="text-[#9b7fd6]">لا توجد باقات دراسية بعد</p>
+                  <BookOpen size={44} strokeWidth={1.3} color="#7c6aaa" className="mb-3 mx-auto" />
+                  <p className="text-[#7c6aaa]">لا توجد باقات دراسية بعد</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -40,13 +40,13 @@ export default function StudentAcademicPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-heading font-bold text-brand-textBody">{prog.packageNameAr || 'باقة دراسية'}</div>
-                        <div className="text-sm text-[#9b7fd6] mt-0.5">
+                        <div className="text-sm text-[#7c6aaa] mt-0.5">
                           {prog.teacher ? `${prog.teacher.firstNameAr} ${prog.teacher.lastNameAr}` : '—'}
                         </div>
                         <div className="w-full bg-[#e8e0f5] rounded-full h-1.5 mt-3">
                           <div className="bg-purple-gradient h-1.5 rounded-full" style={{ width: `${prog.progressPercent || 0}%` }} />
                         </div>
-                        <div className="text-xs text-[#9b7fd6] mt-1">
+                        <div className="text-xs text-[#7c6aaa] mt-1">
                           {prog.consumedSessions}/{prog.purchasedSessions} حصة ({prog.progressPercent || 0}% مكتمل) — {prog.remainingSessions} متبقية
                         </div>
                       </div>
@@ -69,13 +69,13 @@ export default function StudentAcademicPage() {
                   <span className="font-heading font-extrabold text-2xl text-white">{data.current.progressPercent || 0}%</span>
                 </div>
                 <div className="font-heading font-bold text-brand-textBody">{data.current.packageNameAr || 'باقة دراسية'}</div>
-                <div className="text-sm text-[#9b7fd6] mt-1">
+                <div className="text-sm text-[#7c6aaa] mt-1">
                   {data.current.teacher ? `${data.current.teacher.firstNameAr} ${data.current.teacher.lastNameAr}` : '—'}
                 </div>
-                <div className="text-xs text-[#9b7fd6] mt-1">{data.current.remainingSessions} حصة متبقية</div>
+                <div className="text-xs text-[#7c6aaa] mt-1">{data.current.remainingSessions} حصة متبقية</div>
               </div>
             ) : (
-              <div className="text-center py-6 text-[#9b7fd6] text-sm">لا يوجد برنامج نشط حالياً</div>
+              <div className="text-center py-6 text-[#7c6aaa] text-sm">لا يوجد برنامج نشط حالياً</div>
             )}
           </div>
         </div>

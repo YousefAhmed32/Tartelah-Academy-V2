@@ -7,7 +7,7 @@ export default function PageHeader({ title, subtitle, actions, variant = 'light'
           {title}
         </h1>
         {subtitle && (
-          <p className={`text-sm mt-1 ${isDark ? 'text-brand-textMuted' : 'text-[#9b7fd6]'}`}>
+          <p className={`text-sm mt-1 ${isDark ? 'text-brand-textMuted' : 'text-[#7c6aaa]'}`}>
             {subtitle}
           </p>
         )}

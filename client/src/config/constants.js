@@ -172,6 +172,7 @@ export const ROUTES = {
 
   TEACHER_DASHBOARD: '/teacher',
   TEACHER_STUDENTS: '/teacher/students',
+  TEACHER_STUDENT_DETAIL: '/teacher/students/:studentId',
   TEACHER_SESSIONS: '/teacher/sessions',
   TEACHER_ATTENDANCE: '/teacher/attendance',
   TEACHER_EVALUATIONS: '/teacher/evaluations',
@@ -179,6 +180,10 @@ export const ROUTES = {
   TEACHER_PROGRESS: '/teacher/progress',
   TEACHER_LINKS: '/teacher/meeting-links',
   TEACHER_PERFORMANCE: '/teacher/performance',
+  TEACHER_PAYROLL: '/teacher/payroll',
+  TEACHER_PAYROLL_PERIOD: '/teacher/payroll/:periodId',
+  TEACHER_QURAN_REPORT: '/teacher/quran-reports/:sessionId',
+  TEACHER_MONTHLY_REPORTS: '/teacher/monthly-reports',
   TEACHER_NOTIFICATIONS: '/teacher/notifications',
   TEACHER_SETTINGS: '/teacher/settings',
   TEACHER_ASSIGNMENT_REQUESTS: '/teacher/assignment-requests',
@@ -228,6 +233,29 @@ export const ROUTES = {
 
   ADMIN_ASSIGNMENT_REQUESTS: '/admin/assignment-requests',
   ADMIN_ASSIGNMENT_REQUEST_DETAIL: '/admin/assignment-requests/:id',
+
+  // Bulk whole-teacher replacement (Phase 2 meeting addendum §4) — a
+  // dedicated step-based page, not a modal, per the brief's explicit
+  // requirement for a workflow this consequential.
+  ADMIN_TEACHER_REPLACEMENT: '/admin/teachers/replace',
+  ADMIN_TEACHER_REPLACEMENT_BATCH: '/admin/teachers/replace/:batchId',
+
+  // Hourly teacher payroll + financial adjustments (Phase 2 §6–§7).
+  ADMIN_PAYROLL: '/admin/payroll',
+  ADMIN_PAYROLL_PERIOD: '/admin/payroll/:periodId',
+
+  // Subscription renewal requests (Phase 2 §9).
+  ADMIN_SUBSCRIPTION_RENEWALS: '/admin/subscriptions/renewals',
+
+  // Quran session reports + missing-report tracking (Phase 2 §10–§11).
+  ADMIN_QURAN_REPORTS: '/admin/quran-reports',
+  STUDENT_QURAN_REPORTS: '/student/quran-reports',
+
+  // Monthly teacher reports (Phase 2 §12).
+  ADMIN_MONTHLY_REPORTS: '/admin/monthly-reports',
+
+  // Evaluation/renewal survey (Phase 2 §13).
+  ADMIN_SURVEYS: '/admin/surveys',
 }
 
 // Continuation link from the onboarding wizard's success page (and its

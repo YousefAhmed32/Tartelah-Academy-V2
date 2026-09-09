@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Check, Star, FileText, X, Users, CalendarDays, Calendar,
-  CircleCheck, Clock, ExternalLink, AlertTriangle,
+  CircleCheck, Clock, ExternalLink, AlertTriangle, BookOpen,
+  Sparkles, Hourglass, CheckCheck, PlayCircle, BookMarked,
 } from 'lucide-react'
 import api from '../../utils/api.js'
+import { ROUTES } from '../../config/constants.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -15,10 +18,14 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
+import FinishReceiptModal from '../../components/teacher/FinishReceiptModal.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
+import { useCountdown } from '../../hooks/useCountdown.js'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
 import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATT_OPTIONS, DELAY_REASON, getFileUrl } from '../../config/constants.js'
+import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
 const AR_MONTHS = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
@@ -68,7 +75,7 @@ function QuickEvalModal({ session, onClose }) {
           <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div>
             <div className="font-bold text-sm text-brand-textBody">{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</div>
-            <div className="text-xs text-[#9b7fd6]">{session.titleAr}</div>
+            <SessionTitleDisplay session={session} size="sm" />
           </div>
         </div>
         <div>
@@ -82,7 +89,7 @@ function QuickEvalModal({ session, onClose }) {
         <div>
           <label className={LBL}>
             الدرجة: <span className="font-extrabold" style={{ color: scoreColor }}>{score}/١٠</span>{' '}
-            <span className="font-normal text-[#9b7fd6]">({SCORE_LABELS[score]})</span>
+            <span className="font-normal text-[#7c6aaa]">({SCORE_LABELS[score]})</span>
           </label>
           <input type="range" min="1" max="10" step="1" value={score}
             onChange={e => setScore(Number(e.target.value))}
@@ -175,7 +182,7 @@ function RescheduleModal({ session, onClose, qc }) {
       }
     >
       <div className="space-y-3" dir="rtl">
-        <p className="text-sm text-[#9b7fd6]">الموعد الحالي: {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}</p>
+        <p className="text-sm text-[#7c6aaa]">الموعد الحالي: {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}</p>
         <div>
           <label className={LBL}>الموعد الجديد *</label>
           <input type="datetime-local" value={newDate} onChange={e => setNewDate(e.target.value)} className={FIELD} />
@@ -213,7 +220,7 @@ function DelayModal({ session, onClose, qc }) {
       }
     >
       <div className="space-y-4" dir="rtl">
-        <p className="text-sm text-[#9b7fd6]">لا داعي للقلق — هذا لا يُلغي الحصة، فقط نسجّل الوقت الفعلي وسببه.</p>
+        <p className="text-sm text-[#7c6aaa]">لا داعي للقلق — هذا لا يُلغي الحصة، فقط نسجّل الوقت الفعلي وسببه.</p>
         <div>
           <label className={LBL}>سبب التأخر</label>
           <select value={reasonCode} onChange={e => setReasonCode(e.target.value)} className={FIELD}>
@@ -256,7 +263,7 @@ function CancelModal({ session, onClose, qc }) {
       }
     >
       <div className="space-y-3" dir="rtl">
-        <p className="text-sm text-[#9b7fd6]">لن تُحتسب هذه الحصة على الطالب ولا يُصرف عنها أجر — يرجى توضيح السبب.</p>
+        <p className="text-sm text-[#7c6aaa]">لن تُحتسب هذه الحصة على الطالب ولا يُصرف عنها أجر — يرجى توضيح السبب.</p>
         <div>
           <label className={LBL}>سبب الإلغاء *</label>
           <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className="field-light resize-none w-full" placeholder="مثال: ظرف طارئ للطالب..." />
@@ -272,19 +279,33 @@ function CancelModal({ session, onClose, qc }) {
 //   2. In progress   → live "🟢 الحصة جارية" state + single "✅ إنهاء الحصة" button
 //   3. Completed     → read-only summary (+ optional post-hoc تقييم/واجب, for History)
 // Reschedule/delay/cancel remain available but de-emphasized as secondary actions.
-function SessionCard({ session, onEval, onHomework }) {
+function SessionCard({ session, onEval, onHomework, featured = false }) {
   const qc = useQueryClient()
-  const [expanded, setExpanded] = useState(false)
+  const navigate = useNavigate()
+  const [expanded, setExpanded] = useState(featured)
   const [showReschedule, setShowReschedule] = useState(false)
   const [showDelay, setShowDelay] = useState(false)
   const [showFinish, setShowFinish] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
+  const [receipt, setReceipt] = useState(null)
 
   const isOngoing = session.status === 'ongoing'
   const isDone = session.status === 'completed'
   const isCancelled = session.status === 'cancelled'
   const canStart = ['scheduled', 'missed', 'no_show'].includes(session.status)
   const window_ = session.window || null
+  // The check-in window opens PRE_SESSION_ACCESS_MINUTES before the scheduled
+  // start (server/src/config/attendancePolicy.js) — enforced authoritatively
+  // on the backend (session.controller.js#startSession) as of this pass, and
+  // mirrored here so the teacher sees a real "not open yet" state with a
+  // countdown instead of a button that would just 400 if pressed too early.
+  const checkInNotOpenYet = canStart && window_?.phase === 'upcoming'
+  const canCheckInNow = canStart && !checkInNotOpenYet
+  const countdown = useCountdown(checkInNotOpenYet ? window_.preSessionOpensAt : null)
+  // Countdown to the scheduled start itself — shown only on the featured
+  // "next lesson" hero card, distinct from `countdown` (time until check-in
+  // OPENS, shown inline in the not-yet-open state below).
+  const startCountdown = useCountdown(featured && canStart ? session.scheduledAt : null)
   const elapsed = useElapsed(isOngoing ? session.teacherStartedAt : null)
 
   const { data: existingAtt } = useQuery({
@@ -305,6 +326,11 @@ function SessionCard({ session, onEval, onHomework }) {
         toast('سُجّلت متأخراً — لا مشكلة، تم تسجيل الوقت الفعلي', { icon: '⏱️' })
       }
     },
+    // The backend is the real authority on the check-in window — surfaces
+    // its exact message (e.g. "يفتح تسجيل الحضور قبل الموعد بـ ٦٠ دقيقة")
+    // instead of a generic error if the window somehow closes/hasn't opened
+    // between render and click.
+    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
   })
 
   // Evidence-only: records that the external link was opened. A click is
@@ -335,9 +361,21 @@ function SessionCard({ session, onEval, onHomework }) {
 
   return (
     <>
-      <motion.div layout className="rounded-2xl overflow-hidden transition-all bg-white shadow-sm"
-        style={{ border: isOngoing ? '1.5px solid #22c55e' : expanded ? '1px solid rgba(124,58,237,0.3)' : '1px solid #f3f4f6' }}
+      <motion.div layout className={`rounded-2xl overflow-hidden transition-all bg-white ${featured ? 'shadow-md' : 'shadow-sm'}`}
+        style={{ border: isOngoing ? '1.5px solid #22c55e' : featured ? '1.5px solid #7c3aed' : expanded ? '1px solid rgba(124,58,237,0.3)' : '1px solid #f3f4f6' }}
       >
+        {featured && !isOngoing && (
+          <div className="flex items-center justify-between gap-1.5 px-4 pt-3">
+            <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-violet-600">
+              <Sparkles size={12} strokeWidth={2.4} /> الحصة التالية
+            </span>
+            {canStart && (
+              <span className="text-[11px] font-bold text-gray-400">
+                {startCountdown.isPast ? 'حان موعدها' : `تبدأ خلال ${startCountdown.label}`}
+              </span>
+            )}
+          </div>
+        )}
         {/* Main row */}
         <button
           className="w-full flex items-center gap-3 p-4 text-start"
@@ -345,7 +383,7 @@ function SessionCard({ session, onEval, onHomework }) {
         >
           <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="sm" />
           <div className="flex-1 min-w-0">
-            <div className="text-gray-900 font-semibold text-sm truncate">{session.titleAr}</div>
+            <SessionTitleDisplay session={session} size="sm" />
             <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap text-gray-500">
               <span>{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</span>
               <span>•</span>
@@ -422,8 +460,33 @@ function SessionCard({ session, onEval, onHomework }) {
                   </div>
                 )}
 
-                {/* ── State 1: Not started yet ─────────────────────────────── */}
-                {canStart && (
+                {/* ── State 1a: Scheduled, but check-in doesn't open yet ──────
+                     A distinct "readiness" state — NEVER a disabled "بدء
+                     الحصة" button, which would wrongly imply the session is
+                     already actionable. The backend rejects an early
+                     check-in with the same rule (session.controller.js). */}
+                {checkInNotOpenYet && (
+                  <div className="pt-3">
+                    <div className="rounded-2xl p-4 text-center bg-gray-50 border border-gray-100">
+                      <Hourglass size={18} strokeWidth={1.6} className="mx-auto mb-1.5 text-gray-400" />
+                      <div className="text-xs font-bold text-gray-600 mb-0.5">لم يفتح تسجيل الحضور بعد</div>
+                      <div className="text-[11px] text-gray-400">يفتح خلال <b className="text-gray-600">{countdown.label}</b></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
+                      <button onClick={() => setShowReschedule(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-amber-600 transition-all">
+                        ↺ إعادة جدولة
+                      </button>
+                      <button onClick={() => setShowCancel(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-all flex items-center gap-1">
+                        <X size={12} strokeWidth={2.5} /> إلغاء
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── State 1b: Check-in open — not started yet ────────────── */}
+                {canCheckInNow && (
                   <div className="pt-3">
                     {windowNote && (
                       <div className="mb-3 flex items-start gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(245,158,11,0.08)', color: '#b45309' }}>
@@ -435,7 +498,7 @@ function SessionCard({ session, onEval, onHomework }) {
                       className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold disabled:opacity-60">
                       {startMutation.isPending ? '...' : <>▶ بدء الحصة</>}
                     </button>
-                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">سيتم تسجيل وقت بدئك وفتح الفصل الخارجي تلقائياً.</p>
+                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">سيتم تسجيل وقت دخولك (تسجيل حضور) وفتح الفصل الخارجي تلقائياً — فتح الرابط وحده لا يُثبت الحضور الفعلي.</p>
 
                     {/* Secondary actions — de-emphasized on purpose */}
                     <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
@@ -474,6 +537,11 @@ function SessionCard({ session, onEval, onHomework }) {
                         style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)' }}>
                         <FileText size={13} strokeWidth={2} /> واجب
                       </button>
+                      <button onClick={() => navigate(ROUTES.TEACHER_QURAN_REPORT.replace(':sessionId', session._id))}
+                        className="flex-1 min-w-[100px] py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                        style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.2)' }}>
+                        <BookOpen size={13} strokeWidth={2} /> تقرير الحلقة
+                      </button>
                     </div>
                   </div>
                 )}
@@ -494,10 +562,13 @@ function SessionCard({ session, onEval, onHomework }) {
         <DelayModal session={session} onClose={() => setShowDelay(false)} qc={qc} />
       )}
       {showFinish && (
-        <FinishSessionModal session={session} onClose={() => setShowFinish(false)} qc={qc} />
+        <FinishSessionModal session={session} onClose={() => setShowFinish(false)} qc={qc} onFinished={setReceipt} />
       )}
       {showCancel && (
         <CancelModal session={session} onClose={() => setShowCancel(false)} qc={qc} />
+      )}
+      {receipt && (
+        <FinishReceiptModal data={receipt} onClose={() => setReceipt(null)} />
       )}
     </>
   )
@@ -611,7 +682,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
           {[1,2,3,4].map(s => (
             <div key={s} className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
-                style={{ background: s <= step ? '#7c3aed' : 'rgba(124,58,237,0.15)', color: s <= step ? 'white' : '#9b7fd6' }}>
+                style={{ background: s <= step ? '#7c3aed' : 'rgba(124,58,237,0.15)', color: s <= step ? 'white' : '#7c6aaa' }}>
                 {s < step ? <Check size={12} strokeWidth={2.5} /> : s}
               </div>
               {s < 4 && <div className="w-8 h-0.5 rounded-full" style={{ background: s < step ? '#7c3aed' : 'rgba(124,58,237,0.2)' }} />}
@@ -622,10 +693,10 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
         {/* Step 1 — Student */}
         {step === 1 && (
           <div className="space-y-3">
-            <p className="text-sm text-[#9b7fd6] mb-4">اختر الطالب الذي تريد إنشاء جدول دوري معه</p>
+            <p className="text-sm text-[#7c6aaa] mb-4">اختر الطالب الذي تريد إنشاء جدول دوري معه</p>
             {students.length === 0 ? (
-              <div className="text-center py-8 text-[#9b7fd6]">
-                <Users size={36} strokeWidth={1.4} color="#9b7fd6" className="mb-2 mx-auto" />
+              <div className="text-center py-8 text-[#7c6aaa]">
+                <Users size={36} strokeWidth={1.4} color="#7c6aaa" className="mb-2 mx-auto" />
                 <p>لا يوجد طلاب مُعيَّنون لك بعد</p>
               </div>
             ) : (
@@ -642,7 +713,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                     <Avatar src={getFileUrl(s.avatar)} firstName={s.firstNameAr} lastName={s.lastNameAr} size="sm" />
                     <div className="text-start">
                       <div className="font-semibold text-sm text-brand-textBody">{s.firstNameAr} {s.lastNameAr}</div>
-                      <div className="text-xs text-[#9b7fd6]">{s.email}</div>
+                      <div className="text-xs text-[#7c6aaa]">{s.email}</div>
                     </div>
                     {form.studentId === s._id && (
                       <div className="mr-auto w-5 h-5 rounded-full bg-brand-purple flex items-center justify-center">
@@ -669,7 +740,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                     className="py-2.5 rounded-xl text-sm font-semibold transition-all"
                     style={{
                       background: form.frequency === v ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.04)',
-                      color: form.frequency === v ? '#7c3aed' : '#9b7fd6',
+                      color: form.frequency === v ? '#7c3aed' : '#7c6aaa',
                       border: form.frequency === v ? '1.5px solid #7c3aed' : '1.5px solid rgba(124,58,237,0.1)',
                     }}>
                     {label}
@@ -687,14 +758,14 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                       className="py-2 rounded-xl text-xs font-bold transition-all"
                       style={{
                         background: form.daysOfWeek.includes(d.value) ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.04)',
-                        color: form.daysOfWeek.includes(d.value) ? '#c4b5fd' : '#9b7fd6',
+                        color: form.daysOfWeek.includes(d.value) ? '#c4b5fd' : '#7c6aaa',
                         border: form.daysOfWeek.includes(d.value) ? '1.5px solid #7c3aed' : '1.5px solid transparent',
                       }}>
                       {d.short}
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-[#9b7fd6] mt-1.5">
+                <p className="text-xs text-[#7c6aaa] mt-1.5">
                   {form.daysOfWeek.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label).join(' + ')}
                 </p>
               </div>
@@ -742,7 +813,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                       className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex-1"
                       style={{
                         background: form.sessionsCount === n ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.04)',
-                        color: form.sessionsCount === n ? '#7c3aed' : '#9b7fd6',
+                        color: form.sessionsCount === n ? '#7c3aed' : '#7c6aaa',
                         border: form.sessionsCount === n ? '1.5px solid #7c3aed' : '1.5px solid rgba(124,58,237,0.1)',
                       }}>
                       {n}
@@ -759,7 +830,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <label className={LBL}>عنوان الحصة (قالب)</label>
               <input value={form.titleTemplate} onChange={e => set('titleTemplate', e.target.value)}
                 className={FIELD} placeholder="مثال: حصة تجويد" />
-              <p className="text-xs text-[#9b7fd6] mt-1">سيتم إضافة رقم تسلسلي تلقائياً (حصة ١، حصة ٢...)</p>
+              <p className="text-xs text-[#7c6aaa] mt-1">سيتم إضافة رقم تسلسلي تلقائياً (حصة ١، حصة ٢...)</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -789,7 +860,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                 <Avatar src={getFileUrl(selectedStudent.avatar)} firstName={selectedStudent.firstNameAr} lastName={selectedStudent.lastNameAr} size="sm" />
                 <div>
                   <div className="font-bold text-sm text-brand-textBody">{selectedStudent.firstNameAr} {selectedStudent.lastNameAr}</div>
-                  <div className="text-xs text-[#9b7fd6]">
+                  <div className="text-xs text-[#7c6aaa]">
                     {SCHEDULE_FREQUENCY[form.frequency]?.label} •{' '}
                     {form.daysOfWeek.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label).join(' + ')} •{' '}
                     {form.timeHour}:{form.timeMinute}
@@ -809,7 +880,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <div className="max-h-60 overflow-y-auto custom-scroll space-y-1.5 rounded-xl p-3"
                 style={{ background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(124,58,237,0.1)' }}>
                 {preview.length === 0 ? (
-                  <p className="text-center text-sm text-[#9b7fd6] py-4">لا توجد حصص — تحقق من الإعدادات</p>
+                  <p className="text-center text-sm text-[#7c6aaa] py-4">لا توجد حصص — تحقق من الإعدادات</p>
                 ) : preview.map((dateStr, i) => {
                   const d = new Date(dateStr)
                   return (
@@ -818,7 +889,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                       <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-none"
                         style={{ background: 'rgba(124,58,237,0.2)', color: '#c4b5fd' }}>{i + 1}</span>
                       <span className="text-sm text-brand-textBody">{formatDateAr(d)}</span>
-                      <span className="text-xs text-[#9b7fd6] mr-auto">{form.timeHour}:{form.timeMinute}</span>
+                      <span className="text-xs text-[#7c6aaa] mr-auto">{form.timeHour}:{form.timeMinute}</span>
                     </div>
                   )
                 })}
@@ -834,6 +905,117 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
         )}
       </div>
     </Modal>
+  )
+}
+
+// ─── Today Focus View ─────────────────────────────────────────────────────────
+// The teacher's actual daily job: "what's next, and what needs me right
+// now" — not a flat chronological stack. One un-collapsed hero card for the
+// single most relevant lesson (live, or the next one up, or one stuck
+// needing action) with its primary action always visible, then the rest
+// grouped by what they mean operationally rather than just sorted by time.
+function GroupSection({ title, icon: Icon, count, tone = 'gray', children }) {
+  if (!count) return null
+  const toneMap = {
+    gray: { bg: '#f3f4f6', color: '#4b5563' },
+    green: { bg: 'rgba(34,197,94,0.12)', color: '#16a34a' },
+    amber: { bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
+    violet: { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed' },
+  }[tone]
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="w-6 h-6 rounded-lg flex items-center justify-center flex-none" style={{ background: toneMap.bg }}>
+          <Icon size={13} strokeWidth={2.2} style={{ color: toneMap.color }} />
+        </span>
+        <span className="text-sm font-bold text-gray-800">{title}</span>
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: toneMap.bg, color: toneMap.color }}>{count}</span>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  )
+}
+
+// A completed session with no Quran/session report yet — sourced from
+// /quran-reports/me/overdue (server/src/services/reportTracking.service.js),
+// the existing missing-report tracker, surfaced here instead of living only
+// on a separate page the teacher has to remember to check.
+function OverdueReportRow({ report }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={() => navigate(ROUTES.TEACHER_QURAN_REPORT.replace(':sessionId', report.sessionId))}
+      className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-white border text-start transition-all hover:border-amber-300"
+      style={{ borderColor: 'rgba(217,119,6,0.25)' }}
+    >
+      <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-none" style={{ background: 'rgba(217,119,6,0.1)' }}>
+        <BookMarked size={16} strokeWidth={2} className="text-amber-600" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-bold text-gray-800 truncate">{report.studentName || 'طالب'}</div>
+        <div className="text-[11px] text-gray-400">حصة {formatDateAr(report.scheduledAt)} — منذ {report.ageHours} ساعة بلا تقرير حلقة</div>
+      </div>
+      <span className="text-[11px] font-bold text-amber-700 flex-none">إضافة التقرير ›</span>
+    </button>
+  )
+}
+
+function TodayFocusView({ sessions, isLoading, isError, isFetching, onRetry, onEval, onHomework, overdueReports }) {
+  const todayKey = new Date().toDateString()
+  const todaySessions = useMemo(
+    () => sessions.filter((s) => new Date(s.scheduledAt).toDateString() === todayKey),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sessions]
+  )
+
+  const ongoing = todaySessions.filter((s) => s.status === 'ongoing')
+  const needsCompletion = todaySessions.filter((s) =>
+    ['missed', 'no_show'].includes(s.status) ||
+    (s.status === 'scheduled' && ['grace_period', 'extended_completion', 'overdue'].includes(s.window?.phase))
+  )
+  const needsCompletionIds = new Set(needsCompletion.map((s) => s._id))
+  const upcoming = todaySessions
+    .filter((s) => s.status === 'scheduled' && !needsCompletionIds.has(s._id))
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+  const completedToday = todaySessions.filter((s) => s.status === 'completed')
+
+  const featured = ongoing[0] || upcoming[0] || needsCompletion[0] || null
+  const restOngoing = ongoing.filter((s) => s._id !== featured?._id)
+  const restUpcoming = upcoming.filter((s) => s._id !== featured?._id)
+  const restNeedsCompletion = needsCompletion.filter((s) => s._id !== featured?._id)
+
+  if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
+  if (isError) return <ErrorState onRetry={onRetry} isRetrying={isFetching} />
+
+  return (
+    <div className="space-y-6">
+      {featured ? (
+        <SessionCard session={featured} onEval={onEval} onHomework={onHomework} featured />
+      ) : (
+        <div className="rounded-2xl p-10 text-center bg-white border-2 border-dashed border-gray-200">
+          <Calendar size={38} strokeWidth={1.3} className="mb-2.5 mx-auto text-gray-300" />
+          <p className="text-gray-900 font-semibold">لا توجد حصص مجدولة اليوم</p>
+          <p className="text-xs mt-1 text-gray-500">استعرض الشهر الحالي أو أنشئ جدولاً دورياً جديداً</p>
+        </div>
+      )}
+
+      <GroupSection title="الآن" icon={PlayCircle} count={restOngoing.length} tone="green">
+        {restOngoing.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
+      </GroupSection>
+
+      <GroupSection title="القادمة اليوم" icon={Clock} count={restUpcoming.length} tone="violet">
+        {restUpcoming.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
+      </GroupSection>
+
+      <GroupSection title="تحتاج استكمالًا" icon={AlertTriangle} count={restNeedsCompletion.length + overdueReports.length} tone="amber">
+        {restNeedsCompletion.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
+        {overdueReports.map((r) => <OverdueReportRow key={r.sessionId} report={r} />)}
+      </GroupSection>
+
+      <GroupSection title="المنتهية اليوم" icon={CheckCheck} count={completedToday.length} tone="gray">
+        {completedToday.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
+      </GroupSection>
+    </div>
   )
 }
 
@@ -906,11 +1088,15 @@ function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TeacherSessionsPage() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState('month')
+  // "اليوم" is the default landing tab per the daily-workflow redesign — the
+  // month/history/rules views remain one click away, not competing for
+  // first attention (see Work Package C).
+  const [tab, setTab] = useState('today')
   const [showWizard, setShowWizard] = useState(false)
   const [evalSession, setEvalSession] = useState(null)
   const [hwSession, setHwSession] = useState(null)
   const [showManual, setShowManual] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
   const [manualForm, setManualForm] = useState({ studentId:'', titleAr:'', scheduledAt:'', durationMinutes:60, meetingLink:'', meetingProvider:'zoom', notes:'' })
 
   const now = new Date()
@@ -948,6 +1134,14 @@ export default function TeacherSessionsPage() {
     enabled: tab === 'history',
   })
 
+  // Completed sessions still missing a Quran/session report — feeds the
+  // "تحتاج استكمالًا" queue on the "اليوم" tab (Work Package C's explicit
+  // "clear queue for completed lessons missing required reports").
+  const { data: overdueReports = [] } = useQuery({
+    queryKey: ['teacher', 'quran-reports', 'overdue'],
+    queryFn: () => api.get('/quran-reports/me/overdue').then(r => toArray(r.data?.data)),
+  })
+
   const createManualMutation = useMutation({
     mutationFn: (data) => api.post('/sessions', data),
     onSuccess: () => {
@@ -961,7 +1155,24 @@ export default function TeacherSessionsPage() {
     onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
   })
 
-  function chg(e) { setManualForm(p => ({ ...p, [e.target.name]: e.target.value })) }
+  function chg(e) {
+    const { name, value } = e.target
+    if (name === 'studentId') {
+      const selectedStudent = students.find(s => s._id === value)
+      setManualForm(p => {
+        const shouldAutoName = !p.titleAr || p.titleAr.startsWith('حصة ')
+        return {
+          ...p,
+          studentId: value,
+          titleAr: shouldAutoName && selectedStudent
+            ? `حصة ${selectedStudent.firstNameAr} ${selectedStudent.lastNameAr || ''}`.trim()
+            : p.titleAr,
+        }
+      })
+    } else {
+      setManualForm(p => ({ ...p, [name]: value }))
+    }
+  }
 
   // Group sessions by date for month view
   const grouped = sessions.reduce((acc, s) => {
@@ -971,7 +1182,14 @@ export default function TeacherSessionsPage() {
     return acc
   }, {})
 
+  const todayKey = now.toDateString()
+  const todayActionableCount = sessions.filter((s) => {
+    if (new Date(s.scheduledAt).toDateString() !== todayKey) return false
+    return s.status === 'ongoing' || s.status === 'scheduled' || s.status === 'missed' || s.status === 'no_show'
+  }).length
+
   const TABS = [
+    { key: 'today',   label: 'اليوم', count: todayActionableCount + overdueReports.length },
     { key: 'month',   label: 'الشهر الحالي', count: sessions.length },
     { key: 'rules',   label: 'الجداول الدورية', count: rules.length },
     { key: 'history', label: 'السجل', count: null },
@@ -982,7 +1200,11 @@ export default function TeacherSessionsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start gap-3 justify-between">
         <div>
-          <h1 className="font-heading font-extrabold text-2xl text-gray-900">الحصص الدراسية</h1>
+          <h1 className="font-heading font-extrabold text-2xl text-gray-900 flex items-center gap-2">
+            الحصص الدراسية
+            <button onClick={() => setShowGuide(true)} aria-label="كيف تعمل الحصة؟"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-violet-500 bg-violet-50 hover:bg-violet-100 transition-colors">؟</button>
+          </h1>
           <p className="text-sm mt-0.5 text-gray-500">إدارة حصصك وجداولك الدورية</p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -1010,6 +1232,20 @@ export default function TeacherSessionsPage() {
           </button>
         ))}
       </div>
+
+      {/* Today Tab — the default landing view */}
+      {tab === 'today' && (
+        <TodayFocusView
+          sessions={sessions}
+          isLoading={sessLoading}
+          isError={sessError}
+          isFetching={sessFetching}
+          onRetry={refetchSessions}
+          onEval={setEvalSession}
+          onHomework={setHwSession}
+          overdueReports={overdueReports}
+        />
+      )}
 
       {/* Month Tab */}
       {tab === 'month' && (
@@ -1125,7 +1361,7 @@ export default function TeacherSessionsPage() {
           </div>
           <div>
             <label className={LBL}>عنوان الحصة *</label>
-            <input name="titleAr" value={manualForm.titleAr} onChange={chg} className={FIELD} placeholder="مثال: حصة تجويد — الدرس الأول" />
+            <input name="titleAr" value={manualForm.titleAr} onChange={chg} className={FIELD} placeholder="مثال: حصة محمد أحمد" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1181,6 +1417,9 @@ export default function TeacherSessionsPage() {
       {hwSession && (
         <QuickHomeworkModal session={hwSession} onClose={() => setHwSession(null)} />
       )}
+
+      {/* "كيف تعمل الحصة؟" contextual lifecycle guide */}
+      {showGuide && <SessionLifecycleGuide role="teacher" onClose={() => setShowGuide(false)} />}
     </div>
   )
 }

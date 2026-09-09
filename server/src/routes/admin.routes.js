@@ -8,6 +8,8 @@ const onboardingCtrl = require('../controllers/adminOnboarding.controller')
 const onboardingSessionCtrl = require('../controllers/onboardingSession.controller')
 const assignmentCtrl = require('../controllers/adminAssignment.controller')
 const subjectCtrl = require('../controllers/teachingSubject.controller')
+const credentialDefaultsCtrl = require('../controllers/credentialDefaults.controller')
+const payrollCtrl = require('../controllers/payroll.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { requirePermission } = require('../middleware/rbac.middleware')
 
@@ -44,6 +46,7 @@ router.get('/teachers/:id', requirePermission('teachers.view'), ctrl.getTeacher)
 router.post('/teachers', requirePermission('teachers.manage'), ctrl.createTeacher)
 router.patch('/teachers/:id', requirePermission('teachers.manage'), ctrl.updateTeacher)
 router.post('/teachers/:id/reset-password', requirePermission('teachers.manage'), ctrl.adminResetPassword)
+router.post('/teachers/:id/sync-meeting-links', requirePermission('teachers.manage'), ctrl.adminSyncTeacherMeetingLinks)
 
 // Teacher working hours (Phase 2 Part 1 — admin-configured weekly template;
 // see config/workingHours.js)
@@ -128,5 +131,25 @@ router.get('/audit-logs', requirePermission('audit.view'), auditCtrl.getAuditLog
 // Payroll ledger browser — the persisted TeacherPayrollEntry artifact (see
 // payrollLedger.service.js), not a live recount.
 router.get('/payroll/ledger', requirePermission('reports.view'), perfCtrl.getAdminPayrollLedger)
+
+// Hourly teacher payroll & financial adjustments (Phase 2 §6–§7)
+router.get('/payroll/periods', requirePermission('payroll.view'), payrollCtrl.listOrgPeriods)
+router.get('/payroll/periods/:periodId', requirePermission('payroll.view'), payrollCtrl.getPeriod)
+router.get('/payroll/periods/:periodId/entries', requirePermission('payroll.view'), payrollCtrl.getPeriodEntries)
+router.get('/payroll/teachers/:teacherId/periods', requirePermission('payroll.view'), payrollCtrl.listTeacherPeriods)
+router.post('/payroll/periods/:periodId/submit', requirePermission('payroll.manage'), payrollCtrl.submitPeriod)
+router.post('/payroll/periods/:periodId/approve', requirePermission('payroll.approve'), payrollCtrl.approvePeriod)
+router.post('/payroll/periods/:periodId/pay', requirePermission('payroll.pay'), payrollCtrl.markPeriodPaid)
+router.post('/payroll/periods/:periodId/reopen', requirePermission('payroll.manage'), payrollCtrl.reopenPeriod)
+router.get('/payroll/adjustments', requirePermission('payroll.view'), payrollCtrl.listAdjustments)
+router.post('/payroll/teachers/:teacherId/adjustments', requirePermission('payroll.manage'), payrollCtrl.createAdjustment)
+router.post('/payroll/entries/:entryId/reverse', requirePermission('payroll.manage'), payrollCtrl.reverseAdjustment)
+
+// Academy-wide default student/teacher passwords (Phase 2 meeting addendum §1)
+router.get('/credential-defaults', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.getStatus)
+router.get('/credential-defaults/availability', credentialDefaultsCtrl.getAvailability)
+router.put('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.setDefault)
+router.post('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.setDefault)
+router.delete('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.clearDefault)
 
 module.exports = router

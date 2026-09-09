@@ -11,7 +11,7 @@ class BookingConflictError extends Error {
 
 // Sessions in these statuses no longer occupy the calendar — a cancelled or
 // rescheduled-away session must never block a new booking at the same time.
-const NON_BLOCKING_STATUSES = ['cancelled']
+const NON_BLOCKING_STATUSES = ['cancelled', 'rescheduled']
 
 /**
  * Throws BookingConflictError if `teacherId` or `studentId` already has a
@@ -20,7 +20,8 @@ const NON_BLOCKING_STATUSES = ['cancelled']
  */
 async function assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes = 60, excludeSessionId }) {
   const start = new Date(scheduledAt)
-  const end = new Date(start.getTime() + durationMinutes * 60000)
+  const duration = Number(durationMinutes) || 60
+  const end = new Date(start.getTime() + duration * 60000)
 
   const filter = {
     status: { $nin: NON_BLOCKING_STATUSES },
@@ -30,7 +31,7 @@ async function assertNoConflict({ teacherId, studentId, scheduledAt, durationMin
     $expr: {
       $gt: [
         { $add: ['$scheduledAt', { $multiply: [{ $ifNull: ['$durationMinutes', 60] }, 60000] }] },
-        start.getTime(),
+        start,
       ],
     },
   }
@@ -42,4 +43,4 @@ async function assertNoConflict({ teacherId, studentId, scheduledAt, durationMin
   }
 }
 
-module.exports = { assertNoConflict, BookingConflictError }
+module.exports = { assertNoConflict, BookingConflictError, NON_BLOCKING_STATUSES }

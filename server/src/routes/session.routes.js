@@ -17,6 +17,7 @@ router.patch('/:id/finish', isAdminOrTeacher, ctrl.finishSession)
 // able to cancel their own session.
 router.patch('/:id/cancel', ctrl.cancelSession)
 router.patch('/:id/reschedule', isAdminOrTeacher, ctrl.rescheduleSession)
+router.patch('/:id/meeting-link', isAdminOrTeacher, ctrl.updateSessionMeetingLink)
 router.patch('/:id/delay', isAdminOrTeacher, ctrl.reportDelay)
 router.patch('/:id/accept', isAdminOrTeacher, ctrl.acceptSession)
 router.patch('/:id/decline', isAdminOrTeacher, ctrl.declineSession)

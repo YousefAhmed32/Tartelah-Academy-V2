@@ -13,7 +13,7 @@ import Button from '../../components/ui/Button.jsx'
 function Section({ title, children }) {
   return (
     <div className="mb-6">
-      <div className="text-xs font-bold uppercase tracking-widest text-[#9b7fd6] mb-3 pb-2 border-b border-[#ede9fe]">{title}</div>
+      <div className="text-xs font-bold uppercase tracking-widest text-[#7c6aaa] mb-3 pb-2 border-b border-[#ede9fe]">{title}</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
     </div>
   )
@@ -114,7 +114,7 @@ function SettingsForm({ settings, onSave, isPending }) {
       </Section>
 
       <div className="mb-6">
-        <div className="text-xs font-bold uppercase tracking-widest text-[#9b7fd6] mb-3 pb-2 border-b border-[#ede9fe]">النشرة البريدية</div>
+        <div className="text-xs font-bold uppercase tracking-widest text-[#7c6aaa] mb-3 pb-2 border-b border-[#ede9fe]">النشرة البريدية</div>
         <div className="flex items-center gap-3 mb-3">
           <input type="checkbox" id="newsletter-enabled" checked={form.newsletterEnabled} onChange={f('newsletterEnabled')} className="w-4 h-4 accent-violet-600" />
           <label htmlFor="newsletter-enabled" className="text-sm font-semibold text-[#374151]">تفعيل قسم النشرة البريدية في الفوتر</label>

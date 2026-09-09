@@ -155,14 +155,18 @@ exports.getRequest = async (req, res, next) => {
 // Admin: Approve or reject an enrollment request
 exports.reviewRequest = async (req, res, next) => {
   try {
-    const { action, adminNotes, teacherId, levelId, groupName, startDate } = req.body
+    const {
+      action, adminNotes, teacherId, levelId, groupName, startDate,
+      scheduleConfig, studentType,
+    } = req.body
+
     if (!['approved', 'rejected'].includes(action)) {
       return sendError(res, 'الإجراء غير صالح', 400)
     }
 
     const request = await EnrollmentRequest.findById(req.params.id)
       .populate('packageId')
-      .populate('studentId', 'firstNameAr lastNameAr _id')
+      .populate('studentId', 'firstNameAr lastNameAr email phone gender studentType avatar _id')
     if (!request) return sendError(res, 'الطلب غير موجود', 404)
     if (!['pending', 'under_review'].includes(request.status)) {
       return sendError(res, 'تم البت في هذا الطلب مسبقاً', 400)
@@ -173,12 +177,21 @@ exports.reviewRequest = async (req, res, next) => {
     request.reviewedBy = req.user._id
     request.reviewedAt = new Date()
 
+    let assignmentRequest = null
+
     if (action === 'approved') {
       if (!teacherId) return sendError(res, 'يجب تحديد المعلم عند الموافقة', 400)
 
       request.teacherId = teacherId
       request.levelId = levelId
       request.groupName = groupName
+
+      // Sync studentType if provided
+      const resolvedStudentType = scheduleConfig?.studentType || studentType || request.studentId.studentType || 'new'
+      if (['existing', 'new'].includes(resolvedStudentType) && request.studentId.studentType !== resolvedStudentType) {
+        await User.findByIdAndUpdate(request.studentId._id, { studentType: resolvedStudentType })
+        request.studentId.studentType = resolvedStudentType
+      }
 
       const pkg = request.packageId
       const start = startDate ? new Date(startDate) : new Date()
@@ -219,6 +232,62 @@ exports.reviewRequest = async (req, res, next) => {
 
       request.subscriptionId = subscription._id
 
+      // Orchestrate Scheduling & Teacher Assignment if enabled
+      if (scheduleConfig && scheduleConfig.enabled) {
+        try {
+          const assignmentService = require('../services/assignment.service')
+          const { userHasPermission } = require('../middleware/rbac.middleware')
+          const overrideAllowed = req.user.role === 'admin' || userHasPermission(req.user, 'assignments.override')
+
+          const isDirect = scheduleConfig.mode === 'direct' || resolvedStudentType === 'existing' || !!scheduleConfig.immediateOverride
+          const overrideReason = scheduleConfig.overrideReason || (isDirect ? 'جدولة مباشرة من مراجعة طلب التسجيل (معلم كبير في السن أو اتفاق مسبق)' : undefined)
+
+          const result = await assignmentService.createAssignmentRequest({
+            studentId: request.studentId._id,
+            teacherId,
+            studentType: resolvedStudentType,
+            specialization: scheduleConfig.specialization || 'quran',
+            ageCategory: scheduleConfig.ageCategory,
+            studentAge: scheduleConfig.studentAge,
+            lessonDurationMinutes: Number(scheduleConfig.lessonDurationMinutes || 45),
+            schedule: {
+              days: scheduleConfig.days || [],
+              startDate: scheduleConfig.startDate ? new Date(scheduleConfig.startDate) : start,
+              endDate: scheduleConfig.noEndDate ? null : (scheduleConfig.endDate ? new Date(scheduleConfig.endDate) : null),
+              frequency: scheduleConfig.frequency || 'weekly',
+              timezone: scheduleConfig.timezone || null,
+            },
+            teachingType: scheduleConfig.teachingType || 'individual',
+            adminNotes: scheduleConfig.notes || adminNotes,
+            editedMessage: scheduleConfig.editedMessage || scheduleConfig.customMessage || null,
+            immediateOverride: isDirect,
+            overrideReason,
+            overrideAllowed,
+            actorId: req.user._id,
+            actorRole: req.user.role,
+          })
+          assignmentRequest = result.assignmentRequest
+          request.assignmentRequestId = assignmentRequest._id
+        } catch (scheduleErr) {
+          // If scheduling step fails (e.g. availability conflict or invalid slots),
+          // roll back the subscription and wallet transaction cleanly.
+          await Promise.allSettled([
+            require('../models/LessonWallet').deleteOne({ idempotencyKey: `enrollment:${request._id}:purchase` }).catch(() => {}),
+            require('../models/LessonTransaction').deleteOne({ _id: transaction._id }).catch(() => {}),
+            Subscription.deleteOne({ _id: subscription._id }).catch(() => {}),
+          ])
+
+          if (scheduleErr.status) {
+            return sendError(res, scheduleErr.message, scheduleErr.status, {
+              ...(scheduleErr.field ? { field: scheduleErr.field } : {}),
+              ...(scheduleErr.conflicts ? { conflicts: scheduleErr.conflicts } : {}),
+              ...(scheduleErr.alternativeSlots ? { alternativeSlots: scheduleErr.alternativeSlots } : {}),
+            })
+          }
+          throw scheduleErr
+        }
+      }
+
       // Notify student: approved
       await createNotification({
         userId: request.studentId._id,
@@ -230,16 +299,19 @@ exports.reviewRequest = async (req, res, next) => {
         actionUrl: '/student/subscription',
       })
 
-      // Notify teacher: new student assigned
-      await createNotification({
-        userId: teacherId,
-        titleAr: 'تم تعيين طالب جديد',
-        bodyAr: `تم تعيين الطالب ${request.studentId.firstNameAr} ${request.studentId.lastNameAr} إليك. يرجى جدولة أول حصة.`,
-        type: 'enrollment',
-        priority: 'high',
-        relatedId: request._id,
-        actionUrl: '/teacher/students',
-      })
+      // Notify teacher: if scheduleConfig was NOT enabled, send the generic prompt to schedule first lesson.
+      // If scheduleConfig was enabled, assignmentService has already sent the comprehensive notification.
+      if (!assignmentRequest) {
+        await createNotification({
+          userId: teacherId,
+          titleAr: 'تم تعيين طالب جديد',
+          bodyAr: `تم تعيين الطالب ${request.studentId.firstNameAr} ${request.studentId.lastNameAr} إليك. يرجى جدولة أول حصة.`,
+          type: 'enrollment',
+          priority: 'high',
+          relatedId: request._id,
+          actionUrl: '/teacher/students',
+        })
+      }
     } else {
       // Notify student: rejected
       await createNotification({
@@ -254,15 +326,27 @@ exports.reviewRequest = async (req, res, next) => {
     }
 
     await request.save()
-    await request.populate(['packageId', 'studentId', 'teacherId', 'reviewedBy'])
+    await request.populate(['packageId', 'studentId', 'teacherId', 'reviewedBy', 'assignmentRequestId'])
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: `enrollment.${action}`,
       entity: 'EnrollmentRequest', entityId: request._id,
-      changes: { action, teacherId: request.teacherId, subscriptionId: request.subscriptionId }, ip: req.ip,
+      changes: {
+        action, teacherId: request.teacherId, subscriptionId: request.subscriptionId,
+        assignmentRequestId: request.assignmentRequestId,
+      },
+      ip: req.ip,
     })
 
-    sendSuccess(res, request, action === 'approved' ? 'تمت الموافقة وتفعيل الاشتراك' : 'تم رفض الطلب')
+    const successMsg = action === 'approved'
+      ? (assignmentRequest
+          ? (assignmentRequest.status === 'completed'
+              ? 'تمت الموافقة وتفعيل الاشتراك وجدولة الحصص مباشرة'
+              : 'تمت الموافقة وتفعيل الاشتراك وإرسال طلب الإسناد للمعلم')
+          : 'تمت الموافقة وتفعيل الاشتراك')
+      : 'تم رفض الطلب'
+
+    sendSuccess(res, request, successMsg)
   } catch (err) {
     next(err)
   }

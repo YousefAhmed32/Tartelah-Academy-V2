@@ -94,9 +94,13 @@ export default function TeacherStudentsPage() {
                 className="rounded-2xl p-5 transition-all bg-white border border-gray-100 shadow-sm"
               >
                 <div className="flex items-start gap-3 mb-3">
-                  <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="md" />
+                  <Link to={ROUTES.TEACHER_STUDENT_DETAIL.replace(':studentId', st._id)} className="flex-none">
+                    <Avatar src={getFileUrl(st.avatar)} firstName={st.firstNameAr} lastName={st.lastNameAr} size="md" />
+                  </Link>
                   <div className="flex-1 min-w-0">
-                    <div className="font-heading font-bold text-gray-900 truncate">{st.firstNameAr} {st.lastNameAr}</div>
+                    <Link to={ROUTES.TEACHER_STUDENT_DETAIL.replace(':studentId', st._id)} className="font-heading font-bold text-gray-900 truncate hover:text-violet-600 transition-colors block">
+                      {st.firstNameAr} {st.lastNameAr}
+                    </Link>
                     <div className="text-xs mt-0.5 truncate text-gray-500">{st.email}</div>
                     <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                       <Badge variant="purple">{st.courseLevel || 'مبتدئ'}</Badge>

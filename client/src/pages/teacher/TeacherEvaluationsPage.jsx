@@ -175,7 +175,7 @@ export default function TeacherEvaluationsPage() {
                 <span className="font-extrabold" style={{ color: scoreToGrade(form.score).color }}>
                   {form.score}/١٠
                 </span>
-                &nbsp;<span className="text-xs text-[#9b7fd6]">({SCORE_LABELS[form.score]})</span>
+                &nbsp;<span className="text-xs text-[#7c6aaa]">({SCORE_LABELS[form.score]})</span>
               </label>
               <input
                 type="range"
@@ -187,7 +187,7 @@ export default function TeacherEvaluationsPage() {
                 onChange={change}
                 className="w-full h-2 rounded-full accent-brand-purple mt-2"
               />
-              <div className="flex justify-between text-xs mt-1 text-[#9b7fd6]">
+              <div className="flex justify-between text-xs mt-1 text-[#7c6aaa]">
                 <span>١</span><span>٥</span><span>١٠</span>
               </div>
             </div>

@@ -3,7 +3,8 @@ import Spinner from './Spinner.jsx'
 
 const variants = {
   gold: 'btn-gold',
-  outline: 'btn-outline',
+  outline: 'cursor-pointer font-body font-semibold text-gray-700 bg-white border border-gray-200 rounded-btn px-6 py-3 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900',
+  secondary: 'cursor-pointer font-body font-semibold text-violet-700 bg-violet-50/80 border border-violet-200/70 rounded-btn px-6 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-100/90 hover:border-violet-300',
   purple: 'btn-purple',
   ghost: 'btn-ghost',
   danger: 'cursor-pointer font-body font-bold text-white bg-red-600 border-none rounded-btn px-6 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-red-700',

@@ -4,6 +4,7 @@ const Notification = require('../models/Notification')
 const User = require('../models/User')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination, buildSearchFilter } = require('../utils/pagination')
+const { resolveDatePreset } = require('../utils/datePresets')
 const { logAction } = require('../services/audit.service')
 const walletService = require('../services/wallet.service')
 const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
@@ -111,6 +112,16 @@ exports.getAllSubscriptions = async (req, res, next) => {
     const { page, limit, skip } = getPagination(req.query)
     const filter = {}
     if (req.query.status) filter.status = req.query.status
+
+    if (req.query.preset) {
+      const range = resolveDatePreset(req.query.preset, req.query.startDate, req.query.endDate)
+      filter.createdAt = { $gte: range.start, $lte: range.end }
+    } else if (req.query.startDate && req.query.endDate) {
+      const start = new Date(req.query.startDate); start.setHours(0, 0, 0, 0)
+      const end = new Date(req.query.endDate); end.setHours(23, 59, 59, 999)
+      filter.createdAt = { $gte: start, $lte: end }
+    }
+
     if (req.query.search) {
       // Subscriptions have no searchable text of their own — resolve the
       // student-name/email search against User first, then filter by id.

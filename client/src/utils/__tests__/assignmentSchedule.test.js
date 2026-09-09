@@ -1,11 +1,12 @@
 import { describe, test, expect } from 'vitest'
 import {
-  formatTimeArabic12, addMinutesToTime, describeAvailability, generateTimeSlots,
+  formatTimeArabic12, formatTimeArabic12Strict, addMinutesToTime, describeAvailability, generateTimeSlots,
   groupSlotsByPeriod, findNearestSlot, findSameTimeOtherDay, findCommonTime,
   buildSuggestions, computeUpcomingOccurrences, scheduleSummaryLabel,
   validateScheduleDates, dayLabel, deriveScheduleDays, hydrateScheduleSelection,
   validateScheduleForSubmit,
   buildSlotStatusMap, conflictLabel, isTemporaryHold,
+  buildAssignmentMessagePreview, formatScheduleDays, formatScheduleTimes,
 } from '../assignmentSchedule.js'
 
 describe('formatTimeArabic12', () => {
@@ -20,6 +21,29 @@ describe('formatTimeArabic12', () => {
   })
   test('never renders a raw technical 24-hour string', () => {
     expect(formatTimeArabic12('14:30')).not.toContain('14:30')
+  })
+})
+
+describe('formatTimeArabic12Strict', () => {
+  test('always numeric — never substitutes "منتصف الليل" for 00:00/24:00', () => {
+    expect(formatTimeArabic12Strict('00:00')).toBe('12:00 ص')
+    expect(formatTimeArabic12Strict('24:00')).toBe('12:00 ص')
+    expect(formatTimeArabic12Strict('00:30')).toBe('12:30 ص')
+  })
+  test('a slot range built from this formatter never mixes a word with a number', () => {
+    // The exact bug the UX brief flagged: a range where the start reads as a
+    // word ("منتصف الليل") and the end reads as a number ("12:30 ص") — the
+    // strict formatter must keep both ends numeric and consistent.
+    const start = formatTimeArabic12Strict('00:00')
+    const end = formatTimeArabic12Strict(addMinutesToTime('00:00', 30))
+    expect(start).toBe('12:00 ص')
+    expect(end).toBe('12:30 ص')
+    expect(`${start} – ${end}`).toBe('12:00 ص – 12:30 ص')
+  })
+  test('matches formatTimeArabic12 for every other time', () => {
+    expect(formatTimeArabic12Strict('06:00')).toBe(formatTimeArabic12('06:00'))
+    expect(formatTimeArabic12Strict('18:00')).toBe(formatTimeArabic12('18:00'))
+    expect(formatTimeArabic12Strict('12:00')).toBe(formatTimeArabic12('12:00'))
   })
 })
 
@@ -310,5 +334,51 @@ describe('validateScheduleForSubmit', () => {
   test('a fully valid daily/monthly schedule (no weekday selection needed) passes', () => {
     expect(validateScheduleForSubmit({ ...base, frequency: 'daily', singleTime: '10:00', selectedDayOfWeeks: [] }, 'existing')).toBeNull()
     expect(validateScheduleForSubmit({ ...base, frequency: 'monthly', singleTime: '10:00', selectedDayOfWeeks: [] }, 'existing')).toBeNull()
+  })
+})
+
+describe('buildAssignmentMessagePreview', () => {
+  test('formats schedule days and times correctly', () => {
+    const days = [{ dayOfWeek: 0, time: '16:00' }, { dayOfWeek: 2, time: '18:00' }]
+    expect(formatScheduleDays(days)).toBe('الأحد، الثلاثاء')
+    expect(formatScheduleTimes(days)).toContain('الأحد')
+  })
+
+  test('builds gender-aware Arabic message preview for male student', () => {
+    const msg = buildAssignmentMessagePreview({
+      teacherName: 'أحمد محمود',
+      studentName: 'عمر خالد',
+      studentGender: 'male',
+      studentAge: 12,
+      curriculum: 'quran',
+      scheduleDays: [{ dayOfWeek: 0, time: '16:00' }],
+      scheduleTimes: [{ dayOfWeek: 0, time: '16:00' }],
+      lessonDurationMinutes: 45,
+      startDate: '2026-09-01',
+    })
+    expect(msg).toContain('أ. أحمد محمود')
+    expect(msg).toContain('طالب جديد')
+    expect(msg).toContain('بياناته كالتالي')
+    expect(msg).toContain('عمر خالد')
+    expect(msg).toContain('45 دقيقة')
+    expect(msg).toContain('القرآن الكريم')
+  })
+
+  test('builds gender-aware Arabic message preview for female student', () => {
+    const msg = buildAssignmentMessagePreview({
+      teacherName: 'فاطمة الزهراء',
+      studentName: 'مريم علي',
+      studentGender: 'female',
+      studentAge: 10,
+      curriculum: 'tajweed',
+      scheduleDays: [{ dayOfWeek: 1, time: '17:00' }],
+      scheduleTimes: [{ dayOfWeek: 1, time: '17:00' }],
+      lessonDurationMinutes: 60,
+      startDate: '2026-09-01',
+    })
+    expect(msg).toContain('طالبة جديدة')
+    expect(msg).toContain('بياناتها كالتالي')
+    expect(msg).toContain('مريم علي')
+    expect(msg).toContain('التجويد')
   })
 })

@@ -3,7 +3,7 @@ import { formatNumber } from '../../utils/format.js'
 
 const BREAKDOWN_ITEMS = [
   { key: 'totalPurchased', label: 'إجمالي المشترى', color: '#7c3aed' },
-  { key: 'totalUsed', label: 'المستهلك', color: '#9b7fd6' },
+  { key: 'totalUsed', label: 'المستهلك', color: '#7c6aaa' },
   { key: 'bonusLessons', label: 'حصص إضافية', color: '#E8C76A' },
   { key: 'compensationLessons', label: 'حصص تعويضية', color: '#22c55e' },
   { key: 'frozenLessons', label: 'مجمّدة', color: '#3b82f6' },
@@ -43,7 +43,7 @@ export default function WalletBalanceCard({ wallet }) {
           <div key={item.key} className="p-4 rounded-[14px]" style={{ background: '#f8f5ff' }}>
             <div className="flex items-center gap-1.5 mb-1">
               <span className="w-2 h-2 rounded-full flex-none" style={{ background: item.color }} />
-              <span className="text-xs text-[#9b7fd6]">{item.label}</span>
+              <span className="text-xs text-[#7c6aaa]">{item.label}</span>
             </div>
             <div className="font-heading font-bold text-brand-textBody">{formatNumber(wallet[item.key] || 0)}</div>
           </div>
