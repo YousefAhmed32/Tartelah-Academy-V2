@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart, GraduationCap, Archive, ArchiveRestore, Plus, Loader2, GripVertical, ArrowUpDown } from 'lucide-react'
+import { User, Lock, Building2, Globe, Phone, Mail, MessageCircle, Video, Share2, Save, Heart, GraduationCap, Archive, ArchiveRestore, Plus, Loader2, GripVertical, ArrowUpDown, ShieldAlert, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { motion, Reorder } from 'framer-motion'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
+import Modal from '../../components/ui/Modal.jsx'
 import ImageUploadField from '../../components/ui/ImageUploadField.jsx'
 import { getFileUrl } from '../../config/constants.js'
 import {
@@ -558,6 +559,181 @@ function CredentialDefaultsTab() {
   )
 }
 
+// ── Maintenance Tab (Reset test data & launch preparation) ─────────────────────
+
+function MaintenanceTab() {
+  const qc = useQueryClient()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [confirmInput, setConfirmInput] = useState('')
+
+  const { data: statsData, isLoading } = useQuery({
+    queryKey: ['admin', 'maintenance', 'stats'],
+    queryFn: () => api.get('/admin/maintenance/stats').then((r) => r.data.data),
+  })
+
+  const resetMut = useMutation({
+    mutationFn: (confirmText) => api.post('/admin/maintenance/reset-test-data', { confirmText }).then((r) => r.data),
+    onSuccess: (res) => {
+      toast.success(res?.message || 'تم تصفير البيانات التجريبية بنجاح')
+      setModalOpen(false)
+      setConfirmInput('')
+      qc.invalidateQueries()
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'فشلت عملية التصفير')
+    },
+  })
+
+  const cleanable = statsData?.cleanable || {}
+  const protectedData = statsData?.protected || {}
+  const canConfirm = confirmInput.trim() === 'تصفير ترتيلة'
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <Section title="صيانة النظام وبدء التشغيل الفعلي (تصفير البيانات التجريبية)" icon={ShieldAlert}>
+        <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+          تُتيح هذه الأداة للإدارة تصفير ومسح كافة البيانات التجريبية التي أُنشئت أثناء فترات الاختبار والتطوير (الطلاب، المعلمون، الحصص، الجداول، المحافظ، ومسيرات الرواتب)،
+          ليتم تسليم وتشغيل المنصة على أرضية بيضاء ونظيفة تماماً، مع <b>حماية كاملة وغير قابلة للمساس</b> لحسابات المديرين والإعدادات وباقات الأسعار والمناهج والمقالات.
+        </p>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Spinner color="border-violet-600" /></div>
+        ) : (
+          <div className="space-y-6">
+            {/* Stat comparison grid */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Trash2 size={14} className="text-red-500" /> البيانات المرشحة للتنظيف والتصفير
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-red-600">{cleanable.studentsCount ?? 0}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">طلاب تجريبيين</div>
+                </div>
+                <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-red-600">{cleanable.teachersCount ?? 0}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">معلمين تجريبيين</div>
+                </div>
+                <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-red-600">{cleanable.sessionsCount ?? 0}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">حصص مجدولة ومسجلة</div>
+                </div>
+                <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-red-600">{cleanable.subscriptionsCount ?? 0}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">اشتراكات ومحافظ</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Protected Core Data */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-600" /> البيانات الأساسية المحمية 100% (لن تُمس أبداً)
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-emerald-700">{protectedData.adminsCount ?? 1}</div>
+                  <div className="text-xs text-emerald-800 font-semibold mt-0.5">حسابات المديرين (محمية)</div>
+                </div>
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-emerald-700">{protectedData.packagesCount ?? 0}</div>
+                  <div className="text-xs text-emerald-800 font-semibold mt-0.5">باقات الأسعار</div>
+                </div>
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-emerald-700">{protectedData.subjectsCount ?? 0}</div>
+                  <div className="text-xs text-emerald-800 font-semibold mt-0.5">المناهج والمواد</div>
+                </div>
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <div className="text-xl font-extrabold text-emerald-700">{protectedData.articlesCount ?? 0}</div>
+                  <div className="text-xs text-emerald-800 font-semibold mt-0.5">مقالات الموقع والمدونة</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Danger Zone Action */}
+            <div className="rounded-2xl border-2 border-red-200 bg-red-50/30 p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-none">
+                  <AlertTriangle size={20} />
+                </div>
+                <div className="space-y-1 text-xs">
+                  <h4 className="font-bold text-red-900 text-sm">منطقة الخطر — بدء التشغيل الفعلي للأكاديمية</h4>
+                  <p className="text-red-700 leading-relaxed">
+                    هذا الإجراء يقوم بمسح شامل لكافة حسابات الطلاب والمعلمين ومسيرات رواتبهم وحصصهم التي تمت تجربتها سابقاً. 
+                    لا يمكن التراجع عن هذه الخطوة بعد تنفيذها. يُرجى التأكد التام قبل المتابعة.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <Button
+                  variant="danger"
+                  onClick={() => setModalOpen(true)}
+                  icon={<Trash2 size={15} />}
+                >
+                  تصفير البيانات التجريبية وبدء التشغيل الفعلي
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Confirmation Modal with Phrase Input */}
+      {modalOpen && (
+        <Modal
+          open={modalOpen}
+          onClose={() => { if (!resetMut.isPending) setModalOpen(false) }}
+          title="تأكيد تصفير البيانات وبدء التشغيل الفعلي"
+          size="md"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={resetMut.isPending}>
+                إلغاء وتراجع
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => resetMut.mutate(confirmInput.trim())}
+                loading={resetMut.isPending}
+                disabled={!canConfirm || resetMut.isPending}
+              >
+                تأكيد التصفير النهائي الآن
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-xs" dir="rtl">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 leading-relaxed">
+              ⚠️ <b>تحذير نهائي:</b> أنت على وشك حذف كافة الطلاب والمعلمين والحصص والمحافظ ومسيرات الرواتب التجريبية.
+              حسابك الإداري وكافة إعدادات الأكاديمية والباقات والمناهج ستبقى آمنة تماماً دون أي مساس.
+            </div>
+
+            <div>
+              <label className="font-bold text-gray-700 block mb-1.5">
+                لتأكيد العملية، يرجى كتابة عبارة <span className="text-red-600 font-extrabold select-all">تصفير ترتيلة</span> في المربع أدناه:
+              </label>
+              <input
+                type="text"
+                className="w-full h-11 bg-white border-2 border-gray-200 rounded-xl px-3.5 text-sm font-bold text-gray-900 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-center"
+                placeholder="اكتب هنا: تصفير ترتيلة"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {confirmInput && !canConfirm && (
+              <p className="text-[11px] text-amber-600 font-semibold text-center">
+                العبارة المكتوبة غير متطابقة، يرجى كتابة: تصفير ترتيلة
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 const ALL_TABS = [
@@ -565,6 +741,7 @@ const ALL_TABS = [
   { key: 'academy', label: 'إعدادات الأكاديمية', icon: Building2 },
   { key: 'curricula', label: 'المناهج التعليمية', icon: GraduationCap, permission: 'curricula.view' },
   { key: 'credentials', label: 'كلمات المرور الافتراضية', icon: Lock, permission: 'credentials.manage_defaults' },
+  { key: 'maintenance', label: 'صيانة النظام وبدء التشغيل', icon: ShieldAlert, permission: 'settings.update' },
 ]
 
 export default function AdminSettingsPage() {
@@ -593,6 +770,7 @@ export default function AdminSettingsPage() {
       {activeTab === 'academy' && <AcademyTab />}
       {activeTab === 'curricula' && <CurriculaTab />}
       {activeTab === 'credentials' && <CredentialDefaultsTab />}
+      {activeTab === 'maintenance' && <MaintenanceTab />}
     </div>
   )
 }

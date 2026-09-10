@@ -11,6 +11,7 @@ const subjectCtrl = require('../controllers/teachingSubject.controller')
 const credentialDefaultsCtrl = require('../controllers/credentialDefaults.controller')
 const payrollCtrl = require('../controllers/payroll.controller')
 const transferCtrl = require('../controllers/transfer.controller')
+const maintenanceCtrl = require('../controllers/maintenance.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { requirePermission } = require('../middleware/rbac.middleware')
 
@@ -36,6 +37,7 @@ router.post('/students', requirePermission('students.manage'), onboardingCtrl.cr
 router.get('/students/:id', requirePermission('students.view'), ctrl.getStudent)
 router.patch('/students/:id', requirePermission('students.manage'), ctrl.updateStudent)
 router.delete('/students/:id', requirePermission('students.manage'), ctrl.deleteStudent)
+router.delete('/students/:id/permanent', requirePermission('students.manage'), maintenanceCtrl.deleteStudentPermanently)
 router.post('/students/:id/reset-password', requirePermission('students.manage'), ctrl.adminResetPassword)
 
 // Academic records per student
@@ -46,6 +48,7 @@ router.get('/teachers', requirePermission('teachers.view'), ctrl.getTeachers)
 router.get('/teachers/:id', requirePermission('teachers.view'), ctrl.getTeacher)
 router.post('/teachers', requirePermission('teachers.manage'), ctrl.createTeacher)
 router.patch('/teachers/:id', requirePermission('teachers.manage'), ctrl.updateTeacher)
+router.delete('/teachers/:id/permanent', requirePermission('teachers.manage'), maintenanceCtrl.deleteTeacherPermanently)
 router.post('/teachers/:id/reset-password', requirePermission('teachers.manage'), ctrl.adminResetPassword)
 router.post('/teachers/:id/sync-meeting-links', requirePermission('teachers.manage'), ctrl.adminSyncTeacherMeetingLinks)
 
@@ -166,5 +169,9 @@ router.patch('/transfers/batches/:batchId/entries/:studentId', requirePermission
 router.post('/transfers/batches/:batchId/run', requirePermission('transfers.execute'), transferCtrl.runTeacherReplacementBatch)
 router.post('/transfers/batches/:batchId/retry', requirePermission('transfers.execute'), transferCtrl.retryTeacherReplacementBatch)
 router.post('/transfers/batches/:batchId/cancel', requirePermission('transfers.execute'), transferCtrl.cancelTeacherReplacementBatch)
+
+// System maintenance & clean slate data reset
+router.get('/maintenance/stats', requirePermission('settings.view'), maintenanceCtrl.getMaintenanceStats)
+router.post('/maintenance/reset-test-data', requirePermission('settings.update'), maintenanceCtrl.resetPlatformTestData)
 
 module.exports = router

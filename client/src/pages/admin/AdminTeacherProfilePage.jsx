@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -7,7 +7,7 @@ import {
   ArrowRight, Mail, Phone, Wallet, GraduationCap, Users, Calendar, Plus, Clock,
   User, KeyRound, CalendarClock, Lock, History, ClipboardCheck, TrendingUp,
   Settings, LayoutGrid, FileText, Power, PowerOff, MessageCircle, StickyNote,
-  Video, RefreshCw, ExternalLink, Gift, RotateCcw, SlidersHorizontal,
+  Video, RefreshCw, ExternalLink, Gift, RotateCcw, SlidersHorizontal, Trash2, AlertTriangle,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
@@ -989,61 +989,97 @@ function AccountTab({ teacher, onUpdate }) {
     onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
   })
 
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const navigate = useNavigate()
+
+  const deleteMut = useMutation({
+    mutationFn: () => api.delete(`/admin/teachers/${teacher._id}/permanent?force=true`).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('تم حذف حساب المعلم وسجلاته نهائيًا')
+      qc.invalidateQueries({ queryKey: ['admin', 'teachers'] })
+      navigate(ROUTES.ADMIN_TEACHERS)
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ أثناء حذف المعلم'),
+  })
+
   function requestToggle() {
     if (teacher.isActive) setConfirmDeactivate(true)
     else toggleMut.mutate(true)
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-        <h3 className="font-bold text-gray-900 mb-1">تعديل بيانات المعلم</h3>
-        <GenderSegmentedControl value={form.gender} onChange={(v) => set('gender', v)} />
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className={labelCls}>الاسم الأول</label><input className={inputCls} value={form.firstNameAr} onChange={(e) => set('firstNameAr', e.target.value)} /></div>
-          <div><label className={labelCls}>الاسم الأخير</label><input className={inputCls} value={form.lastNameAr} onChange={(e) => set('lastNameAr', e.target.value)} /></div>
-        </div>
-        <div><label className={labelCls}>البريد الإلكتروني</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className={labelCls}>رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-          <div><label className={labelCls}>الراتب / الحصة (قديم، اختياري)</label><input type="number" className={inputCls} value={form.salaryPerSession} onChange={(e) => set('salaryPerSession', e.target.value)} placeholder="0" /></div>
-        </div>
-        <SpecializationsMultiSelect value={form.specializations} onChange={(v) => set('specializations', v)} required />
-        <AudienceCategoriesMultiSelect value={form.audienceCategories} onChange={(v) => set('audienceCategories', v)} />
-        <div><label className={labelCls}>سعر ساعة التدريس</label><input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate} onChange={(e) => set('hourlyRate', e.target.value)} placeholder="0" /></div>
-        <ShiftsMultiSelect value={form.availableShifts} onChange={(v) => set('availableShifts', v)} />
-        <div><label className={labelCls}>نبذة (تظهر للطلاب)</label><textarea className={`${inputCls} h-16 resize-none py-2`} value={form.bioAr} onChange={(e) => set('bioAr', e.target.value)} /></div>
-        <div>
-          <label className={labelCls}>ملاحظات إدارية (داخلية، لا تظهر للمعلم)</label>
-          <textarea className={`${inputCls} h-16 resize-none py-2`} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="ملاحظات للفريق الإداري فقط..." />
-        </div>
-        <button onClick={() => updateMut.mutate(form)} disabled={updateMut.isPending}
-          className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-          {updateMut.isPending && <Spinner size="sm" color="border-white" />} حفظ التعديلات
-        </button>
-      </div>
-
-      <div className="space-y-5">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <h3 className="font-bold text-gray-900 flex items-center gap-2"><KeyRound size={16} className="text-violet-600" /> إعادة تعيين كلمة المرور</h3>
-          <p className="text-xs text-gray-500">أدخل كلمة مرور جديدة للمعلم — سيُطلب منه تسجيل الدخول بها.</p>
-          <input type="password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" dir="ltr" />
-          <button onClick={() => resetPwMut.mutate()} disabled={pw.length < 8 || resetPwMut.isPending}
-            className="w-full h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-            {resetPwMut.isPending && <Spinner size="sm" color="border-white" />} تعيين كلمة المرور
+          <h3 className="font-bold text-gray-900 mb-1">تعديل بيانات المعلم</h3>
+          <GenderSegmentedControl value={form.gender} onChange={(v) => set('gender', v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>الاسم الأول</label><input className={inputCls} value={form.firstNameAr} onChange={(e) => set('firstNameAr', e.target.value)} /></div>
+            <div><label className={labelCls}>الاسم الأخير</label><input className={inputCls} value={form.lastNameAr} onChange={(e) => set('lastNameAr', e.target.value)} /></div>
+          </div>
+          <div><label className={labelCls}>البريد الإلكتروني</label><input type="email" dir="ltr" className={inputCls} value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>رقم الهاتف</label><input dir="ltr" className={inputCls} value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+            <div><label className={labelCls}>الراتب / الحصة (قديم، اختياري)</label><input type="number" className={inputCls} value={form.salaryPerSession} onChange={(e) => set('salaryPerSession', e.target.value)} placeholder="0" /></div>
+          </div>
+          <SpecializationsMultiSelect value={form.specializations} onChange={(v) => set('specializations', v)} required />
+          <AudienceCategoriesMultiSelect value={form.audienceCategories} onChange={(v) => set('audienceCategories', v)} />
+          <div><label className={labelCls}>سعر ساعة التدريس</label><input type="number" min="0" step="0.5" className={inputCls} value={form.hourlyRate} onChange={(e) => set('hourlyRate', e.target.value)} placeholder="0" /></div>
+          <ShiftsMultiSelect value={form.availableShifts} onChange={(v) => set('availableShifts', v)} />
+          <div><label className={labelCls}>نبذة (تظهر للطلاب)</label><textarea className={`${inputCls} h-16 resize-none py-2`} value={form.bioAr} onChange={(e) => set('bioAr', e.target.value)} /></div>
+          <div>
+            <label className={labelCls}>ملاحظات إدارية (داخلية، لا تظهر للمعلم)</label>
+            <textarea className={`${inputCls} h-16 resize-none py-2`} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="ملاحظات للفريق الإداري فقط..." />
+          </div>
+          <button onClick={() => updateMut.mutate(form)} disabled={updateMut.isPending}
+            className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+            {updateMut.isPending && <Spinner size="sm" color="border-white" />} حفظ التعديلات
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <h3 className="font-bold text-gray-900">حالة الحساب</h3>
-          <p className="text-xs text-gray-500">
-            {teacher.isActive ? 'الحساب نشط حاليًا ويستطيع المعلم الدخول وإدارة حصصه.' : 'الحساب موقوف حاليًا — لا يستطيع المعلم الدخول.'}
-          </p>
-          <button onClick={requestToggle} disabled={toggleMut.isPending}
-            className={`w-full h-11 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${teacher.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
-            {toggleMut.isPending ? <Spinner size="sm" color={teacher.isActive ? 'border-red-500' : 'border-emerald-600'} /> : (teacher.isActive ? <PowerOff size={15} /> : <Power size={15} />)}
-            {teacher.isActive ? 'إيقاف حساب المعلم' : 'تفعيل حساب المعلم'}
-          </button>
+        <div className="space-y-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2"><KeyRound size={16} className="text-violet-600" /> إعادة تعيين كلمة المرور</h3>
+            <p className="text-xs text-gray-500">أدخل كلمة مرور جديدة للمعلم — سيُطلب منه تسجيل الدخول بها.</p>
+            <input type="password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" dir="ltr" />
+            <button onClick={() => resetPwMut.mutate()} disabled={pw.length < 8 || resetPwMut.isPending}
+              className="w-full h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+              {resetPwMut.isPending && <Spinner size="sm" color="border-white" />} تعيين كلمة المرور
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h3 className="font-bold text-gray-900">حالة الحساب</h3>
+            <p className="text-xs text-gray-500">
+              {teacher.isActive ? 'الحساب نشط حاليًا ويستطيع المعلم الدخول وإدارة حصصه.' : 'الحساب موقوف حاليًا — لا يستطيع المعلم الدخول.'}
+            </p>
+            <button onClick={requestToggle} disabled={toggleMut.isPending}
+              className={`w-full h-11 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${teacher.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+              {toggleMut.isPending ? <Spinner size="sm" color={teacher.isActive ? 'border-red-500' : 'border-emerald-600'} /> : (teacher.isActive ? <PowerOff size={15} /> : <Power size={15} />)}
+              {teacher.isActive ? 'إيقاف حساب المعلم' : 'تفعيل حساب المعلم'}
+            </button>
+          </div>
+
+          {/* Danger Zone: Permanent Delete */}
+          <div className="bg-red-50/40 rounded-2xl border border-red-200 p-5 space-y-3">
+            <h3 className="font-bold text-red-900 flex items-center gap-1.5">
+              <AlertTriangle size={16} className="text-red-600" /> منطقة الخطر: الحذف النهائي للمعلم
+            </h3>
+            <p className="text-xs text-red-700 leading-relaxed">
+              حذف حساب المعلم وساعاته ومواعيده غير المكتملة نهائيًا من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
+            </p>
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                disabled={deleteMut.isPending}
+                className="px-5 h-10 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm"
+              >
+                {deleteMut.isPending ? <Spinner size="sm" color="border-white" /> : <Trash2 size={14} />}
+                حذف المعلم وسجلاته نهائيًا
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1054,6 +1090,16 @@ function AccountTab({ teacher, onUpdate }) {
         title="إيقاف حساب المعلم"
         message={`سيتم إيقاف حساب "${teacher.firstNameAr} ${teacher.lastNameAr}" فوراً، ولن يتمكن من الدخول أو إدارة حصصه حتى يُعاد تفعيله. هل تريد المتابعة؟`}
         confirmLabel="إيقاف الحساب"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => { deleteMut.mutate(); setConfirmDelete(false) }}
+        title="تأكيد الحذف النهائي للمعلم"
+        message={`هل أنت متأكد من رغبتك في حذف المعلم "${teacher.firstNameAr} ${teacher.lastNameAr}" نهائيًا؟ سيتم مسح حسابه وساعاته ومواعيده غير المكتملة فوراً.`}
+        confirmLabel="نعم، احذف المعلم نهائيًا"
         variant="danger"
       />
     </div>
