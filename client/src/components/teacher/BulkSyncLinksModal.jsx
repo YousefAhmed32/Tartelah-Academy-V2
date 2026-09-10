@@ -206,6 +206,8 @@ export default function BulkSyncLinksModal({
       qc.invalidateQueries({ queryKey: ['admin', 'teacher-profile'] })
       qc.invalidateQueries({ queryKey: ['admin', 'teachers'] })
       qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'teacher-sessions'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'teacher-schedule-rules'] })
       onClose()
     },
     onError: (err) => {
@@ -219,7 +221,7 @@ export default function BulkSyncLinksModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="تجديد وتعميم رابط المحاضرات العام"
+      title={isAdmin ? "تعميم الرابط العمومي على كافة محاضرات وحصص المعلم" : "تجديد وتعميم رابط المحاضرات العام"}
       size="lg"
       footer={
         <div className="flex items-center justify-between w-full flex-wrap gap-2" dir="rtl">
@@ -265,10 +267,10 @@ export default function BulkSyncLinksModal({
           </div>
           <div className="min-w-0 flex-1 text-xs">
             <h4 className="font-bold text-gray-900 text-sm mb-0.5">
-              تغيير الرابط العمومي وتحديث جداول الطلاب
+              تغيير الرابط العمومي وتحديث كافة المحاضرات لجميع الطلاب
             </h4>
             <p className="text-gray-600 leading-relaxed">
-              إذا تغير رابط Zoom أو Google Meet الخاص بك، يمكنك وضع الرابط الجديد هنا وسيقوم النظام تلقائياً بتحديث جميع الجداول الدورية والحصص القادمة للطلاب، مع إشعارهم فوراً.
+              إذا تغير رابط Zoom أو Google Meet الخاص بك، يمكنك وضع الرابط الجديد هنا وسيقوم النظام تلقائياً بتحديث كافة الجداول الدورية والحصص القادمة للطلاب دفعة واحدة، مع إشعارهم فوراً.
             </p>
           </div>
         </div>
@@ -396,7 +398,7 @@ export default function BulkSyncLinksModal({
                 onChange={(e) => setSaveToSavedLinks(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
               />
-              حفظ كرابط دائم في الحساب
+              تعيين هذا الرابط كرابط عمومي معتمد للمعلم (افتراضي للطلاب الجدد والحصص)
             </label>
           </div>
         </div>

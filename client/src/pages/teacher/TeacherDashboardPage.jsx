@@ -22,6 +22,7 @@ import EditSessionLinkModal from '../../components/teacher/EditSessionLinkModal.
 import RescheduleSessionModal from '../../components/teacher/RescheduleSessionModal.jsx'
 import CancelSessionModal from '../../components/teacher/CancelSessionModal.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr, timeFromNow } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
@@ -179,7 +180,7 @@ function NextSessionCard({ session }) {
         <button
           onClick={handleJoin}
           disabled={startMutation.isPending}
-          className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
+          className="btn-purple w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
         >
           <Video size={16} strokeWidth={2} />
           {canCheckIn ? 'تسجيل الحضور وبدء الحصة' : 'فتح الفصل الخارجي'}
@@ -187,7 +188,7 @@ function NextSessionCard({ session }) {
       ) : (
         <button
           onClick={() => setShowEditLink(true)}
-          className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
+          className="btn-purple w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
         >
           <Video size={16} strokeWidth={2} />
           إضافة رابط وبدء الحصة
@@ -504,6 +505,7 @@ export default function TeacherDashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [showBulkSync, setShowBulkSync] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
 
   const { data: stats = DEFAULT_STATS, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['teacher', 'dashboard'],
@@ -549,14 +551,22 @@ export default function TeacherDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-        <p className="text-xs font-semibold mb-1 text-violet-600">{getArabicDate()}</p>
-        <h1 className="font-heading font-extrabold text-2xl text-gray-900">
-          أهلاً، {user?.firstNameAr || user?.firstName}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {hasActions ? 'لديك مهام تنتظرك اليوم' : 'يومك التعليمي هادئ اليوم — أحسنت!'}
-        </p>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-xs font-semibold mb-1 text-violet-600">{getArabicDate()}</p>
+          <h1 className="font-heading font-extrabold text-2xl text-gray-900">
+            أهلاً، {user?.firstNameAr || user?.firstName}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {hasActions ? 'لديك مهام تنتظرك اليوم' : 'يومك التعليمي هادئ اليوم — أحسنت!'}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowGuide(true)}
+          className="flex items-center gap-2 h-10 px-4 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200/80 rounded-xl transition-all shadow-sm cursor-pointer"
+        >
+          <BookOpen size={15} /> كيف تعمل الحصة؟
+        </button>
       </motion.div>
 
       {/* New-student assignment requests awaiting this teacher's approval —
@@ -793,6 +803,11 @@ export default function TeacherDashboardPage() {
           open={showBulkSync}
           onClose={() => setShowBulkSync(false)}
         />
+      )}
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <SessionLifecycleGuide role="teacher" onClose={() => setShowGuide(false)} />
       )}
     </div>
   )

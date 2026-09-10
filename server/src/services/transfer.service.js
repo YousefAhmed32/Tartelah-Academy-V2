@@ -217,13 +217,25 @@ async function executeStudentTransfer(studentId, {
     // 3) Create the new teacher's ScheduleRule(s) — one per distinct
     // duration/timezone grouping (a rule set normally shares these, so this
     // is one new rule per old rule, carrying the resolved days).
+    let targetMeetingLink = ''
+    let targetMeetingProvider = 'zoom'
+    try {
+      const targetTeacher = await User.findById(targetTeacherId).select('meetingLinks').lean()
+      if (targetTeacher?.meetingLinks?.[0]?.link) {
+        targetMeetingLink = targetTeacher.meetingLinks[0].link
+        targetMeetingProvider = targetTeacher.meetingLinks[0].provider || targetMeetingProvider
+      }
+    } catch (_) {}
+
     const newRuleByOldRuleId = {}
     for (const { rule, chosenDays } of finalDays) {
       const newRule = await ScheduleRule.create({
         teacherId: targetTeacherId, studentId, subscriptionId: subscription._id,
         frequency: rule.frequency, daysOfWeek: chosenDays.map((d) => d.dayOfWeek),
         timeOfDay: chosenDays[0]?.time || rule.timeOfDay, durationMinutes: rule.durationMinutes,
-        startDate: effective, sessionsTotal: rule.sessionsTotal, meetingProvider: rule.meetingProvider,
+        startDate: effective, sessionsTotal: rule.sessionsTotal,
+        meetingLink: targetMeetingLink || rule.meetingLink || '',
+        meetingProvider: targetMeetingProvider || rule.meetingProvider || 'zoom',
         titleTemplate: rule.titleTemplate, status: 'active', timezone: rule.timezone,
         notes: `منقول من جدول سابق (${rule._id}) — سبب النقل: ${reason.trim()}`,
       })

@@ -138,6 +138,10 @@ exports.addStudentToTeacher = async (req, res, next) => {
 
     let assignmentRequest = null
     if (schedule) {
+      if (!schedule.meetingLink && teacher.meetingLinks?.[0]?.link) {
+        schedule.meetingLink = teacher.meetingLinks[0].link
+        schedule.meetingProvider = teacher.meetingLinks[0].provider || 'zoom'
+      }
       try {
         const overrideAllowed = userHasPermission(req.user, 'assignments.override')
         const assignmentService = require('../services/assignment.service')

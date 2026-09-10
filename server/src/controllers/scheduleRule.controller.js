@@ -47,6 +47,18 @@ exports.createRule = async (req, res, next) => {
     const studentName = student ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student?.name || '')
     const defaultTitle = studentName ? `حصة ${studentName}` : 'حصة'
 
+    let resolvedMeetingLink = meetingLink || ''
+    let resolvedMeetingProvider = meetingProvider || 'zoom'
+    if (!resolvedMeetingLink) {
+      try {
+        const teacherUser = await User.findById(teacherId).select('meetingLinks').lean()
+        if (teacherUser?.meetingLinks?.[0]?.link) {
+          resolvedMeetingLink = teacherUser.meetingLinks[0].link
+          resolvedMeetingProvider = teacherUser.meetingLinks[0].provider || resolvedMeetingProvider
+        }
+      } catch (_) {}
+    }
+
     const rule = await ScheduleRule.create({
       teacherId,
       studentId,
@@ -58,8 +70,8 @@ exports.createRule = async (req, res, next) => {
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
       sessionsTotal: sessionsTotal || undefined,
-      meetingLink: meetingLink || '',
-      meetingProvider: meetingProvider || 'zoom',
+      meetingLink: resolvedMeetingLink,
+      meetingProvider: resolvedMeetingProvider,
       titleTemplate: titleTemplate || defaultTitle,
       notes,
     })

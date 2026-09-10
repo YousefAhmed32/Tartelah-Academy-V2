@@ -88,6 +88,22 @@ async function startOnboardingSession({ clientRequestId, teacher, workingHours, 
   if (existingEmail) throw new OnboardingError('البريد الإلكتروني مسجل مسبقاً', 409, 'teacher.email')
 
   const teacherFields = pickAllowed(teacher, TEACHER_ALLOWED_FIELDS)
+  let initialMeetingLinks = Array.isArray(teacher.meetingLinks) ? [...teacher.meetingLinks] : []
+  if (teacher.generalMeetingLink && typeof teacher.generalMeetingLink === 'string' && teacher.generalMeetingLink.trim()) {
+    const gLink = teacher.generalMeetingLink.trim()
+    const provider = teacher.generalMeetingProvider || 'zoom'
+    const label = provider === 'meet' ? 'Google Meet' : provider === 'zoom' ? 'Zoom' : 'الرابط العمومي لجميع الحصص'
+    const matchIdx = initialMeetingLinks.findIndex(l => l.link === gLink)
+    if (matchIdx !== -1) initialMeetingLinks.splice(matchIdx, 1)
+    initialMeetingLinks.unshift({ provider, label, link: gLink })
+  }
+  if (initialMeetingLinks.length > 0) {
+    teacherFields.meetingLinks = initialMeetingLinks
+  }
+  delete teacherFields.generalMeetingLink
+  delete teacherFields.generalMeetingProvider
+  delete teacherFields.applyGeneralLinkToStudents
+
   const teacherCredential = await resolveCredentialInput(teacher, 'teacher.credential', 'teacher')
 
   let teacherDoc = null
@@ -206,6 +222,10 @@ async function saveStudentToSession({ sessionId, clientRequestId, student, actor
     }
 
     if (student.schedule) {
+      if (!student.schedule.meetingLink && teacher.meetingLinks?.[0]?.link) {
+        student.schedule.meetingLink = teacher.meetingLinks[0].link
+        student.schedule.meetingProvider = teacher.meetingLinks[0].provider || 'zoom'
+      }
       const result = await assignmentService.createAssignmentRequest({
         studentId: studentDoc._id, teacherId: teacher._id, studentType: studentDoc.studentType,
         specialization: student.specialization, ageCategory: student.ageCategory, studentAge: student.studentAge,

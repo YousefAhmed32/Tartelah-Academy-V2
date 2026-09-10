@@ -6,7 +6,7 @@ import {
   Radio, Clock, UserX, Link2Off, Timer, ClipboardCheck, CheckCircle2, Ban,
   ShieldAlert, ChevronDown, RefreshCw, Eye, Check, X, AlertTriangle, Wifi,
   TrendingUp, Users, Wallet, ArrowLeft, Send, ListChecks, CalendarClock,
-  Table as TableIcon, LayoutGrid, SlidersHorizontal, RotateCcw,
+  Table as TableIcon, LayoutGrid, SlidersHorizontal, RotateCcw, BookOpen,
 } from 'lucide-react'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
@@ -753,9 +753,11 @@ export default function AdminOperationsCenterPage() {
     <div dir="rtl" className="space-y-5 ">
       <PageHeader title="مركز العمليات" subtitle="نظرة تشغيلية فورية على الأكاديمية — ما يحدث الآن وما يحتاج إجراءً"
         actions={
-          <button onClick={() => setShowGuide(true)}
-            className="text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-2 rounded-xl transition-colors">
-            كيف تعمل الحصة؟
+          <button
+            onClick={() => setShowGuide(true)}
+            className="flex items-center gap-2 h-10 px-4 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200/80 rounded-xl transition-all shadow-sm cursor-pointer"
+          >
+            <BookOpen size={15} /> كيف تعمل الحصة؟
           </button>
         }
       />

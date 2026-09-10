@@ -216,6 +216,18 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
   } catch (_) {}
   const ruleTitle = studentName ? `حصة ${studentName}` : 'حصة'
 
+  let meetingLink = doc.schedule?.meetingLink || ''
+  let meetingProvider = doc.schedule?.meetingProvider || 'zoom'
+  if (!meetingLink && doc.teacherId) {
+    try {
+      const teacherUser = await User.findById(doc.teacherId).select('meetingLinks').lean()
+      if (teacherUser?.meetingLinks?.[0]?.link) {
+        meetingLink = teacherUser.meetingLinks[0].link
+        meetingProvider = teacherUser.meetingLinks[0].provider || meetingProvider
+      }
+    } catch (_) {}
+  }
+
   const createdRuleIds = []
   const createdSessionIds = []
   try {
@@ -234,6 +246,8 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
         startDate: doc.schedule.startDate, endDate: doc.schedule.endDate || undefined,
         timezone: doc.schedule.timezone || availability.timezone,
         titleTemplate: ruleTitle, status: 'active', notes: doc.adminNotes,
+        meetingLink: meetingLink || '',
+        meetingProvider: meetingProvider || 'zoom',
       })
       createdRuleIds.push(rule._id)
       const sessions = await generateSessionsFromRule(rule)

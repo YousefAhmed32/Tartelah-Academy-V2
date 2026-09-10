@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Edit2, Pause, Play, Link2, Trash2, PlusCircle } from 'lucide-react'
+import { Calendar, Clock, Edit2, Pause, Play, Link2, Trash2, PlusCircle, BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -12,6 +12,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ROUTES } from '../../config/constants.js'
 
@@ -74,6 +75,7 @@ export default function AdminScheduleRulesPage() {
   const [editRule, setEditRule] = useState(null)
   const [generateRule, setGenerateRule] = useState(null)
   const [deleteRule, setDeleteRule] = useState(null)
+  const [showGuide, setShowGuide] = useState(false)
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -124,12 +126,21 @@ export default function AdminScheduleRulesPage() {
         title="جداول الحصص"
         subtitle={`${data?.total || 0} قاعدة جدول دورية معتمدة`}
         actions={
-          <Link
-            to={ROUTES.ADMIN_TEACHER_ONBOARDING_WIZARD}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
-          >
-            <PlusCircle size={14} /> إضافة طالب وجدولة حصص جديدة
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowGuide(true)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200/80 transition-all shadow-sm cursor-pointer"
+            >
+              <BookOpen size={14} /> كيف تعمل الحصة؟
+            </button>
+            <Link
+              to={ROUTES.ADMIN_TEACHER_ONBOARDING_WIZARD}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+            >
+              <PlusCircle size={14} /> إضافة طالب وجدولة حصص جديدة
+            </Link>
+          </div>
         }
       />
 
@@ -245,6 +256,11 @@ export default function AdminScheduleRulesPage() {
         confirmLabel="حذف"
         variant="danger"
       />
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <SessionLifecycleGuide role="admin" onClose={() => setShowGuide(false)} />
+      )}
     </div>
   )
 }

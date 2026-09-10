@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   ChevronRight, ChevronLeft, Plus, Trash2, AlertCircle, CheckCircle2, Copy, User, GraduationCap,
-  KeyRound, CalendarClock, Pencil, XCircle, History, UserPlus, Users, X,
+  KeyRound, CalendarClock, Pencil, XCircle, History, UserPlus, Users, X, Video, Link2,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Input from '../../components/ui/Input.jsx'
@@ -44,6 +44,15 @@ const STUDENT_GENDER_OPTIONS = [
   { value: 'female', label: 'طالبة' },
 ]
 
+function detectProvider(url) {
+  if (!url || typeof url !== 'string') return 'zoom'
+  const lower = url.toLowerCase().trim()
+  if (lower.includes('meet.google.com')) return 'meet'
+  if (lower.includes('zoom.us') || lower.includes('zoom.com')) return 'zoom'
+  if (lower.includes('teams.microsoft.com') || lower.includes('teams.live.com')) return 'teams'
+  return 'other'
+}
+
 function newClientRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -53,6 +62,7 @@ function emptyTeacher() {
   return {
     firstNameAr: '', lastNameAr: '', email: '', phone: '',
     gender: '', bioAr: '', specializations: [], audienceCategories: [], hourlyRate: '', availableShifts: [],
+    generalMeetingLink: '', generalMeetingProvider: 'zoom', applyGeneralLinkToStudents: true,
     credential: emptyCredential(),
   }
 }
@@ -107,6 +117,8 @@ function buildStudentPayload(s) {
     schedule: {
       days: deriveScheduleDays(s.schedule), startDate: s.schedule.startDate,
       endDate: s.schedule.noEndDate ? undefined : (s.schedule.endDate || undefined), frequency: s.schedule.frequency,
+      meetingLink: s.schedule.meetingLink || undefined,
+      meetingProvider: s.schedule.meetingProvider || undefined,
     },
     teachingType: s.schedule.teachingType,
     scheduleNotes: s.schedule.notes || undefined,
@@ -971,6 +983,75 @@ export default function AdminTeacherOnboardingWizardPage() {
               <Input label="سعر ساعة التدريس" type="number" min="0" step="0.5" variant="light" value={teacher.hourlyRate} onChange={(e) => teacherSet('hourlyRate', e.target.value)} />
             </div>
             <ShiftsMultiSelect value={teacher.availableShifts} onChange={(v) => teacherSet('availableShifts', v)} />
+
+            {/* General Meeting Link Card */}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center flex-none">
+                    <Video size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-gray-900">الرابط العمومي للاجتماعات والفصول الافتراضية (اختياري)</h4>
+                    <p className="text-[11px] text-gray-500">رابط غرفة Zoom أو Google Meet العام للمعلم، ويُعتمد كافتراضي لكافة حصصه.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { key: 'zoom', label: 'Zoom', color: '#2D8CFF' },
+                    { key: 'meet', label: 'Google Meet', color: '#00897B' },
+                    { key: 'teams', label: 'Teams', color: '#6264A7' },
+                    { key: 'other', label: 'رابط مخصص', color: '#7c3aed' },
+                  ].map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => teacherSet('generalMeetingProvider', p.key)}
+                      className={`h-9 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                        (teacher.generalMeetingProvider || 'zoom') === p.key
+                          ? 'bg-white border-violet-600 text-violet-700 shadow-sm ring-1 ring-violet-200'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="url"
+                    dir="ltr"
+                    value={teacher.generalMeetingLink || ''}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      teacherSet('generalMeetingLink', val)
+                      if (val.trim()) {
+                        teacherSet('generalMeetingProvider', detectProvider(val))
+                      }
+                    }}
+                    placeholder="https://zoom.us/j/... أو https://meet.google.com/..."
+                    className="w-full h-11 bg-white border border-gray-200 rounded-xl px-3.5 text-xs sm:text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 font-mono transition-all placeholder:text-gray-400"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={teacher.applyGeneralLinkToStudents !== false}
+                    onChange={(e) => teacherSet('applyGeneralLinkToStudents', e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-gray-700">
+                    تعميم الرابط العمومي تلقائيًا على جميع الطلاب المضافين في هذا المعالج (موصى به)
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
         )}
 

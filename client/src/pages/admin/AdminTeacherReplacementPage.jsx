@@ -128,7 +128,10 @@ function SetupStep({ onGoToHistory }) {
   const [searchFilter, setSearchFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Automatic query for preview whenever sourceTeacherId and targetTeacherId are both present
+  const isSameTeacher = !!form.sourceTeacherId && !!form.targetTeacherId && form.sourceTeacherId === form.targetTeacherId
+  const hasSelectedBoth = !!form.sourceTeacherId && !!form.targetTeacherId && !isSameTeacher
+
+  // Automatic query for preview whenever sourceTeacherId and targetTeacherId are both present and different
   const {
     data: preview,
     isLoading: isPreviewLoading,
@@ -138,7 +141,7 @@ function SetupStep({ onGoToHistory }) {
   } = useQuery({
     queryKey: ['admin', 'transfers', 'preview', form.sourceTeacherId, form.targetTeacherId],
     queryFn: () => transferService.previewTeacherReplacement(form.sourceTeacherId, form.targetTeacherId).then(r => r.data.data),
-    enabled: !!form.sourceTeacherId && !!form.targetTeacherId,
+    enabled: !!form.sourceTeacherId && !!form.targetTeacherId && !isSameTeacher,
     staleTime: 60_000,
   })
 
@@ -211,40 +214,71 @@ function SetupStep({ onGoToHistory }) {
       {/* 4-Step Process Guide */}
       <div className="bg-gradient-to-r from-violet-50/70 via-purple-50/40 to-amber-50/30 rounded-2xl border border-violet-100/80 p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-violet-100">
-            <span className="w-6 h-6 rounded-full bg-violet-600 text-white font-bold flex items-center justify-center text-xs flex-none">
-              1
+          <div className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all ${
+            hasSelectedBoth
+              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+              : 'bg-white/90 border-violet-200 text-gray-800 shadow-xs'
+          }`}>
+            <span className={`w-6 h-6 rounded-full font-bold flex items-center justify-center text-xs flex-none ${
+              hasSelectedBoth ? 'bg-emerald-600 text-white' : 'bg-violet-600 text-white'
+            }`}>
+              {hasSelectedBoth ? '✓' : '1'}
             </span>
             <div>
-              <p className="font-bold text-gray-800">اختيار المعلمين</p>
-              <p className="text-gray-500 text-[11px]">المعلم المغادر والبديل</p>
+              <p className="font-bold">اختيار المعلمين</p>
+              <p className="text-[11px] opacity-75">المعلم المغادر والبديل</p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-violet-100">
-            <span className="w-6 h-6 rounded-full bg-violet-600 text-white font-bold flex items-center justify-center text-xs flex-none">
-              2
+
+          <div className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all ${
+            preview && !previewError
+              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+              : isPreviewLoading
+              ? 'bg-violet-50 border-violet-300 text-violet-900 animate-pulse'
+              : hasSelectedBoth
+              ? 'bg-white/90 border-violet-200 text-gray-800 shadow-xs'
+              : 'bg-white/60 border-gray-100 text-gray-500'
+          }`}>
+            <span className={`w-6 h-6 rounded-full font-bold flex items-center justify-center text-xs flex-none ${
+              preview && !previewError
+                ? 'bg-emerald-600 text-white'
+                : hasSelectedBoth
+                ? 'bg-violet-600 text-white'
+                : 'bg-gray-200 text-gray-600'
+            }`}>
+              {preview && !previewError ? '✓' : '2'}
             </span>
             <div>
-              <p className="font-bold text-gray-800">المعاينة وفحص التوافق</p>
-              <p className="text-gray-500 text-[11px]">كشف التعارضات تلقائياً</p>
+              <p className="font-bold">المعاينة وفحص التوافق</p>
+              <p className="text-[11px] opacity-75">كشف التعارضات تلقائياً</p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-violet-100">
-            <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 font-bold flex items-center justify-center text-xs flex-none">
+
+          <div className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all ${
+            preview && preview.summary?.conflict > 0
+              ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+              : 'bg-white/60 border-gray-100 text-gray-500'
+          }`}>
+            <span className={`w-6 h-6 rounded-full font-bold flex items-center justify-center text-xs flex-none ${
+              preview && preview.summary?.conflict > 0
+                ? 'bg-amber-500 text-white'
+                : 'bg-gray-200 text-gray-600'
+            }`}>
               3
             </span>
             <div>
-              <p className="font-bold text-gray-700">حل التعارضات البديلة</p>
-              <p className="text-gray-400 text-[11px]">تحديد الأوقات المناسبة</p>
+              <p className="font-bold">حل التعارضات البديلة</p>
+              <p className="text-[11px] opacity-75">تحديد الأوقات المناسبة</p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-violet-100">
-            <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 font-bold flex items-center justify-center text-xs flex-none">
+
+          <div className="flex items-center gap-2.5 bg-white/60 border border-gray-100 p-2.5 rounded-xl text-gray-500">
+            <span className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 font-bold flex items-center justify-center text-xs flex-none">
               4
             </span>
             <div>
-              <p className="font-bold text-gray-700">التنفيذ الآمن والإشعار</p>
-              <p className="text-gray-400 text-[11px]">ترحيل الحصص المستقبلية</p>
+              <p className="font-bold">التنفيذ الآمن والإشعار</p>
+              <p className="text-[11px] opacity-75">ترحيل الحصص المستقبلية</p>
             </div>
           </div>
         </div>
@@ -435,7 +469,19 @@ function SetupStep({ onGoToHistory }) {
 
         {/* Live Preview Column (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          {!form.sourceTeacherId || !form.targetTeacherId ? (
+          {isSameTeacher ? (
+            <div className="bg-amber-50/70 rounded-2xl border border-amber-200 p-10 text-center space-y-3 flex flex-col items-center justify-center min-h-[420px]">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <AlertTriangle size={26} />
+              </div>
+              <h4 className="font-heading font-bold text-base text-amber-900">
+                المعلم المغادر والمعلم البديل متطابقان
+              </h4>
+              <p className="text-xs text-amber-700 max-w-sm leading-relaxed">
+                يجب أن يكون المعلم البديل شخصًا مختلفًا عن المعلم المغادر. يرجى اختيار معلم بديل آخر لاستقبال الطلاب.
+              </p>
+            </div>
+          ) : !form.sourceTeacherId || !form.targetTeacherId ? (
             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center space-y-3 flex flex-col items-center justify-center min-h-[420px]">
               <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center">
                 <ArrowLeftRight size={26} />
@@ -459,10 +505,24 @@ function SetupStep({ onGoToHistory }) {
                 <AlertTriangle size={24} />
               </div>
               <h4 className="font-heading font-bold text-sm text-gray-800">تعذّر تحميل المعاينة</h4>
-              <p className="text-xs text-red-600">{previewError.response?.data?.message || previewError.message}</p>
+              <p className="text-xs text-red-600 leading-relaxed max-w-md mx-auto">
+                {previewError.response?.data?.message || previewError.message || 'حدث خطأ أثناء فحص جداول الطلاب'}
+              </p>
               <Button variant="outline" size="sm" onClick={() => refetchPreview()}>
                 إعادة المحاولة
               </Button>
+            </div>
+          ) : preview && preview.entries.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center space-y-3 flex flex-col items-center justify-center min-h-[420px]">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center">
+                <Users size={26} />
+              </div>
+              <h4 className="font-heading font-bold text-base text-gray-800">
+                لا يوجد طلاب نشطون مسجلون لهذا المعلم
+              </h4>
+              <p className="text-xs text-gray-500 max-w-md leading-relaxed">
+                المعلم المغادر المختار ليس لديه أي اشتراكات نشطة أو طلاب مسندون حاليًا لنقلهم. يمكنك مراجعة حالة الطلاب في ملف المعلم أو اختيار معلم آخر.
+              </p>
             </div>
           ) : preview ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">

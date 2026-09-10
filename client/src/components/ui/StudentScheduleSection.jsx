@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useId } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Loader2, ShieldAlert,
-  Copy, X, Sparkles, ChevronDown, ChevronUp,
+  Copy, X, Sparkles, ChevronDown, ChevronUp, Video,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import TeachingSubjectCombobox from './TeachingSubjectCombobox.jsx'
@@ -26,6 +26,7 @@ export function emptySchedule() {
     selectedDayOfWeeks: [], dayTimes: {}, singleTime: '16:00',
     startDate: new Date().toISOString().slice(0, 10), endDate: '', noEndDate: true,
     teachingType: 'individual', notes: '',
+    meetingLink: '', meetingProvider: 'zoom',
     immediateOverride: false, overrideReason: '',
   }
 }
@@ -506,6 +507,48 @@ export default function StudentScheduleSection({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Meeting Link & Platform */}
+        <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between flex-wrap gap-1">
+            <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+              <Video size={14} className="text-violet-600" />
+              رابط الاجتماع (غرفة الحصة)
+            </label>
+            <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+              افتراضي: يرث الرابط العمومي للمعلم تلقائياً
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="sm:col-span-2">
+              <input
+                type="url"
+                dir="ltr"
+                placeholder="اتركه فارغاً لاعتماد الرابط العمومي، أو أدخل رابطاً مخصصاً لهذا الطالب"
+                className="w-full h-10 bg-white border border-gray-200 rounded-xl px-3 text-xs text-gray-800 outline-none focus:border-violet-500 font-mono"
+                value={value.meetingLink || ''}
+                onChange={(e) => set({ meetingLink: e.target.value })}
+              />
+            </div>
+            <div>
+              <select
+                className="w-full h-10 bg-white border border-gray-200 rounded-xl px-2.5 text-xs text-gray-800 outline-none focus:border-violet-500 cursor-pointer"
+                value={value.meetingProvider || 'zoom'}
+                onChange={(e) => set({ meetingProvider: e.target.value })}
+              >
+                <option value="zoom">Zoom</option>
+                <option value="meet">Google Meet</option>
+                <option value="teams">Microsoft Teams</option>
+                <option value="other">رابط آخر</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400">
+            {value.meetingLink
+              ? 'سيتم استخدام هذا الرابط المخصص لهذا الطالب بدلاً من الرابط العمومي للمعلم.'
+              : 'يرث هذا الطالب الرابط العمومي المسجل لدى المعلم، ولن تحتاج لتحديثه يدوياً.'}
+          </p>
         </div>
 
         {/* Weekly summary + monthly preview */}

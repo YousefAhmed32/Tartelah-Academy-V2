@@ -10,6 +10,7 @@ const assignmentCtrl = require('../controllers/adminAssignment.controller')
 const subjectCtrl = require('../controllers/teachingSubject.controller')
 const credentialDefaultsCtrl = require('../controllers/credentialDefaults.controller')
 const payrollCtrl = require('../controllers/payroll.controller')
+const transferCtrl = require('../controllers/transfer.controller')
 const { authenticate } = require('../middleware/auth.middleware')
 const { requirePermission } = require('../middleware/rbac.middleware')
 
@@ -151,5 +152,19 @@ router.get('/credential-defaults/availability', credentialDefaultsCtrl.getAvaila
 router.put('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.setDefault)
 router.post('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.setDefault)
 router.delete('/credential-defaults/:role', requirePermission('credentials.manage_defaults'), credentialDefaultsCtrl.clearDefault)
+
+// Active-student transfer and bulk teacher replacement (Phase 2 meeting addendum §3–§4)
+router.post('/transfers/students/:studentId/preview', requirePermission('transfers.view'), transferCtrl.previewStudentTransfer)
+router.post('/transfers/students/:studentId', requirePermission('transfers.execute'), transferCtrl.executeStudentTransfer)
+router.get('/transfers/students/:studentId/history', requirePermission('transfers.view'), transferCtrl.getStudentTransferHistory)
+
+router.post('/transfers/teachers/:teacherId/preview', requirePermission('transfers.view'), transferCtrl.previewTeacherReplacement)
+router.post('/transfers/teachers/:teacherId/batches', requirePermission('transfers.execute'), transferCtrl.createTeacherReplacementBatch)
+router.get('/transfers/batches', requirePermission('transfers.view'), transferCtrl.listTeacherReplacementBatches)
+router.get('/transfers/batches/:batchId', requirePermission('transfers.view'), transferCtrl.getTeacherReplacementBatch)
+router.patch('/transfers/batches/:batchId/entries/:studentId', requirePermission('transfers.execute'), transferCtrl.setBatchEntryResolution)
+router.post('/transfers/batches/:batchId/run', requirePermission('transfers.execute'), transferCtrl.runTeacherReplacementBatch)
+router.post('/transfers/batches/:batchId/retry', requirePermission('transfers.execute'), transferCtrl.retryTeacherReplacementBatch)
+router.post('/transfers/batches/:batchId/cancel', requirePermission('transfers.execute'), transferCtrl.cancelTeacherReplacementBatch)
 
 module.exports = router

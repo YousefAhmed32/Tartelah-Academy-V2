@@ -74,37 +74,72 @@ export default function SessionLifecycleGuide({ role = 'admin', onClose }) {
   const steps = STEPS.filter((s) => showAll || s.roles.includes(role))
 
   return (
-    <Modal open onClose={onClose} title="كيف تعمل الحصة؟" size="md" closable
+    <Modal open onClose={onClose} title="دليل الحصص: كيف تعمل الحصة؟" size="lg" closable
       footer={
-        <button onClick={() => setShowAll((v) => !v)}
-          className="text-xs font-bold text-violet-600 hover:text-violet-700">
-          {showAll ? `عرض ما يخص ${ROLE_LABELS[role]} فقط` : 'عرض الرحلة الكاملة (كل الأطراف)'}
-        </button>
+        <div className="flex items-center justify-between w-full">
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <RefreshCw size={13} />
+            {showAll ? `عرض ما يخص ${ROLE_LABELS[role]} فقط` : 'عرض الرحلة الكاملة (كل الأطراف)'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            إغلاق
+          </button>
+        </div>
       }
     >
-      <div dir="rtl" className="space-y-1">
-        <div className="flex items-start gap-2 rounded-xl bg-violet-50 border border-violet-100 px-3 py-2.5 mb-4">
-          <Info size={15} className="text-violet-500 flex-none mt-0.5" />
-          <p className="text-[11px] font-semibold text-violet-700">
-            رحلة الحصة كاملة من إضافة الطالب حتى التجديد — بتوقيت الأكاديمية (القاهرة).
-          </p>
+      <div dir="rtl" className="space-y-4">
+        <div className="flex items-start gap-2.5 rounded-2xl bg-gradient-to-r from-violet-50 to-purple-50/50 border border-violet-100 p-3.5">
+          <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-none mt-0.5 shadow-sm">
+            <Info size={16} />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-xs font-bold text-violet-900">
+              دورة حياة الحصة التشغيلية بالأكاديمية ({ROLE_LABELS[role] || 'العام'})
+            </h4>
+            <p className="text-[11px] text-violet-700/90 mt-0.5 leading-relaxed">
+              توضيح تسلسل الحصة خطوة بخطوة من إضافة الطالب والجدولة حتى تسجيل الحضور وتأثير الرصيد والراتب، بتوقيت الأكاديمية (القاهرة).
+            </p>
+          </div>
         </div>
 
-        <ol className="relative ps-8">
-          <div className="absolute top-1 bottom-1 start-[15px] w-px bg-gray-200" aria-hidden="true" />
+        <div className="space-y-3 pt-1">
           {steps.map((step, i) => {
             const Icon = step.icon
+            const isLast = i === steps.length - 1
             return (
-              <li key={step.title} className="relative pb-5 last:pb-0">
-                <span className="absolute start-[-32px] top-0 w-8 h-8 rounded-full bg-white border-2 border-violet-200 flex items-center justify-center">
-                  <Icon size={14} strokeWidth={2} className="text-violet-600" />
-                </span>
-                <div className="text-sm font-bold text-gray-800">{i + 1}. {step.title}</div>
-                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{step.body}</p>
-              </li>
+              <div key={step.title} className="flex items-start gap-3 group">
+                {/* Timeline icon + vertical connecting line */}
+                <div className="flex flex-col items-center flex-none">
+                  <div className="w-9 h-9 rounded-2xl bg-violet-50 border border-violet-200/80 flex items-center justify-center text-violet-600 shadow-sm group-hover:bg-violet-600 group-hover:text-white transition-all">
+                    <Icon size={16} strokeWidth={2} />
+                  </div>
+                  {!isLast && (
+                    <div className="w-0.5 min-h-[30px] flex-1 bg-violet-100 my-1 rounded-full" />
+                  )}
+                </div>
+
+                {/* Step content */}
+                <div className="flex-1 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-violet-100 text-violet-700 text-[11px] font-extrabold">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-bold text-gray-900">{step.title}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1.5 leading-relaxed bg-gray-50/70 border border-gray-100 p-2.5 rounded-xl">
+                    {step.body}
+                  </p>
+                </div>
+              </div>
             )
           })}
-        </ol>
+        </div>
       </div>
     </Modal>
   )

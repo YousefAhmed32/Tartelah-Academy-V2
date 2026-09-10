@@ -225,4 +225,69 @@ describe('admin.controller.updateTeacher — backward compatibility & validation
     expect(res.status).toHaveBeenCalledWith(404)
     expect(User.findOneAndUpdate).not.toHaveBeenCalled()
   })
+
+  test('accepts generalMeetingLink and stores it in meetingLinks', async () => {
+    mockBeforeLookup({ _id: 't1', hourlyRate: 10 })
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 't1', meetingLinks: [] }) })
+    const select = jest.fn().mockResolvedValue({ _id: 't1', meetingLinks: [{ provider: 'zoom', link: 'https://zoom.us/j/123' }] })
+    User.findOneAndUpdate.mockReturnValue({ select })
+    const req = {
+      params: { id: 't1' },
+      body: { generalMeetingLink: 'https://zoom.us/j/123', generalMeetingProvider: 'zoom' },
+      user: actor,
+    }
+    const res = mockRes()
+    const next = jest.fn()
+    await ctrl.updateTeacher(req, res, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(200)
+    const [, updates] = User.findOneAndUpdate.mock.calls[0]
+    expect(updates.meetingLinks).toEqual([
+      expect.objectContaining({ provider: 'zoom', link: 'https://zoom.us/j/123' }),
+    ])
+  })
+})
+
+describe('admin.controller.adminSyncTeacherMeetingLinks', () => {
+  test('rejects sync with missing meetingLink', async () => {
+    const req = { params: { id: 't1' }, body: {}, user: actor }
+    const res = mockRes()
+    await ctrl.adminSyncTeacherMeetingLinks(req, res, jest.fn())
+    expect(res.status).toHaveBeenCalledWith(400)
+  })
+
+  test('returns 404 when teacher is not found', async () => {
+    User.findById = jest.fn().mockResolvedValue(null)
+    const req = { params: { id: 'missing' }, body: { meetingLink: 'https://zoom.us/j/999' }, user: actor }
+    const res = mockRes()
+    await ctrl.adminSyncTeacherMeetingLinks(req, res, jest.fn())
+    expect(res.status).toHaveBeenCalledWith(404)
+  })
+
+  test('executes sync and returns success for valid teacher', async () => {
+    User.findById = jest.fn().mockResolvedValue({ _id: 't1', role: 'teacher' })
+    const teacherCtrl = require('../teacher.controller')
+    const originalExecute = teacherCtrl.executeSyncMeetingLinks
+    teacherCtrl.executeSyncMeetingLinks = jest.fn().mockResolvedValue({
+      updatedRulesCount: 2,
+      updatedSessionsCount: 5,
+      affectedStudentsCount: 3,
+    })
+
+    const req = {
+      params: { id: 't1' },
+      body: { meetingLink: 'https://meet.google.com/abc-def-ghi', meetingProvider: 'meet' },
+      user: actor,
+    }
+    const res = mockRes()
+    await ctrl.adminSyncTeacherMeetingLinks(req, res, jest.fn())
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(jsonOf(res).data).toEqual(expect.objectContaining({
+      updatedRulesCount: 2,
+      updatedSessionsCount: 5,
+      affectedStudentsCount: 3,
+    }))
+
+    teacherCtrl.executeSyncMeetingLinks = originalExecute
+  })
 })

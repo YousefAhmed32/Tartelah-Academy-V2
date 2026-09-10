@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Plus, Edit2, XCircle, Video, User, GraduationCap, Search, ChevronDown, RefreshCw, ShieldAlert } from 'lucide-react'
+import { Calendar, Clock, Plus, Edit2, XCircle, Video, User, GraduationCap, Search, ChevronDown, RefreshCw, ShieldAlert, BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -12,6 +12,7 @@ import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { PAYROLL_STATUS, getFileUrl } from '../../config/constants.js'
 import Can from '../../components/shared/Can.jsx'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
+import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',   bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -415,6 +416,7 @@ export default function AdminSessionsPage() {
   const [editSession, setEditSession] = useState(null)
   const [rescheduleSession, setRescheduleSession] = useState(null)
   const [correctSession, setCorrectSession] = useState(null)
+  const [showGuide, setShowGuide] = useState(false)
   const qc = useQueryClient()
 
   const buildQuery = () => {
@@ -480,17 +482,27 @@ export default function AdminSessionsPage() {
     <div dir="rtl" className="space-y-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة الحصص</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} حصة — صلاحيات كاملة على جميع الحصص</p>
         </div>
-        <Can permission="sessions.manage">
-          <button onClick={() => setCreateModal(true)}
-            className="flex items-center gap-2 h-10 px-5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">
-            <Plus size={16} /> حصة جديدة
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowGuide(true)}
+            className="flex items-center gap-2 h-10 px-4 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 rounded-xl font-bold text-sm transition-all shadow-sm cursor-pointer"
+          >
+            <BookOpen size={16} /> كيف تعمل الحصة؟
           </button>
-        </Can>
+          <Can permission="sessions.manage">
+            <button
+              onClick={() => setCreateModal(true)}
+              className="flex items-center gap-2 h-10 px-5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus size={16} /> حصة جديدة
+            </button>
+          </Can>
+        </div>
       </div>
 
       {/* Filters */}
@@ -632,6 +644,11 @@ export default function AdminSessionsPage() {
           <CorrectionModal session={correctSession} onClose={() => setCorrectSession(null)} />
         )}
       </AnimatePresence>
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <SessionLifecycleGuide role="admin" onClose={() => setShowGuide(false)} />
+      )}
     </div>
   )
 }

@@ -473,7 +473,7 @@ exports.getTeacher = async (req, res, next) => {
 const TEACHER_WRITABLE_FIELDS = [
   'firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'isActive', 'bioAr',
   'specialization', 'salaryPerSession', 'gender', 'category', 'specializations', 'audienceCategories',
-  'hourlyRate', 'availableShifts', 'notes',
+  'hourlyRate', 'availableShifts', 'notes', 'meetingLinks',
 ]
 
 exports.createTeacher = async (req, res, next) => {
@@ -520,6 +520,18 @@ exports.createTeacher = async (req, res, next) => {
 
     const fields = {}
     TEACHER_WRITABLE_FIELDS.forEach((f) => { if (req.body[f] !== undefined) fields[f] = req.body[f] })
+
+    if (req.body.generalMeetingLink && typeof req.body.generalMeetingLink === 'string' && req.body.generalMeetingLink.trim()) {
+      const gLink = req.body.generalMeetingLink.trim()
+      const provider = req.body.generalMeetingProvider || 'zoom'
+      const label = req.body.generalMeetingLabel || (provider === 'meet' ? 'Google Meet' : provider === 'zoom' ? 'Zoom' : 'رابط المحاضرات العام')
+      fields.meetingLinks = [{
+        provider,
+        label,
+        link: gLink,
+      }]
+    }
+
     const user = await User.create({
       ...fields, role: 'teacher', password: resolved.passwordToStore,
       mustChangePassword: resolved.mustChangePassword, createdBy: req.user._id,
@@ -553,6 +565,19 @@ exports.updateTeacher = async (req, res, next) => {
     if (updates.hourlyRate === '') updates.hourlyRate = 0
     if (updates.category === '') updates.category = null
 
+    if (req.body.generalMeetingLink && typeof req.body.generalMeetingLink === 'string' && req.body.generalMeetingLink.trim()) {
+      const gLink = req.body.generalMeetingLink.trim()
+      const provider = req.body.generalMeetingProvider || 'zoom'
+      const label = req.body.generalMeetingLabel || (provider === 'meet' ? 'Google Meet' : provider === 'zoom' ? 'Zoom' : 'رابط المحاضرات العام')
+      
+      const teacherExisting = await User.findById(req.params.id).select('meetingLinks')
+      const existingLinks = teacherExisting?.meetingLinks ? [...teacherExisting.meetingLinks] : []
+      const matchIdx = existingLinks.findIndex(l => l.link === gLink)
+      if (matchIdx !== -1) existingLinks.splice(matchIdx, 1)
+      existingLinks.unshift({ provider, label, link: gLink })
+      updates.meetingLinks = existingLinks
+    }
+
     const before = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('hourlyRate category specializations audienceCategories')
     if (!before) return sendError(res, 'المعلم غير موجود', 404)
 
@@ -562,6 +587,20 @@ exports.updateTeacher = async (req, res, next) => {
       { new: true, runValidators: true }
     ).select('-password -refreshToken')
     if (!user) return sendError(res, 'المعلم غير موجود', 404)
+
+    // Optionally sync general meeting link to active rules & future sessions if requested
+    if (req.body.syncToActiveSessions && req.body.generalMeetingLink) {
+      const teacherCtrl = require('./teacher.controller')
+      await teacherCtrl.executeSyncMeetingLinks({
+        teacherId: user._id,
+        meetingLink: req.body.generalMeetingLink.trim(),
+        meetingProvider: req.body.generalMeetingProvider || 'zoom',
+        studentIds: [],
+        saveToSavedLinks: false,
+        actorId: req.user._id,
+        actorRole: req.user.role,
+      }).catch((err) => console.error('Failed to auto-sync meeting links on teacher update:', err))
+    }
 
     // hourlyRate is a protected financial field — every change gets its own
     // dedicated, clearly-labeled audit entry in addition to the general
@@ -619,10 +658,13 @@ exports.getAllSessions = async (req, res, next) => {
       filter.scheduledAt = {}
       if (req.query.dateFrom) filter.scheduledAt.$gte = new Date(req.query.dateFrom)
       if (req.query.dateTo) filter.scheduledAt.$lte = new Date(req.query.dateTo)
+    } else if (req.query.upcoming === 'true') {
+      filter.scheduledAt = { $gte: new Date() }
     }
+    const sortDirection = req.query.sortOrder === 'asc' ? 1 : -1
     const [data, total] = await Promise.all([
-      Session.find(filter).sort({ scheduledAt: -1 }).skip(skip).limit(limit)
-        .populate('studentId teacherId', 'firstNameAr lastNameAr avatar'),
+      Session.find(filter).sort({ scheduledAt: sortDirection }).skip(skip).limit(limit)
+        .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email phone studentType'),
       Session.countDocuments(filter),
     ])
     sendPaginated(res, data, total, page, limit)
@@ -833,8 +875,8 @@ exports.adminSyncTeacherMeetingLinks = async (req, res, next) => {
       meetingLink: meetingLink.trim(),
       meetingProvider: meetingProvider || 'zoom',
       studentIds,
-      saveToSavedLinks: !!saveToSavedLinks,
-      label,
+      saveToSavedLinks: saveToSavedLinks !== false,
+      label: label || 'الرابط العمومي لجميع الحصص',
       actorId: req.user._id,
       actorRole: req.user.role,
     })

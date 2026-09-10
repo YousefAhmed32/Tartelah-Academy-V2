@@ -1,6 +1,36 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
+2026-09-10 — General Meeting Link Architecture & Auto-Inheritance (الرابط العمومي وتعميمه وتوريثه التلقائي)
+
+## Status
+Delivered an end-to-end architecture and UI/UX implementation for the Teacher General Meeting Link ("الرابط العمومي") system across both Admin and Teacher platforms, ensuring seamless link propagation and auto-inheritance:
+1. **1-Click General Link Broadcast (`adminSyncTeacherMeetingLinks` & `syncMeetingLinks`)**:
+   - Both Admin and Teacher can set/update the teacher's general meeting link and broadcast it to **all lectures and sessions across all students at once**, completely removing the need to edit individual lectures or platforms one-by-one.
+   - Updates `teacher.meetingLinks[0]` as the primary general meeting link, while keeping legacy/secondary links intact.
+   - Cascades link to all active `ScheduleRule`s and future upcoming `Session`s (`scheduledAt >= now`).
+   - Automatically notifies students with high-priority notifications (`تحديث رابط الحصص الدراسية`).
+   - Audits the operation via `logAction`.
+2. **Auto-Inheritance Hierarchy**:
+   - When creating a new session (`createSession`, `adminCreateSession`) or generating sessions from schedule rules (`generateSessionsFromRule`), if `meetingLink` is not explicitly overridden, it automatically resolves to `teacher.meetingLinks[0].link` and provider.
+   - When creating or activating assignment requests (`createAssignmentRequest`, `activateAssignmentRequest`), the created `ScheduleRule` inherits the teacher's general meeting link.
+   - When onboarding students or adding students to teachers (`AdminTeacherOnboardingWizardPage`, `adminOnboarding.controller`, `onboarding.service`, `onboardingSession.service`), new students and recurring schedules inherit the teacher's general meeting link by default.
+   - When transferring students to a new teacher (`transfer.service`), the newly generated schedule rule automatically inherits the target teacher's general meeting link.
+   - Custom overrides per student or per session remain fully supported and take precedence when explicitly set.
+3. **Frontend Implementation & UI/UX**:
+   - **`AdminTeacherOnboardingWizardPage.jsx`**: Added General Meeting Link Card to Step 1 with auto-detection of provider (Zoom, Google Meet, MS Teams, Other), and a default-checked toggle: *"تعميم الرابط العمومي تلقائيًا على جميع الطلاب المضافين في هذا المعالج"*.
+   - **`StudentScheduleSection.jsx`**: Added meeting link card inside schedule builder clarifying auto-inheritance with custom override capabilities.
+   - **`TeacherSessionsTab.jsx`**: Added Teacher General Meeting Link Bar at the top showing current link / missing state badge, plus direct action button *"تعميم الرابط على الكل"* in the main toolbar.
+   - **`AdminTeacherProfilePage.jsx`**: Highlighted index 0 as *"الرابط العمومي المعتمد"* with distinct styling, and added quick action button in header.
+   - **`TeacherLinksPage.jsx`**: Added header action *"تعميم الرابط على كافة المحاضرات"*, primary general badge, and *"تعيين وتعميم"* button for saved links.
+   - **`BulkSyncLinksModal.jsx`**: Modernized copy, auto-invalidation for all relevant query caches (`teacher-sessions`, `teacher-schedule-rules`, `teacher-profile`), and explicit checkboxes for establishing authoritative general link status.
+4. **Verification**:
+   - `npm run build --prefix client`: Succeeded in 10.74s with 0 errors.
+   - `npm test` in `server`: 12/12 test suites passed, 180/180 unit tests green.
+
+---
+
+## Session Date
 2026-09-08 — UI/UX Pro Max Hardening: Dedicated General Meeting Link Hero Section + Revamped BulkSyncLinksModal + Bug Fixes
 
 ## Status

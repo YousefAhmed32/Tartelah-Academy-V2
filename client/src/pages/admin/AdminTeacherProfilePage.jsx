@@ -17,6 +17,7 @@ import Button from '../../components/ui/Button.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import BulkSyncLinksModal from '../../components/teacher/BulkSyncLinksModal.jsx'
 import TeacherAdjustmentModal from '../../components/admin/TeacherAdjustmentModal.jsx'
+import TeacherSessionsTab from '../../components/admin/TeacherSessionsTab.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import WorkingHoursEditor from '../../components/ui/WorkingHoursEditor.jsx'
@@ -59,6 +60,7 @@ function InfoRow({ label, value, icon }) {
 
 const TABS = [
   { key: 'overview',    label: 'نظرة عامة',    Icon: LayoutGrid },
+  { key: 'sessions',    label: 'الحصص والجدول', Icon: CalendarClock },
   { key: 'students',    label: 'الطلاب',        Icon: Users },
   { key: 'performance', label: 'الأداء',        Icon: TrendingUp },
   { key: 'payroll',     label: 'الرواتب',       Icon: Wallet, permission: 'payroll.view' },
@@ -315,7 +317,7 @@ function OverviewTab({ teacher, workingHours, scheduleRules, subjects, id, onSyn
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-gray-900 flex items-center gap-2">
               <Video size={16} className="text-violet-600" />
-              روابط الاجتماعات والفصول الافتراضية
+              الرابط العمومي وفصول الاجتماعات
             </h3>
             <button
               type="button"
@@ -323,19 +325,43 @@ function OverviewTab({ teacher, workingHours, scheduleRules, subjects, id, onSyn
               className="px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors flex items-center gap-1.5"
             >
               <RefreshCw size={13} />
-              تعميم / تحديث الرابط
+              تعميم / تحديث الرابط على الكل
             </button>
           </div>
           {teacher.meetingLinks?.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {teacher.meetingLinks.map((ml, idx) => (
-                <div key={idx} className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-none" />
-                    <span className="font-bold text-gray-800 truncate">{ml.label || ml.title || (ml.provider === 'meet' ? 'Google Meet' : 'Zoom')}</span>
-                    <a href={ml.link} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 truncate max-w-[200px]" dir="ltr">
-                      {ml.link}
-                    </a>
+                <div
+                  key={idx}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-xl border text-xs transition-all ${
+                    idx === 0
+                      ? 'bg-violet-50/50 border-violet-200 ring-1 ring-violet-100'
+                      : 'bg-gray-50 border-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+                    <span className={`w-2 h-2 rounded-full flex-none ${idx === 0 ? 'bg-violet-600' : 'bg-emerald-500'}`} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-gray-800">
+                          {ml.label || ml.title || (ml.provider === 'meet' ? 'Google Meet' : 'Zoom')}
+                        </span>
+                        {idx === 0 && (
+                          <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-md">
+                            الرابط العمومي المعتمد
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={ml.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-violet-600 hover:text-violet-800 truncate block max-w-[280px] font-mono mt-0.5"
+                        dir="ltr"
+                      >
+                        {ml.link}
+                      </a>
+                    </div>
                   </div>
                   <a
                     href={ml.link}
@@ -344,15 +370,22 @@ function OverviewTab({ teacher, workingHours, scheduleRules, subjects, id, onSyn
                     className="text-gray-400 hover:text-gray-600 p-1 flex-none"
                     title="فتح الرابط"
                   >
-                    <ExternalLink size={13} />
+                    <ExternalLink size={14} />
                   </a>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-400 py-1">
-              لم يقم المعلم بتسجيل روابط مسبقة. يمكنك تعميم رابط جديد على طلابه بالضغط على الزر أعلاه.
-            </p>
+            <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-100 text-xs text-amber-800 flex items-center justify-between gap-3">
+              <span>لم يتم تعيين رابط عمومي بعد. يمكنك تعيين رابط وتعميمه على كافة الحصص بضغطة واحدة.</span>
+              <button
+                type="button"
+                onClick={onSyncLinks}
+                className="text-[11px] font-bold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-200 hover:bg-violet-50 flex-none shadow-xs"
+              >
+                تعيين الآن
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -1105,6 +1138,14 @@ export default function AdminTeacherProfilePage() {
             </div>
           </div>
           <div className="hidden sm:flex flex-col gap-2 flex-none">
+            <button
+              type="button"
+              onClick={() => setShowBulkSync(true)}
+              title="تعميم الرابط العمومي على كافة المحاضرات والحصص"
+              className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shadow-xs"
+            >
+              <Video size={15} />
+            </button>
             {teacher.email && (
               <button onClick={() => window.open(`mailto:${teacher.email}`)} title="مراسلة" className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors">
                 <Mail size={15} />
@@ -1137,6 +1178,16 @@ export default function AdminTeacherProfilePage() {
           scheduleRules={scheduleRules}
           subjects={subjects}
           id={id}
+          onSyncLinks={() => setShowBulkSync(true)}
+        />
+      )}
+      {tab === 'sessions' && (
+        <TeacherSessionsTab
+          teacherId={id}
+          teacher={teacher}
+          students={students}
+          workingHours={workingHours}
+          scheduleRules={scheduleRules}
           onSyncLinks={() => setShowBulkSync(true)}
         />
       )}

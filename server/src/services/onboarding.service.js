@@ -46,6 +46,7 @@ class OnboardingError extends Error {
 const TEACHER_ALLOWED_FIELDS = [
   'firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'bioAr',
   'gender', 'specializations', 'audienceCategories', 'hourlyRate', 'availableShifts',
+  'meetingLinks', 'generalMeetingLink', 'generalMeetingProvider', 'applyGeneralLinkToStudents',
 ]
 
 const STUDENT_ALLOWED_FIELDS = [
@@ -248,6 +249,22 @@ async function createTeacherWithStudents({ clientRequestId, teacher, workingHour
   try {
     // ── Teacher account ──
     const teacherFields = pickAllowed(teacher, TEACHER_ALLOWED_FIELDS)
+    let initialMeetingLinks = Array.isArray(teacher.meetingLinks) ? [...teacher.meetingLinks] : []
+    if (teacher.generalMeetingLink && typeof teacher.generalMeetingLink === 'string' && teacher.generalMeetingLink.trim()) {
+      const gLink = teacher.generalMeetingLink.trim()
+      const provider = teacher.generalMeetingProvider || 'zoom'
+      const label = provider === 'meet' ? 'Google Meet' : provider === 'zoom' ? 'Zoom' : 'الرابط العمومي لجميع الحصص'
+      const matchIdx = initialMeetingLinks.findIndex(l => l.link === gLink)
+      if (matchIdx !== -1) initialMeetingLinks.splice(matchIdx, 1)
+      initialMeetingLinks.unshift({ provider, label, link: gLink })
+    }
+    if (initialMeetingLinks.length > 0) {
+      teacherFields.meetingLinks = initialMeetingLinks
+    }
+    delete teacherFields.generalMeetingLink
+    delete teacherFields.generalMeetingProvider
+    delete teacherFields.applyGeneralLinkToStudents
+
     const teacherCredential = await resolveCredentialInput(teacher, 'teacher.credential', 'teacher')
     const teacherDoc = await User.create({
       ...teacherFields,
@@ -326,6 +343,10 @@ async function createTeacherWithStudents({ clientRequestId, teacher, workingHour
       // no schedule and scheduled later from the teacher's profile) ──
       let assignmentResult = null
       if (studentInput.schedule) {
+        if (!studentInput.schedule.meetingLink && teacherDoc.meetingLinks?.[0]?.link && teacher.applyGeneralLinkToStudents !== false) {
+          studentInput.schedule.meetingLink = teacherDoc.meetingLinks[0].link
+          studentInput.schedule.meetingProvider = teacherDoc.meetingLinks[0].provider || 'zoom'
+        }
         const { assignmentRequest } = await assignmentService.createAssignmentRequest({
           studentId: studentDoc._id, teacherId: teacherDoc._id, studentType: studentDoc.studentType,
           specialization: studentInput.specialization, ageCategory: studentInput.ageCategory, studentAge: studentInput.studentAge,

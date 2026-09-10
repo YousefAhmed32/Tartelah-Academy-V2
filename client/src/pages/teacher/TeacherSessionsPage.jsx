@@ -495,7 +495,7 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
                       </div>
                     )}
                     <button onClick={handleStart} disabled={startMutation.isPending}
-                      className="btn-gold w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold disabled:opacity-60">
+                      className="btn-purple w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold disabled:opacity-60">
                       {startMutation.isPending ? '...' : <>▶ بدء الحصة</>}
                     </button>
                     <p className="text-[10px] text-gray-400 mt-1.5 text-center">سيتم تسجيل وقت دخولك (تسجيل حضور) وفتح الفصل الخارجي تلقائياً — فتح الرابط وحده لا يُثبت الحضور الفعلي.</p>
@@ -1200,16 +1200,22 @@ export default function TeacherSessionsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start gap-3 justify-between">
         <div>
-          <h1 className="font-heading font-extrabold text-2xl text-gray-900 flex items-center gap-2">
+          <h1 className="font-heading font-extrabold text-2xl text-gray-900">
             الحصص الدراسية
-            <button onClick={() => setShowGuide(true)} aria-label="كيف تعمل الحصة؟"
-              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-violet-500 bg-violet-50 hover:bg-violet-100 transition-colors">؟</button>
           </h1>
           <p className="text-sm mt-0.5 text-gray-500">إدارة حصصك وجداولك الدورية</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="ghost" className="!bg-white !text-gray-700 !border-gray-200 hover:!bg-gray-50" onClick={() => setShowManual(true)}>+ حصة واحدة</Button>
-          <Button size="sm" variant="purple" onClick={() => setShowWizard(true)}>
+        <div className="flex gap-2 flex-wrap items-center">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowGuide(true)}
+            className="!bg-violet-50 !text-violet-700 !border-violet-200 hover:!bg-violet-100 flex items-center gap-1.5 font-bold cursor-pointer"
+          >
+            <BookOpen size={14} /> كيف تعمل الحصة؟
+          </Button>
+          <Button size="sm" variant="ghost" className="!bg-white !text-gray-700 !border-gray-200 hover:!bg-gray-50 cursor-pointer" onClick={() => setShowManual(true)}>+ حصة واحدة</Button>
+          <Button size="sm" variant="purple" onClick={() => setShowWizard(true)} className="cursor-pointer">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="inline me-1.5">
               <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>

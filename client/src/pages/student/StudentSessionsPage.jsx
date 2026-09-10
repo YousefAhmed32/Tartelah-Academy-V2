@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Calendar, Clock, Timer, Link2, X, CheckCircle2, Wallet, Gift } from 'lucide-react'
+import { Calendar, Clock, Timer, Link2, X, CheckCircle2, Wallet, Gift, BookOpen } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
@@ -76,9 +76,11 @@ export default function StudentSessionsPage() {
     <div dir="rtl">
       <PageHeader title="حصصي" subtitle="جميع الحصص الدراسية"
         actions={
-          <button onClick={() => setShowGuide(true)}
-            className="text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-2 rounded-xl transition-colors">
-            كيف تعمل الحصة؟
+          <button
+            onClick={() => setShowGuide(true)}
+            className="flex items-center gap-2 h-10 px-4 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200/80 rounded-xl transition-all shadow-sm cursor-pointer"
+          >
+            <BookOpen size={15} /> كيف تعمل الحصة؟
           </button>
         }
       />

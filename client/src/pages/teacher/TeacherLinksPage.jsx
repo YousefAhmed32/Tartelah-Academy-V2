@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Link2, Video, MonitorPlay, Briefcase } from 'lucide-react'
+import { Link2, Video, MonitorPlay, Briefcase, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
+import BulkSyncLinksModal from '../../components/teacher/BulkSyncLinksModal.jsx'
 import { MEETING_PROVIDERS } from '../../config/constants.js'
 import { SkeletonCardGrid } from '../../components/ui/Skeleton.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
@@ -14,6 +15,8 @@ import { toArray } from '../../utils/format.js'
 
 export default function TeacherLinksPage() {
   const [showModal, setShowModal] = useState(false)
+  const [showSyncModal, setShowSyncModal] = useState(false)
+  const [syncInitialLink, setSyncInitialLink] = useState('')
   const [form, setForm] = useState({ provider: 'zoom', label: '', link: '' })
   const qc = useQueryClient()
 
@@ -45,11 +48,28 @@ export default function TeacherLinksPage() {
   const providers = Object.entries(MEETING_PROVIDERS).map(([k, v]) => ({ key: k, ...v }))
 
   return (
-    <div>
+    <div className="space-y-5" dir="rtl">
       <PageHeader
-        title="روابط الاجتماعات"
-        subtitle="إدارة روابط الاجتماع الدائمة"
-        actions={<Button variant="purple" onClick={() => setShowModal(true)}>+ إضافة رابط</Button>}
+        title="روابط الاجتماعات والفصول الافتراضية"
+        subtitle="إدارة روابط الاجتماع الدائمة وتعميم الرابط العمومي على كافة الحصص"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              icon={<RefreshCw size={14} className="text-violet-600" />}
+              onClick={() => {
+                setSyncInitialLink(links?.[0]?.link || '')
+                setShowSyncModal(true)
+              }}
+              className="!border-violet-200 !text-violet-700 hover:!bg-violet-50 font-bold"
+            >
+              تعميم الرابط على كافة المحاضرات
+            </Button>
+            <Button variant="purple" onClick={() => setShowModal(true)}>
+              + إضافة رابط جديد
+            </Button>
+          </div>
+        }
       />
 
       {isLoading ? (
@@ -76,10 +96,30 @@ export default function TeacherLinksPage() {
                   {link.provider === 'zoom' ? <Video size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'meet' ? <MonitorPlay size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : link.provider === 'teams' ? <Briefcase size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} /> : <Link2 size={20} strokeWidth={1.8} color={provider?.color || '#7c3aed'} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-gray-900 font-semibold">{link.label || provider?.label}</div>
-                  <a href={link.link} target="_blank" rel="noopener noreferrer" className="text-xs truncate block mt-0.5 text-gray-500">{link.link}</a>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-gray-900 font-semibold">{link.label || provider?.label}</div>
+                    {i === 0 ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
+                        <CheckCircle2 size={11} /> الرابط العمومي المعتمد لجميع الحصص
+                      </span>
+                    ) : null}
+                  </div>
+                  <a href={link.link} target="_blank" rel="noopener noreferrer" className="text-xs truncate block mt-0.5 text-gray-500 font-mono" dir="ltr">{link.link}</a>
                 </div>
                 <div className="flex items-center gap-2">
+                  {i !== 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSyncInitialLink(link.link)
+                        setShowSyncModal(true)
+                      }}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors flex items-center gap-1"
+                      title="تعيين كرابط عمومي وتعميمه على كافة الحصص"
+                    >
+                      <Sparkles size={12} /> تعميم
+                    </button>
+                  )}
                   <a href={link.link} target="_blank" rel="noopener noreferrer"
                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors">فتح</a>
                   <button
@@ -91,6 +131,15 @@ export default function TeacherLinksPage() {
             )
           })}
         </div>
+      )}
+
+      {showSyncModal && (
+        <BulkSyncLinksModal
+          open={showSyncModal}
+          onClose={() => setShowSyncModal(false)}
+          initialLink={syncInitialLink}
+          savedLinks={links}
+        />
       )}
 
       <Modal

@@ -51,9 +51,21 @@ exports.createSession = async (req, res, next) => {
       titleAr = studentName ? `حصة ${studentName}` : (titleAr || 'حصة تلاوة')
     }
 
+    let resolvedMeetingLink = meetingLink || ''
+    let resolvedMeetingProvider = meetingProvider || 'zoom'
+    if (!resolvedMeetingLink && teacherId) {
+      try {
+        const teacherUser = await User.findById(teacherId).select('meetingLinks').lean()
+        if (teacherUser?.meetingLinks?.[0]?.link) {
+          resolvedMeetingLink = teacherUser.meetingLinks[0].link
+          resolvedMeetingProvider = teacherUser.meetingLinks[0].provider || resolvedMeetingProvider
+        }
+      } catch (_) {}
+    }
+
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt, durationMinutes,
-      meetingLink, meetingProvider, notes,
+      meetingLink: resolvedMeetingLink, meetingProvider: resolvedMeetingProvider, notes,
       isMakeup: isMakeup || false,
       isException: true,
     })
@@ -706,10 +718,22 @@ exports.adminCreateSession = async (req, res, next) => {
       titleAr = studentName ? `حصة ${studentName}` : (titleAr || 'حصة تلاوة')
     }
 
+    let resolvedMeetingLink = meetingLink || ''
+    let resolvedMeetingProvider = meetingProvider || 'zoom'
+    if (!resolvedMeetingLink && teacherId) {
+      try {
+        const teacherUser = await User.findById(teacherId).select('meetingLinks').lean()
+        if (teacherUser?.meetingLinks?.[0]?.link) {
+          resolvedMeetingLink = teacherUser.meetingLinks[0].link
+          resolvedMeetingProvider = teacherUser.meetingLinks[0].provider || resolvedMeetingProvider
+        }
+      } catch (_) {}
+    }
+
     const session = await Session.create({
       studentId, teacherId, titleAr, scheduledAt,
       durationMinutes: durationMinutes || 60,
-      meetingLink, meetingProvider, notes,
+      meetingLink: resolvedMeetingLink, meetingProvider: resolvedMeetingProvider, notes,
       isMakeup: isMakeup || false,
       isException: true,
     })

@@ -155,6 +155,18 @@ exports.generateSessionsFromRule = async (rule) => {
     } catch (_) {}
   }
 
+  let resolvedLink = rule.meetingLink || ''
+  let resolvedProvider = rule.meetingProvider || 'zoom'
+  if (!resolvedLink && rule.teacherId && mongoose.connection?.readyState === 1 && User) {
+    try {
+      const teacherUser = await User.findById(rule.teacherId).select('meetingLinks').lean()
+      if (teacherUser?.meetingLinks?.[0]?.link) {
+        resolvedLink = teacherUser.meetingLinks[0].link
+        resolvedProvider = teacherUser.meetingLinks[0].provider || resolvedProvider
+      }
+    } catch (_) {}
+  }
+
   const ops = dates.map((date, i) => ({
     updateOne: {
       filter: { seriesId: rule._id, scheduledAt: date },
@@ -167,8 +179,8 @@ exports.generateSessionsFromRule = async (rule) => {
           titleAr: buildSessionTitle(rule.titleTemplate, studentName, existing + i + 1, totalCount),
           scheduledAt: date,
           durationMinutes: rule.durationMinutes || 60,
-          meetingLink: rule.meetingLink || '',
-          meetingProvider: rule.meetingProvider || 'zoom',
+          meetingLink: resolvedLink,
+          meetingProvider: resolvedProvider,
           status: 'scheduled',
         },
       },
