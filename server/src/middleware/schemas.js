@@ -1,3 +1,5 @@
+const Joi = require('joi')
+
 const cleanEmailStr = (val) =>
   (typeof val === 'string'
     ? val.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '').toLowerCase().trim()
