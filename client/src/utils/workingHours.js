@@ -21,6 +21,7 @@ export const QUICK_PRESETS = [
   { key: 'morning', label: 'صباحًا', periods: [{ start: '08:00', end: '12:00' }] },
   { key: 'after10', label: 'بعد الساعة 10 صباحًا', periods: [{ start: '10:00', end: '22:00' }] },
   { key: 'noon_to_midnight', label: 'من 12 ظهرًا حتى 12 منتصف الليل', periods: [{ start: '12:00', end: '23:59' }] },
+  { key: 'full_day_24h', label: 'طوال اليوم (24 ساعة)', periods: [{ start: '00:00', end: '23:59' }] },
 ]
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/

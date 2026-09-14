@@ -4,7 +4,7 @@
 // (e.g. still loading). See client/src/hooks/useTeachingSubjects.js and
 // server/src/services/teachingSubject.service.js for the backend twin.
 import { describe, test, expect } from 'vitest'
-import { subjectLabel, teacherCategoryLabel } from '../teacherProfile.js'
+import { subjectLabel, teacherCategoryLabel, teacherShiftsLabel } from '../teacherProfile.js'
 
 describe('subjectLabel', () => {
   const subjects = [
@@ -42,5 +42,30 @@ describe('teacherCategoryLabel (legacy-only fallback)', () => {
   test('still resolves the six canonical keys for call sites with no live catalog access', () => {
     expect(teacherCategoryLabel('tajweed')).toBe('التجويد')
     expect(teacherCategoryLabel('other')).toBe('أخرى')
+  })
+})
+
+describe('teacherShiftsLabel (24h shifts)', () => {
+  test('formats individual shifts correctly', () => {
+    expect(teacherShiftsLabel(['morning'])).toBe('صباحًا')
+    expect(teacherShiftsLabel(['afternoon'])).toBe('بعد الظهر')
+    expect(teacherShiftsLabel(['evening'])).toBe('مساءً')
+    expect(teacherShiftsLabel(['night'])).toBe('ليلاً')
+  })
+
+  test('formats multiple shifts with Arabic comma separator', () => {
+    expect(teacherShiftsLabel(['morning', 'evening'])).toBe('صباحًا، مساءً')
+    expect(teacherShiftsLabel(['morning', 'afternoon', 'night'])).toBe('صباحًا، بعد الظهر، ليلاً')
+  })
+
+  test('returns 24-hour summary when full_day or all 4 quadrants selected', () => {
+    expect(teacherShiftsLabel(['full_day'])).toBe('على مدار 24 ساعة (طوال اليوم)')
+    expect(teacherShiftsLabel(['morning', 'afternoon', 'evening', 'night'])).toBe('على مدار 24 ساعة (طوال اليوم)')
+  })
+
+  test('returns null for empty or non-array values', () => {
+    expect(teacherShiftsLabel([])).toBe(null)
+    expect(teacherShiftsLabel(null)).toBe(null)
+    expect(teacherShiftsLabel(undefined)).toBe(null)
   })
 })

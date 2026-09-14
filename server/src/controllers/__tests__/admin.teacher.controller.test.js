@@ -138,7 +138,14 @@ describe('admin.controller.createTeacher — category/hourlyRate/availableShifts
     expect(logAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'admin.create_teacher' }))
   })
 
-  test.each([['morning only', ['morning']], ['evening only', ['evening']], ['both', ['morning', 'evening']]])(
+  test.each([
+    ['morning only', ['morning']],
+    ['evening only', ['evening']],
+    ['afternoon only', ['afternoon']],
+    ['night only', ['night']],
+    ['full_day only', ['full_day']],
+    ['all 24h shifts', ['morning', 'afternoon', 'evening', 'night', 'full_day']],
+  ])(
     'accepts availableShifts: %s',
     async (_label, shifts) => {
       User.findOne.mockResolvedValue(null)
@@ -179,7 +186,7 @@ describe('admin.controller.updateTeacher — backward compatibility & validation
   })
 
   test('rejects update with an invalid shift value', async () => {
-    const req = { params: { id: 't1' }, body: { availableShifts: ['night'] }, user: actor }
+    const req = { params: { id: 't1' }, body: { availableShifts: ['invalid_shift'] }, user: actor }
     const res = mockRes()
     await ctrl.updateTeacher(req, res, jest.fn())
     expect(res.status).toHaveBeenCalledWith(400)

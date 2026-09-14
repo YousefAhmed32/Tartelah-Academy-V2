@@ -100,8 +100,8 @@ export default function ScheduleSlotPicker({
                 <p className="text-xs font-semibold text-red-600 bg-red-50 rounded-lg px-3 py-2 text-center">كل مواعيد هذا اليوم محجوزة أو لا تناسب مدة الحصة</p>
               ) : null}
               <div className="max-h-80 overflow-y-auto overscroll-contain space-y-3 pe-1">
-                {['morning', 'afternoon', 'evening'].map((period) => (
-                  grouped[period].length > 0 && (
+                {['morning', 'afternoon', 'evening', 'night'].map((period) => (
+                  grouped[period]?.length > 0 && (
                     <div key={period}>
                       <div className="text-[10px] font-bold text-gray-500 mb-1.5">{PERIOD_LABELS_AR[period]}</div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">

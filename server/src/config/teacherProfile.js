@@ -15,7 +15,13 @@ const { isValidAudienceCategoriesArray } = require('./studentAudience')
 // unknown or archived key is not. See services/teachingSubject.service.js.
 const { isValidActiveKey } = require('../services/teachingSubject.service')
 
-const SHIFT = { MORNING: 'morning', EVENING: 'evening' }
+const SHIFT = {
+  MORNING: 'morning',
+  AFTERNOON: 'afternoon',
+  EVENING: 'evening',
+  NIGHT: 'night',
+  FULL_DAY: 'full_day',
+}
 const SHIFT_VALUES = Object.values(SHIFT)
 
 function isValidShift(value) {

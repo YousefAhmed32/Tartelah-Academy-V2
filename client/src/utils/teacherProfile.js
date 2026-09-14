@@ -23,8 +23,11 @@ const LEGACY_TEACHER_CATEGORY_OPTIONS = [
 export const TEACHER_CATEGORY_OPTIONS = LEGACY_TEACHER_CATEGORY_OPTIONS
 
 export const SHIFT_OPTIONS = [
-  { value: 'morning', label: 'صباحًا' },
-  { value: 'evening', label: 'مساءً' },
+  { value: 'morning', label: 'صباحًا', period: '06:00 ص – 12:00 م', desc: 'الفترة الصباحية' },
+  { value: 'afternoon', label: 'بعد الظهر', period: '12:00 م – 06:00 م', desc: 'فترة الظهيرة والعصر' },
+  { value: 'evening', label: 'مساءً', period: '06:00 م – 12:00 ص', desc: 'الفترة المسائية' },
+  { value: 'night', label: 'ليلاً', period: '12:00 ص – 06:00 ص', desc: 'الفترة الليلية والفجر' },
+  { value: 'full_day', label: 'على مدار 24 ساعة', period: 'طوال اليوم (24/7)', desc: 'متاح في أي وقت' },
 ]
 
 /**
@@ -52,5 +55,8 @@ export function teacherCategoryLabel(value) {
 
 export function teacherShiftsLabel(shifts) {
   if (!Array.isArray(shifts) || !shifts.length) return null
+  if (shifts.includes('full_day') || (shifts.includes('morning') && shifts.includes('afternoon') && shifts.includes('evening') && shifts.includes('night'))) {
+    return 'على مدار 24 ساعة (طوال اليوم)'
+  }
   return shifts.map(s => SHIFT_OPTIONS.find(o => o.value === s)?.label).filter(Boolean).join('، ')
 }

@@ -48,7 +48,7 @@ export const FREQUENCY_OPTIONS = [
 // selector in the UI.
 export const FREQUENCIES_WITH_WEEKDAY_PICKER = ['weekly', 'biweekly']
 
-export const PERIOD_LABELS_AR = { morning: 'صباحًا', afternoon: 'ظهرًا وعصرًا', evening: 'مساءً' }
+export const PERIOD_LABELS_AR = { morning: 'صباحًا', afternoon: 'ظهرًا وعصرًا', evening: 'مساءً', night: 'ليلاً' }
 
 export const ASSIGNMENT_STATUS_LABELS = {
   draft: { label: 'مسودة', color: '#9ca3af' },
@@ -234,12 +234,13 @@ export function buildSlotStatusMap(workingWindows, freeWindows, durationMinutes,
   })
 }
 
-/** Groups slot times into صباحًا / ظهرًا وعصرًا / مساءً for a scannable picker. */
+/** Groups slot times into صباحًا / ظهرًا وعصرًا / مساءً / ليلاً for a scannable picker. */
 export function groupSlotsByPeriod(slotTimes) {
-  const groups = { morning: [], afternoon: [], evening: [] }
+  const groups = { morning: [], afternoon: [], evening: [], night: [] }
   for (const t of slotTimes || []) {
     const h = Number(t.split(':')[0])
-    if (h < 12) groups.morning.push(t)
+    if (h >= 0 && h < 6) groups.night.push(t)
+    else if (h < 12) groups.morning.push(t)
     else if (h < 17) groups.afternoon.push(t)
     else groups.evening.push(t)
   }
