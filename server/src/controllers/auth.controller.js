@@ -50,7 +50,11 @@ exports.login = async (req, res, next) => {
     const { password } = req.body
     const email = cleanEmail(req.body.email)
     const user = await User.findOne({ email }).select('+password +tokenVersion')
-    if (!user || !(await user.comparePassword(password))) {
+    let isMatch = user && password ? await user.comparePassword(password) : false
+    if (!isMatch && user && typeof password === 'string' && password.trim() !== password) {
+      isMatch = await user.comparePassword(password.trim())
+    }
+    if (!user || !isMatch) {
       return sendError(res, 'البريد الإلكتروني أو كلمة المرور غير صحيحة', 401)
     }
     if (!user.isActive) return sendError(res, 'تم إيقاف حسابك. تواصل مع الإدارة.', 403)

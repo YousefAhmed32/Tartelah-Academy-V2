@@ -18,6 +18,7 @@ export default function Modal({
   size = 'md',
   footer,
   closable = true,
+  bodyClassName = '',
 }) {
   useEffect(() => {
     if (open) {
@@ -31,7 +32,7 @@ export default function Modal({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -44,19 +45,19 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className={`relative w-full ${sizes[size]} bg-white rounded-card shadow-card-dark z-10 overflow-hidden`}
+            className={`relative w-full ${sizes[size]} bg-white rounded-2xl sm:rounded-card shadow-card-dark z-10 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh]`}
             dir="rtl"
           >
             {/* Header */}
             {(title || closable) && (
-              <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-[#f0ecf8]">
+              <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 sm:py-5 border-b border-[#f0ecf8] flex-none">
                 {title && (
-                  <h3 className="font-heading font-bold text-xl text-brand-textBody">{title}</h3>
+                  <h3 className="font-heading font-bold text-lg sm:text-xl text-brand-textBody">{title}</h3>
                 )}
                 {closable && (
                   <button
                     onClick={onClose}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-[#8a7bb0] hover:bg-[#f3eefc] transition-colors ms-auto"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-[#8a7bb0] hover:bg-[#f3eefc] transition-colors ms-auto cursor-pointer"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/>
@@ -67,13 +68,13 @@ export default function Modal({
             )}
 
             {/* Body */}
-            <div className="px-6 py-5 max-h-[65vh] overflow-y-auto custom-scroll">
+            <div className={`px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto custom-scroll flex-1 ${bodyClassName}`}>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className="px-6 py-4 border-t border-[#f0ecf8] flex items-center justify-end gap-3">
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-[#f0ecf8] flex items-center justify-end gap-3 flex-none bg-white">
                 {footer}
               </div>
             )}

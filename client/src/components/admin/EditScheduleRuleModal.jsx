@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
-  Calendar, Clock, Video, Trash2, Sparkles, ExternalLink,
-  Layers, CheckCircle2, User, HelpCircle,
+  Calendar, Clock, Video, Trash2, ExternalLink,
+  Layers, CheckCircle2, User, HelpCircle, RotateCw, Save, Plus, Link2,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
@@ -206,9 +206,9 @@ export default function EditScheduleRuleModal({
         open
         onClose={onClose}
         title={isEdit ? 'تعديل الجدول الدوري للحصص' : 'إنشاء جدول دوري للحصص'}
-        size="md"
+        size="lg"
         footer={
-          <div className="flex items-center justify-between w-full gap-2">
+          <div className="flex items-center justify-between w-full gap-3">
             <div>
               {isEdit && (
                 <Button
@@ -223,72 +223,103 @@ export default function EditScheduleRuleModal({
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={onClose} disabled={saveMut.isPending || deleteMut.isPending}>
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                disabled={saveMut.isPending || deleteMut.isPending}
+                className="text-slate-600 hover:text-slate-900"
+              >
                 إلغاء
               </Button>
               <Button
                 variant="purple"
                 onClick={handleSubmit}
                 loading={saveMut.isPending}
-                icon={isEdit ? undefined : <Sparkles size={14} />}
+                icon={isEdit ? <Save size={15} /> : <Plus size={16} />}
               >
-                {isEdit ? 'حفظ التعديلات' : `إنشاء الجدول وتوليد الحصص (${form.sessionsTotal || 8} حصة)`}
+                {isEdit
+                  ? 'حفظ التعديلات'
+                  : `إنشاء الجدول وتوليد الحصص (${form.sessionsTotal || 8} ${Number(form.sessionsTotal) === 1 ? 'حصة' : Number(form.sessionsTotal) === 2 ? 'حصتان' : 'حصص'})`}
               </Button>
             </div>
           </div>
         }
       >
         <div className="space-y-4 text-right" dir="rtl">
-          {/* Teacher & Student Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gray-50/80 rounded-2xl border border-gray-100">
-            {/* Teacher */}
-            <div>
-              <label className={LABEL_CLS}>
-                <span>المعلم المسؤول</span>
-                {lockTeacher && <span className="text-[10px] text-violet-600 font-semibold bg-violet-50 px-1.5 py-0.5 rounded">محدد مسبقاً</span>}
-              </label>
-              {lockTeacher ? (
-                <div className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-gray-200 text-sm">
-                  <Avatar firstName={currentTeacher?.firstNameAr} lastName={currentTeacher?.lastNameAr} size="sm" />
-                  <span className="font-bold text-gray-800 truncate">{teacherDisplayName || 'المعلم'}</span>
-                </div>
-              ) : (
-                <select value={form.teacherId} onChange={(e) => set('teacherId', e.target.value)} className={FIELD}>
-                  <option value="">اختر المعلم...</option>
-                  {teachers.map((t) => (
-                    <option key={t._id} value={t._id}>
-                      {t.firstNameAr} {t.lastNameAr}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Student */}
-            <div>
-              <label className={LABEL_CLS}>
-                <span>الطالب المستفيد</span>
-                {lockStudent && <span className="text-[10px] text-violet-600 font-semibold bg-violet-50 px-1.5 py-0.5 rounded">محدد مسبقاً</span>}
-              </label>
-              {lockStudent ? (
-                <div className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-gray-200 text-sm">
-                  <Avatar firstName={currentStudent?.firstNameAr || currentStudent?.student?.firstNameAr} lastName={currentStudent?.lastNameAr || currentStudent?.student?.lastNameAr} size="sm" />
-                  <span className="font-bold text-gray-800 truncate">{studentDisplayName || 'الطالب'}</span>
-                </div>
-              ) : (
-                <select value={form.studentId} onChange={(e) => set('studentId', e.target.value)} className={FIELD}>
-                  <option value="">اختر الطالب...</option>
-                  {students.map((s) => {
-                    const st = s.student || s
-                    return (
-                      <option key={st._id} value={st._id}>
-                        {st.firstNameAr} {st.lastNameAr} {st.phone ? `(${st.phone})` : ''}
+          {/* Teacher & Student Selection Card */}
+          <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Teacher */}
+              <div>
+                <label className={LABEL_CLS}>
+                  <span>المعلم المسؤول</span>
+                  {lockTeacher && (
+                    <span className="text-[10px] text-violet-700 font-bold bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full">
+                      محدد مسبقاً
+                    </span>
+                  )}
+                </label>
+                {lockTeacher ? (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                    <Avatar firstName={currentTeacher?.firstNameAr} lastName={currentTeacher?.lastNameAr} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-800 text-sm truncate">{teacherDisplayName || 'المعلم'}</div>
+                      <div className="text-[11px] text-slate-400">معلم معتمد</div>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={form.teacherId}
+                    onChange={(e) => set('teacherId', e.target.value)}
+                    className="field-light w-full h-11 text-sm rounded-xl font-medium"
+                  >
+                    <option value="">اختر المعلم...</option>
+                    {teachers.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.firstNameAr} {t.lastNameAr}
                       </option>
-                    )
-                  })}
-                </select>
-              )}
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Student */}
+              <div>
+                <label className={LABEL_CLS}>
+                  <span>الطالب المستفيد</span>
+                  {lockStudent && (
+                    <span className="text-[10px] text-violet-700 font-bold bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full">
+                      محدد مسبقاً
+                    </span>
+                  )}
+                </label>
+                {lockStudent ? (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                    <Avatar firstName={currentStudent?.firstNameAr || currentStudent?.student?.firstNameAr} lastName={currentStudent?.lastNameAr || currentStudent?.student?.lastNameAr} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-800 text-sm truncate">{studentDisplayName || 'الطالب'}</div>
+                      <div className="text-[11px] text-slate-400">طالب مسجل</div>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={form.studentId}
+                    onChange={(e) => set('studentId', e.target.value)}
+                    className="field-light w-full h-11 text-sm rounded-xl font-medium"
+                  >
+                    <option value="">اختر الطالب...</option>
+                    {students.map((s) => {
+                      const st = s.student || s
+                      return (
+                        <option key={st._id} value={st._id}>
+                          {st.firstNameAr} {st.lastNameAr} {st.phone ? `(${st.phone})` : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
 
@@ -296,7 +327,7 @@ export default function EditScheduleRuleModal({
           {isEdit && (
             <div>
               <label className={LABEL_CLS}>حالة الجدول الدوري</label>
-              <select value={form.status} onChange={(e) => set('status', e.target.value)} className={FIELD}>
+              <select value={form.status} onChange={(e) => set('status', e.target.value)} className="field-light w-full h-11 text-sm rounded-xl font-medium">
                 {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
@@ -305,21 +336,31 @@ export default function EditScheduleRuleModal({
           )}
 
           {/* Frequency & Duration */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className={LABEL_CLS}>نمط تكرار الجدول</label>
-              <select value={form.frequency} onChange={(e) => set('frequency', e.target.value)} className={FIELD}>
+              <label className={LABEL_CLS}>
+                <span className="flex items-center gap-1.5">
+                  <RotateCw size={13} className="text-violet-600" />
+                  نمط تكرار الجدول
+                </span>
+              </label>
+              <select value={form.frequency} onChange={(e) => set('frequency', e.target.value)} className="field-light w-full h-11 text-sm rounded-xl font-medium">
                 {Object.entries(SCHEDULE_FREQUENCY).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={LABEL_CLS}>مدة الحصة</label>
+              <label className={LABEL_CLS}>
+                <span className="flex items-center gap-1.5">
+                  <Clock size={13} className="text-violet-600" />
+                  مدة الحصة
+                </span>
+              </label>
               <select
                 value={form.durationMinutes}
                 onChange={(e) => set('durationMinutes', Number(e.target.value))}
-                className={FIELD}
+                className="field-light w-full h-11 text-sm rounded-xl font-medium"
               >
                 <option value={30}>٣٠ دقيقة</option>
                 <option value={45}>٤٥ دقيقة</option>
@@ -332,14 +373,18 @@ export default function EditScheduleRuleModal({
 
           {/* Days of Week (for weekly & biweekly) */}
           {(form.frequency === 'weekly' || form.frequency === 'biweekly') && (
-            <div>
-              <label className={LABEL_CLS}>
-                <span>أيام الحصص في الأسبوع</span>
-                <span className="text-violet-600 font-mono text-[11px]">
-                  {form.daysOfWeek.length} أيام محددة
+            <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-violet-600" />
+                  <span>أيام الحصص في الأسبوع</span>
+                </label>
+                <span className="text-[11px] font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-0.5 rounded-full">
+                  {form.daysOfWeek.length} {form.daysOfWeek.length === 1 ? 'يوم محدد' : form.daysOfWeek.length === 2 ? 'يومان محددان' : 'أيام محددة'}
                 </span>
-              </label>
-              <div className="grid grid-cols-7 gap-1.5">
+              </div>
+
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
                 {DAYS_OF_WEEK.map((d) => {
                   const active = form.daysOfWeek.includes(d.value)
                   return (
@@ -347,30 +392,37 @@ export default function EditScheduleRuleModal({
                       key={d.value}
                       type="button"
                       onClick={() => toggleDay(d.value)}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      className={`h-11 sm:h-12 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center cursor-pointer select-none ${
                         active
-                          ? 'bg-violet-600 text-white shadow-xs'
-                          : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-violet-300'
+                          ? 'bg-violet-600 text-white shadow-xs shadow-violet-200 scale-[1.02]'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-violet-50/40 hover:border-violet-300'
                       }`}
                       title={d.label}
                     >
-                      <span>{d.short}</span>
+                      <span className="hidden sm:inline">{d.label}</span>
+                      <span className="sm:hidden">{d.short}</span>
                     </button>
                   )
                 })}
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">
-                {form.daysOfWeek.map((d) => DAYS_OF_WEEK.find((x) => x.value === d)?.label).join(' • ') || 'اختر يوماً واحداً على الأقل'}
-              </p>
+
+              <div className="text-[11px] font-medium text-slate-500 pt-0.5">
+                {form.daysOfWeek.length > 0
+                  ? `الأيام المختارة: ${form.daysOfWeek.map((d) => DAYS_OF_WEEK.find((x) => x.value === d)?.label).join(' • ')}`
+                  : 'يرجى اختيار يوم واحد على الأقل'}
+              </div>
             </div>
           )}
 
           {/* Time & Start Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className={LABEL_CLS}>
-                <span>وقت الحصة</span>
-                <span className="text-violet-600 font-semibold text-[11px]" dir="ltr">
+                <span className="flex items-center gap-1.5">
+                  <Clock size={13} className="text-violet-600" />
+                  وقت الحصة
+                </span>
+                <span className="text-violet-700 font-bold text-[11px] bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100" dir="ltr">
                   {formatTime12h(form.timeOfDay)}
                 </span>
               </label>
@@ -378,38 +430,44 @@ export default function EditScheduleRuleModal({
                 type="time"
                 value={form.timeOfDay}
                 onChange={(e) => set('timeOfDay', e.target.value)}
-                className={FIELD}
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
                 required
               />
             </div>
             <div>
-              <label className={LABEL_CLS}>تاريخ بدء الجدول</label>
+              <label className={LABEL_CLS}>
+                <span className="flex items-center gap-1.5">
+                  <Calendar size={13} className="text-violet-600" />
+                  تاريخ بدء الجدول
+                </span>
+              </label>
               <input
                 type="date"
                 value={form.startDate}
                 onChange={(e) => set('startDate', e.target.value)}
-                className={FIELD}
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
                 required
               />
             </div>
           </div>
 
           {/* Total Sessions to Generate OR End Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className={LABEL_CLS}>
                 <span>عدد الحصص المطلوب توليدها</span>
+                <span className="text-[11px] text-slate-400 font-normal">اختيار سريع</span>
               </label>
-              <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="grid grid-cols-5 gap-1.5 mb-2">
                 {[4, 8, 12, 16, 24].map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => set('sessionsTotal', n)}
-                    className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       Number(form.sessionsTotal) === n
-                        ? 'bg-violet-100 text-violet-700 border border-violet-300 font-bold'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent'
+                        ? 'bg-violet-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/50'
                     }`}
                   >
                     {n}
@@ -422,7 +480,7 @@ export default function EditScheduleRuleModal({
                 max={100}
                 value={form.sessionsTotal || ''}
                 onChange={(e) => set('sessionsTotal', e.target.value ? Number(e.target.value) : '')}
-                className={FIELD}
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
                 placeholder="أو اكتب عدداً مخصصاً..."
               />
             </div>
@@ -434,27 +492,29 @@ export default function EditScheduleRuleModal({
                 type="date"
                 value={form.endDate}
                 onChange={(e) => set('endDate', e.target.value)}
-                className={FIELD}
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
               />
-              <p className="text-[10px] text-gray-400 mt-1">يُترك فارغاً للاستمرار بحسب عدد الحصص</p>
+              <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                يُترك فارغاً للاستمرار بحسب عدد الحصص المحددة.
+              </p>
             </div>
           </div>
 
           {/* Meeting Link & General Link Helper */}
-          <div className="p-3.5 bg-violet-50/40 border border-violet-100 rounded-2xl space-y-3">
+          <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                <Video size={14} className="text-violet-600" />
-                رابط الاجتماع ومنصة التدريس
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Video size={15} className="text-violet-600" />
+                منصة التدريس ورابط الاجتماع
               </span>
               <button
                 type="button"
                 onClick={handleApplyGeneralLink}
-                className="text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-white border border-violet-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                className="text-xs font-bold text-violet-700 hover:text-violet-800 bg-white border border-violet-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 title="استخدام الرابط المسجل في ملف المعلم"
               >
-                <Sparkles size={11} className="text-violet-500" />
-                استخدام الرابط العمومي للمعلم
+                <Link2 size={13} className="text-violet-600" />
+                <span>استخدام الرابط العام للمعلم</span>
               </button>
             </div>
 
@@ -463,7 +523,7 @@ export default function EditScheduleRuleModal({
                 <select
                   value={form.meetingProvider}
                   onChange={(e) => set('meetingProvider', e.target.value)}
-                  className="field-light w-full text-xs"
+                  className="field-light w-full h-11 text-xs font-semibold rounded-xl"
                 >
                   <option value="zoom">Zoom</option>
                   <option value="meet">Google Meet</option>
@@ -476,28 +536,29 @@ export default function EditScheduleRuleModal({
                   type="url"
                   value={form.meetingLink}
                   onChange={(e) => set('meetingLink', e.target.value)}
-                  className="field-light w-full text-xs"
+                  className="field-light w-full h-11 text-xs font-medium rounded-xl"
                   placeholder="https://zoom.us/j/... أو https://meet.google.com/..."
                   dir="ltr"
                 />
               </div>
             </div>
 
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              💡 <span className="font-semibold">ملاحظة:</span> إذا تُرك الرابط فارغاً، سيقوم النظام تلقائياً بتطبيق الرابط العمومي المعتمد للمعلم على جميع الحصص.
-            </p>
+            <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-white/70 p-2.5 rounded-xl border border-slate-100">
+              <span className="font-semibold text-amber-600 flex-none">تنبيه:</span>
+              <span>إذا تُرك الرابط فارغاً، سيقوم النظام تلقائياً بتطبيق الرابط العام المعتمد للمعلم على جميع الحصص.</span>
+            </div>
           </div>
 
           {/* Title Template & Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pb-3">
             <div>
               <label className={LABEL_CLS}>عنوان الحصة (قالب)</label>
               <input
                 type="text"
                 value={form.titleTemplate}
                 onChange={(e) => set('titleTemplate', e.target.value)}
-                className={FIELD}
-                placeholder={studentDisplayName ? `مثال: حصة ${studentDisplayName}` : 'حصة'}
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
+                placeholder={studentDisplayName ? `مثال: حصة ${studentDisplayName}` : 'حصة قرآن كريم'}
               />
             </div>
             <div>
@@ -506,8 +567,8 @@ export default function EditScheduleRuleModal({
                 type="text"
                 value={form.notes}
                 onChange={(e) => set('notes', e.target.value)}
-                className={FIELD}
-                placeholder="ملاحظات مرجعية..."
+                className="field-light w-full h-11 text-sm font-medium rounded-xl"
+                placeholder="ملاحظات مرجعية خاصة بالحصة..."
               />
             </div>
           </div>
