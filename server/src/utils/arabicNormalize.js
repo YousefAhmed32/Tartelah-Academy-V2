@@ -17,4 +17,21 @@ function normalizeArabic(text) {
     .toLowerCase()
 }
 
-module.exports = { normalizeArabic }
+function normalizeArabicDigits(str) {
+  if (!str || typeof str !== 'string') return ''
+  return str.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+}
+
+function toArabicDigits(str) {
+  if (!str || typeof str !== 'string') return ''
+  return str.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d])
+}
+
+function cleanEmail(val) {
+  return (val || '')
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+module.exports = { normalizeArabic, normalizeArabicDigits, toArabicDigits, cleanEmail }

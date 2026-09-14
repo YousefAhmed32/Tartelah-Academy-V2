@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
                 type="text"
                 inputMode="email"
                 value={email}
-                onChange={e => setEmail(cleanEmail(e.target.value))}
+                onChange={e => setEmail(e.target.value)}
                 onBlur={e => setEmail(cleanEmail(e.target.value))}
                 placeholder="example@email.com"
                 required

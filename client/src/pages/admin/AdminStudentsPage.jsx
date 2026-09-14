@@ -39,15 +39,15 @@ function CreateStudentModal({ open, onClose }) {
       toast.success('تم إنشاء حساب الطالب بنجاح')
       qc.invalidateQueries({ queryKey: ['admin', 'students'] })
       const tempPass = res.data?.temporaryPassword || res.temporaryPassword
-      if (tempPass) {
-        setCreatedResult({
-          email: form.email,
-          temporaryPassword: tempPass,
-          name: `${form.firstNameAr} ${form.lastNameAr}`,
-        })
-      } else {
-        handleClose()
-      }
+      const initialPass = tempPass || (form.credential?.mode === 'manual' ? form.credential.password : 'كلمة المرور الموحدة للأكاديمية')
+      setCreatedResult({
+        email: form.email,
+        password: initialPass,
+        isDefault: form.credential?.mode === 'academy_default',
+        isManual: form.credential?.mode === 'manual',
+        isAuto: !!tempPass,
+        name: `${form.firstNameAr} ${form.lastNameAr}`,
+      })
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
   })
@@ -95,21 +95,39 @@ function CreateStudentModal({ open, onClose }) {
           </div>
           <div>
             <h4 className="font-heading font-extrabold text-gray-900 text-base">{createdResult.name}</h4>
-            <p className="text-xs text-gray-500 mt-0.5">{createdResult.email}</p>
-          </div>
-          <div className="bg-violet-50/80 border border-violet-100 rounded-xl p-3 text-right space-y-1.5">
-            <div className="text-xs text-violet-700 font-bold">كلمة المرور المؤقتة المُولّدة:</div>
-            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-200">
-              <span className="font-mono text-sm font-bold text-gray-900 select-all">{createdResult.temporaryPassword}</span>
+            <div className="flex items-center justify-center gap-1.5 mt-1 text-xs text-gray-600">
+              <span className="font-mono font-medium">{createdResult.email}</span>
               <button
                 type="button"
-                onClick={() => copyToClipboard(createdResult.temporaryPassword)}
-                className="flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
+                onClick={() => copyToClipboard(createdResult.email)}
+                className="text-violet-600 hover:text-violet-700 p-0.5"
+                title="نسخ البريد الإلكتروني"
               >
-                <Copy size={13} /> نسخ
+                <Copy size={13} />
               </button>
             </div>
-            <p className="text-[11px] text-gray-500">انسخ كلمة المرور هذه لتزويد الطالب بها لتسجيل دخوله الأول.</p>
+          </div>
+          <div className="bg-violet-50/80 border border-violet-100 rounded-xl p-3 text-right space-y-1.5">
+            <div className="text-xs text-violet-700 font-bold">
+              {createdResult.isAuto ? 'كلمة المرور المؤقتة المُولّدة:' : createdResult.isManual ? 'كلمة المرور المحددة للحساب:' : 'كلمة مرور تسجيل الدخول:'}
+            </div>
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-200">
+              <span className="font-mono text-sm font-bold text-gray-900 select-all">{createdResult.password}</span>
+              {!createdResult.isDefault && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(createdResult.password)}
+                  className="flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
+                >
+                  <Copy size={13} /> نسخ
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500">
+              {createdResult.isDefault
+                ? 'الحساب جاهز لتسجيل الدخول بكلمة مرور الأكاديمية الموحدة.'
+                : 'انسخ بيانات الدخول لتسجيل الدخول بها أو تزويد الطالب بها.'}
+            </p>
           </div>
         </div>
       </Modal>

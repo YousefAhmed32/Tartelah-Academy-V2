@@ -133,11 +133,7 @@ export default function RegisterPage() {
 
   function change(e) {
     const { name, value } = e.target
-    if (name === 'email') {
-      setForm(p => ({ ...p, email: cleanEmail(value) }))
-    } else {
-      setForm(p => ({ ...p, [name]: value }))
-    }
+    setForm(p => ({ ...p, [name]: value }))
   }
 
   async function handleSubmit(e) {

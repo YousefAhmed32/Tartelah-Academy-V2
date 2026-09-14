@@ -25,7 +25,7 @@ import { credentialDefaultsService } from '../../services/credentialDefaults.ser
 // choice for THIS student yet" flag below without any fragile heuristic.
 export default function PasswordCredentialSection({ value, onChange, role, compact = false }) {
   const set = (patch) => onChange({ ...value, ...patch })
-  const mode = value.mode || 'auto'
+  const mode = value.mode || 'manual'
   const touchedRef = useRef(false)
 
   const { data: availability } = useQuery({
@@ -35,24 +35,12 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
   })
   const defaultAvailable = !!availability?.[role]
 
-  // "Use academy default password" is selected by default when the role has
-  // a configured default — but only until the admin makes an explicit choice
-  // (any button click) for this instance, and only once (first successful
-  // availability fetch, which may resolve after mount).
-  useEffect(() => {
-    if (touchedRef.current) return
-    if (defaultAvailable && mode !== 'academy_default') {
-      set({ mode: 'academy_default', requirePasswordChange: false, password: '', passwordConfirm: '' })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultAvailable])
-
   const selectMode = (nextMode) => {
     touchedRef.current = true
     set({
       mode: nextMode,
       password: '', passwordConfirm: '',
-      requirePasswordChange: nextMode === 'auto', // auto→true, academy_default/manual→false (meeting addendum §1)
+      requirePasswordChange: nextMode === 'auto',
     })
   }
 
@@ -69,6 +57,15 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
       <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
+          onClick={() => selectMode('manual')}
+          className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
+            mode === 'manual' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
+          }`}
+        >
+          <KeyRound size={13} /> كلمة مرور يدوية
+        </button>
+        <button
+          type="button"
           onClick={() => defaultAvailable && selectMode('academy_default')}
           disabled={!defaultAvailable}
           title={defaultAvailable ? undefined : 'لم يتم إعداد كلمة مرور افتراضية لهذا الدور بعد — يمكن إعدادها من إعدادات الأكاديمية'}
@@ -78,15 +75,6 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
           }`}
         >
           <Building2 size={13} /> كلمة مرور الأكاديمية
-        </button>
-        <button
-          type="button"
-          onClick={() => selectMode('manual')}
-          className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
-            mode === 'manual' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
-          }`}
-        >
-          <KeyRound size={13} /> كلمة مرور يدوية
         </button>
         <button
           type="button"
@@ -100,9 +88,15 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
       </div>
 
       {mode === 'academy_default' && (
-        <p className="text-[11px] text-gray-400 leading-relaxed">
-          سيُستخدم رمز الدخول الموحّد الذي حدّدته الأكاديمية لهذا النوع من الحسابات — هذه كلمة مرور مشتركة تُستخدم تشغيليًا للحسابات الجديدة، ولا تُعرض هنا لأي سبب. يمكن للطالب/المعلم تغييرها لاحقًا من إعداداته.
-        </p>
+        <div className="p-3 bg-violet-50/70 border border-violet-100 rounded-xl text-xs text-violet-800 leading-relaxed space-y-1">
+          <div className="font-bold flex items-center gap-1.5">
+            <Building2 size={14} className="text-violet-600" />
+            سيتم استخدام كلمة المرور الموحدة المعتمدة للأكاديمية
+          </div>
+          <p className="text-[11px] text-gray-600">
+            يمكنك الاطلاع على كلمة المرور الموحدة أو تعديلها من إعدادات الأكاديمية. الحساب سيُنشأ بهذه الكلمة فوراً.
+          </p>
+        </div>
       )}
       {mode === 'auto' && (
         <p className="text-[11px] text-gray-400 leading-relaxed">
@@ -155,7 +149,7 @@ export function validateCredentialValue(value) {
 }
 
 export function emptyCredential() {
-  return { mode: 'auto', password: '', passwordConfirm: '', requirePasswordChange: true }
+  return { mode: 'manual', password: '', passwordConfirm: '', requirePasswordChange: false }
 }
 
 /** Builds the exact `credential` object the backend API expects — never

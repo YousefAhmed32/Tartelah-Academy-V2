@@ -13,6 +13,7 @@ const { createTeacherWithStudents } = require('../services/onboarding.service')
 const { resolveCredentialInput, CredentialError } = require('../config/credentialMode')
 const { userHasPermission } = require('../middleware/rbac.middleware')
 const { validateWorkingHoursDays, buildDefaultWorkingHours } = require('../config/workingHours')
+const { cleanEmail } = require('../utils/arabicNormalize')
 
 const STUDENT_ALLOWED_FIELDS = ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone', 'bioAr', 'studentType', 'gender']
 
@@ -34,7 +35,8 @@ exports.createStudent = async (req, res, next) => {
     if (studentType !== undefined && !['existing', 'new'].includes(studentType)) {
       return sendError(res, 'نوع الطالب يجب أن يكون "قديم" أو "جديد"', 400)
     }
-    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedEmail = cleanEmail(email)
+    if (!normalizedEmail) return sendError(res, 'البريد الإلكتروني مطلوب', 400)
     const existing = await User.findOne({ email: normalizedEmail })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
 
@@ -84,7 +86,8 @@ exports.addStudentToTeacher = async (req, res, next) => {
     if (!email?.trim()) return sendError(res, 'البريد الإلكتروني مطلوب', 400)
     if (!['existing', 'new'].includes(studentType)) return sendError(res, 'يجب تحديد نوع الطالب: قديم أو جديد', 400)
 
-    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedEmail = cleanEmail(email)
+    if (!normalizedEmail) return sendError(res, 'البريد الإلكتروني مطلوب', 400)
     const existing = await User.findOne({ email: normalizedEmail })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
 

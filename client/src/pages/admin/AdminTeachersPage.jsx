@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { GraduationCap, Plus, UserPlus, ChevronLeft } from 'lucide-react'
+import { GraduationCap, Plus, UserPlus, ChevronLeft, Copy, CheckCircle2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -33,6 +33,7 @@ const initialForm = {
 function CreateTeacherModal({ open, onClose }) {
   const qc = useQueryClient()
   const [form, setForm] = useState(initialForm)
+  const [createdResult, setCreatedResult] = useState(null)
 
   const createMutation = useMutation({
     mutationFn: (d) => {
@@ -40,16 +41,32 @@ function CreateTeacherModal({ open, onClose }) {
       return api.post('/admin/teachers', { ...rest, role: 'teacher', credential: credentialPayload(credential) })
     },
     onSuccess: (res) => {
-      toast.success('تم إنشاء حساب المعلم')
-      if (res?.data?.data?.temporaryPassword) {
-        toast.success(`كلمة المرور المؤقتة: ${res.data.data.temporaryPassword}`, { duration: 15000 })
-      }
+      toast.success('تم إنشاء حساب المعلم بنجاح')
       qc.invalidateQueries({ queryKey: ['admin', 'teachers'] })
-      onClose()
-      setForm(initialForm)
+      const tempPass = res?.data?.data?.temporaryPassword || res?.temporaryPassword
+      const initialPass = tempPass || (form.credential?.mode === 'manual' ? form.credential.password : 'كلمة المرور الموحدة للأكاديمية')
+      setCreatedResult({
+        email: form.email,
+        password: initialPass,
+        isDefault: form.credential?.mode === 'academy_default',
+        isManual: form.credential?.mode === 'manual',
+        isAuto: !!tempPass,
+        name: `${form.firstNameAr} ${form.lastNameAr}`,
+      })
     },
     onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
   })
+
+  function handleClose() {
+    setForm(initialForm)
+    setCreatedResult(null)
+    onClose()
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard?.writeText(text)
+    toast.success('تم النسخ إلى الحافظة')
+  }
 
   function change(e) { setForm(p => ({ ...p, [e.target.name]: e.target.value })) }
   function submitCreate() {
@@ -64,10 +81,64 @@ function CreateTeacherModal({ open, onClose }) {
     createMutation.mutate(form)
   }
 
+  if (createdResult) {
+    return (
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title="تم إنشاء حساب المعلم بنجاح"
+        size="sm"
+        footer={<Button variant="purple" onClick={handleClose}>تم، إغلاق النافذة</Button>}
+      >
+        <div dir="rtl" className="space-y-4 text-center py-2">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 size={24} />
+          </div>
+          <div>
+            <h4 className="font-heading font-extrabold text-gray-900 text-base">{createdResult.name}</h4>
+            <div className="flex items-center justify-center gap-1.5 mt-1 text-xs text-gray-600">
+              <span className="font-mono font-medium">{createdResult.email}</span>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(createdResult.email)}
+                className="text-violet-600 hover:text-violet-700 p-0.5"
+                title="نسخ البريد الإلكتروني"
+              >
+                <Copy size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="bg-violet-50/80 border border-violet-100 rounded-xl p-3 text-right space-y-1.5">
+            <div className="text-xs text-violet-700 font-bold">
+              {createdResult.isAuto ? 'كلمة المرور المؤقتة المُولّدة:' : createdResult.isManual ? 'كلمة المرور المحددة للحساب:' : 'كلمة مرور تسجيل الدخول:'}
+            </div>
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-200">
+              <span className="font-mono text-sm font-bold text-gray-900 select-all">{createdResult.password}</span>
+              {!createdResult.isDefault && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(createdResult.password)}
+                  className="flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
+                >
+                  <Copy size={13} /> نسخ
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500">
+              {createdResult.isDefault
+                ? 'الحساب جاهز لتسجيل الدخول بكلمة مرور الأكاديمية الموحدة.'
+                : 'انسخ بيانات الدخول لتسجيل الدخول بها أو تزويد المعلم بها.'}
+            </p>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="إضافة معلم جديد" size="md"
+    <Modal open={open} onClose={handleClose} title="إضافة معلم جديد" size="md"
       footer={<>
-        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="ghost" onClick={handleClose}>إلغاء</Button>
         <Button variant="purple" onClick={submitCreate} loading={createMutation.isPending}>إنشاء الحساب</Button>
       </>}>
       <div className="space-y-4">

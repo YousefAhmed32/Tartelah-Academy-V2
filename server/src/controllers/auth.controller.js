@@ -19,12 +19,7 @@ function issueTokens(user, res) {
   return accessToken
 }
 
-function cleanEmail(val) {
-  return (val || '')
-    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
-    .trim()
-    .toLowerCase()
-}
+const { normalizeArabicDigits, toArabicDigits, cleanEmail } = require('../utils/arabicNormalize')
 
 exports.register = async (req, res, next) => {
   try {
@@ -50,9 +45,22 @@ exports.login = async (req, res, next) => {
     const { password } = req.body
     const email = cleanEmail(req.body.email)
     const user = await User.findOne({ email }).select('+password +tokenVersion')
-    let isMatch = user && password ? await user.comparePassword(password) : false
-    if (!isMatch && user && typeof password === 'string' && password.trim() !== password) {
-      isMatch = await user.comparePassword(password.trim())
+    let isMatch = false
+    if (user && password && typeof password === 'string') {
+      isMatch = await user.comparePassword(password)
+      if (!isMatch) {
+        const trimmed = password.trim()
+        const normalizedWestern = normalizeArabicDigits(trimmed)
+        const normalizedEastern = toArabicDigits(trimmed)
+
+        if (trimmed !== password && await user.comparePassword(trimmed)) {
+          isMatch = true
+        } else if (normalizedWestern !== password && await user.comparePassword(normalizedWestern)) {
+          isMatch = true
+        } else if (normalizedEastern !== password && await user.comparePassword(normalizedEastern)) {
+          isMatch = true
+        }
+      }
     }
     if (!user || !isMatch) {
       return sendError(res, 'البريد الإلكتروني أو كلمة المرور غير صحيحة', 401)

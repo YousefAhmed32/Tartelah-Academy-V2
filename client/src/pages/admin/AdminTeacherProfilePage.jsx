@@ -8,6 +8,7 @@ import {
   User, KeyRound, CalendarClock, Lock, History, ClipboardCheck, TrendingUp,
   Settings, LayoutGrid, FileText, Power, PowerOff, MessageCircle, StickyNote,
   Video, RefreshCw, ExternalLink, Gift, RotateCcw, SlidersHorizontal, Trash2, AlertTriangle,
+  Copy, CheckCircle2,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
@@ -89,6 +90,7 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
   const overrideAllowed = hasPermission('assignments.override')
   const [tab, setTab] = useState('info')
   const [form, setForm] = useState(emptyAddStudentForm)
+  const [createdResult, setCreatedResult] = useState(null)
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
   const { data: packages } = useQuery({
@@ -97,15 +99,34 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
     enabled: open,
   })
 
+  function handleClose() {
+    onClose()
+    setForm(emptyAddStudentForm())
+    setCreatedResult(null)
+    setTab('info')
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard?.writeText(text)
+    toast.success('تم النسخ إلى الحافظة')
+  }
+
   const mut = useMutation({
     mutationFn: (payload) => api.post(`/admin/teachers/${teacherId}/students`, payload).then((r) => r.data),
     onSuccess: (res) => {
-      toast.success(res.data.assignmentRequest?.requiresTeacherApproval ? 'تمت إضافة الطالب — بانتظار موافقة المعلم على الجدول' : 'تمت إضافة الطالب')
+      toast.success(res.data.assignmentRequest?.requiresTeacherApproval ? 'تمت إضافة الطالب — بانتظار موافقة المعلم على الجدول' : 'تمت إضافة الطالب بنجاح')
       qc.invalidateQueries({ queryKey: ['admin', 'teacher-profile', teacherId] })
       qc.invalidateQueries({ queryKey: ['admin', 'teacher-availability', teacherId] })
-      onClose()
-      setForm(emptyAddStudentForm())
-      setTab('info')
+      const tempPass = res.data?.temporaryPassword || res.temporaryPassword
+      const initialPass = tempPass || (form.credential?.mode === 'manual' ? form.credential.password : 'كلمة المرور الموحدة للأكاديمية')
+      setCreatedResult({
+        email: form.email,
+        password: initialPass,
+        isDefault: form.credential?.mode === 'academy_default',
+        isManual: form.credential?.mode === 'manual',
+        isAuto: !!tempPass,
+        name: `${form.firstNameAr} ${form.lastNameAr}`,
+      })
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'حدث خطأ')
@@ -153,10 +174,64 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
 
   const pkg = (packages || []).find((p) => p._id === form.packageId)
 
+  if (createdResult) {
+    return (
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title="تم إضافة الطالب بنجاح"
+        size="sm"
+        footer={<Button variant="purple" onClick={handleClose}>تم، إغلاق النافذة</Button>}
+      >
+        <div dir="rtl" className="space-y-4 text-center py-2">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 size={24} />
+          </div>
+          <div>
+            <h4 className="font-heading font-extrabold text-gray-900 text-base">{createdResult.name}</h4>
+            <div className="flex items-center justify-center gap-1.5 mt-1 text-xs text-gray-600">
+              <span className="font-mono font-medium">{createdResult.email}</span>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(createdResult.email)}
+                className="text-violet-600 hover:text-violet-700 p-0.5"
+                title="نسخ البريد الإلكتروني"
+              >
+                <Copy size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="bg-violet-50/80 border border-violet-100 rounded-xl p-3 text-right space-y-1.5">
+            <div className="text-xs text-violet-700 font-bold">
+              {createdResult.isAuto ? 'كلمة المرور المؤقتة المُولّدة:' : createdResult.isManual ? 'كلمة المرور المحددة للحساب:' : 'كلمة مرور تسجيل الدخول:'}
+            </div>
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-200">
+              <span className="font-mono text-sm font-bold text-gray-900 select-all">{createdResult.password}</span>
+              {!createdResult.isDefault && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(createdResult.password)}
+                  className="flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
+                >
+                  <Copy size={13} /> نسخ
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500">
+              {createdResult.isDefault
+                ? 'الحساب جاهز لتسجيل الدخول بكلمة مرور الأكاديمية الموحدة.'
+                : 'انسخ بيانات الدخول لتسجيل الدخول بها أو تزويد الطالب بها.'}
+            </p>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="إضافة طالب جديد" size="md"
+    <Modal open={open} onClose={handleClose} title="إضافة طالب جديد" size="md"
       footer={<>
-        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+        <Button variant="ghost" onClick={handleClose}>إلغاء</Button>
         <Button variant="purple" onClick={submit} loading={mut.isPending}>إضافة الطالب</Button>
       </>}>
       <div className="space-y-3">

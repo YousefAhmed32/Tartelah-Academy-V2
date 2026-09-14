@@ -26,6 +26,7 @@ const { isKnownKey } = require('../services/teachingSubject.service')
 const TeacherWorkingHours = require('../models/TeacherWorkingHours')
 const LessonWallet = require('../models/LessonWallet')
 const { resolveDatePreset } = require('../utils/datePresets')
+const { cleanEmail } = require('../utils/arabicNormalize')
 const crypto = require('crypto')
 
 const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -478,7 +479,9 @@ const TEACHER_WRITABLE_FIELDS = [
 
 exports.createTeacher = async (req, res, next) => {
   try {
-    const existing = await User.findOne({ email: req.body.email })
+    const normalizedEmail = cleanEmail(req.body.email)
+    if (!normalizedEmail) return sendError(res, 'البريد الإلكتروني مطلوب', 400)
+    const existing = await User.findOne({ email: normalizedEmail })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
     if (req.body.gender !== undefined && !isValidGender(req.body.gender)) {
       return sendError(res, 'يجب تحديد تصنيف المعلم: معلم أو معلمة', 400)
@@ -533,7 +536,7 @@ exports.createTeacher = async (req, res, next) => {
     }
 
     const user = await User.create({
-      ...fields, role: 'teacher', password: resolved.passwordToStore,
+      ...fields, email: normalizedEmail, role: 'teacher', password: resolved.passwordToStore,
       mustChangePassword: resolved.mustChangePassword, createdBy: req.user._id,
     })
 
