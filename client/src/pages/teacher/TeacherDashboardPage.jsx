@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import {
   Calendar, Star, FileText, TrendingUp, ChevronLeft, Video, ExternalLink,
   Check, AlertCircle, UserPlus, Clock, BookOpen, Link2, CalendarClock,
-  XCircle, RefreshCw,
+  XCircle, RefreshCw, Wallet, Gift,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { quranReportService } from '../../services/quranReport.service.js'
@@ -35,6 +35,7 @@ const DEFAULT_STATS = {
   totalStudents: 0, sessionsToday: 0, pendingEvaluations: 0, completedThisMonth: 0,
   upcomingSessions: [], recentStudents: [], needsAttention: 0,
   currentSession: null, ongoingCount: 0,
+  payrollSummary: null,
 }
 
 function useCountdown(targetDate) {
@@ -521,6 +522,7 @@ export default function TeacherDashboardPage() {
         needsAttention: d.needsAttention || 0,
         currentSession: d.currentSession || null,
         ongoingCount: d.ongoingCount || 0,
+        payrollSummary: d.payrollSummary || null,
       }
     }),
     placeholderData: DEFAULT_STATS,
@@ -707,6 +709,50 @@ export default function TeacherDashboardPage() {
 
         {/* Right Column: Stats + Students + Sessions */}
         <div className="lg:col-span-2 flex flex-col gap-5">
+          {/* Payroll & Financial Summary Card */}
+          {stats?.payrollSummary && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-3.5 w-full sm:w-auto">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-none">
+                  <Wallet size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-gray-500">مستحقات الدورة الحالية ({stats.payrollSummary.periodKey || 'الشهرية'})</span>
+                    {stats.payrollSummary.bonusesTotal > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 rounded-full">
+                        <Gift size={11} /> +{stats.payrollSummary.bonusesTotal} ر.س مكافأة
+                      </span>
+                    )}
+                    {stats.payrollSummary.deductionsTotal > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 px-2 py-0.5 rounded-full">
+                        -{stats.payrollSummary.deductionsTotal} ر.س جزاءات/خصومات
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-800 mt-0.5 font-medium">
+                    الصافي التقديري المستحق:{' '}
+                    <strong className="text-base font-extrabold text-emerald-700 font-heading">
+                      {stats.payrollSummary.netPayable} ر.س
+                    </strong>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(ROUTES.TEACHER_PAYROLL)}
+                className="flex items-center gap-1.5 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-100 px-3.5 py-2 rounded-xl transition-colors w-full sm:w-auto justify-center cursor-pointer"
+              >
+                <span>كشف المستحقات</span>
+                <ChevronLeft size={13} />
+              </button>
+            </motion.div>
+          )}
+
           {/* Stats Row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[

@@ -2,6 +2,7 @@ const Session = require('../models/Session')
 const Homework = require('../models/Homework')
 const Evaluation = require('../models/Evaluation')
 const Subscription = require('../models/Subscription')
+const LessonWallet = require('../models/LessonWallet')
 const Memorization = require('../models/Memorization')
 const Attendance = require('../models/Attendance')
 const { sendSuccess, sendError } = require('../utils/response')
@@ -10,11 +11,12 @@ exports.getMyStats = async (req, res, next) => {
   try {
     const studentId = req.user._id
     const now = new Date()
-    const [upcomingSessions, subscription, pendingHw, evaluations, memorization, attendanceCounts] = await Promise.all([
+    const [upcomingSessions, subscription, wallet, pendingHw, evaluations, memorization, attendanceCounts] = await Promise.all([
       Session.find({ studentId, scheduledAt: { $gte: now }, status: { $in: ['scheduled', 'ongoing'] } })
         .sort({ scheduledAt: 1 }).limit(10)
         .populate('teacherId', 'firstNameAr lastNameAr avatar'),
       Subscription.findOne({ studentId, status: 'active' }).populate('packageId', 'nameAr sessionsPerMonth'),
+      LessonWallet.findOne({ studentId }),
       Homework.countDocuments({ assignedTo: studentId, status: 'active', dueDate: { $gte: now } }),
       Evaluation.find({ studentId }).sort({ createdAt: -1 }).limit(5),
       Memorization.find({ studentId }),
@@ -40,11 +42,27 @@ exports.getMyStats = async (req, res, next) => {
 
     const surahsCompleted = [...new Set(memorization.map(m => m.surahNumber))].length
 
-    // Session-package status — purchased/consumed/remaining, per the
-    // academy's session-based (not date-based) subscription model.
-    const purchasedSessions = subscription?.totalSessions || 0
-    const remainingSessions = subscription?.sessionsRemaining || 0
-    const consumedSessions = Math.max(0, purchasedSessions - remainingSessions)
+    // Session-package status — authoritatively computed from LessonWallet,
+    // reflecting every admin deduction, bonus, and adjustment instantly.
+    const remainingSessions = wallet?.remaining !== undefined
+      ? wallet.remaining
+      : (subscription?.sessionsRemaining || 0)
+
+    const purchasedSessions = Math.max(
+      wallet?.totalPurchased || 0,
+      subscription?.totalSessions || 0,
+      remainingSessions
+    )
+
+    const consumedSessions = wallet?.totalUsed !== undefined
+      ? wallet.totalUsed
+      : Math.max(0, purchasedSessions - remainingSessions)
+
+    if (subscription && subscription.sessionsRemaining !== remainingSessions) {
+      Subscription.findByIdAndUpdate(subscription._id, {
+        $set: { sessionsRemaining: Math.max(0, remainingSessions) },
+      }).catch(() => {})
+    }
 
     sendSuccess(res, {
       attendanceRate,

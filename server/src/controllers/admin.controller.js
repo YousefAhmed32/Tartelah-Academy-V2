@@ -298,7 +298,7 @@ exports.getStudent = async (req, res, next) => {
     const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-password -refreshToken')
     if (!student) return sendError(res, 'الطالب غير موجود', 404)
 
-    const [subscription, sessions, evaluations, enrollmentRequests] = await Promise.all([
+    const [subscription, sessions, evaluations, enrollmentRequests, wallet] = await Promise.all([
       Subscription.findOne({ studentId: req.params.id, status: 'active' })
         .populate('packageId', 'nameAr price sessionsPerMonth')
         .populate('teacherId', 'firstNameAr lastNameAr avatar'),
@@ -308,9 +308,16 @@ exports.getStudent = async (req, res, next) => {
         .populate('teacherId', 'firstNameAr lastNameAr'),
       EnrollmentRequest.find({ studentId: req.params.id }).sort({ createdAt: -1 })
         .populate('packageId', 'nameAr price'),
+      LessonWallet.findOne({ studentId: req.params.id }),
     ])
 
-    sendSuccess(res, { student, subscription, recentSessions: sessions, recentEvaluations: evaluations, enrollmentRequests })
+    // Self-heal subscription.sessionsRemaining if it fell out of sync with wallet.remaining
+    if (subscription && wallet && subscription.sessionsRemaining !== wallet.remaining) {
+      subscription.sessionsRemaining = wallet.remaining
+      await subscription.save().catch(() => {})
+    }
+
+    sendSuccess(res, { student, subscription, recentSessions: sessions, recentEvaluations: evaluations, enrollmentRequests, wallet })
   } catch (err) { next(err) }
 }
 

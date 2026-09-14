@@ -948,6 +948,7 @@ export default function AdminStudentDetailPage() {
   if (!student) return <div className="text-center pt-20 text-gray-500">الطالب غير موجود</div>
 
   const sub = studentData?.subscription
+  const wallet = studentData?.wallet
   const recentSessions = studentData?.recentSessions || []
   const enrollmentRequests = studentData?.enrollmentRequests || []
   const assignedTeacher = sub?.teacherId
@@ -983,7 +984,7 @@ export default function AdminStudentDetailPage() {
               {[
                 { label: 'متوسط التقييم', value: avgScore ? `${avgScore}/10` : '—' },
                 { label: 'نسبة الحضور', value: attRate != null ? `${attRate}%` : '—' },
-                { label: 'الحصص المتبقية', value: sub ? `${sub.sessionsRemaining ?? '—'}` : '—' },
+                { label: 'الحصص المتبقية', value: wallet?.remaining !== undefined ? `${wallet.remaining}` : (sub ? `${sub.sessionsRemaining ?? '—'}` : '—') },
                 { label: 'الباقة', value: sub?.packageId?.nameAr || 'بلا اشتراك' },
               ].map((s) => (
                 <div key={s.label} className="bg-gray-50 rounded-xl p-2.5">

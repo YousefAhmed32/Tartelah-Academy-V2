@@ -86,6 +86,11 @@ export default function WalletOperationsModal({
       qc.invalidateQueries({ queryKey: ['admin', 'student', studentId, 'wallet'] })
       qc.invalidateQueries({ queryKey: ['admin', 'student', studentId, 'wallet-transactions'] })
       qc.invalidateQueries({ queryKey: ['admin', 'student', studentId] })
+      qc.invalidateQueries({ queryKey: ['admin', 'students'] })
+      qc.invalidateQueries({ queryKey: ['student', 'dashboard'] })
+      qc.invalidateQueries({ queryKey: ['student', 'wallet'] })
+      qc.invalidateQueries({ queryKey: ['teacher', 'students'] })
+      qc.invalidateQueries({ queryKey: ['teacher', 'dashboard'] })
       onClose()
     },
     onError: (err) => {

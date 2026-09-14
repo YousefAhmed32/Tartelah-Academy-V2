@@ -100,13 +100,25 @@ async function applyTransaction({
   )
 
   // Backward-compat mirror: Subscription.sessionsRemaining/totalSessions are
-  // deprecated (LessonWallet is now canonical) but kept readable for any
-  // not-yet-migrated code/UI. Best-effort only — never blocks the real
-  // wallet write above if it fails.
-  if (relatedSubscriptionId) {
-    await Subscription.findByIdAndUpdate(relatedSubscriptionId, {
-      $set: { sessionsRemaining: Math.max(0, updatedWallet.remaining), totalSessions: updatedWallet.totalPurchased },
-    }).catch(() => {})
+  // kept in sync so student dashboard, admin views, and legacy projections
+  // immediately reflect every wallet balance adjustment without drift.
+  try {
+    const targetSubId = relatedSubscriptionId || (
+      await Subscription.findOne({ studentId, status: { $in: ['active', 'paused'] } })
+        .sort({ createdAt: -1 })
+        .select('_id')
+        .then(s => s?._id)
+    )
+    if (targetSubId) {
+      await Subscription.findByIdAndUpdate(targetSubId, {
+        $set: {
+          sessionsRemaining: Math.max(0, updatedWallet.remaining),
+          ...(updatedWallet.totalPurchased ? { totalSessions: updatedWallet.totalPurchased } : {}),
+        },
+      })
+    }
+  } catch (_) {
+    // Best-effort mirror — never blocks the authoritative wallet transaction
   }
 
   return { transaction, wallet: updatedWallet, alreadyApplied: false }

@@ -1,8 +1,27 @@
 const Subscription = require('../models/Subscription')
+const User = require('../models/User')
 const walletService = require('../services/wallet.service')
 const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 const { createNotification } = require('../services/notification.service')
+
+async function notifyTeacherOfStudentAdjustment(studentId, { titleAr, bodyAr }) {
+  try {
+    const activeSub = await Subscription.findOne({ studentId, status: 'active' }).select('teacherId')
+    if (activeSub?.teacherId) {
+      await createNotification({
+        userId: activeSub.teacherId,
+        titleAr,
+        bodyAr,
+        type: 'subscription',
+        priority: 'medium',
+        actionUrl: `/teacher/students/${studentId}`,
+      })
+    }
+  } catch (_) {
+    // Non-critical notification failure — never block the main transaction
+  }
+}
 
 async function isAssignedTeacher(teacherId, studentId) {
   const link = await Subscription.exists({ studentId, teacherId })
@@ -61,6 +80,13 @@ exports.adjustWallet = async (req, res, next) => {
       userId: req.params.studentId, titleAr: 'تعديل على رصيد حصصك',
       bodyAr: `تم تعديل رصيد حصصك بمقدار ${numAmount > 0 ? '+' : ''}${numAmount} — ${reason}`,
       type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
+    })
+
+    const student = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
+    const sName = student ? `${student.firstNameAr || ''} ${student.lastNameAr || ''}`.trim() : 'الطالب'
+    await notifyTeacherOfStudentAdjustment(req.params.studentId, {
+      titleAr: 'تعديل على رصيد حصص الطالب',
+      bodyAr: `تم تعديل رصيد حصص الطالب (${sName}) بمقدار ${numAmount > 0 ? '+' : ''}${numAmount} — ${reason}`,
     })
 
     sendSuccess(res, { wallet, transaction }, 'تم تعديل الرصيد')
@@ -155,6 +181,13 @@ exports.grantBonus = async (req, res, next) => {
       bodyAr: `تم إضافة ${numAmount} حصة مكافأة إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
     })
 
+    const studentBonus = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
+    const sNameBonus = studentBonus ? `${studentBonus.firstNameAr || ''} ${studentBonus.lastNameAr || ''}`.trim() : 'الطالب'
+    await notifyTeacherOfStudentAdjustment(req.params.studentId, {
+      titleAr: 'إضافة حصة مكافأة لطالبك',
+      bodyAr: `تم إضافة ${numAmount} حصة مكافأة إلى رصيد الطالب (${sNameBonus}) — ${reason}`,
+    })
+
     sendSuccess(res, { wallet, transaction }, 'تم منح حصة المكافأة')
   } catch (err) { next(err) }
 }
@@ -179,6 +212,13 @@ exports.grantCompensation = async (req, res, next) => {
     await createNotification({
       userId: req.params.studentId, titleAr: 'حصة تعويضية',
       bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
+    })
+
+    const studentComp = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
+    const sNameComp = studentComp ? `${studentComp.firstNameAr || ''} ${studentComp.lastNameAr || ''}`.trim() : 'الطالب'
+    await notifyTeacherOfStudentAdjustment(req.params.studentId, {
+      titleAr: 'إضافة حصة تعويضية لطالبك',
+      bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيد الطالب (${sNameComp}) — ${reason}`,
     })
 
     sendSuccess(res, { wallet, transaction }, 'تم منح الحصة التعويضية')

@@ -20,6 +20,7 @@ const { isValidGender } = require('../config/teacherIdentity')
 // selectable public filter. See services/teachingSubject.service.js.
 const { isValidActiveKey } = require('../services/teachingSubject.service')
 const { isValidAudienceCategory } = require('../config/studentAudience')
+const { getOrCreateCurrentPeriod } = require('../services/payrollPeriod.service')
 
 // ── Public (unauthenticated) teacher directory ───────────────────────────────
 // Deliberately separate from /admin/teachers: no salary, email, phone,
@@ -238,7 +239,7 @@ exports.getMyStats = async (req, res, next) => {
     // nagging the teacher about indefinitely on their own dashboard.
     const attentionWindowStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
 
-    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention, ongoingSessions] = await Promise.all([
+    const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention, ongoingSessions, currentPeriod] = await Promise.all([
       Subscription.countDocuments({ teacherId, status: 'active' }),
       Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lte: todayEnd } }),
       Evaluation.countDocuments({ teacherId, createdAt: { $gte: monthStart } }),
@@ -260,12 +261,21 @@ exports.getMyStats = async (req, res, next) => {
       // session" card for a live "current session" card without a page nav.
       Session.find({ teacherId, status: 'ongoing' })
         .sort({ scheduledAt: 1 }).populate('studentId', 'firstNameAr lastNameAr avatar'),
+      getOrCreateCurrentPeriod(teacherId).catch(() => null),
     ])
 
     sendSuccess(res, {
       totalStudents, sessionsToday, pendingEvaluations: pendingEvals, completedThisMonth: completedMonth,
       upcomingSessions, recentStudents, needsAttention,
       currentSession: ongoingSessions[0] || null, ongoingCount: ongoingSessions.length,
+      payrollSummary: currentPeriod ? {
+        periodKey: currentPeriod.periodKey,
+        periodId: currentPeriod._id,
+        netPayable: currentPeriod.netPayable || 0,
+        bonusesTotal: currentPeriod.bonusesTotal || 0,
+        deductionsTotal: currentPeriod.deductionsTotal || 0,
+        grossEntitlement: currentPeriod.grossEntitlement || 0,
+      } : null,
     })
   } catch (err) {
     next(err)
