@@ -57,15 +57,16 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleSubmit} noValidate className="space-y-5">
               <Input
                 label="البريد الإلكتروني"
-                type="email"
+                type="text"
+                inputMode="email"
                 value={email}
                 onChange={e => setEmail(cleanEmail(e.target.value))}
+                onBlur={e => setEmail(cleanEmail(e.target.value))}
                 placeholder="example@email.com"
                 required
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                inputMode="email"
               />
               <Button type="submit" variant="purple" fullWidth loading={loading} size="lg">إرسال رابط الاسترداد</Button>
             </form>

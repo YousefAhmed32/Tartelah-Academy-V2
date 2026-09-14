@@ -242,16 +242,20 @@ export default function RegisterPage() {
                 <PremiumInput
                   label="البريد الإلكتروني"
                   name="email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   value={form.email}
                   onChange={change}
+                  onBlur={(e) => {
+                    const clean = cleanEmail(e.target.value)
+                    setForm(p => ({ ...p, email: clean }))
+                  }}
                   placeholder="example@email.com"
                   autoComplete="email"
                   inputDir="ltr"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  inputMode="email"
                   required
                   icon={<Mail size={17} strokeWidth={1.8} />}
                 />
