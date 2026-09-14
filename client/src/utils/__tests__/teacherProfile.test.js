@@ -59,8 +59,8 @@ describe('teacherShiftsLabel (24h shifts)', () => {
   })
 
   test('returns 24-hour summary when full_day or all 4 quadrants selected', () => {
-    expect(teacherShiftsLabel(['full_day'])).toBe('على مدار 24 ساعة (طوال اليوم)')
-    expect(teacherShiftsLabel(['morning', 'afternoon', 'evening', 'night'])).toBe('على مدار 24 ساعة (طوال اليوم)')
+    expect(teacherShiftsLabel(['full_day'])).toBe('على مدار اليوم (24 ساعة)')
+    expect(teacherShiftsLabel(['morning', 'afternoon', 'evening', 'night'])).toBe('على مدار اليوم (24 ساعة)')
   })
 
   test('returns null for empty or non-array values', () => {
