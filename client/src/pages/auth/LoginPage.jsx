@@ -23,6 +23,13 @@ const DEV_ACCOUNTS = [
   { role: 'student',        label: 'Student', Icon: BookOpen,     color: '#22c55e', bg: 'rgba(34,197,94,0.09)',  border: 'rgba(34,197,94,0.22)'  },
 ]
 
+// Helper to clean mobile keyboard spaces, autofill artifacts, and invisible unicode
+const cleanEmail = (val) =>
+  (val || '')
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
+    .trim()
+    .toLowerCase()
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
@@ -35,15 +42,21 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   function change(e) {
-    setForm(p => ({ ...p, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    if (name === 'email') {
+      setForm(p => ({ ...p, email: cleanEmail(value) }))
+    } else {
+      setForm(p => ({ ...p, [name]: value }))
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.email || !form.password) return toast.error('يرجى ملء جميع الحقول')
+    const sanitizedEmail = cleanEmail(form.email)
+    if (!sanitizedEmail || !form.password) return toast.error('يرجى ملء جميع الحقول')
     setLoading(true)
     try {
-      const res = await authService.login(form)
+      const res = await authService.login({ ...form, email: sanitizedEmail })
       const { user, accessToken } = res.data.data
       setAuth(user, accessToken)
       toast.success(`أهلاً ${user.firstNameAr || user.firstName}!`)
@@ -83,7 +96,7 @@ export default function LoginPage() {
               delay={0.07}
             />
 
-            <form onSubmit={handleSubmit} className="space-y-[18px]">
+            <form onSubmit={handleSubmit} noValidate className="space-y-[18px]">
 
               <motion.div {...fu(0.12)}>
                 <PremiumInput
@@ -95,6 +108,10 @@ export default function LoginPage() {
                   placeholder="example@email.com"
                   autoComplete="email"
                   inputDir="ltr"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   icon={<Mail size={17} strokeWidth={1.8} />}
                 />
               </motion.div>

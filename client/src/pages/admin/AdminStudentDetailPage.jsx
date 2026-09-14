@@ -6,7 +6,7 @@ import {
   ArrowRight, Star, CheckCircle, XCircle, Clock, Edit2, Trash2, ArrowLeftRight,
   Mail, Phone, Calendar, User, KeyRound, Power, PowerOff, LayoutGrid, Wallet, BookOpen,
   StickyNote, MessageCircle, Gift, RefreshCw, Eye, Sparkles, SlidersHorizontal,
-  CalendarClock, ExternalLink, AlertTriangle,
+  CalendarClock, ExternalLink, AlertTriangle, Plus,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Badge from '../../components/ui/Badge.jsx'
@@ -225,23 +225,43 @@ function OverviewTab({ student, assignedTeacher }) {
               <p className="text-xs text-gray-500 mt-0.5">مواعيد الحصص الأسبوعية الثابتة وإمكانية تعديل الأيام والتوقيت والمعلم مباشرة</p>
             </div>
           </div>
-          <Link
-            to={ROUTES.ADMIN_SCHEDULE_RULES}
-            className="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            صفحة الجداول الدورية العامة ←
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="purple"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setEditingRule({ isNew: true })}
+            >
+              إضافة جدول دوري
+            </Button>
+            <Link
+              to={ROUTES.ADMIN_SCHEDULE_RULES}
+              className="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              صفحة الجداول الدورية العامة ←
+            </Link>
+          </div>
         </div>
 
         {scheduleLoading ? (
           <div className="flex justify-center py-8"><Spinner color="border-violet-600" /></div>
         ) : !rules.length ? (
-          <div className="text-center py-8 px-4 bg-gray-50/60 rounded-xl border border-dashed border-gray-200">
-            <CalendarClock className="mx-auto text-gray-400 mb-2" size={28} />
-            <p className="text-sm font-semibold text-gray-700">لا يوجد جدول أسبوعي دوري مسجل لهذا الطالب حالياً</p>
-            <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-              يتم إنشاء الجداول الدورية تلقائياً عند تفعيل خطة الحصص أو يمكن جدولتها من خلال صفحة الجداول الدورية.
-            </p>
+          <div className="text-center py-8 px-4 bg-gray-50/60 rounded-xl border border-dashed border-gray-200 space-y-3">
+            <CalendarClock className="mx-auto text-gray-400" size={32} />
+            <div>
+              <p className="text-sm font-bold text-gray-800">لا يوجد جدول أسبوعي دوري مسجل لهذا الطالب حالياً</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                يمكنك كإدارة تعيين وتفعيل جدول دوري فوري للطالب مع المعلم المسؤول وتحديد مواعيد الحصص والرابط وتوليد الحصص مباشرة.
+              </p>
+            </div>
+            <Button
+              variant="purple"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setEditingRule({ isNew: true })}
+            >
+              + تعيين جدول دوري لهذا الطالب
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -342,11 +362,15 @@ function OverviewTab({ student, assignedTeacher }) {
 
       {editingRule && (
         <EditScheduleRuleModal
-          rule={editingRule}
+          rule={editingRule.isNew ? null : editingRule}
+          initialStudentId={student._id}
+          initialTeacherId={assignedTeacher?._id || ''}
+          lockStudent={true}
           onClose={() => setEditingRule(null)}
           onSuccess={() => {
             qc.invalidateQueries({ queryKey: ['admin', 'student', 'schedule-rules', student._id] })
             qc.invalidateQueries({ queryKey: ['admin', 'student', student._id] })
+            qc.invalidateQueries({ queryKey: ['admin', 'student', 'academics'] })
           }}
         />
       )}

@@ -44,6 +44,10 @@ const Input = forwardRef(function Input({
           type={inputType}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={errorId || hintId}
+          autoCapitalize={props.autoCapitalize || (inputType === 'email' ? 'none' : undefined)}
+          autoCorrect={props.autoCorrect || (inputType === 'email' ? 'off' : undefined)}
+          spellCheck={props.spellCheck !== undefined ? props.spellCheck : (inputType === 'email' ? false : undefined)}
+          inputMode={props.inputMode || (inputType === 'email' ? 'email' : undefined)}
           className={`
             ${fieldClass}
             ${icon ? 'pe-12' : ''}

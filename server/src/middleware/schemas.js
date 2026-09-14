@@ -1,7 +1,10 @@
-const Joi = require('joi')
+const cleanEmailStr = (val) =>
+  (typeof val === 'string'
+    ? val.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '').toLowerCase().trim()
+    : val)
 
 const ar = Joi.string().trim()
-const email = Joi.string().email({ tlds: { allow: false } }).lowercase().trim()
+const email = Joi.string().custom(cleanEmailStr).email({ tlds: { allow: false } }).lowercase().trim()
 const password = Joi.string().min(8).max(64)
 
 exports.registerSchema = Joi.object({

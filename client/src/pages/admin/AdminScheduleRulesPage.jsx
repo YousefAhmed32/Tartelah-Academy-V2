@@ -134,9 +134,17 @@ export default function AdminScheduleRulesPage() {
             >
               <BookOpen size={14} /> كيف تعمل الحصة؟
             </button>
+            <Button
+              variant="purple"
+              size="sm"
+              icon={<PlusCircle size={14} />}
+              onClick={() => setEditRule({ isNew: true })}
+            >
+              إضافة جدول دوري مباشر
+            </Button>
             <Link
               to={ROUTES.ADMIN_TEACHER_ONBOARDING_WIZARD}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-colors shadow-sm"
             >
               <PlusCircle size={14} /> إضافة طالب وجدولة حصص جديدة
             </Link>
@@ -244,7 +252,18 @@ export default function AdminScheduleRulesPage() {
         </>
       )}
 
-      {editRule && <EditRuleModal rule={editRule} teachers={teachers} students={students} onClose={() => setEditRule(null)} />}
+      {editRule && (
+        <EditRuleModal
+          rule={editRule.isNew ? null : editRule}
+          teachers={teachers}
+          students={students}
+          onClose={() => setEditRule(null)}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['admin', 'schedule-rules'] })
+            setEditRule(null)
+          }}
+        />
+      )}
       {generateRule && <GenerateMoreModal rule={generateRule} onClose={() => setGenerateRule(null)} />}
       <ConfirmDialog
         open={!!deleteRule}

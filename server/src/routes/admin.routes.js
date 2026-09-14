@@ -119,6 +119,7 @@ router.patch('/homework/:id', requirePermission('sessions.manage'), ctrl.updateH
 
 // Schedule rules — admin has full authority over any teacher's schedule
 router.get('/schedule-rules', requirePermission('scheduleRules.view'), ctrl.getAllScheduleRules)
+router.post('/schedule-rules', requirePermission('scheduleRules.manage'), ctrl.createScheduleRule)
 router.patch('/schedule-rules/:id', requirePermission('scheduleRules.manage'), ctrl.updateScheduleRule)
 router.delete('/schedule-rules/:id', requirePermission('scheduleRules.manage'), ctrl.deleteScheduleRule)
 router.post('/schedule-rules/:id/generate-more', requirePermission('scheduleRules.manage'), ctrl.generateMoreScheduleRule)

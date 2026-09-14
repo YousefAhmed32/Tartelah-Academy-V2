@@ -773,6 +773,81 @@ exports.getAllScheduleRules = async (req, res, next) => {
   } catch (err) { next(err) }
 }
 
+// Admin: create a new recurring schedule rule for any teacher and student
+exports.createScheduleRule = async (req, res, next) => {
+  try {
+    const {
+      teacherId, studentId, subscriptionId, frequency, daysOfWeek, timeOfDay,
+      durationMinutes, startDate, endDate, sessionsTotal,
+      meetingLink, meetingProvider, titleTemplate, notes,
+    } = req.body
+
+    if (!teacherId) return sendError(res, 'يجب تحديد المعلم عند إنشاء الجدول', 400)
+    if (!studentId) return sendError(res, 'يجب تحديد الطالب عند إنشاء الجدول', 400)
+    if (!startDate) return sendError(res, 'تاريخ البدء مطلوب', 400)
+
+    const [teacherUser, studentUser] = await Promise.all([
+      User.findById(teacherId).select('firstNameAr lastNameAr meetingLinks'),
+      User.findById(studentId).select('firstNameAr lastNameAr name'),
+    ])
+
+    if (!teacherUser) return sendError(res, 'المعلم المحدد غير موجود', 404)
+    if (!studentUser) return sendError(res, 'الطالب المحدد غير موجود', 404)
+
+    const studentName = `${studentUser.firstNameAr || ''} ${studentUser.lastNameAr || ''}`.trim() || studentUser.name || 'طالب'
+    const defaultTitle = `حصة ${studentName}`
+
+    let resolvedMeetingLink = meetingLink || ''
+    let resolvedMeetingProvider = meetingProvider || 'zoom'
+    if (!resolvedMeetingLink && teacherUser?.meetingLinks?.[0]?.link) {
+      resolvedMeetingLink = teacherUser.meetingLinks[0].link
+      resolvedMeetingProvider = teacherUser.meetingLinks[0].provider || resolvedMeetingProvider
+    }
+
+    const rule = await ScheduleRule.create({
+      teacherId,
+      studentId,
+      subscriptionId,
+      frequency: frequency || 'weekly',
+      daysOfWeek: daysOfWeek || [],
+      timeOfDay: timeOfDay || '18:00',
+      durationMinutes: durationMinutes || 60,
+      startDate: new Date(startDate),
+      endDate: endDate ? new Date(endDate) : undefined,
+      sessionsTotal: sessionsTotal || undefined,
+      meetingLink: resolvedMeetingLink,
+      meetingProvider: resolvedMeetingProvider,
+      titleTemplate: titleTemplate || defaultTitle,
+      notes,
+    })
+
+    const sessions = await scheduleService.generateSessionsFromRule(rule)
+
+    await createNotification({
+      userId: studentId,
+      titleAr: 'تم إنشاء جدولك الدراسي',
+      bodyAr: `تم إنشاء جدول حصصك الدراسية — ${sessions.length} حصة مجدولة`,
+      type: 'schedule',
+      priority: 'high',
+      relatedId: rule._id,
+      actionUrl: '/student/schedule',
+    })
+
+    await rule.populate([
+      { path: 'teacherId', select: 'firstNameAr lastNameAr avatar' },
+      { path: 'studentId', select: 'firstNameAr lastNameAr avatar' },
+    ])
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'schedule_rule.admin_create',
+      entity: 'ScheduleRule', entityId: rule._id,
+      changes: { teacherId, studentId, sessionCount: sessions.length }, ip: req.ip,
+    })
+
+    sendSuccess(res, { rule, sessions, sessionCount: sessions.length }, 'تم إنشاء الجدول الدوري وتوليد الحصص بنجاح', 201)
+  } catch (err) { next(err) }
+}
+
 // Admin has full authority over any teacher's recurring schedule: the
 // operational fields plus recurrence changes and reassigning the
 // teacher/student — teachers keep their own create/edit permissions

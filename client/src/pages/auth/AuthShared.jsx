@@ -219,6 +219,8 @@ export function BrandHeader({ title, subtitle, delay = 0.07, bottomMargin = 'mb-
 export function PremiumInput({
   label, name, type = 'text', value, onChange, placeholder,
   icon, endSlot, autoComplete, required, inputDir,
+  autoCapitalize, autoCorrect, spellCheck, inputMode,
+  ...rest
 }) {
   const [focused, setFocused] = useState(false)
 
@@ -262,6 +264,10 @@ export function PremiumInput({
           autoComplete={autoComplete}
           required={required}
           dir={inputDir}
+          autoCapitalize={autoCapitalize || (type === 'email' ? 'none' : undefined)}
+          autoCorrect={autoCorrect || (type === 'email' ? 'off' : undefined)}
+          spellCheck={spellCheck !== undefined ? spellCheck : (type === 'email' ? false : undefined)}
+          inputMode={inputMode || (type === 'email' ? 'email' : undefined)}
           onFocus={() => setFocused(true)}
           onBlur={()  => setFocused(false)}
           className="w-full outline-none text-[15px] font-medium"
@@ -273,6 +279,7 @@ export function PremiumInput({
             color:        T.text,
             borderRadius: '14px',
           }}
+          {...rest}
         />
 
         {endSlot && (

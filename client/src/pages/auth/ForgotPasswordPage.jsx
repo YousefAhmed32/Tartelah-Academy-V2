@@ -7,6 +7,12 @@ import { ROUTES } from '../../config/constants.js'
 import Input from '../../components/ui/Input.jsx'
 import Button from '../../components/ui/Button.jsx'
 
+const cleanEmail = (val) =>
+  (val || '')
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
+    .trim()
+    .toLowerCase()
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,9 +20,11 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const sanitizedEmail = cleanEmail(email)
+    if (!sanitizedEmail) return toast.error('يرجى إدخال البريد الإلكتروني')
     setLoading(true)
     try {
-      await authService.forgotPassword(email)
+      await authService.forgotPassword(sanitizedEmail)
       setSent(true)
       toast.success('تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني')
     } catch (err) {
@@ -46,8 +54,19 @@ export default function ForgotPasswordPage() {
               <p className="text-sm" style={{ color: '#b6a6d8' }}>تحقق من صندوق البريد الإلكتروني وافتح الرابط لإعادة تعيين كلمة المرور.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <Input label="البريد الإلكتروني" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@email.com" required />
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              <Input
+                label="البريد الإلكتروني"
+                type="email"
+                value={email}
+                onChange={e => setEmail(cleanEmail(e.target.value))}
+                placeholder="example@email.com"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
+              />
               <Button type="submit" variant="purple" fullWidth loading={loading} size="lg">إرسال رابط الاسترداد</Button>
             </form>
           )}

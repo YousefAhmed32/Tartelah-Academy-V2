@@ -102,6 +102,12 @@ function PasswordStrength({ password }) {
   )
 }
 
+const cleanEmail = (val) =>
+  (val || '')
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
+    .trim()
+    .toLowerCase()
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
@@ -126,24 +132,30 @@ export default function RegisterPage() {
   const preferredTeacherName = searchParams.get('teacherName')
 
   function change(e) {
-    setForm(p => ({ ...p, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    if (name === 'email') {
+      setForm(p => ({ ...p, email: cleanEmail(value) }))
+    } else {
+      setForm(p => ({ ...p, [name]: value }))
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const sanitizedEmail = cleanEmail(form.email)
     if (!form.firstNameAr || !form.lastNameAr) return toast.error('يرجى إدخال الاسم الأول والأخير')
-    if (!form.email)                            return toast.error('يرجى إدخال البريد الإلكتروني')
+    if (!sanitizedEmail)                        return toast.error('يرجى إدخال البريد الإلكتروني')
     if (form.password.length < 8)              return toast.error('كلمة المرور يجب أن تكون ٨ أحرف على الأقل')
     if (form.password !== form.confirmPassword) return toast.error('كلمتا المرور غير متطابقتين')
     setLoading(true)
     try {
       const res = await authService.register({
-        firstNameAr: form.firstNameAr,
-        lastNameAr:  form.lastNameAr,
-        firstName:   form.firstNameAr,
-        lastName:    form.lastNameAr,
-        email:       form.email,
-        phone:       form.phone,
+        firstNameAr: form.firstNameAr.trim(),
+        lastNameAr:  form.lastNameAr.trim(),
+        firstName:   form.firstNameAr.trim(),
+        lastName:    form.lastNameAr.trim(),
+        email:       sanitizedEmail,
+        phone:       form.phone?.trim() || '',
         password:    form.password,
       })
       const { user, accessToken } = res.data.data
@@ -197,7 +209,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
 
             {/* ── Name row: two columns ── */}
             <motion.div {...fu(0.11)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-[18px]">
@@ -236,6 +248,10 @@ export default function RegisterPage() {
                   placeholder="example@email.com"
                   autoComplete="email"
                   inputDir="ltr"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   required
                   icon={<Mail size={17} strokeWidth={1.8} />}
                 />

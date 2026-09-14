@@ -15,6 +15,7 @@ import Button from '../ui/Button.jsx'
 import Spinner from '../ui/Spinner.jsx'
 import Modal from '../ui/Modal.jsx'
 import ConfirmDialog from '../shared/ConfirmDialog.jsx'
+import EditScheduleRuleModal from './EditScheduleRuleModal.jsx'
 import { formatDateAr, formatTimeAr, getDayNameAr, isToday, isFuture, isPast } from '../../utils/date.js'
 import { dayLabel } from '../../utils/assignmentSchedule.js'
 
@@ -48,6 +49,7 @@ export default function TeacherSessionsTab({
 
   // Modal states
   const [sessionModal, setSessionModal] = useState({ open: false, session: null, prefilledStudentId: '' })
+  const [scheduleRuleModal, setScheduleRuleModal] = useState({ open: false, rule: null, studentId: '' })
   const [cancelModal, setCancelModal] = useState({ open: false, session: null })
   const [deleteModal, setDeleteModal] = useState({ open: false, session: null })
   const [copiedLink, setCopiedLink] = useState('')
@@ -358,6 +360,16 @@ export default function TeacherSessionsTab({
               تحديث
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              icon={<CalendarClock size={14} className="text-violet-600" />}
+              onClick={() => setScheduleRuleModal({ open: true, rule: null, studentId: '' })}
+              className="!text-violet-700 !border-violet-200 hover:!bg-violet-50 font-bold"
+              title="إنشاء وتعيين جدول دوري جديد لأحد طلاب هذا المعلم"
+            >
+              إضافة جدول دوري
+            </Button>
+            <Button
               variant="purple"
               size="sm"
               icon={<Plus size={15} />}
@@ -628,6 +640,16 @@ export default function TeacherSessionsTab({
                         <Button
                           variant="outline"
                           size="sm"
+                          icon={<CalendarClock size={13} className="text-violet-600" />}
+                          onClick={() => setScheduleRuleModal({ open: true, rule: null, studentId: st._id })}
+                          className="!text-violet-700 !border-violet-200 hover:!bg-violet-50 font-bold"
+                          title="تعيين جدول دوري لهذا الطالب"
+                        >
+                          تعيين جدول دوري
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           icon={<Plus size={13} />}
                           onClick={() => setSessionModal({ open: true, session: null, prefilledStudentId: st._id })}
                         >
@@ -639,30 +661,63 @@ export default function TeacherSessionsTab({
                     {/* Body: Recurring Schedule + Upcoming Sessions */}
                     <div className="p-4 sm:p-5 space-y-4">
                       {/* Recurring Schedule Rules for this Student */}
-                      {group.rules.length > 0 && (
-                        <div className="bg-violet-50/50 rounded-xl p-3 border border-violet-100 space-y-1.5">
-                          <span className="text-[11px] font-bold text-violet-900 flex items-center gap-1.5">
-                            <Layers size={13} className="text-violet-600" />
-                            المواعيد الدورية المعتمدة:
-                          </span>
+                      {group.rules.length > 0 ? (
+                        <div className="bg-violet-50/50 rounded-xl p-3 border border-violet-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-violet-900 flex items-center gap-1.5">
+                              <Layers size={13} className="text-violet-600" />
+                              المواعيد الدورية المعتمدة ({group.rules.length}):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setScheduleRuleModal({ open: true, rule: null, studentId: st._id })}
+                              className="text-[11px] font-bold text-violet-700 hover:text-violet-900 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Plus size={11} /> إضافة موعد آخر
+                            </button>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             {group.rules.map((r) => (
-                              <span
+                              <div
                                 key={r._id}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-violet-200 text-xs font-semibold text-violet-950"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-violet-200 text-xs font-semibold text-violet-950 shadow-2xs hover:border-violet-400 transition-colors"
                               >
                                 <span>
                                   {r.daysOfWeek?.map((d) => dayLabel(d)).join(' و ') || 'أسبوعيًا'}
                                 </span>
-                                <span className="text-violet-500 font-mono">
-                                  الساعة {r.timeOfDay || r.time}
+                                <span className="text-violet-600 font-mono" dir="ltr">
+                                  {r.timeOfDay || r.time}
                                 </span>
                                 <span className="text-[11px] text-gray-400 font-mono">
                                   ({r.durationMinutes || 60} د)
                                 </span>
-                              </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setScheduleRuleModal({ open: true, rule: r, studentId: st._id })}
+                                  className="p-1 text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-md transition-colors cursor-pointer"
+                                  title="تعديل هذا الجدول الدوري"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
                             ))}
                           </div>
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50/60 border border-dashed border-amber-200 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 text-amber-800">
+                            <CalendarClock size={15} className="text-amber-600 flex-none" />
+                            <span>لا يوجد جدول أسبوعي دوري مسجل لهذا الطالب بعد</span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={<Plus size={12} />}
+                            onClick={() => setScheduleRuleModal({ open: true, rule: null, studentId: st._id })}
+                            className="!text-amber-800 !border-amber-300 hover:!bg-amber-100/60 !py-1 !px-2.5 !text-xs font-bold"
+                          >
+                            تعيين جدول دوري للطالب
+                          </Button>
                         </div>
                       )}
 
@@ -795,18 +850,27 @@ export default function TeacherSessionsTab({
                     <span>{rule.timeOfDay || rule.time}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-100">
                     <span>المدة: {rule.durationMinutes || 60} دقيقة</span>
-                    {rule.meetingLink && (
-                      <a
-                        href={rule.meetingLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-violet-600 hover:underline flex items-center gap-1"
+                    <div className="flex items-center gap-2">
+                      {rule.meetingLink && (
+                        <a
+                          href={rule.meetingLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-violet-600 hover:underline flex items-center gap-1"
+                        >
+                          رابط الحصة <ExternalLink size={10} />
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setScheduleRuleModal({ open: true, rule, studentId: rule.studentId?._id || rule.studentId })}
+                        className="text-violet-700 hover:text-violet-900 font-bold flex items-center gap-1 cursor-pointer"
                       >
-                        رابط الحصة <ExternalLink size={10} />
-                      </a>
-                    )}
+                        <Edit2 size={11} /> تعديل
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -816,6 +880,24 @@ export default function TeacherSessionsTab({
       </div>
 
       {/* ── Modals ── */}
+      {scheduleRuleModal.open && (
+        <EditScheduleRuleModal
+          rule={scheduleRuleModal.rule}
+          initialTeacherId={teacherId}
+          initialStudentId={scheduleRuleModal.studentId}
+          lockTeacher={true}
+          students={assignedStudentsList}
+          onClose={() => setScheduleRuleModal({ open: false, rule: null, studentId: '' })}
+          onSuccess={() => {
+            refetchRules()
+            refetchSessions()
+            qc.invalidateQueries({ queryKey: ['admin', 'teacher-schedule-rules', teacherId] })
+            qc.invalidateQueries({ queryKey: ['admin', 'teacher-sessions', teacherId] })
+            qc.invalidateQueries({ queryKey: ['admin', 'teacher-profile', teacherId] })
+          }}
+        />
+      )}
+
       {sessionModal.open && (
         <AdminSessionModal
           open={sessionModal.open}

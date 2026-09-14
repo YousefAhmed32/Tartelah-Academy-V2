@@ -19,9 +19,17 @@ function issueTokens(user, res) {
   return accessToken
 }
 
+function cleanEmail(val) {
+  return (val || '')
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\u200E\u200F]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
 exports.register = async (req, res, next) => {
   try {
-    const { firstNameAr, lastNameAr, firstName, lastName, email, password, phone } = req.body
+    const { firstNameAr, lastNameAr, firstName, lastName, password, phone } = req.body
+    const email = cleanEmail(req.body.email)
     const existing = await User.findOne({ email })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
     const user = await User.create({
@@ -39,7 +47,8 @@ exports.register = async (req, res, next) => {
 
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body
+    const { password } = req.body
+    const email = cleanEmail(req.body.email)
     const user = await User.findOne({ email }).select('+password +tokenVersion')
     if (!user || !(await user.comparePassword(password))) {
       return sendError(res, 'البريد الإلكتروني أو كلمة المرور غير صحيحة', 401)
@@ -109,7 +118,7 @@ exports.refresh = async (req, res, next) => {
 
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body
+    const email = cleanEmail(req.body.email)
     const user = await User.findOne({ email })
     if (!user) return sendSuccess(res, null, 'إذا كان البريد مسجلاً، ستصلك رسالة')
     const token = crypto.randomBytes(32).toString('hex')
