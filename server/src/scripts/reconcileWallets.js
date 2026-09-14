@@ -14,13 +14,13 @@
 
 function computeExpectedCounters(transactions) {
   const counters = {
-    remaining: 0, totalPurchased: 0, totalUsed: 0,
+    remaining: 0, totalPurchased: 0, totalUsed: 0, deductedLessons: 0,
     bonusLessons: 0, compensationLessons: 0, transferredIn: 0, transferredOut: 0,
   }
   for (const tx of transactions) {
     counters.remaining += tx.amount
     switch (tx.type) {
-      case 'purchase': case 'renewal': case 'refund': case 'migration_import':
+      case 'purchase': case 'renewal': case 'refund': case 'migration_import': case 'opening_balance':
         counters.totalPurchased += tx.amount
         break
       case 'consumption': case 'reversal':
@@ -37,6 +37,13 @@ function computeExpectedCounters(transactions) {
         break
       case 'transfer_in':
         counters.transferredIn += tx.amount
+        break
+      case 'manual_adjustment':
+      case 'admin_edit':
+        if (tx.amount < 0) {
+          counters.deductedLessons += -tx.amount
+          counters.totalUsed += -tx.amount
+        }
         break
       default:
         break

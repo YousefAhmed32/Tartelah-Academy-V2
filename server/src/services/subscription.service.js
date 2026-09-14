@@ -31,7 +31,7 @@ class SubscriptionCreationError extends Error {
  * wallet credit.
  */
 async function createSubscriptionWithOpeningBalance({
-  studentId, packageId, teacherId, startDate, notes,
+  studentId, packageId, teacherId, startDate, endDate, remainingDays, notes,
   lessonsUsed, lessonsRemaining, actorId, actorRole = 'admin',
 }) {
   if (!studentId) throw new SubscriptionCreationError('معرف الطالب مطلوب')
@@ -49,7 +49,10 @@ async function createSubscriptionWithOpeningBalance({
 
   const start = startDate ? new Date(startDate) : new Date()
   if (Number.isNaN(start.getTime())) throw new SubscriptionCreationError('تاريخ بداية الاشتراك غير صالح')
-  const end = new Date(start.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000)
+  const days = Number(remainingDays) || pkg.durationDays || 30
+  const end = endDate && !Number.isNaN(new Date(endDate).getTime())
+    ? new Date(endDate)
+    : new Date(start.getTime() + days * 24 * 60 * 60 * 1000)
 
   const sub = await Subscription.create({
     studentId, packageId, packageNameAr: pkg.nameAr, teacherId,

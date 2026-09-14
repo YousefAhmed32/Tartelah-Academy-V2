@@ -45,6 +45,12 @@ function fieldsToIncrement(type, amount) {
       return { remaining: amount, transferredIn: amount }
     case 'manual_adjustment':
     case 'admin_edit':
+      if (amount < 0) {
+        // Administrative deduction: counts towards deductedLessons AND totalUsed (consumed)
+        const deducted = -amount
+        return { remaining: amount, deductedLessons: deducted, totalUsed: deducted }
+      }
+      return { remaining: amount }
     case 'migration_import':
     default:
       return { remaining: amount }

@@ -156,7 +156,7 @@ function formatTime12h(timeStr) {
   return `${h.toString().padStart(2, '0')}:${m} ${period}`
 }
 
-function OverviewTab({ student, assignedTeacher }) {
+function OverviewTab({ student, assignedTeacher, subscription }) {
   const qc = useQueryClient()
   const [editingRule, setEditingRule] = useState(null)
 
@@ -365,11 +365,14 @@ function OverviewTab({ student, assignedTeacher }) {
           rule={editingRule.isNew ? null : editingRule}
           initialStudentId={student._id}
           initialTeacherId={assignedTeacher?._id || ''}
+          initialSubscription={subscription}
+          student={student}
           lockStudent={true}
           onClose={() => setEditingRule(null)}
           onSuccess={() => {
             qc.invalidateQueries({ queryKey: ['admin', 'student', 'schedule-rules', student._id] })
             qc.invalidateQueries({ queryKey: ['admin', 'student', student._id] })
+            qc.invalidateQueries({ queryKey: ['admin', 'student', student._id, 'wallet'] })
             qc.invalidateQueries({ queryKey: ['admin', 'student', 'academics'] })
           }}
         />
@@ -1014,7 +1017,7 @@ export default function AdminStudentDetailPage() {
         </div>
       </div>
 
-      {tab === 'overview' && <OverviewTab student={student} assignedTeacher={assignedTeacher} />}
+      {tab === 'overview' && <OverviewTab student={student} assignedTeacher={assignedTeacher} subscription={sub} />}
       {tab === 'subscription' && <SubscriptionWalletTab studentId={id} student={student} subscription={sub} enrollmentRequests={enrollmentRequests} />}
       {tab === 'academic' && <AcademicTab studentId={id} recentSessions={recentSessions} academics={academics} academicsLoading={loadAcademics} />}
       {tab === 'transfers' && hasPermission('transfers.view') && (

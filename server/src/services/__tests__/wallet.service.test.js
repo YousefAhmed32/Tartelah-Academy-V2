@@ -61,6 +61,18 @@ describe('wallet.service.applyTransaction', () => {
     expect(incCall.$inc).toEqual({ remaining: 1, totalUsed: -1 })
   })
 
+  test('a negative manual_adjustment decrements remaining, increments totalUsed and deductedLessons', async () => {
+    LessonWallet.findOneAndUpdate
+      .mockResolvedValueOnce({ _id: 'w1', remaining: 12 })
+      .mockResolvedValueOnce({ _id: 'w1', remaining: 11, totalUsed: 1, deductedLessons: 1 })
+    LessonTransaction.create.mockResolvedValueOnce({ _id: 'tx_adj' })
+
+    await walletService.applyTransaction({ studentId: 's1', type: 'manual_adjustment', amount: -1, idempotencyKey: 'k_adj' })
+
+    const incCall = LessonWallet.findOneAndUpdate.mock.calls[1][1]
+    expect(incCall.$inc).toEqual({ remaining: -1, totalUsed: 1, deductedLessons: 1 })
+  })
+
   test('a duplicate idempotencyKey is a guaranteed no-op — never double-applies', async () => {
     LessonWallet.findOneAndUpdate.mockResolvedValueOnce({ _id: 'w1', remaining: 5 })
     const dupError = new Error('duplicate key')

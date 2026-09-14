@@ -4,6 +4,7 @@ import { formatNumber } from '../../utils/format.js'
 const BREAKDOWN_ITEMS = [
   { key: 'totalPurchased', label: 'إجمالي المشترى', color: '#7c3aed' },
   { key: 'totalUsed', label: 'المستهلك', color: '#7c6aaa' },
+  { key: 'deductedLessons', label: 'حصص مخصومة', color: '#ef4444' },
   { key: 'bonusLessons', label: 'حصص إضافية', color: '#E8C76A' },
   { key: 'compensationLessons', label: 'حصص تعويضية', color: '#22c55e' },
   { key: 'frozenLessons', label: 'مجمّدة', color: '#3b82f6' },

@@ -23,6 +23,26 @@ async function notifyTeacherOfStudentAdjustment(studentId, { titleAr, bodyAr }) 
   }
 }
 
+async function notifyAdmins({ titleAr, bodyAr, actionUrl }) {
+  try {
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id').limit(20)
+    await Promise.all(
+      admins.map(a =>
+        createNotification({
+          userId: a._id,
+          titleAr,
+          bodyAr,
+          type: 'subscription',
+          priority: 'medium',
+          actionUrl,
+        }).catch(() => {})
+      )
+    )
+  } catch (_) {
+    // Non-critical admin notification failure
+  }
+}
+
 async function isAssignedTeacher(teacherId, studentId) {
   const link = await Subscription.exists({ studentId, teacherId })
   return !!link
@@ -72,24 +92,46 @@ exports.adjustWallet = async (req, res, next) => {
       reason: reason.trim(), performedByRole: 'admin', performedBy: req.user._id,
     })
 
+    const isDeduction = numAmount < 0
+    const absAmount = Math.abs(numAmount)
+    const unitWord = absAmount === 1 ? 'حصة' : 'حصص'
+
     logAction({
-      actorId: req.user._id, actorRole: req.user.role, action: 'wallet.manual_adjustment',
+      actorId: req.user._id, actorRole: req.user.role, action: isDeduction ? 'wallet.deduction' : 'wallet.manual_adjustment',
       entity: 'LessonWallet', entityId: wallet._id, changes: { amount: numAmount, reason }, ip: req.ip,
-    })
-    await createNotification({
-      userId: req.params.studentId, titleAr: 'تعديل على رصيد حصصك',
-      bodyAr: `تم تعديل رصيد حصصك بمقدار ${numAmount > 0 ? '+' : ''}${numAmount} — ${reason}`,
-      type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
     })
 
     const student = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
     const sName = student ? `${student.firstNameAr || ''} ${student.lastNameAr || ''}`.trim() : 'الطالب'
+
+    // Notify Student
+    await createNotification({
+      userId: req.params.studentId,
+      titleAr: isDeduction ? 'خصم حصص من رصيدك' : 'إضافة حصص إلى رصيدك',
+      bodyAr: isDeduction
+        ? `تم خصم ${absAmount} ${unitWord} من رصيدك من قِبل الإدارة — السبب: ${reason.trim()} (رصيدك الحالي: ${wallet.remaining} حصة)`
+        : `تمت إضافة ${absAmount} ${unitWord} إلى رصيدك من قِبل الإدارة — السبب: ${reason.trim()} (رصيدك الحالي: ${wallet.remaining} حصة)`,
+      type: 'subscription',
+      priority: isDeduction ? 'high' : 'medium',
+      actionUrl: '/student/subscription',
+    }).catch(() => {})
+
+    // Notify Assigned Teacher
     await notifyTeacherOfStudentAdjustment(req.params.studentId, {
-      titleAr: 'تعديل على رصيد حصص الطالب',
-      bodyAr: `تم تعديل رصيد حصص الطالب (${sName}) بمقدار ${numAmount > 0 ? '+' : ''}${numAmount} — ${reason}`,
+      titleAr: isDeduction ? 'خصم حصص من رصيد طالبك' : 'إضافة حصص لرصيد طالبك',
+      bodyAr: isDeduction
+        ? `تم خصم ${absAmount} ${unitWord} من رصيد الطالب (${sName}) — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`
+        : `تمت إضافة ${absAmount} ${unitWord} إلى رصيد الطالب (${sName}) — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`,
     })
 
-    sendSuccess(res, { wallet, transaction }, 'تم تعديل الرصيد')
+    // Notify Admins
+    await notifyAdmins({
+      titleAr: isDeduction ? `خصم رصيد لطالب: ${sName}` : `إضافة رصيد لطالب: ${sName}`,
+      bodyAr: `تم ${isDeduction ? 'خصم' : 'إضافة'} ${absAmount} ${unitWord} ${isDeduction ? 'من' : 'إلى'} رصيد الطالب (${sName}) — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`,
+      actionUrl: `/admin/students/${req.params.studentId}`,
+    })
+
+    sendSuccess(res, { wallet, transaction }, isDeduction ? 'تم خصم الحصص وتحديث المحفظة بنجاح' : 'تم تعديل الرصيد وتحديث المحفظة بنجاح')
   } catch (err) { next(err) }
 }
 
@@ -176,19 +218,33 @@ exports.grantBonus = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role, action: 'wallet.bonus_grant',
       entity: 'LessonWallet', entityId: wallet._id, changes: { amount: numAmount, reason }, ip: req.ip,
     })
+    // Notify Student
     await createNotification({
-      userId: req.params.studentId, titleAr: 'حصة مكافأة',
-      bodyAr: `تم إضافة ${numAmount} حصة مكافأة إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
-    })
+      userId: req.params.studentId,
+      titleAr: 'حصة مكافأة مضافة',
+      bodyAr: `تمت إضافة ${numAmount} ${numAmount === 1 ? 'حصة مكافأة' : 'حصص مكافأة'} إلى رصيدك من قِبل الإدارة — السبب: ${reason.trim()} (رصيدك الحالي: ${wallet.remaining} حصة)`,
+      type: 'subscription',
+      priority: 'medium',
+      actionUrl: '/student/subscription',
+    }).catch(() => {})
 
     const studentBonus = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
     const sNameBonus = studentBonus ? `${studentBonus.firstNameAr || ''} ${studentBonus.lastNameAr || ''}`.trim() : 'الطالب'
+
+    // Notify Teacher
     await notifyTeacherOfStudentAdjustment(req.params.studentId, {
       titleAr: 'إضافة حصة مكافأة لطالبك',
-      bodyAr: `تم إضافة ${numAmount} حصة مكافأة إلى رصيد الطالب (${sNameBonus}) — ${reason}`,
+      bodyAr: `تمت إضافة ${numAmount} ${numAmount === 1 ? 'حصة مكافأة' : 'حصص مكافأة'} إلى رصيد الطالب (${sNameBonus}) — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`,
     })
 
-    sendSuccess(res, { wallet, transaction }, 'تم منح حصة المكافأة')
+    // Notify Admins
+    await notifyAdmins({
+      titleAr: `منح حصص مكافأة: ${sNameBonus}`,
+      bodyAr: `تم منح ${numAmount} حصة مكافأة للطالب (${sNameBonus}) — السبب: ${reason.trim()}`,
+      actionUrl: `/admin/students/${req.params.studentId}`,
+    })
+
+    sendSuccess(res, { wallet, transaction }, 'تم منح حصة المكافأة بنجاح')
   } catch (err) { next(err) }
 }
 
@@ -209,18 +265,33 @@ exports.grantCompensation = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role, action: 'wallet.compensation_grant',
       entity: 'LessonWallet', entityId: wallet._id, changes: { amount: numAmount, reason }, ip: req.ip,
     })
+
+    // Notify Student
     await createNotification({
-      userId: req.params.studentId, titleAr: 'حصة تعويضية',
-      bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيدك — ${reason}`, type: 'subscription', priority: 'medium', actionUrl: '/student/subscription',
-    })
+      userId: req.params.studentId,
+      titleAr: 'حصة تعويضية مضافة',
+      bodyAr: `تمت إضافة ${numAmount} ${numAmount === 1 ? 'حصة تعويضية' : 'حصص تعويضية'} إلى رصيدك من قِبل الإدارة — السبب: ${reason.trim()} (رصيدك الحالي: ${wallet.remaining} حصة)`,
+      type: 'subscription',
+      priority: 'medium',
+      actionUrl: '/student/subscription',
+    }).catch(() => {})
 
     const studentComp = await User.findById(req.params.studentId).select('firstNameAr lastNameAr').catch(() => null)
     const sNameComp = studentComp ? `${studentComp.firstNameAr || ''} ${studentComp.lastNameAr || ''}`.trim() : 'الطالب'
+
+    // Notify Teacher
     await notifyTeacherOfStudentAdjustment(req.params.studentId, {
       titleAr: 'إضافة حصة تعويضية لطالبك',
-      bodyAr: `تم إضافة ${numAmount} حصة تعويضية إلى رصيد الطالب (${sNameComp}) — ${reason}`,
+      bodyAr: `تمت إضافة ${numAmount} ${numAmount === 1 ? 'حصة تعويضية' : 'حصص تعويضية'} إلى رصيد الطالب (${sNameComp}) — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`,
     })
 
-    sendSuccess(res, { wallet, transaction }, 'تم منح الحصة التعويضية')
+    // Notify Admins
+    await notifyAdmins({
+      titleAr: `منح حصص تعويضية: ${sNameComp}`,
+      bodyAr: `تم منح ${numAmount} حصة تعويضية للطالب (${sNameComp}) — السبب: ${reason.trim()}`,
+      actionUrl: `/admin/students/${req.params.studentId}`,
+    })
+
+    sendSuccess(res, { wallet, transaction }, 'تم منح الحصة التعويضية بنجاح')
   } catch (err) { next(err) }
 }

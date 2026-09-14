@@ -11,6 +11,7 @@ const { createNotification } = require('../services/notification.service')
 const periodService = require('../services/payrollPeriod.service')
 const adjustmentService = require('../services/financialAdjustment.service')
 const TeacherPayrollEntry = require('../models/TeacherPayrollEntry')
+const User = require('../models/User')
 
 function handleKnownError(err, res, next) {
   if (err.status) return sendError(res, err.message, err.status, err.field ? { field: err.field } : undefined)
@@ -140,13 +141,45 @@ exports.createAdjustment = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role, action: `payroll.create_${type}`,
       entity: 'TeacherPayrollEntry', entityId: entry._id, changes: { teacherId: req.params.teacherId, amount: entry.amount, reason }, ip: req.ip,
     })
-    const LABELS = { bonus: 'مكافأة مالية', penalty: 'خصم/جزاء', manual_adjustment: 'تسوية مالية' }
+    const teacher = await User.findById(req.params.teacherId).select('firstNameAr lastNameAr').catch(() => null)
+    const tName = teacher ? `${teacher.firstNameAr || ''} ${teacher.lastNameAr || ''}`.trim() : 'المعلم'
+
+    const isPenalty = type === 'penalty'
+    const isBonus = type === 'bonus'
+    const titleAr = isPenalty ? 'خصم / جزاء مالي' : isBonus ? 'مكافأة مالية' : 'تسوية مالية'
+    const bodyAr = isPenalty
+      ? `تم تطبيق خصم بمقدار ${Math.abs(entry.amount)} ر.س من مستحقاتك — السبب: ${reason.trim()} (صافي المستحق التقديري: ${period.netPayable} ر.س)`
+      : isBonus
+      ? `تم صرف مكافأة بمقدار +${entry.amount} ر.س إلى مستحقاتك — السبب: ${reason.trim()} (صافي المستحق التقديري: ${period.netPayable} ر.س)`
+      : `تم تعديل مستحقاتك بمقدار ${entry.amount > 0 ? '+' : ''}${entry.amount} ر.س — السبب: ${reason.trim()} (صافي المستحق التقديري: ${period.netPayable} ر.س)`
+
+    // Notify Teacher
     await createNotification({
-      userId: req.params.teacherId, titleAr: LABELS[type] || 'حركة مالية',
-      bodyAr: `${LABELS[type] || 'حركة مالية'} بمقدار ${entry.amount > 0 ? '+' : ''}${entry.amount} — ${reason}`,
-      type: 'payroll', priority: 'medium', actionUrl: `/teacher/payroll/${period._id}`, relatedId: entry._id,
+      userId: req.params.teacherId,
+      titleAr,
+      bodyAr,
+      type: 'payroll',
+      priority: isPenalty ? 'high' : 'medium',
+      actionUrl: `/teacher/payroll/${period._id}`,
+      relatedId: entry._id,
     }).catch(() => {})
-    sendSuccess(res, { entry, period }, 'تم تسجيل الحركة المالية', 201)
+
+    // Notify Admins
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id').limit(20)
+    await Promise.all(
+      admins.map(a =>
+        createNotification({
+          userId: a._id,
+          titleAr: `حركة مالية لمعلم: ${tName}`,
+          bodyAr: `${titleAr} بمقدار ${entry.amount > 0 ? '+' : ''}${entry.amount} ر.س للمعلم (${tName}) — السبب: ${reason.trim()}`,
+          type: 'payroll',
+          priority: 'medium',
+          actionUrl: `/admin/payroll`,
+        }).catch(() => {})
+      )
+    )
+
+    sendSuccess(res, { entry, period }, 'تم تسجيل الحركة المالية وإرسال الإشعار بنجاح', 201)
   } catch (err) { handleKnownError(err, res, next) }
 }
 
@@ -157,7 +190,37 @@ exports.reverseAdjustment = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role, action: 'payroll.reverse_adjustment',
       entity: 'TeacherPayrollEntry', entityId: reversal._id, changes: { supersedes: reversal.supersedes, reason: req.body.reason }, ip: req.ip,
     })
-    sendSuccess(res, reversal, 'تم عكس الحركة المالية')
+
+    const teacher = await User.findById(reversal.teacherId).select('firstNameAr lastNameAr').catch(() => null)
+    const tName = teacher ? `${teacher.firstNameAr || ''} ${teacher.lastNameAr || ''}`.trim() : 'المعلم'
+
+    // Notify Teacher
+    await createNotification({
+      userId: reversal.teacherId,
+      titleAr: 'إلغاء / عكس حركة مالية',
+      bodyAr: `تم إلغاء الحركة المالية بمقدار ${reversal.amount > 0 ? '+' : ''}${reversal.amount} ر.س — السبب: ${req.body.reason || 'إلغاء إداري'}`,
+      type: 'payroll',
+      priority: 'medium',
+      actionUrl: `/teacher/payroll`,
+      relatedId: reversal._id,
+    }).catch(() => {})
+
+    // Notify Admins
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id').limit(20)
+    await Promise.all(
+      admins.map(a =>
+        createNotification({
+          userId: a._id,
+          titleAr: `عكس حركة مالية لمعلم: ${tName}`,
+          bodyAr: `تم عكس الحركة المالية للمعلم (${tName}) بمقدار ${reversal.amount > 0 ? '+' : ''}${reversal.amount} ر.س`,
+          type: 'payroll',
+          priority: 'medium',
+          actionUrl: `/admin/payroll`,
+        }).catch(() => {})
+      )
+    )
+
+    sendSuccess(res, reversal, 'تم عكس الحركة المالية بنجاح')
   } catch (err) { handleKnownError(err, res, next) }
 }
 

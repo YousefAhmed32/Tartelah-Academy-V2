@@ -515,6 +515,7 @@ function SessionPackageCard({ stats }) {
   const purchased = stats?.purchasedSessions || 0
   const consumed = stats?.consumedSessions || 0
   const remaining = stats?.remainingSessions || 0
+  const deducted = stats?.deductedSessions || 0
   const pct = purchased > 0 ? Math.round((consumed / purchased) * 100) : 0
 
   return (
@@ -524,7 +525,7 @@ function SessionPackageCard({ stats }) {
         <Link to={ROUTES.STUDENT_SUBSCRIPTION} className="text-sm font-semibold text-brand-purple">التفاصيل ←</Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className={`grid ${deducted > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-4`}>
         <div className="text-center">
           <div className="font-heading font-extrabold text-2xl text-brand-textBody">{purchased}</div>
           <div className="text-[11px] text-[#7c6aaa] mt-0.5">مُشتراة</div>
@@ -533,6 +534,12 @@ function SessionPackageCard({ stats }) {
           <div className="font-heading font-extrabold text-2xl text-gray-400">{consumed}</div>
           <div className="text-[11px] text-[#7c6aaa] mt-0.5">مُستهلكة</div>
         </div>
+        {deducted > 0 && (
+          <div className="text-center">
+            <div className="font-heading font-extrabold text-2xl text-rose-500">{deducted}</div>
+            <div className="text-[11px] text-rose-400 mt-0.5">مخصومة</div>
+          </div>
+        )}
         <div className="text-center">
           <div className="font-heading font-extrabold text-2xl text-emerald-600">{remaining}</div>
           <div className="text-[11px] text-[#7c6aaa] mt-0.5">متبقية</div>
@@ -549,10 +556,11 @@ function SessionPackageCard({ stats }) {
         />
       </div>
 
-      <div className="flex gap-4 mt-3.5 text-[12px] text-[#7c6aaa]">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3.5 text-[12px] text-[#7c6aaa]">
         <span>تأخّر: <b className="text-amber-600">{stats?.lateCount || 0}</b></span>
         <span>غياب: <b className="text-red-500">{stats?.absentCount || 0}</b></span>
         <span>إلغاء: <b className="text-gray-500">{stats?.cancelledSessions || 0}</b></span>
+        {deducted > 0 && <span>خصم إداري: <b className="text-rose-600">{deducted}</b></span>}
       </div>
     </div>
   )

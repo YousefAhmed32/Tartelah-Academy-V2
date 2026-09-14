@@ -3,6 +3,7 @@ const Homework = require('../models/Homework')
 const Evaluation = require('../models/Evaluation')
 const Subscription = require('../models/Subscription')
 const LessonWallet = require('../models/LessonWallet')
+const LessonTransaction = require('../models/LessonTransaction')
 const Memorization = require('../models/Memorization')
 const Attendance = require('../models/Attendance')
 const { sendSuccess, sendError } = require('../utils/response')
@@ -44,19 +45,41 @@ exports.getMyStats = async (req, res, next) => {
 
     // Session-package status — authoritatively computed from LessonWallet,
     // reflecting every admin deduction, bonus, and adjustment instantly.
-    const remainingSessions = wallet?.remaining !== undefined
+    let remainingSessions = wallet?.remaining !== undefined
       ? wallet.remaining
       : (subscription?.sessionsRemaining || 0)
 
-    const purchasedSessions = Math.max(
+    let purchasedSessions = Math.max(
       wallet?.totalPurchased || 0,
       subscription?.totalSessions || 0,
       remainingSessions
     )
 
-    const consumedSessions = wallet?.totalUsed !== undefined
+    let consumedSessions = wallet?.totalUsed !== undefined
       ? wallet.totalUsed
       : Math.max(0, purchasedSessions - remainingSessions)
+
+    let deductedSessions = wallet?.deductedLessons || 0
+
+    // Self-heal: check if any administrative deductions exist in the ledger
+    // that were not yet counted in wallet.deductedLessons / wallet.totalUsed
+    if (wallet) {
+      try {
+        const deductionsAgg = await LessonTransaction.aggregate([
+          { $match: { studentId: wallet.studentId, type: { $in: ['manual_adjustment', 'admin_edit'] }, amount: { $lt: 0 } } },
+          { $group: { _id: null, totalDeducted: { $sum: { $abs: '$amount' } } } },
+        ])
+        const expectedDeducted = deductionsAgg[0]?.totalDeducted || 0
+        if (expectedDeducted > 0 && (wallet.deductedLessons || 0) < expectedDeducted) {
+          const diff = expectedDeducted - (wallet.deductedLessons || 0)
+          wallet.deductedLessons = expectedDeducted
+          wallet.totalUsed = (wallet.totalUsed || 0) + diff
+          await wallet.save().catch(() => {})
+          consumedSessions = wallet.totalUsed
+          deductedSessions = wallet.deductedLessons
+        }
+      } catch (_) {}
+    }
 
     if (subscription && subscription.sessionsRemaining !== remainingSessions) {
       Subscription.findByIdAndUpdate(subscription._id, {
@@ -74,6 +97,7 @@ exports.getMyStats = async (req, res, next) => {
       subscriptionDaysLeft: daysLeft,
       purchasedSessions,
       consumedSessions,
+      deductedSessions,
       remainingSessions,
       upcomingSessions,
       recentEvaluations: evaluations,

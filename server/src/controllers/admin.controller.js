@@ -25,6 +25,7 @@ const { isValidAudienceCategoriesArray, isValidAudienceCategory } = require('../
 const { isKnownKey } = require('../services/teachingSubject.service')
 const TeacherWorkingHours = require('../models/TeacherWorkingHours')
 const LessonWallet = require('../models/LessonWallet')
+const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
 const { resolveDatePreset } = require('../utils/datePresets')
 const { cleanEmail } = require('../utils/arabicNormalize')
 const crypto = require('crypto')
@@ -790,6 +791,7 @@ exports.createScheduleRule = async (req, res, next) => {
       teacherId, studentId, subscriptionId, frequency, daysOfWeek, timeOfDay,
       durationMinutes, startDate, endDate, sessionsTotal,
       meetingLink, meetingProvider, titleTemplate, notes,
+      packageId, subscriptionDays, subscriptionEndDate, lessonsRemaining,
     } = req.body
 
     if (!teacherId) return sendError(res, 'يجب تحديد المعلم عند إنشاء الجدول', 400)
@@ -807,6 +809,45 @@ exports.createScheduleRule = async (req, res, next) => {
     const studentName = `${studentUser.firstNameAr || ''} ${studentUser.lastNameAr || ''}`.trim() || studentUser.name || 'طالب'
     const defaultTitle = `حصة ${studentName}`
 
+    // ── Handle Subscription creation or teacher linking ────────────────────
+    let resolvedSubscriptionId = subscriptionId
+    let createdSubResult = null
+
+    if (packageId) {
+      const subDays = Number(subscriptionDays) || undefined
+      const subEnd = subscriptionEndDate ? new Date(subscriptionEndDate) : undefined
+
+      createdSubResult = await createSubscriptionWithOpeningBalance({
+        studentId,
+        packageId,
+        teacherId,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: subEnd,
+        remainingDays: subDays,
+        notes: notes || 'اشتراك تم تفعيله تلقائياً مع إنشاء الجدول الدوري',
+        lessonsRemaining: lessonsRemaining !== undefined ? Number(lessonsRemaining) : undefined,
+        actorId: req.user._id,
+        actorRole: 'admin',
+      })
+      resolvedSubscriptionId = createdSubResult.subscription._id
+    } else if (!resolvedSubscriptionId) {
+      // Find existing active subscription for student if any
+      const existingSub = await Subscription.findOne({ studentId, status: 'active' }).sort({ createdAt: -1 })
+      if (existingSub) {
+        resolvedSubscriptionId = existingSub._id
+        if (!existingSub.teacherId || String(existingSub.teacherId) !== String(teacherId)) {
+          existingSub.teacherId = teacherId
+          await existingSub.save().catch(() => {})
+        }
+      }
+    } else {
+      const existingSub = await Subscription.findById(resolvedSubscriptionId)
+      if (existingSub && (!existingSub.teacherId || String(existingSub.teacherId) !== String(teacherId))) {
+        existingSub.teacherId = teacherId
+        await existingSub.save().catch(() => {})
+      }
+    }
+
     let resolvedMeetingLink = meetingLink || ''
     let resolvedMeetingProvider = meetingProvider || 'zoom'
     if (!resolvedMeetingLink && teacherUser?.meetingLinks?.[0]?.link) {
@@ -817,7 +858,7 @@ exports.createScheduleRule = async (req, res, next) => {
     const rule = await ScheduleRule.create({
       teacherId,
       studentId,
-      subscriptionId,
+      subscriptionId: resolvedSubscriptionId,
       frequency: frequency || 'weekly',
       daysOfWeek: daysOfWeek || [],
       timeOfDay: timeOfDay || '18:00',
@@ -833,15 +874,27 @@ exports.createScheduleRule = async (req, res, next) => {
 
     const sessions = await scheduleService.generateSessionsFromRule(rule)
 
+    // Notify Student
     await createNotification({
       userId: studentId,
       titleAr: 'تم إنشاء جدولك الدراسي',
-      bodyAr: `تم إنشاء جدول حصصك الدراسية — ${sessions.length} حصة مجدولة`,
+      bodyAr: `تم إنشاء وتفعيل جدول حصصك الدراسية مع المعلم (${teacherUser.firstNameAr} ${teacherUser.lastNameAr}) — ${sessions.length} حصة مجدولة`,
       type: 'schedule',
       priority: 'high',
       relatedId: rule._id,
       actionUrl: '/student/schedule',
-    })
+    }).catch(() => {})
+
+    // Notify Teacher
+    await createNotification({
+      userId: teacherId,
+      titleAr: 'تم إسناد جدول طالب جديد لك',
+      bodyAr: `تم تفعيل جدول دراسي جديد لك مع الطالب (${studentName}) — ${sessions.length} حصة مجدولة`,
+      type: 'schedule',
+      priority: 'high',
+      relatedId: rule._id,
+      actionUrl: `/teacher/students/${studentId}`,
+    }).catch(() => {})
 
     await rule.populate([
       { path: 'teacherId', select: 'firstNameAr lastNameAr avatar' },
@@ -854,7 +907,12 @@ exports.createScheduleRule = async (req, res, next) => {
       changes: { teacherId, studentId, sessionCount: sessions.length }, ip: req.ip,
     })
 
-    sendSuccess(res, { rule, sessions, sessionCount: sessions.length }, 'تم إنشاء الجدول الدوري وتوليد الحصص بنجاح', 201)
+    sendSuccess(res, {
+      rule,
+      sessions,
+      sessionCount: sessions.length,
+      subscription: createdSubResult?.subscription || null,
+    }, 'تم إنشاء الجدول الدوري وتوليد الحصص بنجاح', 201)
   } catch (err) { next(err) }
 }
 

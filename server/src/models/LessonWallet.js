@@ -15,7 +15,8 @@ const LessonWalletSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
 
   totalPurchased: { type: Number, default: 0 },      // lifetime lessons bought
-  totalUsed: { type: Number, default: 0 },            // lifetime lessons consumed
+  totalUsed: { type: Number, default: 0 },            // lifetime lessons consumed (sessions attended + administrative deductions)
+  deductedLessons: { type: Number, default: 0 },      // administrative deductions / penalties
   bonusLessons: { type: Number, default: 0 },          // live bonus-credit balance
   compensationLessons: { type: Number, default: 0 },    // live compensation-credit balance
   frozenLessons: { type: Number, default: 0 },           // lessons currently held while wallet is frozen
