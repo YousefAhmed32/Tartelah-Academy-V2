@@ -124,6 +124,28 @@
     border-color: #7c3aed;
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
   }
+  select.field-light {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-inline-start: 0.875rem;
+    padding-inline-end: 2.25rem;
+    line-height: normal;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237c6aaa' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-position: left 0.85rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem 1rem;
+  }
+  [dir="rtl"] select.field-light {
+    background-position: left 0.85rem center;
+  }
+  .field-light.h-11,
+  .field-light.h-10,
+  .field-light.h-9 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    line-height: normal;
+  }
 
   /* ===== ICON BUTTONS ===== */
   .icbtn {
