@@ -15,8 +15,21 @@ This skill integrates the complete **UI/UX Pro Max** design intelligence system 
 - **RTL & Bidirectional (BiDi) Mastery**: Native logical CSS properties (`ms-`, `me-`, `start-`, `end-`), correct icon mirroring, localized date/time.
 - **Motion Design & Micro-Interactions**: Framer Motion entrance choreography, layout animations, drag-and-drop lists (`Reorder.Group`), spring physics (`stiffness: 300, damping: 25`).
 
-## Usage Rules for Tartelah Online
-1. **Accessibility & Contrast**: Never use low-contrast text on light backgrounds (maintain at least 4.5:1 contrast ratio).
-2. **Responsiveness**: Full responsive matrix across Mobile (< 640px), Tablet (640-1024px), Desktop (1024-1440px), and Ultrawide (> 1440px).
-3. **No Mock/Dummy Fallbacks**: All interactive controls must link to real backend APIs with optimistic cache updates and error recovery.
-4. **Touch & Ergonomics**: Primary action buttons must span full width on mobile viewports and provide distinct active/loading states.
+## Non-Negotiable Craft Standards (Benchmarked vs Claude Code & Codex)
+1. **Pre-Render Box-Model Calculation**:
+   - Never combine explicit `h-*` with conflicting `py-*` (prevents text clipping bugs in native `<select>` and inputs).
+   - Ensure native `<select>` elements use `appearance-none` with custom SVG chevron positioned on the physical end (`left-3` in RTL).
+2. **Accessibility & Contrast**:
+   - Never use low-contrast text on light backgrounds (maintain at least 4.5:1 contrast ratio).
+   - Use Western Latin numerals (`0-9`) across all dashboards, tables, and modal metrics.
+3. **Mobile-First Responsiveness**:
+   - Stress test views at 360px width.
+   - Weekday button pickers must wrap (`grid-cols-4 sm:grid-cols-7`), never squish 7 buttons in one row on mobile.
+   - Touch targets must be $\ge 44\text{px}$.
+4. **Data-Control Fusion**:
+   - Quick-select pills and custom numeric inputs must be visually and functionally connected, not placed as disconnected orphan elements.
+5. **Zero AI Gimmickry in Enterprise SaaS**:
+   - Strictly ban `<Sparkles />` or AI star icons on administrative forms, buttons, and tables.
+   - Strictly ban glowing blur blobs (`blur-3xl`) and multi-stop gradient text in admin dashboards.
+6. **No Mock/Dummy Fallbacks**:
+   - All interactive controls must link to real backend APIs with optimistic cache updates and error recovery.
