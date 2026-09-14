@@ -12,14 +12,19 @@ import { QK } from '../services/queryKeys.js'
  *
  * activeOnly: true  -> GET /packages          (public, isActive-only, admin-safe fields only)
  * activeOnly: false -> GET /packages/admin/all (admin-only, every package incl. inactive)
+ * landingOnly: true -> GET /packages?landing=true (packages selected for homepage)
  */
-export function usePackages({ activeOnly = true } = {}) {
+export function usePackages({ activeOnly = true, landingOnly = false } = {}) {
   const query = useQuery({
-    queryKey: [...QK.PACKAGES, { activeOnly }],
-    queryFn: () =>
-      api
-        .get(activeOnly ? '/packages' : '/packages/admin/all')
-        .then((r) => r.data.data ?? []),
+    queryKey: [...QK.PACKAGES, { activeOnly, landingOnly }],
+    queryFn: () => {
+      if (!activeOnly) {
+        return api.get('/packages/admin/all').then((r) => r.data.data ?? [])
+      }
+      return api
+        .get('/packages', { params: landingOnly ? { landing: true } : {} })
+        .then((r) => r.data.data ?? [])
+    },
     staleTime: 60_000,
   })
 

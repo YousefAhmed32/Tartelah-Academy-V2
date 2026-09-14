@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { ChevronRight, ChevronLeft, LayoutGrid, SlidersHorizontal, ShieldCheck, Award, Clock, ArrowLeft } from 'lucide-react'
 import { ROUTES } from '../../config/constants.js'
 import HeroSection from '../../components/home/HeroSection.jsx'
 import TestimonialsSection from '../../components/home/TestimonialsSection.jsx'
@@ -135,9 +136,43 @@ const COMMUNITY_STATS = [
    Main Component
 ───────────────────────────────────────────── */
 export default function HomePage() {
-  const { packages, isLoading: pkgLoading, isError: pkgError, refetch: refetchPkgs } = usePackages({ activeOnly: true })
+  const { packages, isLoading: pkgLoading, isError: pkgError, refetch: refetchPkgs } = usePackages({ activeOnly: true, landingOnly: true })
   const { reducedMotion, finePointer, narrow } = useMotionCapabilities()
   const contactRef = useRef(null)
+  const carouselRef = useRef(null)
+
+  // View mode for multiple packages: 'carousel' (smooth slider) or 'grid' (all visible)
+  const [viewMode, setViewMode] = useState('carousel')
+  const [canScrollPrev, setCanScrollPrev] = useState(false)
+  const [canScrollNext, setCanScrollNext] = useState(true)
+
+  const updateScrollState = useCallback(() => {
+    const el = carouselRef.current
+    if (!el) return
+    const current = Math.abs(el.scrollLeft)
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setCanScrollPrev(current > 15)
+    setCanScrollNext(current < maxScroll - 15)
+  }, [])
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el) return
+    updateScrollState()
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    window.addEventListener('resize', updateScrollState, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', updateScrollState)
+      window.removeEventListener('resize', updateScrollState)
+    }
+  }, [packages, updateScrollState])
+
+  const scrollCarousel = (direction) => {
+    const el = carouselRef.current
+    if (!el) return
+    const step = (el.clientWidth > 768 ? 334 : 290) * (direction === 'next' ? -1 : 1)
+    el.scrollBy({ left: step, behavior: 'smooth' })
+  }
 
   // Starts on the first user interaction anywhere on the homepage (click,
   // scroll, touch, key, wheel) and stops the moment this page unmounts —
@@ -346,70 +381,183 @@ export default function HomePage() {
           PRICING — real, admin-managed packages (single source of truth)
       ════════════════════════════════════════ */}
       <section id="pricing" className="pricing-section">
-        <div className="section-container pricing-row">
+        <div className="pricing-ambient-glow" aria-hidden="true" />
 
-          {/* Pricing cards */}
-          <div className="pricing-cards">
-            {pkgLoading ? (
-              <div className="pricing-skeleton-grid">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="animate-pulse pricing-skeleton-card" />
-                ))}
+        <div className="section-container">
+          {/* Top-Centered Header */}
+          <div className="pricing-header">
+            <RevealSection from="center" delay={0.05} reducedMotion={reducedMotion}>
+              <div className="pricing-header__badge">
+                <span className="pricing-header__badge-dot" />
+                <span>باقات وخطط الاشتراك</span>
               </div>
-            ) : pkgError ? (
-              <div className="pricing-empty-state">
-                <p>تعذّر تحميل الباقات حالياً</p>
-                <button onClick={() => refetchPkgs()} className="btn-gold-pill">
-                  إعادة المحاولة
-                </button>
-              </div>
-            ) : packages.length === 0 ? (
-              <div className="pricing-empty-state">
-                <p>لا توجد باقات متاحة حالياً</p>
-              </div>
-            ) : (
-              <div className="pricing-grid">
-                {packages.slice(0, 4).map((pkg, i) => (
-                  <RevealSection
-                    key={pkg._id}
-                    from={PRICING_DIRECTIONS[i % PRICING_DIRECTIONS.length]}
-                    distance={narrow ? 20 : 48}
-                    delay={i * 0.1}
-                    reducedMotion={reducedMotion}
-                  >
-                    <PriceCard
-                      name={pkg.nameAr}
-                      sub={pkg.descriptionAr}
-                      price={formatCurrency(pkg.price, pkg.currency)}
-                      caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
-                      features={pkg.featuresAr || []}
-                      popular={pkg.isPopular}
-                      reducedMotion={reducedMotion}
-                    />
-                  </RevealSection>
-                ))}
-              </div>
-            )}
-          </div>
+            </RevealSection>
 
-          {/* Lead text */}
-          <div className="pricing-lead">
-            <h2 className="section-heading">
-              <MaskReveal as="span" viewport reducedMotion={reducedMotion} delay={0}>
+            <h2 className="pricing-header__title">
+              <MaskReveal as="span" viewport reducedMotion={reducedMotion} delay={0.1}>
                 <span className="text-gradient-purple">اختر الخطة</span>
               </MaskReveal>
-              <MaskReveal as="span" viewport reducedMotion={reducedMotion} delay={0.1}>
+              {' '}
+              <MaskReveal as="span" viewport reducedMotion={reducedMotion} delay={0.18}>
                 <span className="heading-dark">المناسبة لك</span>
               </MaskReveal>
             </h2>
-            <RevealSection as={motion.p} from="right" delay={0.2} reducedMotion={reducedMotion} className="lead-copy pricing-lead__copy">
-              خطط مرنة تناسب جميع احتياجاتك وأهدافك في تعلم القرآن
+
+            <RevealSection as={motion.p} from="up" delay={0.25} reducedMotion={reducedMotion} className="pricing-header__subtitle">
+              خطط تعليمية مرنة وتفاعلية تناسب جميع المستويات والأعمار في حفظ وتلاوة القرآن الكريم مع نخبة من المعلمين المعتمدين
             </RevealSection>
-            <RevealSection from="right" delay={0.3} reducedMotion={reducedMotion}>
-              <Link to={ROUTES.PRICING} className="btn-ghost-purple">
-                عرض كل الباقات
-              </Link>
-            </RevealSection>
+          </div>
+
+          {/* Pricing Controls (When > 4 packages) */}
+          {!pkgLoading && !pkgError && packages.length > 4 && (
+            <div className="pricing-controls">
+              <div className="pricing-controls__info">
+                <span className="pricing-controls__count-pill">{packages.length} باقات متاحة</span>
+                <span className="hidden sm:inline">تصفح الخطط واختر ما يناسب جدولك وأهدافك</span>
+              </div>
+
+              <div className="pricing-controls__actions">
+                {/* View Switcher: Carousel vs Grid */}
+                <div className="pricing-view-toggle">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('carousel')}
+                    className={`pricing-view-toggle__btn ${viewMode === 'carousel' ? 'pricing-view-toggle__btn--active' : ''}`}
+                    title="عرض شريط متحرك"
+                  >
+                    <SlidersHorizontal size={15} />
+                    <span>متحرك</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={`pricing-view-toggle__btn ${viewMode === 'grid' ? 'pricing-view-toggle__btn--active' : ''}`}
+                    title="عرض شبكي كامل"
+                  >
+                    <LayoutGrid size={15} />
+                    <span>شبكة</span>
+                  </button>
+                </div>
+
+                {/* Navigation Arrows (Only active in carousel mode) */}
+                {viewMode === 'carousel' && (
+                  <div className="flex items-center gap-1.5" dir="ltr">
+                    <button
+                      type="button"
+                      onClick={() => scrollCarousel('next')}
+                      disabled={!canScrollNext}
+                      className="pricing-nav-btn"
+                      aria-label="الباقات التالية"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollCarousel('prev')}
+                      disabled={!canScrollPrev}
+                      className="pricing-nav-btn"
+                      aria-label="الباقات السابقة"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pricing Cards Body */}
+          {pkgLoading ? (
+            <div className="pricing-skeleton-grid">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="animate-pulse pricing-skeleton-card" />
+              ))}
+            </div>
+          ) : pkgError ? (
+            <div className="pricing-empty-state">
+              <p>تعذّر تحميل الباقات حالياً</p>
+              <button onClick={() => refetchPkgs()} className="btn-gold-pill">
+                إعادة المحاولة
+              </button>
+            </div>
+          ) : packages.length === 0 ? (
+            <div className="pricing-empty-state">
+              <p>لا توجد باقات متاحة حالياً</p>
+            </div>
+          ) : packages.length > 4 && viewMode === 'carousel' ? (
+            /* Carousel track for multiple packages (> 4) */
+            <div className="pricing-carousel-container">
+              <div ref={carouselRef} className="pricing-carousel-track">
+                {packages.map((pkg, i) => (
+                  <div key={pkg._id} className="pricing-carousel-item">
+                    <RevealSection
+                      from={PRICING_DIRECTIONS[i % PRICING_DIRECTIONS.length]}
+                      distance={narrow ? 20 : 40}
+                      delay={i * 0.08}
+                      reducedMotion={reducedMotion}
+                    >
+                      <PriceCard
+                        id={pkg._id}
+                        name={pkg.nameAr}
+                        sub={pkg.descriptionAr}
+                        price={formatCurrency(pkg.price, pkg.currency)}
+                        caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
+                        features={pkg.featuresAr || []}
+                        popular={pkg.isPopular}
+                        reducedMotion={reducedMotion}
+                      />
+                    </RevealSection>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Balanced responsive grid for <= 4 packages (or grid view) */
+            <div className={`pricing-grid-adaptive pricing-grid-adaptive--${packages.length <= 4 ? packages.length : 'many'}`}>
+              {packages.map((pkg, i) => (
+                <RevealSection
+                  key={pkg._id}
+                  from={PRICING_DIRECTIONS[i % PRICING_DIRECTIONS.length]}
+                  distance={narrow ? 20 : 40}
+                  delay={i * 0.08}
+                  reducedMotion={reducedMotion}
+                >
+                  <PriceCard
+                    id={pkg._id}
+                    name={pkg.nameAr}
+                    sub={pkg.descriptionAr}
+                    price={formatCurrency(pkg.price, pkg.currency)}
+                    caption={`${pkg.sessionsPerMonth} حصة شهرياً${pkg.durationDays ? ` · لمدة ${humanizeDuration(pkg.durationDays)}` : ''}`}
+                    features={pkg.featuresAr || []}
+                    popular={pkg.isPopular}
+                    reducedMotion={reducedMotion}
+                  />
+                </RevealSection>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom Bar: Trust Indicators & View All Link */}
+          <div className="pricing-bottom-bar">
+            <div className="pricing-trust-badges">
+              <div className="pricing-trust-badge">
+                <ShieldCheck size={18} />
+                <span>ضمان استرداد كامل خلال 7 أيام</span>
+              </div>
+              <div className="pricing-trust-badge">
+                <Award size={18} />
+                <span>معلمون ومعلمات معتمدون بإجازات مسندة</span>
+              </div>
+              <div className="pricing-trust-badge">
+                <Clock size={18} />
+                <span>مرونة تامة في تحديد وتعديل المواعيد</span>
+              </div>
+            </div>
+
+            <Link to={ROUTES.PRICING} className="pricing-view-all-link">
+              <span>عرض كل الباقات والمقارنة بالتفصيل</span>
+              <ArrowLeft size={16} />
+            </Link>
           </div>
         </div>
       </section>
@@ -626,58 +774,538 @@ export default function HomePage() {
           .community-stats { order: 3; flex-basis: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px 30px; }
         }
 
-        /* ── Pricing ── */
-        .pricing-section { background: #FBFAFE; padding: clamp(60px,7vw,100px) clamp(20px,5vw,68px); }
-        .pricing-row { display: flex; align-items: stretch; gap: clamp(28px,4vw,56px); flex-wrap: wrap; }
-        .pricing-cards { flex: 1 1 700px; min-width: 0; order: 1; }
-        .pricing-lead { flex: 0 1 300px; min-width: 240px; order: 2; text-align: right; align-self: center; }
-        .pricing-lead__copy { max-width: 300px; margin-inline-start: auto; margin-inline-end: 0; }
-        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 18px; align-items: start; }
-        .pricing-skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 18px; }
-        .pricing-skeleton-card { height: 280px; border-radius: 20px; background: #efeaf8; }
-        .pricing-empty-state { background: #fff; border: 1px solid #ece6f6; border-radius: 20px; padding: 40px; text-align: center; }
-        .pricing-empty-state p { color: #6B7280; margin-bottom: 16px; }
-
-        @media (max-width: 900px) {
-          .pricing-cards, .pricing-lead { flex-basis: 100%; }
-          .pricing-lead { align-self: auto; }
+        /* ── Pricing Section (Top-tier SaaS Redesign) ── */
+        .pricing-section {
+          position: relative;
+          background: linear-gradient(180deg, #FDFCFE 0%, #F6F2FD 50%, #FDFCFE 100%);
+          padding: clamp(64px, 7.5vw, 104px) clamp(20px, 5vw, 68px);
+          overflow: hidden;
+        }
+        .pricing-ambient-glow {
+          position: absolute;
+          top: 15%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 800px;
+          height: 380px;
+          background: radial-gradient(circle, rgba(109, 52, 214, 0.05) 0%, transparent 70%);
+          pointer-events: none;
+          z-index: 0;
+        }
+        .pricing-header {
+          text-align: center;
+          max-width: 760px;
+          margin: 0 auto clamp(32px, 4.5vw, 48px);
+          position: relative;
+          z-index: 1;
+        }
+        .pricing-header__badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 18px;
+          border-radius: 9999px;
+          background: rgba(109, 52, 214, 0.08);
+          border: 1px solid rgba(109, 52, 214, 0.16);
+          color: #5B2BC4;
+          font-family: Cairo, sans-serif;
+          font-size: 13.5px;
+          font-weight: 700;
+          margin-bottom: 14px;
+        }
+        .pricing-header__badge-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #D4AF37;
+          box-shadow: 0 0 8px rgba(212, 175, 55, 0.6);
+        }
+        .pricing-header__title {
+          font-family: Cairo, sans-serif;
+          font-weight: 800;
+          font-size: clamp(30px, 3.8vw, 46px);
+          line-height: 1.25;
+          margin-bottom: 12px;
+        }
+        .pricing-header__subtitle {
+          font-family: Tajawal, sans-serif;
+          font-size: clamp(15px, 1.3vw, 17.5px);
+          color: #64748B;
+          line-height: 1.8;
+          max-width: 620px;
+          margin: 0 auto;
         }
 
-        /* ── Price card ── */
+        /* ── Controls & Navigation Bar ── */
+        .pricing-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+          max-width: 1340px;
+          margin: 0 auto 24px;
+          position: relative;
+          z-index: 2;
+        }
+        .pricing-controls__info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-family: Cairo, sans-serif;
+          font-size: 14px;
+          color: #64748B;
+          font-weight: 600;
+        }
+        .pricing-controls__count-pill {
+          background: #FFFFFF;
+          border: 1px solid #ECE6F6;
+          border-radius: 20px;
+          padding: 4px 14px;
+          color: #1A0447;
+          font-weight: 700;
+        }
+        .pricing-controls__actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .pricing-view-toggle {
+          display: inline-flex;
+          align-items: center;
+          background: #FFFFFF;
+          border: 1px solid #ECE6F6;
+          border-radius: 12px;
+          padding: 3px;
+          box-shadow: 0 2px 8px rgba(36, 12, 82, 0.04);
+        }
+        .pricing-view-toggle__btn {
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 9px;
+          font-family: Cairo, sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          color: #64748B;
+          transition: all 0.2s ease;
+        }
+        .pricing-view-toggle__btn--active {
+          background: #5B2BC4;
+          color: #FFFFFF;
+          box-shadow: 0 3px 10px rgba(91, 43, 196, 0.25);
+        }
+        .pricing-nav-btn {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          background: #FFFFFF;
+          border: 1px solid #ECE6F6;
+          color: #1A0447;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 12px rgba(36, 12, 82, 0.04);
+        }
+        .pricing-nav-btn:hover:not(:disabled) {
+          background: #5B2BC4;
+          border-color: #5B2BC4;
+          color: #FFFFFF;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(91, 43, 196, 0.22);
+        }
+        .pricing-nav-btn:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+        }
+
+        /* ── Carousel Track ── */
+        .pricing-carousel-container {
+          position: relative;
+          max-width: 1340px;
+          margin: 0 auto;
+          position: relative;
+          z-index: 1;
+        }
+        .pricing-carousel-track {
+          display: flex;
+          gap: 24px;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+          padding: 16px 4px 32px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(109, 52, 214, 0.2) transparent;
+        }
+        .pricing-carousel-track::-webkit-scrollbar {
+          height: 6px;
+        }
+        .pricing-carousel-track::-webkit-scrollbar-track {
+          background: #F1EDFA;
+          border-radius: 8px;
+        }
+        .pricing-carousel-track::-webkit-scrollbar-thumb {
+          background: #C5B2EA;
+          border-radius: 8px;
+        }
+        .pricing-carousel-track::-webkit-scrollbar-thumb:hover {
+          background: #6D34D6;
+        }
+        .pricing-carousel-item {
+          flex: 0 0 310px;
+          width: 310px;
+          scroll-snap-align: start;
+        }
+        @media (max-width: 480px) {
+          .pricing-carousel-item {
+            flex: 0 0 85vw;
+            width: 85vw;
+            max-width: 320px;
+          }
+        }
+
+        /* ── Adaptive Grid (for <= 4 or Grid View) ── */
+        .pricing-grid-adaptive {
+          display: grid;
+          gap: 24px;
+          max-width: 1340px;
+          margin: 0 auto;
+          padding: 16px 4px 32px;
+          position: relative;
+          z-index: 1;
+        }
+        .pricing-grid-adaptive--1 {
+          max-width: 380px;
+          grid-template-columns: 1fr;
+        }
+        .pricing-grid-adaptive--2 {
+          max-width: 760px;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .pricing-grid-adaptive--3 {
+          max-width: 1140px;
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .pricing-grid-adaptive--4 {
+          max-width: 1340px;
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .pricing-grid-adaptive--many {
+          max-width: 1340px;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+        @media (max-width: 1120px) {
+          .pricing-grid-adaptive--4 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .pricing-grid-adaptive--3 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (max-width: 680px) {
+          .pricing-grid-adaptive--2,
+          .pricing-grid-adaptive--3,
+          .pricing-grid-adaptive--4 {
+            grid-template-columns: 1fr;
+            max-width: 360px;
+          }
+        }
+
+        /* ── Skeleton & Empty State ── */
+        .pricing-skeleton-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 24px;
+          max-width: 1340px;
+          margin: 0 auto;
+        }
+        .pricing-skeleton-card {
+          height: 460px;
+          border-radius: 24px;
+          background: #EFEAF8;
+        }
+        .pricing-empty-state {
+          background: #FFFFFF;
+          border: 1px solid #ECE6F6;
+          border-radius: 24px;
+          padding: 48px 24px;
+          text-align: center;
+          max-width: 500px;
+          margin: 0 auto;
+          box-shadow: 0 10px 30px rgba(36, 12, 82, 0.04);
+        }
+        .pricing-empty-state p {
+          color: #6B7280;
+          font-family: Cairo, sans-serif;
+          font-size: 16px;
+          margin-bottom: 20px;
+        }
+
+        /* ── Price Card Design System ── */
         .price-card {
-          background: #fff; border: 1px solid #ece6f6; border-radius: 20px; padding: 30px 24px;
-          box-shadow: 0 14px 36px rgba(36,12,82,.06); text-align: right;
-          transition: transform .35s cubic-bezier(.2,.7,.2,1);
+          position: relative;
+          background: #FFFFFF;
+          border: 1.5px solid #F1EDFA;
+          border-radius: 24px;
+          padding: 32px 24px 28px;
+          box-shadow: 0 12px 32px rgba(26, 4, 71, 0.05);
+          text-align: right;
+          transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s, border-color 0.35s;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
         }
-        .price-card--popular { position: relative; border: 2px solid #E8B24A; box-shadow: 0 24px 50px rgba(212,160,50,.2); }
-        .price-card__sweep-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
-        .price-card__sweep { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 42%, rgba(232,199,106,0.38) 50%, transparent 58%); }
+        .price-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 22px 46px rgba(75, 31, 176, 0.1);
+          border-color: #D6C7F7;
+        }
+        .price-card--popular {
+          border: 2px solid #E8B24A;
+          box-shadow: 0 22px 50px rgba(212, 160, 50, 0.18);
+        }
+        .price-card--popular:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 28px 56px rgba(212, 160, 50, 0.24);
+        }
+        .price-card__sweep-clip {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .price-card__sweep {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(100deg, transparent 40%, rgba(232, 199, 106, 0.35) 50%, transparent 60%);
+        }
         .price-card__badge {
-          position: absolute; top: -15px; inset-inline-start: 50%; transform: translateX(-50%);
-          background: linear-gradient(135deg,#E8C76A,#D4AF37); color: #3a2200; font-family: Cairo, sans-serif;
-          font-weight: 800; font-size: 13px; padding: 6px 18px; border-radius: 30px; white-space: nowrap;
-          box-shadow: 0 8px 18px rgba(212,175,55,.4);
+          position: absolute;
+          top: -14px;
+          inset-inline-start: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(135deg, #F3D37D, #D4AF37);
+          color: #3A2200;
+          font-family: Cairo, sans-serif;
+          font-weight: 800;
+          font-size: 13px;
+          padding: 5px 18px;
+          border-radius: 30px;
+          white-space: nowrap;
+          box-shadow: 0 6px 18px rgba(212, 175, 55, 0.4);
+          z-index: 2;
         }
-        .price-card__name { font-family: Cairo, sans-serif; font-weight: 800; font-size: 22px; color: #1A0447; }
-        .price-card__sub { color: #9aa0ab; font-size: 14px; margin-top: 4px; }
-        .price-card__price-row { margin-top: 18px; display: flex; align-items: baseline; gap: 6px; justify-content: flex-start; flex-direction: row-reverse; }
-        .price-card__price { font-family: Cairo, sans-serif; font-weight: 800; font-size: 36px; color: #1A0447; }
-        .price-card__caption { color: #9aa0ab; font-size: 13px; margin-top: 4px; }
-        .price-card__divider { height: 1px; background: #eee6f6; margin: 20px 0; }
-        .price-card--popular .price-card__divider { background: #f1e6cf; }
-        .price-card__features { display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: #4b5563; }
-        .price-card__feature { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; justify-content: flex-start; }
+        .price-card__header {
+          margin-bottom: 14px;
+        }
+        .price-card__name {
+          font-family: Cairo, sans-serif;
+          font-weight: 800;
+          font-size: 22px;
+          color: #1A0447;
+          line-height: 1.3;
+        }
+        .price-card__sub {
+          color: #8E95A5;
+          font-size: 13.5px;
+          font-family: Tajawal, sans-serif;
+          margin-top: 5px;
+          line-height: 1.5;
+          min-height: 38px;
+        }
+        .price-card__price-row {
+          margin-top: 10px;
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+          justify-content: flex-start;
+          flex-direction: row-reverse;
+        }
+        .price-card__price {
+          font-family: Cairo, sans-serif;
+          font-weight: 800;
+          font-size: 38px;
+          color: #1A0447;
+          letter-spacing: -0.5px;
+        }
+        .price-card__caption-wrap {
+          margin-top: 6px;
+        }
+        .price-card__caption {
+          display: inline-block;
+          font-family: Tajawal, sans-serif;
+          font-size: 13px;
+          color: #6D34D6;
+          background: #F4EFFF;
+          padding: 3px 10px;
+          border-radius: 8px;
+          font-weight: 600;
+        }
+        .price-card--popular .price-card__caption {
+          color: #8D5B00;
+          background: #FDF6E2;
+        }
+        .price-card__divider {
+          height: 1px;
+          background: #F1EDFA;
+          margin: 18px 0;
+        }
+        .price-card--popular .price-card__divider {
+          background: #F3EBD9;
+        }
+        .price-card__features {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          font-size: 14.5px;
+          color: #4B5563;
+          font-family: Tajawal, sans-serif;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          flex-grow: 1;
+        }
+        .price-card__feature {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-direction: row-reverse;
+          justify-content: flex-start;
+          line-height: 1.4;
+        }
+        .price-card__check-wrap {
+          flex-shrink: 0;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: #EFEAF8;
+          display: grid;
+          place-items: center;
+        }
+        .price-card__check-wrap--popular {
+          background: #FBF3DF;
+        }
+        .price-card__action {
+          margin-top: 24px;
+        }
         .price-card__btn {
-          display: block; width: 100%; margin-top: 24px; font-family: Tajawal, sans-serif; font-weight: 700;
-          font-size: 15px; border: none; border-radius: 11px; padding: 13px; text-align: center;
-          text-decoration: none; cursor: pointer; transition: transform .25s, box-shadow .25s;
-          background: linear-gradient(135deg,#5b2bc4,#3d1894); color: #fff; min-height: 44px;
+          display: block;
+          width: 100%;
+          font-family: Tajawal, sans-serif;
+          font-weight: 700;
+          font-size: 15.5px;
+          border: none;
+          border-radius: 12px;
+          padding: 13px;
+          text-align: center;
+          text-decoration: none;
+          cursor: pointer;
+          transition: transform 0.25s, box-shadow 0.25s, background 0.25s;
+          background: linear-gradient(135deg, #5B2BC4, #3D1894);
+          color: #FFFFFF;
+          min-height: 46px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 14px rgba(91, 43, 196, 0.2);
+        }
+        .price-card__btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 22px rgba(91, 43, 196, 0.32);
         }
         .price-card--popular .price-card__btn {
-          background: linear-gradient(135deg,#E8C76A,#D4AF37); color: #3a2200; font-weight: 800;
-          box-shadow: 0 12px 26px rgba(212,175,55,.36);
+          background: linear-gradient(135deg, #F3D37D, #D4AF37);
+          color: #2A1500;
+          font-weight: 800;
+          box-shadow: 0 8px 22px rgba(212, 175, 55, 0.35);
         }
-        .price-card__btn:focus-visible { outline: 2px solid #6D34D6; outline-offset: 3px; }
+        .price-card--popular .price-card__btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 28px rgba(212, 175, 55, 0.45);
+        }
+        .price-card__btn:focus-visible {
+          outline: 2px solid #6D34D6;
+          outline-offset: 3px;
+        }
+
+        /* ── Pricing Bottom Bar / Guarantee ── */
+        .pricing-bottom-bar {
+          margin-top: clamp(32px, 4vw, 48px);
+          border-top: 1px solid #ECE6F6;
+          padding-top: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 20px;
+          max-width: 1340px;
+          margin-inline: auto;
+          position: relative;
+          z-index: 1;
+        }
+        .pricing-trust-badges {
+          display: flex;
+          align-items: center;
+          gap: clamp(16px, 3vw, 32px);
+          flex-wrap: wrap;
+        }
+        .pricing-trust-badge {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: Tajawal, sans-serif;
+          font-size: 14px;
+          color: #556070;
+          font-weight: 600;
+        }
+        .pricing-trust-badge svg {
+          color: #D4AF37;
+          flex-shrink: 0;
+        }
+        .pricing-view-all-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-family: Cairo, sans-serif;
+          font-weight: 700;
+          font-size: 15px;
+          color: #5B2BC4;
+          text-decoration: none;
+          padding: 10px 22px;
+          border-radius: 12px;
+          background: #FFFFFF;
+          border: 1.5px solid rgba(91, 43, 196, 0.2);
+          box-shadow: 0 2px 8px rgba(36, 12, 82, 0.04);
+          transition: all 0.25s ease;
+        }
+        .pricing-view-all-link:hover {
+          background: #5B2BC4;
+          color: #FFFFFF;
+          border-color: #5B2BC4;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px rgba(91, 43, 196, 0.24);
+        }
+        @media (max-width: 768px) {
+          .pricing-bottom-bar {
+            flex-direction: column;
+            align-items: stretch;
+            text-align: center;
+          }
+          .pricing-trust-badges {
+            justify-content: center;
+          }
+          .pricing-view-all-link {
+            justify-content: center;
+          }
+        }
 
         /* ── Contact / CTA ── */
         .contact-section {
@@ -779,7 +1407,7 @@ function JourneyConnector({ color, flipEnd = false, delay = 0, reducedMotion = f
   )
 }
 
-function PriceCard({ name, sub, price, caption, features, popular, reducedMotion = false }) {
+function PriceCard({ id, name, sub, price, caption, features, popular, reducedMotion = false }) {
   return (
     <div className={`price-card${popular ? ' price-card--popular' : ''}`}>
       {popular && !reducedMotion && (
@@ -794,21 +1422,34 @@ function PriceCard({ name, sub, price, caption, features, popular, reducedMotion
         </div>
       )}
       {popular && <div className="price-card__badge">الأكثر طلباً</div>}
-      <div className="price-card__name">{name}</div>
-      {sub && <div className="price-card__sub">{sub}</div>}
+      <div className="price-card__header">
+        <h3 className="price-card__name">{name}</h3>
+        {sub && <p className="price-card__sub">{sub}</p>}
+      </div>
       <div className="price-card__price-row">
         <span className="price-card__price">{price}</span>
       </div>
-      {caption && <div className="price-card__caption">{caption}</div>}
+      {caption && (
+        <div className="price-card__caption-wrap">
+          <span className="price-card__caption">{caption}</span>
+        </div>
+      )}
       <div className="price-card__divider" />
-      <div className="price-card__features">
-        {features.map(f => (
-          <div key={f} className="price-card__feature">
-            <CheckIcon color={popular ? '#D4AF37' : '#6D34D6'} /><span>{f}</span>
-          </div>
+      <ul className="price-card__features" aria-label={`مزايا ${name}`}>
+        {features.map((f, idx) => (
+          <li key={idx} className="price-card__feature">
+            <span className={`price-card__check-wrap ${popular ? 'price-card__check-wrap--popular' : ''}`}>
+              <CheckIcon color={popular ? '#B48208' : '#6D34D6'} />
+            </span>
+            <span>{f}</span>
+          </li>
         ))}
+      </ul>
+      <div className="price-card__action">
+        <Link to={id ? `${ROUTES.REGISTER}?package=${id}` : ROUTES.REGISTER} className="price-card__btn">
+          ابدأ الآن
+        </Link>
       </div>
-      <Link to={ROUTES.REGISTER} className="price-card__btn">ابدأ الآن</Link>
     </div>
   )
 }

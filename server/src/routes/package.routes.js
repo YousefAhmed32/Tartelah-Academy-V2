@@ -8,5 +8,6 @@ router.use(authenticate)
 router.get('/admin/all', requirePermission('packages.view'), ctrl.getAllAdmin)
 router.post('/', requirePermission('packages.manage'), ctrl.create)
 router.patch('/:id', requirePermission('packages.manage'), ctrl.update)
+router.delete('/:id', requirePermission('packages.manage'), ctrl.deletePackage)
 
 module.exports = router

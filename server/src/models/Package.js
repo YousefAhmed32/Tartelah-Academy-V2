@@ -11,9 +11,10 @@ const PackageSchema = new mongoose.Schema({
   featuresAr: [{ type: String }],
   isActive: { type: Boolean, default: true },
   isPopular: { type: Boolean, default: false },
+  showOnLandingPage: { type: Boolean, default: true },
   sortOrder: { type: Number, default: 0 },
 }, { timestamps: true })
 
-PackageSchema.index({ isActive: 1, sortOrder: 1 })
+PackageSchema.index({ isActive: 1, showOnLandingPage: 1, sortOrder: 1 })
 
 module.exports = mongoose.model('Package', PackageSchema)
