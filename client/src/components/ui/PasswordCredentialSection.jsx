@@ -23,10 +23,29 @@ import { credentialDefaultsService } from '../../services/credentialDefaults.ser
 // (e.g. how many have been saved so far) as this component's React `key` —
 // remounting is what correctly resets the "has the admin made an explicit
 // choice for THIS student yet" flag below without any fragile heuristic.
-export default function PasswordCredentialSection({ value, onChange, role, compact = false }) {
+// Master switch: disable automatic password generation from appearing across UI
+// (can be re-enabled at any time without deleting the underlying subsystem)
+export const ENABLE_AUTO_PASSWORD_GENERATION = false
+
+export default function PasswordCredentialSection({
+  value,
+  onChange,
+  role,
+  compact = false,
+  allowAuto = ENABLE_AUTO_PASSWORD_GENERATION,
+}) {
   const set = (patch) => onChange({ ...value, ...patch })
-  const mode = value.mode || 'manual'
+  // If auto is not allowed and current mode is auto, coerce to manual
+  const rawMode = value?.mode || 'manual'
+  const mode = (!allowAuto && rawMode === 'auto') ? 'manual' : rawMode
   const touchedRef = useRef(false)
+
+  // Ensure value.mode is coerced if it was 'auto' when allowAuto is false
+  useEffect(() => {
+    if (!allowAuto && value?.mode === 'auto') {
+      onChange({ ...value, mode: 'manual', requirePasswordChange: false })
+    }
+  }, [allowAuto, value?.mode])
 
   const { data: availability } = useQuery({
     queryKey: ['credentialDefaults', 'availability'],
@@ -44,9 +63,9 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
     })
   }
 
-  const passwordTooShort = mode === 'manual' && value.password && value.password.length < 8
-  const passwordWeak = mode === 'manual' && value.password && value.password.length >= 8 && !/[A-Za-z]/.test(value.password)
-  const mismatch = mode === 'manual' && value.passwordConfirm && value.password !== value.passwordConfirm
+  const passwordTooShort = mode === 'manual' && value?.password && value.password.length < 8
+  const passwordWeak = mode === 'manual' && value?.password && value.password.length >= 8 && !/[A-Za-z]/.test(value.password)
+  const mismatch = mode === 'manual' && value?.passwordConfirm && value.password !== value.passwordConfirm
 
   return (
     <div className={compact ? 'space-y-2.5' : 'space-y-3'}>
@@ -54,7 +73,7 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
         <KeyRound size={13} /> تسجيل الدخول وكلمة المرور
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className={`grid gap-2 ${allowAuto ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <button
           type="button"
           onClick={() => selectMode('manual')}
@@ -76,15 +95,17 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
         >
           <Building2 size={13} /> كلمة مرور الأكاديمية
         </button>
-        <button
-          type="button"
-          onClick={() => selectMode('auto')}
-          className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
-            mode === 'auto' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
-          }`}
-        >
-          <Wand2 size={13} /> إنشاء تلقائي
-        </button>
+        {allowAuto && (
+          <button
+            type="button"
+            onClick={() => selectMode('auto')}
+            className={`h-10 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
+              mode === 'auto' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300'
+            }`}
+          >
+            <Wand2 size={13} /> إنشاء تلقائي
+          </button>
+        )}
       </div>
 
       {mode === 'academy_default' && (
@@ -98,7 +119,7 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
           </p>
         </div>
       )}
-      {mode === 'auto' && (
+      {mode === 'auto' && allowAuto && (
         <p className="text-[11px] text-gray-400 leading-relaxed">
           سيُنشئ النظام كلمة مرور مؤقتة قوية تلقائيًا وتُعرض مرة واحدة فقط بعد الإنشاء. سيُطلب تغييرها عند أول تسجيل دخول.
         </p>
@@ -107,13 +128,13 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
         <div className="space-y-2">
           <Input
             label="كلمة المرور" variant="light" type="password"
-            value={value.password || ''} onChange={(e) => { touchedRef.current = true; set({ password: e.target.value }) }}
+            value={value?.password || ''} onChange={(e) => { touchedRef.current = true; set({ password: e.target.value }) }}
             error={passwordTooShort ? 'يجب أن تكون 8 أحرف على الأقل' : passwordWeak ? 'يجب أن تحتوي على حرف ورقم على الأقل' : undefined}
             autoComplete="new-password"
           />
           <Input
             label="تأكيد كلمة المرور" variant="light" type="password"
-            value={value.passwordConfirm || ''} onChange={(e) => { touchedRef.current = true; set({ passwordConfirm: e.target.value }) }}
+            value={value?.passwordConfirm || ''} onChange={(e) => { touchedRef.current = true; set({ passwordConfirm: e.target.value }) }}
             error={mismatch ? 'كلمتا المرور غير متطابقتين' : undefined}
             autoComplete="new-password"
           />
@@ -123,7 +144,7 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
       <label className="flex items-center gap-2 text-xs text-gray-600 font-semibold cursor-pointer select-none">
         <input
           type="checkbox"
-          checked={value.requirePasswordChange === true}
+          checked={value?.requirePasswordChange === true}
           onChange={(e) => { touchedRef.current = true; set({ requirePasswordChange: e.target.checked }) }}
           disabled={mode === 'auto'}
           className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400 disabled:opacity-50"
@@ -138,13 +159,15 @@ export default function PasswordCredentialSection({ value, onChange, role, compa
 /** Pure client-side check mirroring the backend's passwordPolicy — used to
  * gate "Next"/"Submit" without a round-trip; the backend re-validates
  * regardless. Returns an Arabic error string, or null when valid. */
-export function validateCredentialValue(value) {
-  const mode = value?.mode || 'auto'
-  if (mode === 'auto' || mode === 'academy_default') return null
-  const pw = value.password || ''
-  if (pw.length < 8) return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'
+export function validateCredentialValue(value, allowAuto = ENABLE_AUTO_PASSWORD_GENERATION) {
+  const rawMode = value?.mode || 'manual'
+  const mode = (!allowAuto && rawMode === 'auto') ? 'manual' : rawMode
+  if (mode === 'auto' && allowAuto) return null
+  if (mode === 'academy_default') return null
+  const pw = value?.password || ''
+  if (!pw || pw.length < 8) return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'
   if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) return 'يجب أن تحتوي كلمة المرور على حرف ورقم على الأقل'
-  if (pw !== value.passwordConfirm) return 'كلمتا المرور غير متطابقتين'
+  if (pw !== value?.passwordConfirm) return 'كلمتا المرور غير متطابقتين'
   return null
 }
 
@@ -154,8 +177,12 @@ export function emptyCredential() {
 
 /** Builds the exact `credential` object the backend API expects — never
  * includes the raw password fields for auto/academy_default modes. */
-export function credentialPayload(value) {
-  if (!value || value.mode === 'auto') return { mode: 'auto' }
-  if (value.mode === 'academy_default') return { mode: 'academy_default', requirePasswordChange: value.requirePasswordChange === true }
+export function credentialPayload(value, allowAuto = ENABLE_AUTO_PASSWORD_GENERATION) {
+  if (!value) return { mode: 'manual', password: '', passwordConfirm: '', requirePasswordChange: false }
+  const rawMode = value.mode || 'manual'
+  const mode = (!allowAuto && rawMode === 'auto') ? 'manual' : rawMode
+
+  if (mode === 'auto' && allowAuto) return { mode: 'auto' }
+  if (mode === 'academy_default') return { mode: 'academy_default', requirePasswordChange: value.requirePasswordChange === true }
   return { mode: 'manual', password: value.password, passwordConfirm: value.passwordConfirm, requirePasswordChange: value.requirePasswordChange === true }
 }

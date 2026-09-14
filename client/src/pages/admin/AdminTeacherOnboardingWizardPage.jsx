@@ -409,6 +409,9 @@ function SavedStudentCard({ summary, onEdit, onRemove, removing }) {
         {student.credential?.mode === 'manual' && (
           <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500 font-semibold">بيانات دخول يدوية</span>
         )}
+        {student.credential?.mode === 'academy_default' && (
+          <span className="px-2 py-0.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 font-semibold">كلمة مرور الأكاديمية</span>
+        )}
       </div>
     </div>
   )
