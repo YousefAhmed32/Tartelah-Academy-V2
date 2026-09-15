@@ -12,7 +12,7 @@ const { createSubscriptionWithOpeningBalance } = require('../services/subscripti
 exports.getMySubscription = async (req, res, next) => {
   try {
     const sub = await Subscription.findOne({ studentId: req.user._id, status: 'active' })
-      .populate('packageId', 'nameAr descriptionAr sessionsPerMonth')
+      .populate('packageId', 'nameAr descriptionAr sessionsPerMonth price currency')
       .populate('teacherId', 'firstNameAr lastNameAr avatar')
     sendSuccess(res, sub)
   } catch (err) {

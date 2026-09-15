@@ -67,6 +67,22 @@ describe('survey.submitResponse', () => {
     expect(survey.status).toBe('completed')
     expect(survey.completedAt).toBeInstanceOf(Date)
   })
+
+  test('safely ignores empty string renewalIntention without setting invalid enum', async () => {
+    const survey = { status: 'pending', save: jest.fn().mockResolvedValue(true) }
+    Survey.findOne.mockResolvedValueOnce(survey)
+    await submitResponse('sv1', { studentId: 's1', responses: { teacherCommitmentRating: 4, renewalIntention: '' } })
+    expect(survey.teacherCommitmentRating).toBe(4)
+    expect(survey.renewalIntention).toBeUndefined()
+    expect(survey.status).toBe('completed')
+  })
+
+  test('rejects invalid renewalIntention value with user-friendly SurveyError', async () => {
+    const survey = { status: 'pending', save: jest.fn() }
+    Survey.findOne.mockResolvedValueOnce(survey)
+    await expect(submitResponse('sv1', { studentId: 's1', responses: { renewalIntention: 'maybe' } }))
+      .rejects.toThrow('يرجى تحديد نيتك بشأن تجديد الاشتراك')
+  })
 })
 
 describe('survey.skipSurvey', () => {

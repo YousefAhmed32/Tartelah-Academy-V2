@@ -65,6 +65,9 @@ function AdjustModal({ sub, onClose }) {
   const invalidateWallet = () => {
     qc.invalidateQueries({ queryKey: QK.WALLET(studentId) })
     qc.invalidateQueries({ queryKey: ['wallet', studentId, 'transactions'] })
+    qc.invalidateQueries({ queryKey: ['admin', 'student', studentId, 'wallet'] })
+    qc.invalidateQueries({ queryKey: ['admin', 'student', studentId, 'wallet-transactions'] })
+    qc.invalidateQueries({ queryKey: ['wallet'] })
     qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] })
   }
 
@@ -462,7 +465,7 @@ export default function AdminSubscriptionsPage() {
           </span>
           {search && (
             <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
-              البحث: "{search}"
+              البحث: «{search}»
               <button onClick={() => setSearch('')} className="hover:text-red-600"><X size={12} /></button>
             </span>
           )}

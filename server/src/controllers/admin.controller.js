@@ -25,6 +25,7 @@ const { isValidAudienceCategoriesArray, isValidAudienceCategory } = require('../
 const { isKnownKey } = require('../services/teachingSubject.service')
 const TeacherWorkingHours = require('../models/TeacherWorkingHours')
 const LessonWallet = require('../models/LessonWallet')
+const walletService = require('../services/wallet.service')
 const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
 const { resolveDatePreset } = require('../utils/datePresets')
 const { cleanEmail } = require('../utils/arabicNormalize')
@@ -309,7 +310,7 @@ exports.getStudent = async (req, res, next) => {
         .populate('teacherId', 'firstNameAr lastNameAr'),
       EnrollmentRequest.find({ studentId: req.params.id }).sort({ createdAt: -1 })
         .populate('packageId', 'nameAr price'),
-      LessonWallet.findOne({ studentId: req.params.id }),
+      walletService.getOrCreateWallet(req.params.id),
     ])
 
     // Self-heal subscription.sessionsRemaining if it fell out of sync with wallet.remaining
@@ -657,6 +658,58 @@ exports.adminResetPassword = async (req, res, next) => {
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
 
+exports.getSessionStats = async (req, res, next) => {
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
+    const [stats] = await Session.aggregate([
+      {
+        $facet: {
+          totalSessions: [{ $count: 'count' }],
+          totalCompleted: [{ $match: { status: 'completed' } }, { $count: 'count' }],
+          todayTotal: [
+            { $match: { scheduledAt: { $gte: today, $lte: todayEnd } } },
+            { $count: 'count' },
+          ],
+          todayCompleted: [
+            { $match: { scheduledAt: { $gte: today, $lte: todayEnd }, status: 'completed' } },
+            { $count: 'count' },
+          ],
+          todayScheduled: [
+            { $match: { scheduledAt: { $gte: today, $lte: todayEnd }, status: { $in: ['scheduled', 'ongoing'] } } },
+            { $count: 'count' },
+          ],
+          needsAction: [
+            {
+              $match: {
+                $or: [
+                  { status: 'missed' },
+                  { status: 'scheduled', scheduledAt: { $lt: new Date() } },
+                  { teacherAttendanceStatus: 'late' },
+                  { payrollStatus: 'review_required' },
+                ],
+              },
+            },
+            { $count: 'count' },
+          ],
+          totalCancelled: [{ $match: { status: 'cancelled' } }, { $count: 'count' }],
+        },
+      },
+    ])
+
+    sendSuccess(res, {
+      totalSessions: stats?.totalSessions?.[0]?.count || 0,
+      totalCompleted: stats?.totalCompleted?.[0]?.count || 0,
+      todayTotal: stats?.todayTotal?.[0]?.count || 0,
+      todayCompleted: stats?.todayCompleted?.[0]?.count || 0,
+      todayScheduled: stats?.todayScheduled?.[0]?.count || 0,
+      needsAction: stats?.needsAction?.[0]?.count || 0,
+      totalCancelled: stats?.totalCancelled?.[0]?.count || 0,
+    })
+  } catch (err) { next(err) }
+}
+
 exports.getAllSessions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
@@ -665,10 +718,35 @@ exports.getAllSessions = async (req, res, next) => {
     if (req.query.teacherId) filter.teacherId = req.query.teacherId
     if (req.query.studentId) filter.studentId = req.query.studentId
     if (req.query.payrollStatus) filter.payrollStatus = req.query.payrollStatus
+
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim()
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      const matchedUsers = await User.find({
+        $or: [
+          { firstNameAr: regex },
+          { lastNameAr: regex },
+          { name: regex },
+          { email: regex },
+          { phone: regex },
+        ],
+      }).select('_id').lean()
+      const userIds = matchedUsers.map(u => u._id)
+      filter.$or = [
+        { titleAr: regex },
+        { studentId: { $in: userIds } },
+        { teacherId: { $in: userIds } },
+      ]
+    }
+
     if (req.query.dateFrom || req.query.dateTo) {
       filter.scheduledAt = {}
       if (req.query.dateFrom) filter.scheduledAt.$gte = new Date(req.query.dateFrom)
-      if (req.query.dateTo) filter.scheduledAt.$lte = new Date(req.query.dateTo)
+      if (req.query.dateTo) {
+        const dTo = new Date(req.query.dateTo)
+        dTo.setHours(23, 59, 59, 999)
+        filter.scheduledAt.$lte = dTo
+      }
     } else if (req.query.upcoming === 'true') {
       filter.scheduledAt = { $gte: new Date() }
     }

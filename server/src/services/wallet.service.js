@@ -1,3 +1,4 @@
+const mongoose = require('mongoose')
 const LessonWallet = require('../models/LessonWallet')
 const LessonTransaction = require('../models/LessonTransaction')
 const Subscription = require('../models/Subscription')
@@ -57,12 +58,80 @@ function fieldsToIncrement(type, amount) {
   }
 }
 
+async function ensureWalletDeductionsSynced(wallet) {
+  if (!wallet || !wallet.studentId) return wallet
+  try {
+    if (typeof LessonTransaction.aggregate !== 'function') return wallet
+    let studentFilter = wallet.studentId
+    try {
+      if (mongoose.Types.ObjectId.isValid(wallet.studentId)) {
+        studentFilter = new mongoose.Types.ObjectId(String(wallet.studentId))
+      }
+    } catch (_) {}
+
+    const deductionsAgg = await LessonTransaction.aggregate([
+      {
+        $match: {
+          studentId: { $in: [wallet.studentId, studentFilter] },
+          type: { $in: ['manual_adjustment', 'admin_edit'] },
+          amount: { $lt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalDeducted: { $sum: { $abs: '$amount' } },
+        },
+      },
+    ])
+    const actualDeducted = deductionsAgg[0]?.totalDeducted || 0
+    const currentDeducted = wallet.deductedLessons || 0
+
+    let needsSave = false
+    let newDeducted = currentDeducted
+    let newTotalUsed = wallet.totalUsed || 0
+
+    if (actualDeducted > currentDeducted) {
+      const diff = actualDeducted - currentDeducted
+      newDeducted = actualDeducted
+      newTotalUsed = newTotalUsed + diff
+      needsSave = true
+    }
+
+    if (newTotalUsed < actualDeducted) {
+      newTotalUsed = actualDeducted
+      needsSave = true
+    }
+
+    if (needsSave) {
+      await LessonWallet.updateOne(
+        { _id: wallet._id },
+        {
+          $set: {
+            deductedLessons: newDeducted,
+            totalUsed: newTotalUsed,
+          },
+        }
+      )
+      wallet.deductedLessons = newDeducted
+      wallet.totalUsed = newTotalUsed
+    }
+  } catch (_) {
+    // Non-fatal fallback
+  }
+  return wallet
+}
+
 async function getOrCreateWallet(studentId) {
-  return LessonWallet.findOneAndUpdate(
+  let wallet = await LessonWallet.findOneAndUpdate(
     { studentId },
     { $setOnInsert: { studentId } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   )
+  if (wallet) {
+    wallet = await ensureWalletDeductionsSynced(wallet)
+  }
+  return wallet
 }
 
 /**
@@ -131,7 +200,9 @@ async function applyTransaction({
 }
 
 async function getWallet(studentId) {
-  return LessonWallet.findOne({ studentId })
+  const wallet = await LessonWallet.findOne({ studentId })
+  if (!wallet) return null
+  return ensureWalletDeductionsSynced(wallet)
 }
 
 async function getTransactions(studentId, { page = 1, limit = 20 } = {}) {

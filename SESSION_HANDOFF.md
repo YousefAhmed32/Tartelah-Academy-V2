@@ -1,6 +1,120 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
+2026-09-15 — Student Renewal Modal Overhaul (2 Options, Payment Details & Optional Receipt) + Admin Surveys CRM Hub & 460px Slide-Over Detail Drawer (تطوير نافذة تجديد الاشتراك للطلاب ومركز إدارة الاستبيانات والدرج الجانبي للأدمن)
+
+## Status
+Delivered an end-to-end implementation fulfilling all user requirements:
+1. **Student Renewal Modal (`RenewalModal` in `StudentSubscriptionPage.jsx`)**:
+   - **Option 1 (Default / Recommended - "تجديد نفس الباقة الحالية")**: Renews current package, preserving teacher and current weekly schedule uninterrupted, displaying current package name, price, sessions count, and teacher name.
+   - **Option 2 ("اختيار أو ترقية باقة أخرى")**: Allows switching or upgrading to any active academy package with a clean selector.
+   - **Academy Payment Channels**: Direct in-modal visual cards with 1-click copy buttons and visual feedback:
+     - Bank Transfer (بنك الراجحي, IBAN `SA00 0000 0000 0000 0000 0000`, Account Name `أكاديمية ترتيلة`).
+     - Mobile Wallets (Egypt: Vodafone Cash / InstaPay `01050400096`, Saudi / Gulf: STC Pay `+966 56 744 3805`, with direct WhatsApp link).
+   - **Optional Receipt Attachment**: Students can attach payment proof directly inside the renewal modal or submit without it (uploading later from the dashboard or via WhatsApp).
+   - **Unified Submission Action**: `submitRequest` creates the request and immediately uploads the proof if attached, notifying the student with clear feedback and refreshing requests list.
+2. **Admin Surveys Management Hub (`/admin/surveys` - `AdminSurveysPage.jsx`)**:
+   - Upgraded to Apple/Linear light enterprise SaaS benchmark (Stripe/HubSpot formula, 80% white, 15% soft gray, 5% brand accent).
+   - Top KPI cards formatted strictly with Western (Latin) numerals (`0-9`) showing total surveys, renewal intentions breakdown, and platform average.
+   - 5-criteria platform/teacher breakdown row (Teacher Commitment, Academy Follow-Up, Report Quality, Student Progress, Recommend Likelihood).
+   - Interactive search bar across student names, teacher names, and verbatim notes.
+   - Filter chips ("الكل", "يحتاج متابعة وتواصل" with live counter, "طلبات تغيير المعلم", "طلب تواصل الإدارة").
+   - Filter dropdowns for renewal intention (`yes`, `no`, `undecided`) and teacher picker.
+   - Clickable survey items that open the slide-over drawer seamlessly without full-page navigation.
+   - Deep-linking support: URL `?id=:id` automatically opens the targeted survey drawer (matching admin notification links).
+3. **Dedicated 460px Slide-Over Detail Drawer (`AdminSurveyDetailDrawer.jsx`)**:
+   - Adheres strictly to `AGENTS.md` CRM slide-over panel pattern (460px width, white bg, subtle shadow, `z-50`).
+   - Detailed 5-star ratings breakdown (visual star components + `X / 5` scores across all 5 criteria).
+   - Student dossier card with avatar, name, email, phone with 1-click copy and `tel:` link, plus direct link to `/admin/students/:id`.
+   - Teacher dossier card with avatar, name, phone with 1-click copy, and link to `/admin/teachers/:id`.
+   - Renewal intention badge with status description.
+   - Quoted student feedback notes card.
+   - Action buttons: "نقل الطالب لمعلم آخر" (links to `/admin/teacher-replacement?studentId=...`), "تسجيل التواصل والمتابعة" (calls `surveyService.markFollowedUp`), and "إغلاق".
+4. **Backend Notifications & Deep Linking**:
+   - `survey.controller.js#submitMyResponse`: Sends notifications to all active admins on **every** survey submission with proper priority (`high` for teacher change/admin contact, `medium` for regular evaluation) and deep-link actionUrl `/admin/surveys?id=${survey._id}`.
+   - `survey.service.js` & `survey.controller.js`: Added `getById` endpoint (`GET /api/surveys/admin/:id`) with full population of student, teacher, subscription, and follow-up admin.
+5. **Verification**:
+   - `client`: `npm run build` passed with exit code 0.
+   - `server`: `npm test` passed with 51/51 test suites and 572/572 tests green.
+
+---
+
+## Session Date
+2026-09-15 — Two-Step Renewal Survey UI/UX Overhaul, Smart Validation & `renewalIntention` Enum Fix (تطوير استبيان التجديد وتأمين التحقق البصري والباك إند)
+   - Updated `submitResponse`: strictly parses numeric ratings (1-5), safely ignores empty string `renewalIntention: ''` (leaving it undefined rather than invalid enum), and rejects invalid strings with a user-friendly 400 `SurveyError` with field context.
+   - Added unit tests in `survey.service.test.js` validating both empty string handling and invalid value rejection.
+2. **Smart Frontend Validation & Field-Level Error Highlighting**:
+   - Implemented required field validation for all 5 evaluation rating criteria and `renewalIntention`.
+   - When attempting to submit with missing fields, the system highlights the missing fields in red (`border-red-400 bg-red-50/40 ring-2 ring-red-100/80`), displays clear Arabic error warnings, shows a toast notification, and automatically scrolls to the first missing field.
+   - Errors clear dynamically and immediately as the student answers the field.
+3. **Elevated UI/UX & Branded 3D Illustration**:
+   - Designed and placed a custom 3D illustration asset (`client/public/images/survey-student.png`) featuring a smiling student holding a golden star and feedback tablet in the modal hero banner.
+   - Rebuilt the mandatory renewal-gate variant as a responsive two-step experience: a desktop editorial split with a branded visual panel and compact 2×2 rating grid, followed by renewal preferences and notes; mobile uses a focused single-column composition.
+   - Added the original full-panel renewal illustration (`client/public/images/survey-student-renewal-panel.png`) and kept the existing smaller survey illustration for the non-renewal prompt.
+   - The fixed action area now preserves the real cancellation behavior, blocks forward movement until all five ratings are complete, and resets the scroll position when switching steps.
+   - Added completion progress bar (`X من 6 مكتمل`).
+   - Interactive star rating component with hover previews and dynamic labels (ضعيف، مقبول، جيد، جيد جداً، ممتاز ومتميز! ⭐).
+   - Visual cards for renewal intention (نعم، بإذن الله / لم أقرر بعد / لا، لا أنوي) with distinct active colors and icons (`CheckCircle2`, `HelpCircle`, `XCircle`).
+   - Mutual exclusion between "الاستمرار مع نفس المعلم" and "طلب تغيير المعلم".
+4. **Mandatory Renewal Gating (التقييم كخطوة أساسية إلزامية للتجديد)**:
+   - Backend (`survey.service.js` & `survey.controller.js`): Added `ensureSurveyForSubscription(studentId, subscriptionId)`. Creates or reopens skipped surveys when a student initiates renewal.
+   - Backend (`renewal.controller.js#submitRequest`): Authoritatively blocks renewal requests (`400`) if a survey is pending, ensuring no student can bypass evaluation.
+   - Frontend (`StudentSubscriptionPage.jsx`): Intercepts all "تجديد" buttons (`handleInitiateRenewal`). If an uncompleted survey exists, launches `SurveyPromptModal` in `isRenewalGate={true}` mode.
+   - Modal UX: In renewal gate mode, displays `خطوة أساسية قبل تجديد الاشتراك` banner, replaces "تخطي" with "إلغاء التجديد والعودة", and upon successful submission, automatically transitions the student into `RenewalModal`.
+   - In `RenewalModal`, if the student requested a teacher change in the survey, an informative card is displayed acknowledging the request.
+5. **Verification**:
+   - `client`: `npm run build` passed with 0 errors; focused ESLint passed for `SurveyPromptModal.jsx` and `Modal.jsx`.
+   - Visually verified both steps at desktop and 390×844 mobile viewports, including star selection, progress completion, step transition, fixed actions, RTL layout, and scroll restoration.
+   - `server`: `npm test` passed with 572/572 tests green across 51 test suites.
+
+---
+
+## Session Date
+2026-09-15 — Admin Sessions Management Hub UI/UX Overhaul & Real-Time KPI Stats & Slide-Over Detail Drawer (إعادة هندسة وتطوير واجهة وتجربة مستخدم إدارة الحصص والإحصائيات الحية)
+
+## Status
+Delivered a complete, enterprise-grade UI/UX overhaul of the Admin Sessions Management page (`/admin/sessions`) benchmarked against Apple, Linear, and Stripe design standards:
+1. **Real-Time Authoritative KPI Top Stats**:
+   - Backend (`server/src/controllers/admin.controller.js`): Added `getSessionStats` endpoint using a single high-performance MongoDB `$facet` aggregation. Computes `todayTotal`, `todayCompleted`, `totalCompleted`, `needsAction`, `todayScheduled`, and `totalCancelled`.
+   - Frontend Top Cards: 4 interactive KPI metric cards ("حصص اليوم", "أُنجزت اليوم", "إجمالي المكتملة بالمنصة", "بحاجة متابعة وتنبيهات") with Latin numerals (`0-9`) and micro-interactions. Clicking any KPI card immediately filters the table/cards below!
+2. **Dual View Modes (Table vs. Cards)**:
+   - Added interactive view mode toggle between **عرض الجدول (Table)** and **عرض البطاقات (Cards)** for high-density desktop monitoring or visual card-based browsing.
+3. **Dedicated 460px Slide-Over Detail Drawer (`AdminSessionDetailDrawer.jsx`)**:
+   - Fully adhering to `AGENTS.md` CRM slide-over pattern (no disruptive full-page navigation).
+   - Shows session schedule, duration, live status, interactive student profile dossier card, teacher profile dossier card, meeting link card with 1-click copy & join room buttons, attendance & payroll status indicators, notes, and quick action toolbar (Edit, Reschedule, Correct Attendance, Cancel).
+4. **Interactive Filters & Quick Search**:
+   - Live search input searching session title, student name, and teacher name with backend text search support.
+   - Quick date preset pills (`الكل`, `اليوم`, `هذا الأسبوع`, `هذا الشهر`, `تاريخ مخصص`).
+   - Teacher selector and Payroll status filter dropdowns.
+   - Direct clickable student/teacher names in tables and cards linking to their respective admin dossiers with `e.stopPropagation()` preventing drawer conflicts.
+5. **Verification**:
+   - `client`: `npm run build` completed cleanly in 10.71s with 0 errors.
+   - `server`: `npm test` completed in 11.13s with all 570 tests passing across 51 test suites.
+
+---
+
+## Session Date
+2026-09-15 — Wallet Ledger Deductions & Consumed Sessions Auto-Reconciliation (احتساب خصم الحصص الإدارية ضمن الحصص المستهلكة)
+
+## Status
+Delivered an authoritative fix and auto-healing mechanism for administrative session deductions (`manual_adjustment` and `admin_edit`), ensuring they are properly credited to `totalUsed` (المستهلك) in both live deductions and historical records:
+1. **Root Cause**:
+   - Administrative deductions debited `remaining` correctly, but did not increment `totalUsed`.
+   - Historical negative transactions left `wallet.totalUsed: 0` in the database, even though two deductions (-1 and -1) were recorded in the student ledger.
+2. **Backend Authoritative Ledger & Self-Healing**:
+   - `fieldsToIncrement` in `wallet.service.js`: when `type` is `manual_adjustment` or `admin_edit` and `amount < 0`, returns `{ remaining: amount, deductedLessons: -amount, totalUsed: -amount }`.
+   - Added `ensureWalletDeductionsSynced(wallet)`: queries `LessonTransaction` ledger for all negative manual adjustments and admin edits, compares against `deductedLessons` and `totalUsed`, and atomically heals any drifted wallet document in MongoDB.
+   - Connected `ensureWalletDeductionsSynced` to `getOrCreateWallet`, `getWallet`, `admin.controller.js#getStudent`, and `student.controller.js#getMyStats`.
+   - Updated `computeExpectedCounters` in `server/src/scripts/reconcileWallets.js` to compute both `deductedLessons` and `totalUsed` for negative manual adjustments.
+3. **Frontend Cache & UI Invalidation**:
+   - Updated `client/src/components/admin/WalletOperationsModal.jsx` and `client/src/pages/admin/AdminSubscriptionsPage.jsx` to comprehensively invalidate `['wallet']`, `['subscriptions']`, `['subscription']`, `['students']`, and related query keys upon successful operations.
+4. **Verification**:
+   - `npm test` in `server`: 51/51 test suites passed, 570/570 tests green.
+   - `npm run build` in `client`: Built successfully in 20.85s with 0 errors.
+
+---
+
+## Session Date
 2026-09-10 — General Meeting Link Architecture & Auto-Inheritance (الرابط العمومي وتعميمه وتوريثه التلقائي)
 
 ## Status

@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Button from './Button.jsx'
 
 const sizes = {
   sm: 'max-w-md',
   md: 'max-w-xl',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  '2xl': 'max-w-6xl',
   full: 'max-w-[95vw]',
 }
 
@@ -18,7 +18,9 @@ export default function Modal({
   size = 'md',
   footer,
   closable = true,
+  hideHeader = false,
   bodyClassName = '',
+  panelClassName = '',
 }) {
   useEffect(() => {
     if (open) {
@@ -45,11 +47,11 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className={`relative w-full ${sizes[size]} bg-white rounded-2xl sm:rounded-card shadow-card-dark z-10 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh]`}
+            className={`relative w-full ${sizes[size]} bg-white rounded-2xl sm:rounded-card shadow-card-dark z-10 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] ${panelClassName}`}
             dir="rtl"
           >
             {/* Header */}
-            {(title || closable) && (
+            {!hideHeader && (title || closable) && (
               <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 sm:py-5 border-b border-[#f0ecf8] flex-none">
                 {title && (
                   <h3 className="font-heading font-bold text-lg sm:text-xl text-brand-textBody">{title}</h3>

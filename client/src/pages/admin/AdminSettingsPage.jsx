@@ -503,7 +503,7 @@ function CredentialDefaultRow({ role, label, status, cryptoConfigured }) {
               {status.updatedAt && <span className="text-gray-400 font-normal">— آخر تحديث {new Date(status.updatedAt).toLocaleDateString('ar-EG')}</span>}
             </div>
           ) : (
-            <div className="text-xs text-gray-400 font-semibold mt-0.5">غير مُفعّلة — لن يظهر خيار "كلمة مرور الأكاديمية" لهذا الدور</div>
+            <div className="text-xs text-gray-400 font-semibold mt-0.5">غير مُفعّلة — لن يظهر خيار «كلمة مرور الأكاديمية» لهذا الدور</div>
           )}
         </div>
         <div className="flex gap-2">

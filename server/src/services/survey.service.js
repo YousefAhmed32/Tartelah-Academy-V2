@@ -55,16 +55,86 @@ async function getMyPendingSurvey(studentId) {
     .populate('subscriptionId', 'packageNameAr endDate')
 }
 
-async function submitResponse(surveyId, { studentId, responses }) {
+/**
+ * Ensures a survey document exists for a student's subscription when initiating renewal.
+ * If none exists, creates it in 'pending' status. If previously skipped, reopens it to 'pending'.
+ * Returns { survey, requiresSurvey: boolean }
+ */
+async function ensureSurveyForSubscription(studentId, subscriptionId) {
+  const sub = await Subscription.findOne({ _id: subscriptionId, studentId })
+  if (!sub) throw new SurveyError('الاشتراك غير موجود', 404)
+
+  let survey = await Survey.findOne({ subscriptionId: sub._id })
+  if (!survey) {
+    try {
+      survey = await Survey.create({
+        studentId: sub.studentId,
+        subscriptionId: sub._id,
+        teacherId: sub.teacherId,
+        status: 'pending',
+      })
+    } catch (err) {
+      if (err.code === 11000) {
+        survey = await Survey.findOne({ subscriptionId: sub._id })
+      } else {
+        throw err
+      }
+    }
+  } else if (survey.status === 'skipped') {
+    // If skipped earlier, reopen as pending so the student completes it for renewal
+    survey.status = 'pending'
+    await survey.save()
+  }
+
+  await survey.populate([
+    { path: 'teacherId', select: 'firstNameAr lastNameAr avatar' },
+    { path: 'subscriptionId', select: 'packageNameAr endDate' },
+  ])
+
+  return {
+    survey,
+    requiresSurvey: survey.status === 'pending',
+  }
+}
+
+async function submitResponse(surveyId, { studentId, responses = {} }) {
   const survey = await Survey.findOne({ _id: surveyId, studentId })
   if (!survey) throw new SurveyError('الاستبيان غير موجود', 404)
   if (survey.status !== 'pending') throw new SurveyError('تم الرد على هذا الاستبيان بالفعل', 409)
 
-  const FIELDS = [
-    'teacherCommitmentRating', 'academyFollowUpRating', 'reportQualityRating', 'studentProgressRating',
-    'recommendLikelihood', 'notes', 'renewalIntention', 'continueWithSameTeacher', 'requestTeacherChange', 'requestAdminContact',
+  const RATING_FIELDS = [
+    'teacherCommitmentRating', 'academyFollowUpRating', 'reportQualityRating',
+    'studentProgressRating', 'recommendLikelihood',
   ]
-  FIELDS.forEach((k) => { if (responses[k] !== undefined) survey[k] = responses[k] })
+  RATING_FIELDS.forEach((k) => {
+    if (responses[k] !== undefined && responses[k] !== null && responses[k] !== '') {
+      const val = Number(responses[k])
+      if (Number.isInteger(val) && val >= 1 && val <= 5) {
+        survey[k] = val
+      }
+    }
+  })
+
+  // Sanitize renewalIntention — prevent empty string from breaking Mongoose enum
+  if (responses.renewalIntention !== undefined && responses.renewalIntention !== null && responses.renewalIntention !== '') {
+    if (['yes', 'no', 'undecided'].includes(responses.renewalIntention)) {
+      survey.renewalIntention = responses.renewalIntention
+    } else {
+      throw new SurveyError('يرجى تحديد نيتك بشأن تجديد الاشتراك (نعم / لم أقرر / لا)', 400, { field: 'renewalIntention' })
+    }
+  } else {
+    survey.renewalIntention = undefined
+  }
+
+  if (typeof responses.notes === 'string') {
+    survey.notes = responses.notes.trim()
+  }
+
+  const BOOLEAN_FIELDS = ['continueWithSameTeacher', 'requestTeacherChange', 'requestAdminContact']
+  BOOLEAN_FIELDS.forEach((k) => {
+    if (responses[k] !== undefined) survey[k] = Boolean(responses[k])
+  })
+
   survey.status = 'completed'
   survey.completedAt = new Date()
   await survey.save()
@@ -89,16 +159,64 @@ async function markFollowedUp(surveyId, { adminId }) {
   return survey
 }
 
-async function listForAdmin({ status, requestAdminContact, requestTeacherChange, page = 1, limit = 20 } = {}) {
+async function getSurveyById(surveyId) {
+  const survey = await Survey.findById(surveyId)
+    .populate('studentId', 'firstNameAr lastNameAr avatar email phone country')
+    .populate('teacherId', 'firstNameAr lastNameAr avatar phone email')
+    .populate('subscriptionId', 'packageNameAr startDate endDate')
+    .populate('followedUpBy', 'firstNameAr lastNameAr')
+  if (!survey) throw new SurveyError('الاستبيان غير موجود', 404)
+  return survey
+}
+
+async function listForAdmin({
+  status,
+  requestAdminContact,
+  requestTeacherChange,
+  renewalIntention,
+  teacherId,
+  search,
+  page = 1,
+  limit = 20,
+} = {}) {
   const filter = {}
   if (status) filter.status = status
-  if (requestAdminContact !== undefined) filter.requestAdminContact = requestAdminContact === 'true' || requestAdminContact === true
-  if (requestTeacherChange !== undefined) filter.requestTeacherChange = requestTeacherChange === 'true' || requestTeacherChange === true
+  if (requestAdminContact !== undefined && requestAdminContact !== '') {
+    filter.requestAdminContact = requestAdminContact === 'true' || requestAdminContact === true
+  }
+  if (requestTeacherChange !== undefined && requestTeacherChange !== '') {
+    filter.requestTeacherChange = requestTeacherChange === 'true' || requestTeacherChange === true
+  }
+  if (renewalIntention) filter.renewalIntention = renewalIntention
+  if (teacherId) filter.teacherId = teacherId
+
+  if (search && search.trim()) {
+    const term = search.trim()
+    const matchingUsers = await mongoose.model('User').find({
+      $or: [
+        { firstNameAr: { $regex: term, $options: 'i' } },
+        { lastNameAr: { $regex: term, $options: 'i' } },
+        { phone: { $regex: term, $options: 'i' } },
+      ],
+    }).select('_id')
+    const userIds = matchingUsers.map((u) => u._id)
+    filter.$or = [
+      { studentId: { $in: userIds } },
+      { teacherId: { $in: userIds } },
+      { notes: { $regex: term, $options: 'i' } },
+    ]
+  }
+
   const skip = (page - 1) * limit
   const [surveys, total] = await Promise.all([
-    Survey.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+    Survey.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate('studentId', 'firstNameAr lastNameAr avatar email phone')
-      .populate('teacherId', 'firstNameAr lastNameAr avatar'),
+      .populate('teacherId', 'firstNameAr lastNameAr avatar')
+      .populate('subscriptionId', 'packageNameAr startDate endDate')
+      .populate('followedUpBy', 'firstNameAr lastNameAr'),
     Survey.countDocuments(filter),
   ])
   return { surveys, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / limit) }
@@ -128,6 +246,6 @@ async function getAggregateResults({ teacherId } = {}) {
 }
 
 module.exports = {
-  SurveyError, triggerDueSurveys, getMyPendingSurvey, submitResponse, skipSurvey,
-  markFollowedUp, listForAdmin, getAggregateResults, getSurveyLeadDays,
+  SurveyError, triggerDueSurveys, getMyPendingSurvey, ensureSurveyForSubscription, submitResponse, skipSurvey,
+  markFollowedUp, listForAdmin, getSurveyById, getAggregateResults, getSurveyLeadDays,
 }

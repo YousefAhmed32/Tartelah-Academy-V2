@@ -8,6 +8,7 @@ import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatNumber, formatCurrency } from '../../utils/format.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
 import { useAuthStore } from '../../store/authStore.js'
+import DashboardProfileSearch from '../../components/admin/DashboardProfileSearch.jsx'
 
 function getArabicDate() {
   return new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -102,26 +103,80 @@ function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHome
 }
 
 function SessionRow({ session, index }) {
+  const student = session.studentId
+  const teacher = session.teacherId
+
+  const studentUrl = student?._id ? ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', student._id) : null
+  const teacherUrl = teacher?._id ? ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', teacher._id) : null
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04 }}
-      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all"
     >
-      <Avatar
-        src={getFileUrl(session.studentId?.avatar)}
-        firstName={session.studentId?.firstNameAr}
-        lastName={session.studentId?.lastNameAr}
-        size="sm"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800 truncate">
-          {session.studentId?.firstNameAr} — {session.teacherId?.firstNameAr}
-        </div>
-        <div className="text-xs text-gray-400 mt-0.5">{formatTimeAr(session.scheduledAt)} • {session.durationMinutes} دقيقة</div>
+      <div className="flex -space-x-2 space-x-reverse flex-none">
+        <Avatar
+          src={getFileUrl(student?.avatar)}
+          firstName={student?.firstNameAr}
+          lastName={student?.lastNameAr}
+          size="sm"
+          className="ring-2 ring-white"
+        />
+        <Avatar
+          src={getFileUrl(teacher?.avatar)}
+          firstName={teacher?.firstNameAr}
+          lastName={teacher?.lastNameAr}
+          size="sm"
+          className="ring-2 ring-white"
+        />
       </div>
-      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap text-sm">
+          {/* Student Link */}
+          {studentUrl ? (
+            <Link
+              to={studentUrl}
+              className="inline-flex items-center gap-1 font-bold text-gray-900 hover:text-violet-700 hover:underline transition-colors group/st"
+              title="فتح الملف الشخصي للطالب"
+            >
+              <span>{student?.firstNameAr} {student?.lastNameAr || ''}</span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-violet-50 text-violet-700 border border-violet-100 group-hover/st:bg-violet-100 transition-colors">
+                طالب
+              </span>
+            </Link>
+          ) : (
+            <span className="font-semibold text-gray-800">{student?.firstNameAr || 'طالب'}</span>
+          )}
+
+          <span className="text-gray-300 text-xs mx-0.5">•</span>
+
+          {/* Teacher Link */}
+          {teacherUrl ? (
+            <Link
+              to={teacherUrl}
+              className="inline-flex items-center gap-1 font-bold text-gray-900 hover:text-amber-700 hover:underline transition-colors group/tc"
+              title="فتح الملف الشخصي للمعلم"
+            >
+              <span>{teacher?.firstNameAr} {teacher?.lastNameAr || ''}</span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200/50 group-hover/tc:bg-amber-100 transition-colors">
+                معلم
+              </span>
+            </Link>
+          ) : (
+            <span className="font-semibold text-gray-800">{teacher?.firstNameAr || 'معلم'}</span>
+          )}
+        </div>
+        <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+          <span>{formatTimeAr(session.scheduledAt)}</span>
+          <span>•</span>
+          <span>{session.durationMinutes} دقيقة</span>
+        </div>
+      </div>
+
+      <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-100 flex-none">
         {session.meetingProvider}
       </span>
     </motion.div>
@@ -129,17 +184,35 @@ function SessionRow({ session, index }) {
 }
 
 function RegistrationRow({ user: u, index }) {
+  const profileUrl = u.role === 'teacher'
+    ? ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', u._id)
+    : ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', u._id)
+
+  const isTeacher = u.role === 'teacher'
+
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    <Link
+      to={profileUrl}
+      className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-violet-50/50 transition-all duration-150 cursor-pointer border border-transparent hover:border-violet-100/60"
+      title={`فتح الملف الشخصي: ${u.firstNameAr} ${u.lastNameAr || ''}`}
+    >
       <Avatar src={getFileUrl(u.avatar)} firstName={u.firstNameAr} lastName={u.lastNameAr} size="sm" />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800 truncate">{u.firstNameAr} {u.lastNameAr}</div>
+        <div className="text-sm font-semibold text-gray-800 group-hover:text-violet-700 transition-colors truncate flex items-center gap-1.5">
+          <span>{u.firstNameAr} {u.lastNameAr || ''}</span>
+          <span className="opacity-0 group-hover:opacity-100 text-[10px] text-violet-600 font-medium transition-opacity">
+            (فتح الملف)
+          </span>
+        </div>
         <div className="text-xs text-gray-400">{formatDateAr(u.createdAt)}</div>
       </div>
-      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${u.role === 'teacher' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'}`}>
-        {u.role === 'teacher' ? 'معلم' : 'طالب'}
+      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex-none ${isTeacher ? 'bg-amber-50 text-amber-700 border border-amber-200/40' : 'bg-violet-50 text-violet-700 border border-violet-200/40'}`}>
+        {isTeacher ? 'معلم' : 'طالب'}
       </span>
-    </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-gray-300 group-hover:text-violet-600 group-hover:-translate-x-1 transition-all flex-none">
+        <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </Link>
   )
 }
 
@@ -260,6 +333,9 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Quick Search & Select: Jump directly to any student or teacher profile */}
+      <DashboardProfileSearch />
 
       {/* Operations intelligence strip */}
       <OperationsIntelligenceStrip />
@@ -487,18 +563,35 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-gray-50">
-            {stats.studentsClosingPackage.map((sub, i) => (
-              <div key={sub._id || i} className="flex items-center gap-3 py-2.5">
-                <Avatar src={getFileUrl(sub.studentId?.avatar)} firstName={sub.studentId?.firstNameAr} lastName={sub.studentId?.lastNameAr} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-gray-800 truncate">{sub.studentId?.firstNameAr} {sub.studentId?.lastNameAr}</div>
-                  <div className="text-xs text-gray-400">{sub.packageId?.nameAr}</div>
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700">
-                  {sub.sessionsRemaining} متبقية
-                </span>
-              </div>
-            ))}
+            {stats.studentsClosingPackage.map((sub, i) => {
+              const student = sub.studentId
+              const studentUrl = student?._id ? ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', student._id) : null
+              return (
+                <Link
+                  key={sub._id || i}
+                  to={studentUrl || ROUTES.ADMIN_SUBSCRIPTIONS}
+                  className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-pink-50/40 transition-all cursor-pointer border border-transparent hover:border-pink-100/60"
+                  title={`فتح الملف الشخصي: ${student?.firstNameAr || ''} ${student?.lastNameAr || ''}`}
+                >
+                  <Avatar src={getFileUrl(student?.avatar)} firstName={student?.firstNameAr} lastName={student?.lastNameAr} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-800 group-hover:text-pink-700 transition-colors truncate flex items-center gap-1.5">
+                      <span>{student?.firstNameAr} {student?.lastNameAr || ''}</span>
+                      <span className="opacity-0 group-hover:opacity-100 text-[10px] text-pink-600 font-medium transition-opacity">
+                        (فتح الملف)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400">{sub.packageId?.nameAr}</div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200/50 flex-none">
+                    {sub.sessionsRemaining} متبقية
+                  </span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-gray-300 group-hover:text-pink-600 group-hover:-translate-x-1 transition-all flex-none">
+                    <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}

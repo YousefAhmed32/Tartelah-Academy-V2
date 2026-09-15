@@ -581,7 +581,7 @@ export default function TeacherSessionsTab({
               <Users size={24} className="text-gray-400 mx-auto" />
               <h4 className="font-heading font-bold text-sm text-gray-800">لا يوجد طلاب مسندون لهذا المعلم بعد</h4>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                يمكنك إضافة طالب إلى هذا المعلم من زر "إضافة طالب" في تبويب الطلاب.
+                يمكنك إضافة طالب إلى هذا المعلم من زر «إضافة طالب» في تبويب الطلاب.
               </p>
             </div>
           ) : (

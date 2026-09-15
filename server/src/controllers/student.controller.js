@@ -6,6 +6,7 @@ const LessonWallet = require('../models/LessonWallet')
 const LessonTransaction = require('../models/LessonTransaction')
 const Memorization = require('../models/Memorization')
 const Attendance = require('../models/Attendance')
+const walletService = require('../services/wallet.service')
 const { sendSuccess, sendError } = require('../utils/response')
 
 exports.getMyStats = async (req, res, next) => {
@@ -17,7 +18,7 @@ exports.getMyStats = async (req, res, next) => {
         .sort({ scheduledAt: 1 }).limit(10)
         .populate('teacherId', 'firstNameAr lastNameAr avatar'),
       Subscription.findOne({ studentId, status: 'active' }).populate('packageId', 'nameAr sessionsPerMonth'),
-      LessonWallet.findOne({ studentId }),
+      walletService.getOrCreateWallet(studentId),
       Homework.countDocuments({ assignedTo: studentId, status: 'active', dueDate: { $gte: now } }),
       Evaluation.find({ studentId }).sort({ createdAt: -1 }).limit(5),
       Memorization.find({ studentId }),

@@ -208,7 +208,7 @@ function OverviewTab({ student, assignedTeacher, subscription }) {
 
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
             <span>هل ترغب بنقل الطالب لمعلم آخر؟</span>
-            <span className="text-violet-600 font-semibold">استخدم تبويب "النقل" أعلاه</span>
+            <span className="text-violet-600 font-semibold">استخدم تبويب «النقل» أعلاه</span>
           </div>
         </div>
       </div>

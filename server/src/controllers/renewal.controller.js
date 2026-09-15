@@ -7,6 +7,7 @@ const Subscription = require('../models/Subscription')
 const SubscriptionRenewalRequest = require('../models/SubscriptionRenewalRequest')
 const Package = require('../models/Package')
 const User = require('../models/User')
+const Survey = require('../models/Survey')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { getPagination } = require('../utils/pagination')
@@ -29,6 +30,15 @@ exports.submitRequest = async (req, res, next) => {
     const pkg = await Package.findById(packageId || sub.packageId)
     if (!pkg) return sendError(res, 'الباقة غير موجودة', 404)
     if (!pkg.isActive) return sendError(res, 'هذه الباقة غير متاحة حالياً', 400)
+
+    // Check if there is an uncompleted survey for this subscription cycle
+    const survey = await Survey.findOne({ subscriptionId: sub._id })
+    if (survey && survey.status === 'pending') {
+      return sendError(res, 'يرجى إكمال استبيان تقييم التجربة وتحديد رغبتك بالاستمرار مع المعلم أولاً قبل تقديم طلب التجديد', 400, {
+        requiresSurvey: true,
+        surveyId: survey._id,
+      })
+    }
 
     // Only one pending/under_review renewal request at a time, matching
     // EnrollmentRequest's identical duplicate-submission guard.

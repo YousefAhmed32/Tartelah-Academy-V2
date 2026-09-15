@@ -19,6 +19,20 @@ import { formatDateAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { QK } from '../../services/queryKeys.js'
+import {
+  Check,
+  Copy,
+  CreditCard,
+  Smartphone,
+  UploadCloud,
+  X,
+  RefreshCw,
+  AlertCircle,
+  Sparkles,
+  Building2,
+  ExternalLink,
+  FileText,
+} from 'lucide-react'
 
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 const RENEWAL_STATUS_LABELS = {
@@ -38,15 +52,45 @@ const fadeUp = (delay = 0) => ({
 
 export default function StudentSubscriptionPage() {
   const [renewOpen, setRenewOpen] = useState(false)
+  const [activeSurvey, setActiveSurvey] = useState(null)
+  const [isRenewalGate, setIsRenewalGate] = useState(false)
+  const [isCheckingSurvey, setIsCheckingSurvey] = useState(false)
+  const [surveyPrefill, setSurveyPrefill] = useState(null)
+
   const { data: pendingSurvey } = useQuery({
     queryKey: ['student', 'survey', 'pending'],
     queryFn: () => surveyService.getMyPending().then(r => r.data.data).catch(() => null),
   })
+
   const { data, isLoading } = useQuery({
     queryKey: QK.MY_SUBSCRIPTION,
     queryFn: () => api.get('/subscriptions/me').then(r => r.data.data).catch(() => null),
     retry: false,
   })
+
+  const handleInitiateRenewal = async () => {
+    if (!data?._id) return
+    setIsCheckingSurvey(true)
+    try {
+      const res = await surveyService.ensureForSubscription(data._id)
+      const { survey, requiresSurvey } = res.data.data
+      if (requiresSurvey) {
+        setActiveSurvey(survey)
+        setIsRenewalGate(true)
+      } else {
+        setRenewOpen(true)
+      }
+    } catch {
+      if (pendingSurvey) {
+        setActiveSurvey(pendingSurvey)
+        setIsRenewalGate(true)
+      } else {
+        setRenewOpen(true)
+      }
+    } finally {
+      setIsCheckingSurvey(false)
+    }
+  }
 
   // Lesson entitlement now lives on the wallet, not the subscription's
   // calendar dates — see WalletBalanceCard.jsx / ARCHITECTURE_PLAN.md's
@@ -149,8 +193,12 @@ export default function StudentSubscriptionPage() {
                       {urgency === 'expired' ? 'سجّل في برنامج جديد للاستمرار' : 'تواصل مع الإدارة لتجديد اشتراكك'}
                     </div>
                   </div>
-                  <button onClick={() => setRenewOpen(true)} className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex-none mr-auto">
-                    تجديد
+                  <button
+                    onClick={handleInitiateRenewal}
+                    disabled={isCheckingSurvey}
+                    className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex-none mr-auto disabled:opacity-60"
+                  >
+                    {isCheckingSurvey ? 'تحقق...' : 'تجديد'}
                   </button>
                 </div>
               )}
@@ -218,8 +266,13 @@ export default function StudentSubscriptionPage() {
               <div className="font-semibold text-sm text-brand-textBody">{formatDateAr(data.endDate)}</div>
             </div>
 
-            <button onClick={() => setRenewOpen(true)} className="w-full text-center py-2.5 rounded-xl text-sm font-bold text-brand-purple hover:text-brand-purpleDark transition-colors" style={{ background: 'rgba(124,58,237,0.06)' }}>
-              + تجديد الاشتراك
+            <button
+              onClick={handleInitiateRenewal}
+              disabled={isCheckingSurvey}
+              className="w-full text-center py-2.5 rounded-xl text-sm font-bold text-brand-purple hover:text-brand-purpleDark transition-colors disabled:opacity-60 cursor-pointer"
+              style={{ background: 'rgba(124,58,237,0.06)' }}
+            >
+              {isCheckingSurvey ? 'جاري التحقق...' : '+ تجديد الاشتراك'}
             </button>
           </div>
         </motion.div>
@@ -286,84 +339,490 @@ export default function StudentSubscriptionPage() {
       </motion.div>
 
       <RenewalHistorySection />
-      {renewOpen && <RenewalModal subscription={data} onClose={() => setRenewOpen(false)} />}
-      {pendingSurvey && <SurveyPromptModal survey={pendingSurvey} onClose={() => {}} />}
+      {renewOpen && (
+        <RenewalModal
+          subscription={data}
+          surveyFeedback={surveyPrefill}
+          onClose={() => {
+            setRenewOpen(false)
+            setSurveyPrefill(null)
+          }}
+        />
+      )}
+      {(activeSurvey || (pendingSurvey && !renewOpen)) && (
+        <SurveyPromptModal
+          survey={activeSurvey || pendingSurvey}
+          isRenewalGate={isRenewalGate}
+          onClose={() => {
+            setActiveSurvey(null)
+            setIsRenewalGate(false)
+          }}
+          onCompleted={(submittedSurvey) => {
+            setActiveSurvey(null)
+            if (isRenewalGate) {
+              setSurveyPrefill(submittedSurvey)
+              setRenewOpen(true)
+            }
+            setIsRenewalGate(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// ── Renewal request modal (Phase 2 §9) ──────────────────────────────────────
-// Two-step: submit the request (package/teacher choice + notes), then
-// immediately upload the payment proof for it — the request stays "بانتظار
-// رفع إثبات الدفع" until that happens, matching EnrollmentRequest's
-// identical pending -> under_review transition.
-function RenewalModal({ subscription, onClose }) {
+// ── Renewal request modal (Enhanced with 2 options, payment info, optional proof) ──
+function RenewalModal({ subscription, surveyFeedback, onClose }) {
   const qc = useQueryClient()
-  const [step, setStep] = useState('form') // 'form' | 'proof'
-  const [packageId, setPackageId] = useState(subscription.packageId?._id || '')
+  const currentPkg = subscription.packageId
+  const teacher = subscription.teacherId
+  const teacherName = teacher
+    ? `${teacher.firstNameAr || ''} ${teacher.lastNameAr || ''}`.trim()
+    : 'معلمك الحالي'
+
+  const [renewalType, setRenewalType] = useState('same') // 'same' | 'custom'
+  const [selectedPackageId, setSelectedPackageId] = useState(currentPkg?._id || '')
   const [studentNotes, setStudentNotes] = useState('')
-  const [createdRequest, setCreatedRequest] = useState(null)
   const [proofFile, setProofFile] = useState(null)
+  const [filePreview, setFilePreview] = useState(null)
+  const [copiedKey, setCopiedKey] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: packages } = useQuery({ queryKey: ['packages'], queryFn: () => api.get('/packages').then(r => r.data.data) })
-
-  const submitMut = useMutation({
-    mutationFn: () => renewalService.submitRequest(subscription._id, {
-      packageId: packageId || subscription.packageId?._id,
-      studentNotes: studentNotes.trim() || undefined,
-    }),
-    onSuccess: (res) => { setCreatedRequest(res.data.data); setStep('proof') },
-    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
-  })
-  const proofMut = useMutation({
-    mutationFn: () => renewalService.uploadProof(createdRequest._id, proofFile),
-    onSuccess: () => {
-      toast.success('تم إرسال طلب التجديد — بانتظار مراجعة الإدارة')
-      qc.invalidateQueries({ queryKey: ['student', 'renewal-requests'] })
-      onClose()
-    },
-    onError: (err) => toast.error(err.response?.data?.message || 'حدث خطأ'),
+  const { data: packages = [] } = useQuery({
+    queryKey: ['packages'],
+    queryFn: () => api.get('/packages').then((r) => r.data.data || []),
   })
 
-  if (step === 'proof') {
-    return (
-      <Modal open onClose={onClose} title="رفع إثبات الدفع"
-        footer={<>
-          <Button variant="ghost" onClick={onClose}>لاحقًا</Button>
-          <Button variant="purple" loading={proofMut.isPending} disabled={!proofFile} onClick={() => proofMut.mutate()}>رفع وإرسال</Button>
-        </>}>
-        <div dir="rtl" className="space-y-3">
-          <p className="text-xs text-gray-500">تم إنشاء طلب التجديد. ارفع صورة إثبات الدفع (تحويل بنكي) لإرساله للمراجعة.</p>
-          <input type="file" accept="image/*,.pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} className={inputCls} />
-        </div>
-      </Modal>
-    )
+  const handleCopy = (text, key) => {
+    navigator.clipboard.writeText(text)
+    setCopiedKey(key)
+    toast.success('تم النسخ بنجاح')
+    setTimeout(() => setCopiedKey(null), 2500)
   }
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('حجم الملف لا يتجاوز 10 ميجابايت')
+      return
+    }
+    setProofFile(file)
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (ev) => setFilePreview(ev.target.result)
+      reader.readAsDataURL(file)
+    } else {
+      setFilePreview(null)
+    }
+  }
+
+  const handleRemoveFile = () => {
+    setProofFile(null)
+    setFilePreview(null)
+  }
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    const effectivePackageId =
+      renewalType === 'same'
+        ? currentPkg?._id || selectedPackageId
+        : selectedPackageId
+
+    try {
+      const res = await renewalService.submitRequest(subscription._id, {
+        packageId: effectivePackageId,
+        studentNotes: studentNotes.trim() || undefined,
+      })
+
+      const created = res.data.data
+      if (proofFile && created?._id) {
+        try {
+          await renewalService.uploadProof(created._id, proofFile)
+          toast.success('تم إرسال طلب التجديد مع إثبات الدفع بنجاح! سيتم مراجعته فوراً.')
+        } catch {
+          toast.success('تم إنشاء طلب التجديد. يرجى رفع إثبات الدفع لاحقاً من القائمة.')
+        }
+      } else {
+        toast.success('تم تسجيل طلب التجديد بنجاح! يمكنك إرسال إثبات الدفع لاحقاً.')
+      }
+
+      qc.invalidateQueries({ queryKey: ['student', 'renewal-requests'] })
+      qc.invalidateQueries({ queryKey: QK.MY_SUBSCRIPTION })
+      onClose()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'حدث خطأ أثناء إرسال طلب التجديد')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const chosenPkg =
+    renewalType === 'same'
+      ? currentPkg
+      : packages.find((p) => p._id === selectedPackageId) || currentPkg
+
   return (
-    <Modal open onClose={onClose} title="طلب تجديد الاشتراك"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-        <Button variant="purple" loading={submitMut.isPending} onClick={() => submitMut.mutate()}>إرسال الطلب</Button>
-      </>}>
-      <div dir="rtl" className="space-y-4">
-        <div>
-          <label className="text-xs font-bold text-gray-500 mb-1.5 block">الباقة</label>
-          <select className={inputCls} value={packageId} onChange={(e) => setPackageId(e.target.value)}>
-            {(packages || []).map((p) => <option key={p._id} value={p._id}>{p.nameAr} — {formatCurrency(p.price)}</option>)}
-          </select>
+    <Modal
+      open
+      size="lg"
+      onClose={onClose}
+      title="طلب تجديد الاشتراك"
+      footer={
+        <div className="flex items-center justify-between w-full gap-3">
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
+            إلغاء
+          </Button>
+          <Button
+            variant="purple"
+            loading={isSubmitting}
+            onClick={handleSubmit}
+            className="px-6 shadow-md shadow-brand-purple/20"
+          >
+            {proofFile ? 'إرسال طلب التجديد مع إثبات الدفع' : 'تأكيد وإرسال طلب التجديد'}
+          </Button>
         </div>
-        <div className="rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
-          سيستمر اشتراكك مع نفس المعلم ونفس الجدول الحالي. لتغيير المعلم أو الموعد، تواصل مع الإدارة بعد التجديد.
-        </div>
+      }
+    >
+      <div dir="rtl" className="space-y-5">
+        {/* ── Option 1 vs Option 2 Tabs ── */}
         <div>
-          <label className="text-xs font-bold text-gray-500 mb-1.5 block">ملاحظات (اختياري)</label>
-          <textarea className={`${inputCls} h-20 py-2 resize-none`} value={studentNotes} onChange={(e) => setStudentNotes(e.target.value)} />
+          <label className="text-xs font-bold text-gray-600 mb-2 block">
+            اختر نوع التجديد المطلوب:
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Same Package Option */}
+            <button
+              type="button"
+              onClick={() => {
+                setRenewalType('same')
+                if (currentPkg?._id) setSelectedPackageId(currentPkg._id)
+              }}
+              className={`p-4 rounded-2xl border text-right transition-all flex flex-col justify-between relative overflow-hidden ${
+                renewalType === 'same'
+                  ? 'border-brand-purple bg-purple-50/60 ring-2 ring-brand-purple/20 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-purple/10 text-brand-purple">
+                  موصى به
+                </span>
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    renewalType === 'same'
+                      ? 'border-brand-purple bg-brand-purple text-white'
+                      : 'border-gray-300 bg-white'
+                  }`}
+                >
+                  {renewalType === 'same' && <Check size={12} strokeWidth={3} />}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-gray-900 mb-1">
+                  تجديد نفس الباقة الحالية
+                </h4>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  الاستمرار مع {teacherName} بنفس المواعيد والجدول الأسبوعي المعتاد.
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-purple-100/80 flex items-center justify-between text-xs">
+                <span className="text-gray-500 font-medium">
+                  {currentPkg?.nameAr || 'الباقة الحالية'}
+                </span>
+                {currentPkg?.price !== undefined && (
+                  <span className="font-bold text-brand-purple">
+                    {formatCurrency(currentPkg.price)}
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Custom/Different Package Option */}
+            <button
+              type="button"
+              onClick={() => setRenewalType('custom')}
+              className={`p-4 rounded-2xl border text-right transition-all flex flex-col justify-between relative overflow-hidden ${
+                renewalType === 'custom'
+                  ? 'border-brand-purple bg-purple-50/60 ring-2 ring-brand-purple/20 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  تغيير أو ترقية
+                </span>
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    renewalType === 'custom'
+                      ? 'border-brand-purple bg-brand-purple text-white'
+                      : 'border-gray-300 bg-white'
+                  }`}
+                >
+                  {renewalType === 'custom' && <Check size={12} strokeWidth={3} />}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-gray-900 mb-1">
+                  اختيار أو ترقية باقة أخرى
+                </h4>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  تغيير عدد الحصص الأسبوعية أو الانتقال إلى باقة مكثفة أخرى.
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+                <span>تحديد الباقة من القائمة</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* ── If Custom Package selected, show Package Dropdown ── */}
+        {renewalType === 'custom' && (
+          <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
+            <label className="text-xs font-bold text-gray-700 block">
+              اختر الباقة الجديدة:
+            </label>
+            <select
+              className={inputCls}
+              value={selectedPackageId}
+              onChange={(e) => setSelectedPackageId(e.target.value)}
+            >
+              {(packages || []).map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.nameAr} — {formatCurrency(p.price)} ({p.sessionsPerMonth || 8} حصص شهرياً)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Teacher Change Alert if flagged in Survey */}
+        {surveyFeedback?.requestTeacherChange ? (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+            <AlertCircle size={18} className="text-amber-600 flex-none mt-0.5" />
+            <div>
+              <span className="font-bold block mb-0.5">طلب تغيير المعلم مسجّل:</span>
+              <span>
+                لقد اخترت في استبيان التقييم طلب تغيير المعلم. سيتم التنسيق معك من قِبل إدارة الأكاديمية لاختيار المعلم البديل والموعد المناسب.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 p-2.5 text-xs text-emerald-800 flex items-center gap-2">
+            <Sparkles size={15} className="text-emerald-600 flex-none" />
+            <span>
+              {renewalType === 'same'
+                ? `سيستمر اشتراكك مع نفس المعلم (${teacherName}) ونفس المواعيد السابقة دون انقطاع.`
+                : 'سيتم اعتماد الباقة الجديدة مع تنسيق المواعيد مع المعلم أو إدارة الأكاديمية.'}
+            </span>
+          </div>
+        )}
+
+        {/* ── Official Academy Payment Methods Card ── */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+            <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+              <CreditCard size={18} className="text-brand-purple" />
+              <span>بيانات ووسائل التحويل المعتمدة للأكاديمية</span>
+            </div>
+            {chosenPkg?.price !== undefined && (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                المبلغ المطلوب: {formatCurrency(chosenPkg.price)}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Bank Transfer */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between font-bold text-gray-800">
+                <span className="flex items-center gap-1.5">
+                  <Building2 size={14} className="text-brand-purple" />
+                  <span>التحويل البنكي (السعودية والخليج)</span>
+                </span>
+                <span className="text-[11px] text-gray-500 font-normal">بنك الراجحي</span>
+              </div>
+              <div className="bg-white rounded-lg p-2 border border-slate-200 flex items-center justify-between font-mono">
+                <span className="text-[11px] text-gray-800 font-semibold truncate">
+                  SA00 0000 0000 0000 0000 0000
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('SA00 0000 0000 0000 0000 0000', 'iban')}
+                  className="flex items-center gap-1 text-xs text-brand-purple hover:text-brand-purpleDark ms-2 flex-none px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                >
+                  {copiedKey === 'iban' ? (
+                    <>
+                      <Check size={12} className="text-emerald-600" />
+                      <span className="text-emerald-600 font-bold">تم</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>نسخ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="text-[11px] text-gray-500">
+                اسم الحساب: <span className="text-gray-800 font-semibold">أكاديمية ترتيلة</span>
+              </div>
+            </div>
+
+            {/* Mobile Wallets / Vodafone Cash / STC Pay */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between font-bold text-gray-800">
+                <span className="flex items-center gap-1.5">
+                  <Smartphone size={14} className="text-emerald-600" />
+                  <span>المحافظ الإلكترونية والتحويل السريع</span>
+                </span>
+              </div>
+
+              {/* Egypt Vodafone Cash / InstaPay */}
+              <div className="bg-white rounded-lg p-2 border border-slate-200 flex items-center justify-between">
+                <div className="truncate">
+                  <span className="text-[11px] text-gray-500 block">فودافون كاش / إنستاباي (مصر):</span>
+                  <span className="font-mono font-bold text-gray-800 text-xs">01050400096</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('01050400096', 'voda')}
+                  className="flex items-center gap-1 text-xs text-brand-purple hover:text-brand-purpleDark ms-2 flex-none px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                >
+                  {copiedKey === 'voda' ? (
+                    <>
+                      <Check size={12} className="text-emerald-600" />
+                      <span className="text-emerald-600 font-bold">تم</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>نسخ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* STC Pay / WhatsApp */}
+              <div className="bg-white rounded-lg p-2 border border-slate-200 flex items-center justify-between">
+                <div className="truncate">
+                  <span className="text-[11px] text-gray-500 block">STC Pay / واتساب الدعم المباشر:</span>
+                  <span className="font-mono font-bold text-gray-800 text-xs">+966 56 744 3805</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <a
+                    href="https://wa.me/966567443805"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1.5 rounded text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                    title="مراسلة المالية عبر واتساب"
+                  >
+                    <ExternalLink size={13} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy('+966567443805', 'stc')}
+                    className="flex items-center gap-1 text-xs text-brand-purple hover:text-brand-purpleDark px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                  >
+                    {copiedKey === 'stc' ? (
+                      <>
+                        <Check size={12} className="text-emerald-600" />
+                        <span className="text-emerald-600 font-bold">تم</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} />
+                        <span>نسخ</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Optional Payment Proof Upload ── */}
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+              <UploadCloud size={16} className="text-brand-purple" />
+              <span>إرفاق إثبات التحويل أو الدفع (اختياري الآن)</span>
+            </label>
+            <span className="text-[11px] text-gray-500">
+              يمكن الإرسال لاحقاً عبر واتساب أو الملف الشخصي
+            </span>
+          </div>
+
+          {!proofFile ? (
+            <label className="flex flex-col items-center justify-center p-4 border border-dashed border-gray-300 rounded-xl bg-white hover:bg-purple-50/30 hover:border-brand-purple/40 cursor-pointer transition-all text-center">
+              <UploadCloud size={28} className="text-gray-400 mb-1.5" />
+              <span className="text-xs font-bold text-brand-purple">
+                اضغط لاختيار صورة إيصال التحويل البنكي أو السداد
+              </span>
+              <span className="text-[11px] text-gray-400 mt-0.5">
+                PNG, JPG, PDF (بحد أقصى 10 ميجابايت)
+              </span>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-emerald-200">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                {filePreview ? (
+                  <img
+                    src={filePreview}
+                    alt="Preview"
+                    className="w-11 h-11 rounded-lg object-cover border border-gray-200 flex-none"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-lg bg-purple-50 text-brand-purple flex items-center justify-center flex-none">
+                    <FileText size={20} />
+                  </div>
+                )}
+                <div className="truncate">
+                  <div className="text-xs font-bold text-gray-800 truncate">
+                    {proofFile.name}
+                  </div>
+                  <div className="text-[11px] text-emerald-600 font-medium">
+                    {(proofFile.size / 1024).toFixed(1)} ك.ب — جاهز للإرسال مع الطلب
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="إلغاء الملف"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Student Notes (Optional) ── */}
+        <div>
+          <label className="text-xs font-bold text-gray-700 mb-1.5 block">
+            ملاحظات أو رغبات إضافية (اختياري)
+          </label>
+          <textarea
+            className={`${inputCls} h-16 py-2 resize-none text-xs`}
+            placeholder="اكتب أي ملاحظة للإدارة أو بخصوص المواعيد إن وُجدت..."
+            value={studentNotes}
+            onChange={(e) => setStudentNotes(e.target.value)}
+          />
         </div>
       </div>
     </Modal>
   )
 }
+
 
 function RenewalHistorySection() {
   const { data: requests } = useQuery({ queryKey: ['student', 'renewal-requests'], queryFn: () => renewalService.getMyRequests().then(r => r.data.data) })

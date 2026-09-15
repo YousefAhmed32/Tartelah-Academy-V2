@@ -106,6 +106,7 @@ router.post('/assignments/:id/reassign', requirePermission('assignments.manage')
 router.post('/assignments/:id/cancel', requirePermission('assignments.manage'), assignmentCtrl.cancelAssignment)
 
 // Sessions (admin full control)
+router.get('/sessions/stats', requirePermission('sessions.view'), ctrl.getSessionStats)
 router.get('/sessions', requirePermission('sessions.view'), ctrl.getAllSessions)
 router.post('/sessions', requirePermission('sessions.manage'), sessionCtrl.adminCreateSession)
 router.patch('/sessions/:id', requirePermission('sessions.manage'), sessionCtrl.adminUpdateSession)
