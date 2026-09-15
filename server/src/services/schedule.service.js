@@ -1,6 +1,6 @@
 const Session = require('../models/Session')
 const mongoose = require('mongoose')
-const { fromZonedTime } = require('date-fns-tz')
+const { fromZonedTime, formatInTimeZone } = require('date-fns-tz')
 
 let User
 try {
@@ -198,3 +198,70 @@ exports.generateSessionsFromRule = async (rule) => {
   if (!insertedIds.length) return []
   return Session.find({ _id: { $in: insertedIds } }).sort({ scheduledAt: 1 })
 }
+
+/**
+ * Synchronizes future not-yet-completed sessions for a ScheduleRule whenever
+ * operational parameters like timeOfDay, durationMinutes, meetingLink, etc. change.
+ */
+async function syncFutureSessionsForRule(rule) {
+  if (!rule?._id) return { updatedCount: 0 }
+
+  const tz = rule.timezone || 'Asia/Riyadh'
+  const todayStr = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
+  const startOfToday = fromZonedTime(`${todayStr} 00:00:00`, tz)
+
+  const futureSessions = await Session.find({
+    seriesId: rule._id,
+    status: 'scheduled',
+    // Look for sessions that haven't been completed or cancelled, starting from beginning of today
+    scheduledAt: { $gte: startOfToday },
+  })
+
+  let updatedCount = 0
+
+  for (const session of futureSessions) {
+    let modified = false
+
+    if (!session.isException && rule.timeOfDay) {
+      try {
+        const dayStr = formatInTimeZone(session.scheduledAt, tz, 'yyyy-MM-dd')
+        const targetTimeStr = `${dayStr} ${rule.timeOfDay}`
+        const newScheduledAt = fromZonedTime(targetTimeStr, tz)
+        if (session.scheduledAt.getTime() !== newScheduledAt.getTime()) {
+          session.scheduledAt = newScheduledAt
+          modified = true
+        }
+      } catch (_) {}
+    }
+
+    if (rule.durationMinutes && session.durationMinutes !== rule.durationMinutes) {
+      session.durationMinutes = rule.durationMinutes
+      modified = true
+    }
+
+    if (rule.meetingLink && session.meetingLink !== rule.meetingLink) {
+      session.meetingLink = rule.meetingLink
+      session.meetingProvider = rule.meetingProvider || session.meetingProvider
+      modified = true
+    }
+
+    if (rule.teacherId && String(session.teacherId) !== String(rule.teacherId)) {
+      session.teacherId = rule.teacherId
+      modified = true
+    }
+
+    if (rule.studentId && String(session.studentId) !== String(rule.studentId)) {
+      session.studentId = rule.studentId
+      modified = true
+    }
+
+    if (modified) {
+      await session.save()
+      updatedCount++
+    }
+  }
+
+  return { updatedCount }
+}
+
+exports.syncFutureSessionsForRule = syncFutureSessionsForRule

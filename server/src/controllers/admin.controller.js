@@ -1010,22 +1010,13 @@ exports.updateScheduleRule = async (req, res, next) => {
       .populate('teacherId studentId', 'firstNameAr lastNameAr')
     if (!rule) return sendError(res, 'القاعدة غير موجودة', 404)
 
-    // Keep not-yet-happened generated sessions in sync — past sessions
-    // (history/payroll data) are never rewritten.
-    const futureUpdate = {}
-    if (updates.meetingLink !== undefined) { futureUpdate.meetingLink = updates.meetingLink; futureUpdate.meetingProvider = updates.meetingProvider || rule.meetingProvider }
-    if (updates.teacherId !== undefined) futureUpdate.teacherId = updates.teacherId
-    if (updates.studentId !== undefined) futureUpdate.studentId = updates.studentId
-    if (Object.keys(futureUpdate).length) {
-      await Session.updateMany(
-        { seriesId: rule._id, status: 'scheduled', scheduledAt: { $gte: new Date() } },
-        futureUpdate
-      )
-    }
+    // Keep not-yet-happened generated sessions in sync with the rule (including timeOfDay,
+    // durationMinutes, meetingLink, teacherId, studentId) — past/completed sessions are never rewritten.
+    const { updatedCount } = await scheduleService.syncFutureSessionsForRule(rule)
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'schedule_rule.admin_update',
-      entity: 'ScheduleRule', entityId: rule._id, changes: updates, ip: req.ip,
+      entity: 'ScheduleRule', entityId: rule._id, changes: { ...updates, syncedSessions: updatedCount }, ip: req.ip,
     })
 
     sendSuccess(res, rule, 'تم تحديث الجدول الدوري')

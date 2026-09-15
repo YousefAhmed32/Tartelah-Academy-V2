@@ -29,7 +29,25 @@ import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx
 
 // ─── Arabic month names ───────────────────────────────────────────────────────
 const AR_MONTHS = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
-const HOURS_LIST = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+
+function formatTime12h(timeStr) {
+  if (!timeStr) return '—'
+  const [h, m] = timeStr.split(':').map(Number)
+  if (isNaN(h)) return timeStr
+  const period = h >= 12 ? 'مساءً' : 'صباحاً'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m || 0).padStart(2, '0')} ${period}`
+}
+
+const HOURS_LIST = Array.from({ length: 24 }, (_, i) => {
+  const val = String(i).padStart(2, '0')
+  const h12 = i === 0 ? 12 : i > 12 ? i - 12 : i
+  const period = i < 12 ? 'ص' : 'م'
+  return {
+    value: val,
+    label: `${val}:00 (${h12}:00 ${period})`,
+  }
+})
 const MINS_LIST = ['00', '15', '30', '45']
 
 const DELAY_REASON_OPTIONS = Object.entries(DELAY_REASON).map(([value, label]) => ({ value, label }))
@@ -775,7 +793,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <div>
                 <label className={LBL}>الساعة</label>
                 <select value={form.timeHour} onChange={e => set('timeHour', e.target.value)} className={FIELD}>
-                  {HOURS_LIST.map(h => <option key={h} value={h}>{h}</option>)}
+                  {HOURS_LIST.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
                 </select>
               </div>
               <div>
@@ -793,6 +811,10 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
                   <option value={90}>٩٠ د</option>
                 </select>
               </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-semibold border border-violet-100">
+              <Clock size={14} className="text-violet-600 shrink-0" />
+              <span>الموعد المختار للحصة: {formatTime12h(`${form.timeHour}:${form.timeMinute}`)} (بتوقيت مكة المكرمة)</span>
             </div>
           </div>
         )}
@@ -1044,7 +1066,7 @@ function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
                 {rule.daysOfWeek.length > 0 && (
                   <span>•  {rule.daysOfWeek.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label).join(' + ')}</span>
                 )}
-                <span>• {rule.timeOfDay}</span>
+                <span>• {rule.timeOfDay ? `${formatTime12h(rule.timeOfDay)} (${rule.timeOfDay})` : '—'}</span>
                 <span>• {rule.durationMinutes} دقيقة</span>
               </div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">

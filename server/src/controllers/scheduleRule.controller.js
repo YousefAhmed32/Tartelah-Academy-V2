@@ -187,22 +187,13 @@ exports.updateRule = async (req, res, next) => {
 
     await rule.save()
 
-    // Keep not-yet-happened generated sessions in sync with the rule — past
-    // sessions (history/payroll data) are never rewritten.
-    const futureUpdate = {}
-    if (meetingLink !== undefined) { futureUpdate.meetingLink = meetingLink; futureUpdate.meetingProvider = meetingProvider || rule.meetingProvider }
-    if (isAdmin && teacherId !== undefined) futureUpdate.teacherId = teacherId
-    if (isAdmin && studentId !== undefined) futureUpdate.studentId = studentId
-    if (Object.keys(futureUpdate).length) {
-      await Session.updateMany(
-        { seriesId: rule._id, status: 'scheduled', scheduledAt: { $gte: new Date() } },
-        futureUpdate
-      )
-    }
+    // Keep not-yet-happened generated sessions in sync with the rule (including timeOfDay,
+    // durationMinutes, meetingLink, teacherId, studentId) — past/completed sessions are never rewritten.
+    const { updatedCount } = await scheduleService.syncFutureSessionsForRule(rule)
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'schedule_rule.update',
-      entity: 'ScheduleRule', entityId: rule._id, changes: req.body, ip: req.ip,
+      entity: 'ScheduleRule', entityId: rule._id, changes: { ...req.body, syncedSessions: updatedCount }, ip: req.ip,
     })
 
     sendSuccess(res, rule, 'تم تحديث الجدول')
