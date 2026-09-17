@@ -40,6 +40,7 @@ import { formatNumber } from '../../utils/format.js'
 import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
 import Can from '../../components/shared/Can.jsx'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
+import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import AdminSessionDetailDrawer from '../../components/admin/AdminSessionDetailDrawer.jsx'
 import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
@@ -201,7 +202,7 @@ function SessionModal({ session, onClose, teachers, students }) {
                   studentId: sId,
                   titleAr:
                     shouldAutoName && selectedStudent
-                      ? `حصة ${selectedStudent.firstNameAr} ${selectedStudent.lastNameAr || ''}`.trim()
+                      ? `${selectedStudent.firstNameAr} ${selectedStudent.lastNameAr || ''}`.trim()
                       : prev.titleAr,
                 }))
               }}
@@ -512,9 +513,9 @@ function SessionCardItem({ session, onSelect, onEdit, onReschedule, onCancel, on
         </div>
 
         {/* Title */}
-        <h3 className="font-heading font-bold text-base text-gray-900 group-hover:text-violet-700 transition-colors truncate mb-1">
-          {session.titleAr || 'حصة تدريبية'}
-        </h3>
+        <div className="mb-1">
+          <SessionTitleDisplay session={session} size="lg" />
+        </div>
 
         {/* Time and Duration */}
         <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">

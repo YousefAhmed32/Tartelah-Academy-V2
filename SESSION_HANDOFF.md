@@ -1,6 +1,42 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
+2026-09-17 — Elderly-Friendly UI/UX Overhaul for Session Postponement & Quick Presets
+
+## Status
+- **User Request**:
+  1. Overhaul the user experience for session postponement (`RescheduleSessionModal.jsx`) specifically for elderly teachers (كبار السن).
+  2. Provide large, instant quick-action preset buttons ("غداً", "بعد يومين", "بعد 3 أيام", "الأسبوع القادم") with dates written in clear Arabic.
+  3. Improve the UX/UI: eliminate clunky native browser `datetime-local` pickers, retain the same time by default, provide instant quick reason pills, and show a clear live confirmation banner.
+- **Frontend Architecture & UX Changes**:
+  - `client/src/components/teacher/RescheduleSessionModal.jsx`:
+    - **Quick Presets (أزرار التأجيل السريع الكبيرة)**: 4 prominent cards with min-height 76px and clear subtext ("غداً - السبت 19 سبتمبر", "بعد يومين - الأحد 20 سبتمبر", "بعد 3 أيام - الإثنين 21 سبتمبر", "الأسبوع القادم - الجمعة 25 سبتمبر").
+    - **Time Retention (نفس التوقيت المعتاد)**: Retains original session hour & minute automatically (e.g. 12:00 م) so elderly teachers do not need to touch time pickers unless explicitly changing it.
+    - **Live Visual Preview (ملخص الموعد البديل)**: High-contrast emerald card displaying the confirmed Arabic appointment: `السبت، 19 سبتمبر 2026 — الساعة 12:00 م` with student notification reassurance.
+    - **Quick Reason Pills (أسباب التأجيل الشائعة)**: 4 one-tap pills ("عذر طارئ للطالب", "عذر طارئ للمعلم", "عطل في الإنترنت أو الكهرباء", "بناءً على طلب ولي الأمر") auto-populating the reason field.
+    - **WCAG Accessibility & Touch Targets**: Sized modal to `size="md"`, increased font contrast, min 48-52px buttons, and clear checkmark badges.
+  - `client/src/pages/teacher/TeacherDashboardPage.jsx`:
+    - Labeled button explicitly as "تأجيل الحصة" in soft amber styling with `CalendarClock` icon.
+  - `client/src/pages/teacher/TeacherSessionsPage.jsx`:
+    - Labeled both pre-checkin and checkin buttons as "⏱️ تأجيل الحصة" with amber badge styling.
+- **Verification**:
+  - Client Vitest test suite: 8 test files, 97 passed.
+  - Client production build: `npm run build` completed with code 0 (Vite v6.4.3).
+  - Backend Jest test suite: 54 suites, 598 tests passed.
+
+---
+- Admins can now edit or postpone a lesson directly from the session-detail drawer opened by the dashboard's “معاينة” action. The flow no longer redirects to the Sessions Management page.
+- The inline edit mode covers the lesson title, academy-local date/time, duration, meeting provider/link, and admin notes. The scheduling mode clearly distinguishes “تغيير الموعد” from “تأجيل الحصة”, includes quick date choices, and accepts an optional reason that is shown in notifications.
+- All datetime-local values continue through the canonical academy-time boundary (`Africa/Cairo` in the current settings), and the editor displays the timezone explicitly to prevent UTC/device-time confusion.
+- Both update paths keep the existing booking-conflict guard. A real appointment change is recorded as an exception with `rescheduledFrom`; postponement also records `isPostponed`, `postponedAt`, and `postponedReason`.
+- Admin-originated edits and postponements now send high-priority notifications to both the student and teacher, with role-correct destinations. Relevant admin/teacher/student query caches are invalidated after success so each surface reloads the same appointment.
+- Existing callback-driven edit/reschedule behavior on the dedicated Sessions Management page is preserved; the new inline editor is the dashboard drawer's fallback only.
+- Live browser QA confirmed both edit and reschedule/postpone dialogs open over the drawer while the URL remains `/admin`. The reschedule dialog exposed its current time, Cairo timezone, change-type selector, quick dates, reason, and disabled-until-changed save state. It was closed without saving, so no production-like QA record was changed.
+- Verification: frontend production build passed; targeted ESLint passed with zero output; full client suite passed (90/90); full backend suite passed (53 suites, 590/590 tests). Two new controller tests cover admin postponement and admin appointment edits notifying both parties.
+
+---
+
+## Session Date
 2026-09-17 — Canonical Academy-Time Scheduling Hardening
 
 ## Status

@@ -54,7 +54,7 @@ exports.createSession = async (req, res, next) => {
     if (!titleAr || titleAr === 'حصة' || titleAr === 'حصة تلاوة') {
       const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
       const studentName = student ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim() : (student?.name || '')
-      titleAr = studentName ? `حصة ${studentName}` : (titleAr || 'حصة تلاوة')
+      titleAr = studentName ? studentName : (titleAr || 'حصة تلاوة')
     }
 
     let resolvedMeetingLink = meetingLink || ''
@@ -671,6 +671,8 @@ exports.cancelSession = async (req, res, next) => {
 exports.rescheduleSession = async (req, res, next) => {
   try {
     const { newDate } = req.body
+    const changeType = req.body.changeType === 'postpone' ? 'postpone' : 'reschedule'
+    const reason = String(req.body.reason || '').trim().slice(0, 500)
     if (!newDate) return sendError(res, 'التاريخ الجديد مطلوب', 400)
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
@@ -689,23 +691,45 @@ exports.rescheduleSession = async (req, res, next) => {
     session.scheduledAt = parsedNewDate
     session.status = 'scheduled'
     session.isException = true
+    if (changeType === 'postpone') {
+      session.isPostponed = true
+      session.postponedAt = new Date()
+      session.postponedReason = reason
+    }
     await session.save()
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.reschedule',
       entity: 'Session', entityId: session._id,
-      changes: { from: previousDate, to: session.scheduledAt }, ip: req.ip,
+      changes: { from: previousDate, to: session.scheduledAt, changeType, reason }, ip: req.ip,
     })
 
+    const notificationTitle = changeType === 'postpone' ? 'تم تأجيل الحصة' : 'تم تغيير موعد الحصة'
+    const reasonText = reason ? ` — السبب: ${reason}` : ''
     await createNotification({
       userId: session.studentId,
-      titleAr: 'تم إعادة جدولة الحصة',
-      bodyAr: `تم تغيير موعد حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedNewDate, timezone)}`,
+      titleAr: notificationTitle,
+      bodyAr: `تم ${changeType === 'postpone' ? 'تأجيل' : 'تغيير موعد'} حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedNewDate, timezone)}${reasonText}`,
       type: 'session',
       priority: 'high',
       relatedId: session._id,
       actionUrl: '/student/sessions',
     })
+
+    // When an administrator changes the appointment, both parties need the
+    // same source-of-truth notification. A teacher rescheduling their own
+    // lesson already knows about the action, so only the student is notified.
+    if (isAdmin) {
+      await createNotification({
+        userId: session.teacherId,
+        titleAr: notificationTitle,
+        bodyAr: `تم ${changeType === 'postpone' ? 'تأجيل' : 'تغيير موعد'} حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedNewDate, timezone)}${reasonText}`,
+        type: 'session',
+        priority: 'high',
+        relatedId: session._id,
+        actionUrl: '/teacher/sessions',
+      })
+    }
 
     sendSuccess(res, session, 'تم إعادة جدولة الحصة')
   } catch (err) {
@@ -811,9 +835,11 @@ exports.adminUpdateSession = async (req, res, next) => {
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+    const previousScheduledAt = session.scheduledAt
+    let timezone
 
     if (updates.scheduledAt !== undefined) {
-      const timezone = await getAcademyTimezone()
+      timezone = await getAcademyTimezone()
       updates.scheduledAt = parseAcademyDateTime(updates.scheduledAt, timezone)
       if (Number.isNaN(updates.scheduledAt.getTime())) return sendError(res, 'تاريخ ووقت الحصة غير صالح', 400)
       if (updates.scheduledAt <= new Date()) return sendError(res, 'لا يمكن جدولة حصة في الماضي', 400)
@@ -829,6 +855,12 @@ exports.adminUpdateSession = async (req, res, next) => {
       })
     }
 
+    const scheduledAtChanged = updates.scheduledAt !== undefined
+      && new Date(previousScheduledAt).getTime() !== updates.scheduledAt.getTime()
+    if (scheduledAtChanged) {
+      session.rescheduledFrom = previousScheduledAt
+      session.isException = true
+    }
     Object.assign(session, updates)
     await session.save()
     await session.populate('studentId teacherId', 'firstNameAr lastNameAr avatar email')
@@ -837,6 +869,26 @@ exports.adminUpdateSession = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_update',
       entity: 'Session', entityId: session._id, changes: updates, ip: req.ip,
     })
+
+    if (scheduledAtChanged) {
+      const formattedPrevious = formatAcademyDateTimeAr(previousScheduledAt, timezone)
+      const formattedNext = formatAcademyDateTimeAr(session.scheduledAt, timezone)
+      const bodyAr = `تم تعديل موعد حصة "${session.titleAr}" من ${formattedPrevious} إلى ${formattedNext}`
+      await Promise.all([
+        createNotification({
+          userId: session.studentId?._id || session.studentId,
+          titleAr: 'تم تعديل موعد الحصة', bodyAr,
+          type: 'session', priority: 'high', relatedId: session._id,
+          actionUrl: '/student/sessions',
+        }),
+        createNotification({
+          userId: session.teacherId?._id || session.teacherId,
+          titleAr: 'تم تعديل موعد الحصة', bodyAr,
+          type: 'session', priority: 'high', relatedId: session._id,
+          actionUrl: '/teacher/sessions',
+        }),
+      ])
+    }
 
     sendSuccess(res, session, 'تم تحديث الحصة')
   } catch (err) {

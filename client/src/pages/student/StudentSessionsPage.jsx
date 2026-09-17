@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
+import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, SESSION_OUTCOME, MEETING_PROVIDERS } from '../../config/constants.js'
 
@@ -141,7 +142,7 @@ function SessionRow({ session }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-heading font-bold text-brand-textBody">{session.titleAr || session.title}</span>
+          <SessionTitleDisplay session={session} size="sm" />
           {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
               ⏱️ حصة مؤجلة

@@ -2,7 +2,20 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
-## Canonical Academy-Time Scheduling Hardening — 2026-09-17 (latest)
+## Inline Admin Session Editing & Postponement — 2026-09-17 (latest)
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Edit from dashboard drawer | ✅ | “تعديل الحصة” opens an inline modal over the existing session drawer; no navigation to Sessions Management. Admin can update title, academy-local appointment, duration, meeting details, and notes. |
+| Reschedule vs postpone UX | ✅ | “إعادة جدولة” opens a focused workflow with explicit “تغيير الموعد” / “تأجيل الحصة” choices, quick dates, optional reason, current appointment, and Cairo timezone notice. |
+| Cross-role consistency | ✅ | Successful mutations invalidate the relevant admin, teacher, and session caches; the open drawer also updates immediately from the response. |
+| Teacher + student notifications | ✅ | Admin schedule edits and postponements send high-priority notifications to both parties with the new academy-formatted time and optional reason. |
+| Scheduling safety | ✅ | Existing overlap validation remains authoritative; real changes record `rescheduledFrom`/exception state, while postponement also records its explicit lifecycle metadata. |
+| Verification | ✅ | Live dashboard QA confirmed both dialogs stay on `/admin` and no QA data was saved. Client 90/90, server 590/590 across 53 suites, production build and targeted ESLint passed. |
+
+## Canonical Academy-Time Scheduling Hardening — 2026-09-17
 
 Full detail in `SESSION_HANDOFF.md`'s matching entry.
 

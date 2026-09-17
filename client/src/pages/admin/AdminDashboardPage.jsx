@@ -822,6 +822,7 @@ export default function AdminDashboardPage() {
           session={drawerSession}
           open={!!drawerSession}
           onClose={() => setDrawerSession(null)}
+          onSessionUpdated={setDrawerSession}
         />
       )}
 

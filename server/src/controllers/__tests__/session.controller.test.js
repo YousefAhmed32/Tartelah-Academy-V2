@@ -213,3 +213,67 @@ describe('session.controller.finishSession — postponement and rescheduling wor
     )
   })
 })
+
+describe('session.controller — admin schedule changes notify both parties', () => {
+  const admin = { _id: 'admin1', role: 'admin' }
+
+  function buildScheduledSession() {
+    return {
+      _id: 'session1',
+      teacherId: 'teacher1',
+      studentId: 'student1',
+      titleAr: 'حصة محمد',
+      scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      durationMinutes: 60,
+      status: 'scheduled',
+      save: jest.fn().mockResolvedValue(true),
+      populate: jest.fn().mockImplementation(async function populate() { return this }),
+    }
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    bookingService.assertNoConflict.mockResolvedValue(true)
+    createNotification.mockResolvedValue(true)
+  })
+
+  test('admin postponement marks the session and notifies student and teacher', async () => {
+    const session = buildScheduledSession()
+    Session.findById.mockResolvedValue(session)
+    const newDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    const req = {
+      params: { id: 'session1' }, user: admin, ip: '127.0.0.1',
+      body: { newDate, changeType: 'postpone', reason: 'طلب ولي الأمر' },
+    }
+    const res = mockRes()
+
+    await ctrl.rescheduleSession(req, res, jest.fn())
+
+    expect(jsonOf(res).success).toBe(true)
+    expect(session.isPostponed).toBe(true)
+    expect(session.postponedReason).toBe('طلب ولي الأمر')
+    expect(createNotification).toHaveBeenCalledTimes(2)
+    expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 'student1', actionUrl: '/student/sessions' }))
+    expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 'teacher1', actionUrl: '/teacher/sessions' }))
+  })
+
+  test('editing the appointment from admin notifies student and teacher', async () => {
+    const session = buildScheduledSession()
+    Session.findById.mockResolvedValue(session)
+    const newDate = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const req = {
+      params: { id: 'session1' }, user: admin, ip: '127.0.0.1',
+      body: { scheduledAt: newDate, durationMinutes: 45 },
+    }
+    const res = mockRes()
+
+    await ctrl.adminUpdateSession(req, res, jest.fn())
+
+    expect(jsonOf(res).success).toBe(true)
+    expect(session.isException).toBe(true)
+    expect(session.rescheduledFrom).toBeInstanceOf(Date)
+    expect(createNotification).toHaveBeenCalledTimes(2)
+    expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 'student1' }))
+    expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 'teacher1' }))
+  })
+})

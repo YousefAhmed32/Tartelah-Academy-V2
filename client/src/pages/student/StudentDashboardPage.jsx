@@ -7,6 +7,8 @@ import { useAuthStore } from '../../store/authStore.js'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
+import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
+import { formatSessionTitle, extractSessionIndexInfo } from '../../utils/sessionTitle.js'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, ROUTES } from '../../config/constants.js'
 // greeting uses no emoji — wave removed
@@ -243,7 +245,7 @@ function NextSessionCard({ session, countdown }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
           <div className="font-heading font-bold text-xl text-white truncate">
-            {session.titleAr || session.title || 'حصة قرآن'}
+            {formatSessionTitle(session)}
           </div>
           {session.isPostponed && (
             <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
@@ -489,9 +491,7 @@ function SessionRow({ session }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-brand-textBody text-sm truncate">
-            {session.titleAr || session.title || 'حصة قرآن'}
-          </span>
+          <SessionTitleDisplay session={session} size="sm" />
           {session.isPostponed && (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80">
               <span>⏱️</span> حصة مؤجلة

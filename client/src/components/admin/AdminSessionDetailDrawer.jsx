@@ -23,7 +23,9 @@ import {
 import toast from 'react-hot-toast'
 import Avatar from '../ui/Avatar.jsx'
 import AttendanceStatusBadge from '../ui/AttendanceStatusBadge.jsx'
+import AdminSessionScheduleEditor from './AdminSessionScheduleEditor.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
 
 const STATUS_MAP = {
@@ -54,8 +56,10 @@ export default function AdminSessionDetailDrawer({
   onReschedule,
   onCorrect,
   onCancel,
+  onSessionUpdated,
 }) {
   const [copied, setCopied] = useState(false)
+  const [inlineAction, setInlineAction] = useState(null)
   const navigate = useNavigate()
 
   if (!open || !session) return null
@@ -108,7 +112,7 @@ export default function AdminSessionDetailDrawer({
                 <span className="text-xs text-gray-400 font-mono">#{session._id.slice(-6)}</span>
               </div>
               <h2 className="font-heading font-extrabold text-lg text-gray-900 mt-1 truncate max-w-[280px]">
-                {session.titleAr || 'تفاصيل الحصة'}
+                {formatSessionTitle(session)}
               </h2>
             </div>
             <button
@@ -441,9 +445,12 @@ export default function AdminSessionDetailDrawer({
           {/* Footer Actions with Safe Fallbacks */}
           {(() => {
             const handleEdit = () => {
-              onClose()
-              if (typeof onEdit === 'function') onEdit(session)
-              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+              if (typeof onEdit === 'function') {
+                onClose()
+                onEdit(session)
+              } else {
+                setInlineAction('edit')
+              }
             }
             const handleCorrect = () => {
               onClose()
@@ -451,9 +458,12 @@ export default function AdminSessionDetailDrawer({
               else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
             }
             const handleReschedule = () => {
-              onClose()
-              if (typeof onReschedule === 'function') onReschedule(session)
-              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+              if (typeof onReschedule === 'function') {
+                onClose()
+                onReschedule(session)
+              } else {
+                setInlineAction('reschedule')
+              }
             }
             const handleCancelAction = () => {
               onClose()
@@ -509,6 +519,13 @@ export default function AdminSessionDetailDrawer({
           })()}
         </motion.div>
       </div>
+      <AdminSessionScheduleEditor
+        open={!!inlineAction}
+        session={session}
+        mode={inlineAction || 'edit'}
+        onClose={() => setInlineAction(null)}
+        onSaved={(updatedSession) => onSessionUpdated?.(updatedSession)}
+      />
     </div>
   )
 }

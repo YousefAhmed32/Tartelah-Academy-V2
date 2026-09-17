@@ -23,6 +23,7 @@ import RescheduleSessionModal from '../../components/teacher/RescheduleSessionMo
 import CancelSessionModal from '../../components/teacher/CancelSessionModal.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
+import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr, timeFromNow } from '../../utils/date.js'
 import { toArray, formatCurrency, formatNumber } from '../../utils/format.js'
@@ -138,7 +139,7 @@ function NextSessionCard({ session }) {
               </span>
             )}
           </div>
-          <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
+          <SessionTitleDisplay session={session} size="lg" className="mb-0.5" />
           <div className="text-sm mt-0.5 text-gray-500 truncate">
             {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}
           </div>
@@ -218,11 +219,11 @@ function NextSessionCard({ session }) {
         <button
           type="button"
           onClick={() => setShowReschedule(true)}
-          className="py-2 px-1.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center gap-1.5 transition-colors"
-          title="إعادة جدولة الحصة"
+          className="py-2 px-1.5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50/70 hover:bg-amber-100 border border-amber-200/80 flex items-center justify-center gap-1.5 transition-colors"
+          title="تأجيل الحصة لموعد آخر"
         >
           <CalendarClock size={13} className="text-amber-600 flex-none" />
-          <span className="truncate">إعادة جدولة</span>
+          <span className="truncate">تأجيل الحصة</span>
         </button>
         <button
           type="button"
@@ -290,7 +291,7 @@ function CurrentSessionCard({ session, ongoingCount }) {
             <div className="flex items-center gap-1.5 text-[11px] font-bold mb-1 text-emerald-600">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> الحصة جارية الآن
             </div>
-            <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
+            <SessionTitleDisplay session={session} size="lg" className="mb-0.5" />
             <div className="text-sm mt-0.5 text-gray-500">
               {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}
             </div>

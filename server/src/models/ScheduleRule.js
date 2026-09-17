@@ -23,6 +23,7 @@ const ScheduleRuleSchema = new mongoose.Schema({
     default: 'zoom',
   },
   titleTemplate: { type: String, default: 'حصة' },
+  startingSessionNumber: { type: Number },
   status: { type: String, enum: ['active', 'paused', 'ended'], default: 'active' },
   skipDates: [{ type: Date }],
   timezone: { type: String, default: DEFAULT_ACADEMY_TIMEZONE },

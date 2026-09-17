@@ -5,7 +5,7 @@ import {
   Calendar, Clock, Video, Trash2,
   RotateCw, Save, Plus, Link2, ChevronDown, Info,
   AlertCircle, CheckCircle2, RefreshCw, Layers,
-  GraduationCap, UserCheck, CalendarClock,
+  GraduationCap, UserCheck, CalendarClock, Hash, Sparkles,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
@@ -344,6 +344,7 @@ export default function EditScheduleRuleModal({
       ...p,
       lessonsUsed: used,
       lessonsRemaining: rem,
+      sessionsTotal: rem,
     }))
   }
 
@@ -355,6 +356,7 @@ export default function EditScheduleRuleModal({
       ...p,
       lessonsRemaining: rem,
       lessonsUsed: used,
+      sessionsTotal: rem,
     }))
   }
 
@@ -431,7 +433,7 @@ export default function EditScheduleRuleModal({
         durationMinutes: Number(data.durationMinutes) || 60,
         sessionsTotal: data.sessionsTotal ? Number(data.sessionsTotal) : undefined,
         endDate: data.endDate || undefined,
-        titleTemplate: data.titleTemplate || (studentDisplayName ? `حصة ${studentDisplayName}` : 'حصة قرآن كريم'),
+        titleTemplate: data.titleTemplate || (studentDisplayName ? studentDisplayName : 'حصة'),
       }
 
       // Attach package & subscription details if new rule and package selected
@@ -444,6 +446,10 @@ export default function EditScheduleRuleModal({
         payload.lessonsUsed = data.lessonsUsed !== undefined && data.lessonsUsed !== '' ? Number(data.lessonsUsed) : 0
         payload.lessonsRemaining =
           data.lessonsRemaining !== undefined && data.lessonsRemaining !== '' ? Number(data.lessonsRemaining) : undefined
+        payload.startingSessionNumber = Number(payload.lessonsUsed) + 1
+        if (payload.lessonsRemaining !== undefined) {
+          payload.sessionsTotal = payload.lessonsRemaining
+        }
       }
 
       if (isEdit) {
@@ -980,6 +986,86 @@ export default function EditScheduleRuleModal({
                       </span>
                     </div>
                   </div>
+
+                  {/* Smart Sequence Preview Card */}
+                  {(() => {
+                    const totalPkgSessions = Number(selectedPackage?.sessionsPerMonth || form.sessionsTotal || 16)
+                    const usedLessons = Number(form.lessonsUsed) || 0
+                    const remLessons = form.lessonsRemaining !== undefined && form.lessonsRemaining !== '' ? Number(form.lessonsRemaining) : Math.max(0, totalPkgSessions - usedLessons)
+                    const firstSessionNum = usedLessons + 1
+                    const lastSessionNum = Math.min(totalPkgSessions, usedLessons + remLessons)
+
+                    return (
+                      <div className="bg-gradient-to-br from-violet-50/70 via-white to-purple-50/50 border border-violet-200/80 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-xs" dir="rtl">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs shadow-xs">
+                              <Sparkles size={14} />
+                            </span>
+                            <div>
+                              <h5 className="text-xs font-bold text-gray-900">
+                                احتساب ترقيم الحصص الذكي المرتبط بالرصيد
+                              </h5>
+                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                تتطابق أرقام الحصص على المنصة مباشرة مع استهلاك الطالب الفعلي
+                              </p>
+                            </div>
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-violet-100/80 text-violet-800 border border-violet-200/60">
+                            <Hash size={11} className="text-violet-600" />
+                            أول حصة: {firstSessionNum} من {totalPkgSessions}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                          {/* 1. Past Consumed */}
+                          <div className="bg-white/90 border border-amber-200/70 rounded-xl p-2.5 space-y-1">
+                            <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                              حصص مستهلكة مسبقاً
+                            </div>
+                            <div className="font-extrabold text-amber-950 text-sm">
+                              {usedLessons > 0 ? `${usedLessons} حصص` : 'لا يوجد (0)'}
+                            </div>
+                            <div className="text-[11px] text-amber-700/90 leading-tight">
+                              {usedLessons > 0
+                                ? `أُنجزت من 1 إلى ${usedLessons} (محسوبة في الراتب)`
+                                : 'الباقة تبدأ جديدة من الحصة 1'}
+                            </div>
+                          </div>
+
+                          {/* 2. First Upcoming on Platform */}
+                          <div className="bg-white/90 border border-violet-200 rounded-xl p-2.5 space-y-1 shadow-xs ring-1 ring-violet-500/20">
+                            <div className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">
+                              أول حصة على المنصة
+                            </div>
+                            <div className="font-extrabold text-violet-900 text-sm flex items-center gap-1">
+                              <span>حصة رقم ({firstSessionNum} من {totalPkgSessions})</span>
+                            </div>
+                            <div className="text-[11px] text-violet-600/90 leading-tight">
+                              {usedLessons > 0
+                                ? `تبدأ مباشرة من رقم ${firstSessionNum} لا من 1`
+                                : `تبدأ كأول حصة من إجمالي ${totalPkgSessions}`}
+                            </div>
+                          </div>
+
+                          {/* 3. Total Scheduled on Platform */}
+                          <div className="bg-white/90 border border-emerald-200/70 rounded-xl p-2.5 space-y-1">
+                            <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                              الحصص المتبقية المجدولة
+                            </div>
+                            <div className="font-extrabold text-emerald-950 text-sm">
+                              {remLessons} حصص مجدولة
+                            </div>
+                            <div className="text-[11px] text-emerald-700/90 leading-tight">
+                              {remLessons > 0
+                                ? `تسلسلها من ${firstSessionNum} إلى ${lastSessionNum}`
+                                : 'تم استهلاك رصيد الباقة بالكامل'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             ) : null}
@@ -1274,7 +1360,7 @@ export default function EditScheduleRuleModal({
                 label="عنوان الحصة (قالب)"
                 value={form.titleTemplate}
                 onChange={(e) => set('titleTemplate', e.target.value)}
-                placeholder={studentDisplayName ? `مثال: حصة ${studentDisplayName}` : 'حصة قرآن كريم'}
+                placeholder={studentDisplayName ? `مثال: ${studentDisplayName}` : 'حصة'}
               />
               <FormInput
                 label="ملاحظات إدارية (مرجعية)"

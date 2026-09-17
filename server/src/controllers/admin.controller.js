@@ -1066,6 +1066,15 @@ exports.createScheduleRule = async (req, res, next) => {
       resolvedMeetingProvider = teacherUser.meetingLinks[0].provider || resolvedMeetingProvider
     }
 
+    let derivedStartingNumber = startingSessionNumber ? Number(startingSessionNumber) : undefined
+    if (!derivedStartingNumber && createdSubResult?.used > 0) {
+      derivedStartingNumber = createdSubResult.used + 1
+    }
+
+    const resolvedSessionsTotal = sessionsTotal
+      ? Number(sessionsTotal)
+      : (createdSubResult?.remaining !== undefined ? createdSubResult.remaining : undefined)
+
     const rule = await ScheduleRule.create({
       teacherId,
       studentId,
@@ -1076,10 +1085,11 @@ exports.createScheduleRule = async (req, res, next) => {
       durationMinutes: durationMinutes || 60,
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
-      sessionsTotal: sessionsTotal || undefined,
+      sessionsTotal: resolvedSessionsTotal,
       meetingLink: resolvedMeetingLink,
       meetingProvider: resolvedMeetingProvider,
       titleTemplate: titleTemplate || defaultTitle,
+      startingSessionNumber: derivedStartingNumber,
       notes,
       timezone,
     })

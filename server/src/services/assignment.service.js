@@ -230,10 +230,24 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
 
   const createdRuleIds = []
   const createdSessionIds = []
+  let resolvedSubscriptionId = null
+  try {
+    const Subscription = require('../models/Subscription')
+    const sub = await Subscription.findOne({ studentId: doc.studentId, status: 'active' }).sort({ createdAt: -1 })
+    if (sub) {
+      resolvedSubscriptionId = sub._id
+      if (!sub.teacherId || String(sub.teacherId) !== String(doc.teacherId)) {
+        sub.teacherId = doc.teacherId
+        await sub.save().catch(() => {})
+      }
+    }
+  } catch (_) {}
+
   try {
     for (const group of groups) {
       const rule = await ScheduleRule.create({
         teacherId: doc.teacherId, studentId: doc.studentId,
+        subscriptionId: resolvedSubscriptionId,
         frequency: doc.schedule.frequency || 'weekly',
         // 'monthly' means "the same day-of-month as startDate" — schedule.
         // service.js's generateDates() only honors that when daysOfWeek is
@@ -262,7 +276,7 @@ async function activateAssignment(assignmentRequestOrId, { actorId, actorRole })
   }
 
   doc.status = 'completed'
-  doc.activationResult = { scheduleRuleIds: createdRuleIds, sessionIds: createdSessionIds, activatedAt: new Date() }
+  doc.activationResult = { scheduleRuleIds: createdRuleIds, sessionIds: createdSessionIds, subscriptionId: resolvedSubscriptionId, activatedAt: new Date() }
   doc.updatedBy = actorId
   doc.responseHistory.push({ action: 'activated', actorId, actorRole, at: new Date() })
   await doc.save()

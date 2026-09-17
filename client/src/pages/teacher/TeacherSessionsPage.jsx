@@ -498,8 +498,8 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
                       <button onClick={() => setShowReschedule(true)}
-                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-amber-600 transition-all">
-                        ↺ إعادة جدولة
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all">
+                        ⏱️ تأجيل الحصة
                       </button>
                       <button onClick={() => setShowCancel(true)}
                         className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-all flex items-center gap-1">
@@ -531,8 +531,8 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
                         <AlertTriangle size={12} strokeWidth={2} /> تأخرت الحصة
                       </button>
                       <button onClick={() => setShowReschedule(true)}
-                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-amber-600 transition-all">
-                        ↺ إعادة جدولة
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all">
+                        ⏱️ تأجيل الحصة
                       </button>
                       <button onClick={() => setShowCancel(true)}
                         className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-all flex items-center gap-1">

@@ -301,6 +301,20 @@ function AddStudentModal({ teacherId, open, onClose, teacherContext }) {
                     placeholder={form.splitMode === 'used' ? 'عدد الحصص المستخدمة' : 'عدد الحصص المتبقية'}
                     value={form.splitValue} onChange={(e) => set('splitValue', e.target.value)} />
                 )}
+                {form.splitMode !== 'none' && form.splitValue !== '' && (
+                  <div className="rounded-lg bg-violet-50/90 border border-violet-200 p-2 text-xs text-violet-950 font-bold flex items-center justify-between gap-2">
+                    <span>
+                      {form.splitMode === 'used'
+                        ? `أول حصة للطالب على المنصة: رقم (${Number(form.splitValue) + 1} من ${pkg.sessionsPerMonth})`
+                        : `أول حصة للطالب على المنصة: رقم (${Math.max(1, pkg.sessionsPerMonth - Number(form.splitValue) + 1)} من ${pkg.sessionsPerMonth})`}
+                    </span>
+                    <span className="text-[11px] bg-violet-200/70 text-violet-800 px-2 py-0.5 rounded font-bold shrink-0">
+                      {form.splitMode === 'used'
+                        ? `${Math.max(0, pkg.sessionsPerMonth - Number(form.splitValue))} حصص متبقية`
+                        : `${form.splitValue} حصص متبقية`}
+                    </span>
+                  </div>
+                )}
                 <div><label htmlFor="addstudent-startDate" className={labelCls}>تاريخ بداية الاشتراك</label><input id="addstudent-startDate" type="date" className={inputCls} value={form.startDate} onChange={(e) => set('startDate', e.target.value)} /></div>
               </div>
             )}

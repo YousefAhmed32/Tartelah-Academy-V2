@@ -85,13 +85,25 @@ async function createSubscriptionWithOpeningBalance({
     // in the teacher's current open payroll period without asking for a report for
     // historical lessons that were delivered before the platform tracked them.
     if (teacherId && used > 0) {
+      let studentName = ''
+      try {
+        const User = require('../models/User')
+        const st = await User.findById(studentId).select('firstNameAr lastNameAr name').lean()
+        if (st) {
+          studentName = st.firstNameAr ? `${st.firstNameAr} ${st.lastNameAr || ''}`.trim() : (st.name || '')
+        }
+      } catch (_) {}
+
       const importedAt = new Date()
       for (let i = 0; i < used; i++) {
+        const seqTitle = studentName
+          ? `حصة ${studentName} (${i + 1} من ${pkg.sessionsPerMonth})`
+          : `حصة سابقة (${i + 1} من ${pkg.sessionsPerMonth})`
         const pastSession = await Session.create({
           studentId,
           teacherId,
           subscriptionId: sub._id,
-          titleAr: `حصة سابقة معتمدة (${pkg.nameAr})`,
+          titleAr: seqTitle,
           scheduledAt: new Date(importedAt.getTime() + i),
           durationMinutes: Number(durationMinutes) || 60,
           status: 'completed',

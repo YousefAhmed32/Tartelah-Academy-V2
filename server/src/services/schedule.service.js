@@ -9,18 +9,16 @@ try {
 } catch (_) {}
 
 function buildSessionTitle(titleTemplate, studentName, index, total) {
-  const countStr = total ? `${index} من ${total}` : `حصة ${index}`
-  if (!titleTemplate || titleTemplate === 'حصة') {
-    if (studentName) return `حصة ${studentName} (${countStr})`
-    return `حصة ${index}`
+  let displayIndex = index
+  if (total && total > 0 && index > 0) {
+    displayIndex = ((index - 1) % total) + 1
   }
-  if (studentName && titleTemplate.includes(studentName)) {
-    return `${titleTemplate} (${countStr})`
-  }
+  const countStr = total ? `${displayIndex} من ${total}` : `${displayIndex}`
   if (studentName) {
-    return `${titleTemplate} — ${studentName} (${countStr})`
+    return total ? `${studentName} ${countStr}` : `${studentName} ${displayIndex}`
   }
-  return `${titleTemplate} ${index}`
+  const template = titleTemplate || 'حصة'
+  return `${template} ${index}`
 }
 
 function pad2(n) { return String(n).padStart(2, '0') }
@@ -122,8 +120,6 @@ exports.generateSessionsFromRule = async (rule) => {
   const dates = generateDates(rule)
   if (!dates.length) return []
 
-  const existing = await Session.countDocuments({ seriesId: rule._id })
-
   let studentName = ''
   if (rule.studentId && typeof rule.studentId === 'object' && rule.studentId.firstNameAr) {
     studentName = `${rule.studentId.firstNameAr} ${rule.studentId.lastNameAr || ''}`.trim()
@@ -140,21 +136,90 @@ exports.generateSessionsFromRule = async (rule) => {
     } catch (_) {}
   }
 
-  let totalCount = rule.sessionsTotal || 0
-  if (!totalCount && rule.subscriptionId && mongoose.connection?.readyState === 1) {
+  // 1. Resolve Subscription (use rule.subscriptionId or auto-detect active subscription)
+  let sub = null
+  let resolvedSubscriptionId = rule.subscriptionId
+  if (mongoose.connection?.readyState === 1) {
     try {
       const Subscription = mongoose.model('Subscription')
-      const sub = await Subscription.findById(rule.subscriptionId)
-        .select('totalSessions packageId')
-        .populate('packageId', 'sessionsPerMonth')
-        .lean()
-      if (sub?.packageId?.sessionsPerMonth) {
-        totalCount = sub.packageId.sessionsPerMonth
-      } else if (sub?.totalSessions) {
-        totalCount = sub.totalSessions
+      if (resolvedSubscriptionId) {
+        sub = await Subscription.findById(resolvedSubscriptionId)
+          .select('totalSessions packageId status studentId teacherId walletTransactionId sessionsRemaining')
+          .populate('packageId', 'sessionsPerMonth nameAr')
+          .lean()
+      }
+      if (!sub && rule.studentId) {
+        const subFilter = { studentId: rule.studentId, status: 'active' }
+        if (rule.teacherId) {
+          sub = await Subscription.findOne({ ...subFilter, teacherId: rule.teacherId })
+            .sort({ createdAt: -1 })
+            .select('totalSessions packageId status studentId teacherId walletTransactionId sessionsRemaining')
+            .populate('packageId', 'sessionsPerMonth nameAr')
+            .lean()
+        }
+        if (!sub) {
+          sub = await Subscription.findOne(subFilter)
+            .sort({ createdAt: -1 })
+            .select('totalSessions packageId status studentId teacherId walletTransactionId sessionsRemaining')
+            .populate('packageId', 'sessionsPerMonth nameAr')
+            .lean()
+        }
+        if (sub?._id) {
+          resolvedSubscriptionId = sub._id
+          if (rule._id) {
+            const ScheduleRule = mongoose.model('ScheduleRule')
+            await ScheduleRule.updateOne({ _id: rule._id }, { $set: { subscriptionId: sub._id } }).catch(() => {})
+          }
+        }
       }
     } catch (_) {}
   }
+
+  // 2. Resolve totalCount (denominator in "X من Y")
+  let totalCount = rule.sessionsTotal || 0
+  if (sub) {
+    if (sub.packageId?.sessionsPerMonth) {
+      totalCount = sub.packageId.sessionsPerMonth
+    } else if (sub.totalSessions) {
+      totalCount = sub.totalSessions
+    }
+  } else if (rule.startingSessionNumber && Number(rule.startingSessionNumber) > 1 && totalCount > 0 && totalCount < Number(rule.startingSessionNumber)) {
+    // If startingSessionNumber is 11 and sessionsTotal is 6, the actual total denominator is 10 + 6 = 16
+    totalCount = (Number(rule.startingSessionNumber) - 1) + totalCount
+  }
+
+  // 3. Resolve starting offset (consumed lessons or explicit startingSessionNumber)
+  let priorOffset = 0
+  if (rule.startingSessionNumber && Number(rule.startingSessionNumber) > 1) {
+    priorOffset = Number(rule.startingSessionNumber) - 1
+  } else if (sub && mongoose.connection?.readyState === 1) {
+    try {
+      const seriesFilter = rule._id ? { seriesId: { $ne: rule._id } } : {}
+      const consumedCount = await Session.countDocuments({
+        subscriptionId: sub._id,
+        $or: [{ subscriptionConsumed: true }, { status: 'completed' }],
+        ...seriesFilter,
+      })
+
+      let openingUsed = 0
+      if (sub.walletTransactionId) {
+        const LessonTransaction = mongoose.model('LessonTransaction')
+        const tx = await LessonTransaction.findById(sub.walletTransactionId).select('metadata').lean()
+        if (tx?.metadata?.lessonsUsedAtOpening) {
+          openingUsed = Number(tx.metadata.lessonsUsedAtOpening)
+        }
+      }
+
+      priorOffset = Math.max(consumedCount, openingUsed)
+    } catch (_) {}
+  }
+
+  const existingFilter = { seriesId: rule._id }
+  if (resolvedSubscriptionId) {
+    existingFilter.subscriptionId = resolvedSubscriptionId
+  }
+  const existing = await Session.countDocuments(existingFilter)
+  const baseIndex = priorOffset + existing
 
   let resolvedLink = rule.meetingLink || ''
   let resolvedProvider = rule.meetingProvider || 'zoom'
@@ -175,9 +240,10 @@ exports.generateSessionsFromRule = async (rule) => {
         $setOnInsert: {
           teacherId: rule.teacherId,
           studentId: rule.studentId,
-          subscriptionId: rule.subscriptionId,
+          subscriptionId: resolvedSubscriptionId,
           seriesId: rule._id,
-          titleAr: buildSessionTitle(rule.titleTemplate, studentName, existing + i + 1, totalCount),
+          titleAr: buildSessionTitle(rule.titleTemplate, studentName, baseIndex + i + 1, totalCount),
+          title: buildSessionTitle(rule.titleTemplate, studentName, baseIndex + i + 1, totalCount),
           scheduledAt: date,
           durationMinutes: rule.durationMinutes || 60,
           meetingLink: resolvedLink,
@@ -266,3 +332,4 @@ async function syncFutureSessionsForRule(rule) {
 }
 
 exports.syncFutureSessionsForRule = syncFutureSessionsForRule
+exports.buildSessionTitle = buildSessionTitle
