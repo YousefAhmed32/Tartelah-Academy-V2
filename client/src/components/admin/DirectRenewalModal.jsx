@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { RefreshCw, Calendar, BookOpen, User, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, Calendar, BookOpen, User, AlertCircle, CheckCircle2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -121,7 +121,7 @@ export default function DirectRenewalModal({
           </Button>
           <Button
             variant="purple"
-            icon={<Sparkles size={15} />}
+            icon={<RefreshCw size={15} />}
             loading={renewMutation.isPending}
             disabled={!canSubmit}
             onClick={() => renewMutation.mutate()}

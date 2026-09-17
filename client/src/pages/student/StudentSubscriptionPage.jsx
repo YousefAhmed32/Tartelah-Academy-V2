@@ -28,7 +28,7 @@ import {
   X,
   RefreshCw,
   AlertCircle,
-  Sparkles,
+  CheckCircle2,
   Building2,
   ExternalLink,
   FileText,
@@ -610,7 +610,7 @@ function RenewalModal({ subscription, surveyFeedback, onClose }) {
           </div>
         ) : (
           <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 p-2.5 text-xs text-emerald-800 flex items-center gap-2">
-            <Sparkles size={15} className="text-emerald-600 flex-none" />
+            <CheckCircle2 size={15} className="text-emerald-600 flex-none" />
             <span>
               {renewalType === 'same'
                 ? `سيستمر اشتراكك مع نفس المعلم (${teacherName}) ونفس المواعيد السابقة دون انقطاع.`

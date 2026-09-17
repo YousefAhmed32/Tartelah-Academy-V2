@@ -63,7 +63,7 @@ exports.getMyStats = async (req, res, next) => {
     let deductedSessions = wallet?.deductedLessons || 0
 
     // Self-heal: check if any administrative deductions exist in the ledger
-    // that were not yet counted in wallet.deductedLessons / wallet.totalUsed
+    // that were not yet counted in wallet.deductedLessons
     if (wallet) {
       try {
         const deductionsAgg = await LessonTransaction.aggregate([
@@ -72,11 +72,8 @@ exports.getMyStats = async (req, res, next) => {
         ])
         const expectedDeducted = deductionsAgg[0]?.totalDeducted || 0
         if (expectedDeducted > 0 && (wallet.deductedLessons || 0) < expectedDeducted) {
-          const diff = expectedDeducted - (wallet.deductedLessons || 0)
           wallet.deductedLessons = expectedDeducted
-          wallet.totalUsed = (wallet.totalUsed || 0) + diff
           await wallet.save().catch(() => {})
-          consumedSessions = wallet.totalUsed
           deductedSessions = wallet.deductedLessons
         }
       } catch (_) {}

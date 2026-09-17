@@ -604,7 +604,15 @@ Storage + validation only for Part 1 (`config/workingHours.js`'s `validateWorkin
 ```
 timezone: String (default 'Africa/Cairo')
 ```
-The first academy-wide timezone setting (previously only `ScheduleRule.timezone`, a **per-rule** field defaulting `'Asia/Riyadh'`, existed — left untouched, different concern). Resolved through one function, `services/academySettings.service.js#getAcademyTimezone()` — every future time-of-day feature must read it from there, never a hardcoded string. Admin-editable from `AdminWebsitePage.jsx`'s settings tab.
+The academy-wide timezone setting is resolved through `services/academySettings.service.js#getAcademyTimezone()` — every time-of-day feature must read it from there, never a hardcoded string. Admin-editable from `AdminWebsitePage.jsx`'s settings tab. New `ScheduleRule` records inherit this value; an explicit legacy/per-rule timezone remains supported for backward compatibility.
+
+### Canonical date/time contract
+
+- MongoDB stores session timestamps as absolute UTC `Date` values.
+- A browser `datetime-local` value has no offset and is interpreted by the backend as academy wall-clock time via `utils/academyDateTime.js#parseAcademyDateTime()`; values already carrying `Z` or an offset remain absolute instants.
+- The client initializes `utils/date.js` from the public academy setting and always formats timestamps, derives calendar-day keys, and pre-fills datetime-local controls in that timezone. Browser/device timezone is never a scheduling source of truth.
+- Date-only filters use half-open academy boundaries (`>= start`, `< next-day start`) so midnight belongs to exactly one day on UTC and non-UTC servers.
+- Recurring rules retain their explicit `timezone` because changing an existing rule's semantic zone silently would move future lessons. New rules receive the current academy timezone explicitly.
 
 ### LessonTransaction — new `opening_balance` type
 Added to the existing append-only ledger's `type` enum (see the Lesson Wallet section above). Behaves identically to `'purchase'` in `wallet.service.js`'s increment table (`{remaining: amount, totalPurchased: amount}`) but is reported separately so "credited via a new subscription's documented opening balance" is distinguishable from an ad hoc top-up. `metadata` on this transaction type records `{ packageTotal, lessonsUsedAtOpening, lessonsRemainingAtOpening }`.

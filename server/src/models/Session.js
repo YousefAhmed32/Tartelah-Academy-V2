@@ -19,6 +19,10 @@ const SessionSchema = new mongoose.Schema({
   meetingProvider: { type: String, enum: ['zoom', 'meet', 'teams', 'other', 'custom'], default: 'zoom' },
   notes: { type: String },
   teacherNotes: { type: String },
+  // Historical lessons imported during student onboarding are already
+  // completed outside the platform. They remain real payable sessions, but
+  // must never enter the missing/overdue Quran-report workflow.
+  quranReportRequired: { type: Boolean, default: true },
   completedAt: { type: Date },
   cancelledAt: { type: Date },
   cancelReason: { type: String },
@@ -26,6 +30,11 @@ const SessionSchema = new mongoose.Schema({
   isException: { type: Boolean, default: false },
   isMakeup: { type: Boolean, default: false },
   rescheduledFrom: { type: Date },
+  isPostponed: { type: Boolean, default: false },
+  postponedAt: { type: Date },
+  postponedReason: { type: String },
+  postponedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Session' },
+  rescheduledSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session' },
 
   // Teacher attendance & performance tracking.
   // teacherStartedAt IS the platform check-in timestamp (teacher clicked

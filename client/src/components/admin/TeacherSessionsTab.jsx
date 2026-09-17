@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Calendar, Clock, Plus, Edit2, Trash2, XCircle, Video, CheckCircle2,
   AlertTriangle, Users, RefreshCw, Filter, ChevronDown, ChevronUp, Copy,
-  Check, ExternalLink, Sparkles, Search, Layers, User, CalendarClock,
+  Check, ExternalLink, Search, Layers, User, CalendarClock,
   Phone, Mail, ArrowLeftRight, HelpCircle,
 } from 'lucide-react'
 import api from '../../utils/api.js'
@@ -16,7 +16,11 @@ import Spinner from '../ui/Spinner.jsx'
 import Modal from '../ui/Modal.jsx'
 import ConfirmDialog from '../shared/ConfirmDialog.jsx'
 import EditScheduleRuleModal from './EditScheduleRuleModal.jsx'
-import { formatDateAr, formatTimeAr, getDayNameAr, isToday, isFuture, isPast } from '../../utils/date.js'
+import AcademyTimezoneNotice from '../ui/AcademyTimezoneNotice.jsx'
+import {
+  academyDateKey, academyMonthDateRange, formatDateAr, formatTimeAr, getAcademyWeekdayIndex,
+  getDayNameAr, isToday, isFuture, isPast, shiftDateKey, toAcademyDateTimeLocal,
+} from '../../utils/date.js'
 import { dayLabel } from '../../utils/assignmentSchedule.js'
 
 const STATUS_MAP = {
@@ -66,27 +70,17 @@ export default function TeacherSessionsTab({
       if (statusFilter !== 'all') params.status = statusFilter
       if (studentFilter !== 'all') params.studentId = studentFilter
       if (dateRangeFilter === 'today') {
-        const start = new Date()
-        start.setHours(0, 0, 0, 0)
-        const end = new Date()
-        end.setHours(23, 59, 59, 999)
-        params.dateFrom = start.toISOString()
-        params.dateTo = end.toISOString()
+        const today = academyDateKey(new Date())
+        params.dateFrom = today
+        params.dateTo = today
       } else if (dateRangeFilter === 'week') {
-        const start = new Date()
-        start.setHours(0, 0, 0, 0)
-        const end = new Date()
-        end.setDate(end.getDate() + 7)
-        params.dateFrom = start.toISOString()
-        params.dateTo = end.toISOString()
+        const today = academyDateKey(new Date())
+        params.dateFrom = today
+        params.dateTo = shiftDateKey(today, 7)
       } else if (dateRangeFilter === 'month') {
-        const start = new Date()
-        start.setDate(1)
-        start.setHours(0, 0, 0, 0)
-        const end = new Date(start)
-        end.setMonth(end.getMonth() + 1)
-        params.dateFrom = start.toISOString()
-        params.dateTo = end.toISOString()
+        const { start, end } = academyMonthDateRange(new Date())
+        params.dateFrom = start
+        params.dateTo = end
       }
       return api.get('/admin/sessions', { params }).then(r => r.data)
     },
@@ -150,7 +144,7 @@ export default function TeacherSessionsTab({
   const groupedByDay = useMemo(() => {
     const groups = {}
     filteredSessions.forEach((s) => {
-      const dateKey = new Date(s.scheduledAt).toISOString().slice(0, 10)
+      const dateKey = academyDateKey(s.scheduledAt)
       if (!groups[dateKey]) groups[dateKey] = []
       groups[dateKey].push(s)
     })
@@ -1098,7 +1092,7 @@ function WeeklyScheduleView({
   const sessionsByDayOfWeek = useMemo(() => {
     const map = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
     sessions.forEach((s) => {
-      const dayNum = new Date(s.scheduledAt).getDay()
+      const dayNum = getAcademyWeekdayIndex(s.scheduledAt)
       map[dayNum]?.push(s)
     })
     return map
@@ -1241,9 +1235,7 @@ function AdminSessionModal({
       now.setHours(now.getHours() + 1)
       d = now
     }
-    const dt = new Date(d)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+    return toAcademyDateTimeLocal(d)
   }
 
   const [form, setForm] = useState({
@@ -1284,7 +1276,7 @@ function AdminSessionModal({
 
     mut.mutate({
       ...form,
-      scheduledAt: new Date(form.scheduledAt).toISOString(),
+      scheduledAt: form.scheduledAt,
       durationMinutes: Number(form.durationMinutes),
     })
   }
@@ -1311,6 +1303,7 @@ function AdminSessionModal({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4 text-right" dir="rtl">
+        <AcademyTimezoneNotice compact />
         {/* Teacher Field (Read-only) */}
         <div>
           <label className="text-xs font-bold text-gray-500 mb-1 block">المعلم</label>

@@ -20,14 +20,21 @@ const Subscription = require('../models/Subscription')
 // Letting the balance go negative surfaces that as a visible, auditable
 // signal instead of quietly absorbing it — "nothing should change silently."
 
-function fieldsToIncrement(type, amount) {
+function fieldsToIncrement(type, amount, metadata = {}) {
   switch (type) {
     case 'purchase':
     case 'renewal':
-    // A new subscription's documented opening balance — credited the same
-    // way a purchase is (see LessonTransaction's enum comment for why this
-    // is a distinct type rather than reusing 'purchase').
+      return { remaining: amount, totalPurchased: amount }
+    // A new subscription's documented opening balance
     case 'opening_balance':
+      if (metadata && metadata.packageTotal) {
+        const used = metadata.lessonsUsedAtOpening || 0
+        return {
+          remaining: amount,
+          totalPurchased: metadata.packageTotal,
+          totalUsed: used,
+        }
+      }
       return { remaining: amount, totalPurchased: amount }
     case 'consumption':
     case 'reversal':
@@ -47,9 +54,9 @@ function fieldsToIncrement(type, amount) {
     case 'manual_adjustment':
     case 'admin_edit':
       if (amount < 0) {
-        // Administrative deduction: counts towards deductedLessons AND totalUsed (consumed)
+        // Administrative deduction: counts towards deductedLessons only (NOT totalUsed / consumed)
         const deducted = -amount
-        return { remaining: amount, deductedLessons: deducted, totalUsed: deducted }
+        return { remaining: amount, deductedLessons: deducted }
       }
       return { remaining: amount }
     case 'migration_import':
@@ -87,34 +94,12 @@ async function ensureWalletDeductionsSynced(wallet) {
     const actualDeducted = deductionsAgg[0]?.totalDeducted || 0
     const currentDeducted = wallet.deductedLessons || 0
 
-    let needsSave = false
-    let newDeducted = currentDeducted
-    let newTotalUsed = wallet.totalUsed || 0
-
-    if (actualDeducted > currentDeducted) {
-      const diff = actualDeducted - currentDeducted
-      newDeducted = actualDeducted
-      newTotalUsed = newTotalUsed + diff
-      needsSave = true
-    }
-
-    if (newTotalUsed < actualDeducted) {
-      newTotalUsed = actualDeducted
-      needsSave = true
-    }
-
-    if (needsSave) {
+    if (actualDeducted !== currentDeducted) {
       await LessonWallet.updateOne(
         { _id: wallet._id },
-        {
-          $set: {
-            deductedLessons: newDeducted,
-            totalUsed: newTotalUsed,
-          },
-        }
+        { $set: { deductedLessons: actualDeducted } }
       )
-      wallet.deductedLessons = newDeducted
-      wallet.totalUsed = newTotalUsed
+      wallet.deductedLessons = actualDeducted
     }
   } catch (_) {
     // Non-fatal fallback
@@ -167,7 +152,7 @@ async function applyTransaction({
     throw err
   }
 
-  const inc = fieldsToIncrement(type, amount)
+  const inc = fieldsToIncrement(type, amount, metadata)
   const updatedWallet = await LessonWallet.findOneAndUpdate(
     { _id: wallet._id },
     { $inc: inc, $set: { lastTransactionAt: new Date() } },

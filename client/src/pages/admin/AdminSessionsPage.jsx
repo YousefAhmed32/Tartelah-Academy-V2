@@ -32,13 +32,17 @@ import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
-import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import {
+  academyDateKey, academyMonthDateRange, formatDateAr, formatTimeAr,
+  getAcademyWeekdayIndex, shiftDateKey, toAcademyDateTimeLocal,
+} from '../../utils/date.js'
 import { formatNumber } from '../../utils/format.js'
 import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
 import Can from '../../components/shared/Can.jsx'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import AdminSessionDetailDrawer from '../../components/admin/AdminSessionDetailDrawer.jsx'
+import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
 
 const STATUS_CONFIG = {
   scheduled:    { label: 'مجدولة',       bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  border: 'border-violet-100' },
@@ -101,18 +105,11 @@ function SessionModal({ session, onClose, teachers, students }) {
   const qc = useQueryClient()
   const isEditing = !!session
 
-  const toDateTimeLocal = (d) => {
-    if (!d) return ''
-    const dt = new Date(d)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-  }
-
   const [form, setForm] = useState({
     teacherId: session?.teacherId?._id || session?.teacherId || '',
     studentId: session?.studentId?._id || session?.studentId || '',
     titleAr: session?.titleAr || 'حصة تلاوة',
-    scheduledAt: toDateTimeLocal(session?.scheduledAt),
+    scheduledAt: toAcademyDateTimeLocal(session?.scheduledAt),
     durationMinutes: session?.durationMinutes || 60,
     meetingLink: session?.meetingLink || '',
     meetingProvider: session?.meetingProvider || 'zoom',
@@ -144,7 +141,7 @@ function SessionModal({ session, onClose, teachers, students }) {
     }
     mut.mutate({
       ...form,
-      scheduledAt: new Date(form.scheduledAt).toISOString(),
+      scheduledAt: form.scheduledAt,
       durationMinutes: Number(form.durationMinutes),
     })
   }
@@ -179,6 +176,7 @@ function SessionModal({ session, onClose, teachers, students }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          <AcademyTimezoneNotice compact />
           <Field label="المعلم *">
             <select className={selectCls} value={form.teacherId} onChange={(e) => set('teacherId', e.target.value)} required>
               <option value="">اختر المعلم</option>
@@ -227,7 +225,7 @@ function SessionModal({ session, onClose, teachers, students }) {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="تاريخ ووقت الحصة *">
               <input
                 type="datetime-local"
@@ -252,7 +250,7 @@ function SessionModal({ session, onClose, teachers, students }) {
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="منصة الاجتماع">
               <select
                 className={selectCls}
@@ -260,7 +258,7 @@ function SessionModal({ session, onClose, teachers, students }) {
                 onChange={(e) => set('meetingProvider', e.target.value)}
               >
                 <option value="zoom">Zoom</option>
-                <option value="google_meet">Google Meet</option>
+                <option value="meet">Google Meet</option>
                 <option value="teams">Microsoft Teams</option>
                 <option value="other">أخرى</option>
               </select>
@@ -326,16 +324,9 @@ function RescheduleModal({ session, onClose }) {
   const qc = useQueryClient()
   const [newDate, setNewDate] = useState('')
 
-  const toDateTimeLocal = (d) => {
-    if (!d) return ''
-    const dt = new Date(d)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-  }
-
   const mut = useMutation({
     mutationFn: () =>
-      api.patch(`/sessions/${session._id}/reschedule`, { newDate: new Date(newDate).toISOString() }).then((r) => r.data),
+      api.patch(`/sessions/${session._id}/reschedule`, { newDate }).then((r) => r.data),
     onSuccess: () => {
       toast.success('تم تحديث موعد الحصة')
       qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
@@ -365,9 +356,12 @@ function RescheduleModal({ session, onClose }) {
             value={newDate}
             onChange={(e) => setNewDate(e.target.value)}
             required
-            min={toDateTimeLocal(new Date())}
+            min={toAcademyDateTimeLocal(new Date())}
           />
         </Field>
+        <div className="mt-3">
+          <AcademyTimezoneNotice compact />
+        </div>
         <div className="flex gap-3 mt-4">
           <button
             onClick={() => mut.mutate()}
@@ -501,10 +495,17 @@ function SessionCardItem({ session, onSelect, onEdit, onReschedule, onCancel, on
       <div>
         {/* Top bar: Status & Provider */}
         <div className="flex items-center justify-between gap-2 mb-3">
-          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} border ${sc.border}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-            {sc.label}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} border ${sc.border}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+              {sc.label}
+            </span>
+            {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                ⏱️ حصة مؤجلة
+              </span>
+            )}
+          </div>
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 uppercase">
             {session.meetingProvider || 'Zoom'}
           </span>
@@ -717,10 +718,17 @@ function SessionTableRow({ session, onSelect, onEdit, onReschedule, onCancel, on
 
       {/* Status */}
       <td className="px-5 py-3.5 whitespace-nowrap">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} border ${sc.border}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-          {sc.label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} border ${sc.border}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+            {sc.label}
+          </span>
+          {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              ⏱️ مؤجلة
+            </span>
+          )}
+        </div>
       </td>
 
       {/* Actions */}
@@ -798,29 +806,25 @@ export default function AdminSessionsPage() {
   // Calculate dates based on preset
   const { dateFrom, dateTo } = useMemo(() => {
     const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = academyDateKey(now)
 
     if (datePreset === 'today') {
       return { dateFrom: todayStr, dateTo: todayStr }
     }
     if (datePreset === 'this_week') {
-      const day = now.getDay()
+      const day = getAcademyWeekdayIndex(now)
       const diff = (day + 1) % 7
-      const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() - diff)
-      const endOfWeek = new Date(startOfWeek)
-      endOfWeek.setDate(startOfWeek.getDate() + 6)
+      const startOfWeek = shiftDateKey(todayStr, -diff)
       return {
-        dateFrom: startOfWeek.toISOString().slice(0, 10),
-        dateTo: endOfWeek.toISOString().slice(0, 10),
+        dateFrom: startOfWeek,
+        dateTo: shiftDateKey(startOfWeek, 6),
       }
     }
     if (datePreset === 'this_month') {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const { start, end } = academyMonthDateRange(now)
       return {
-        dateFrom: startOfMonth.toISOString().slice(0, 10),
-        dateTo: endOfMonth.toISOString().slice(0, 10),
+        dateFrom: start,
+        dateTo: end,
       }
     }
     if (datePreset === 'custom') {

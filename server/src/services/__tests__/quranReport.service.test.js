@@ -58,11 +58,63 @@ describe('quranReport.submitReport', () => {
     expect(Revision.create).toHaveBeenCalledWith(expect.objectContaining({ studentId: 'st1', teacherId: 't1', sessionId: 's1', surahNumber: 1 }))
   })
 
+  test('submits report with all standardized fields (todayRecitation, nextRecitation, ratings, parentNotes)', async () => {
+    Session.findOne.mockResolvedValueOnce({ _id: 's1', studentId: 'st1', teacherId: 't1' })
+    const mockReport = { status: 'draft', history: [], save: jest.fn().mockResolvedValue(true) }
+    QuranSessionReport.findOne.mockResolvedValueOnce(mockReport)
+
+    const payload = {
+      todayRecitation: 'سورة الملك من 1 إلى 15',
+      todayRevision: 'سورة النبأ كاملة',
+      nextRecitation: 'سورة الملك من 16 إلى 30',
+      nextRevision: 'سورة النازعات',
+      nextManners: 'حديث إنما الأعمال بالنيات',
+      nextTajweed: 'أحكام النون الساكنة والتنوين (الإظهار)',
+      quranLink: 'https://quran.com/67',
+      memorizationLevel: 'excellent',
+      revisionLevel: 'very_good',
+      tajweedLevel: 'excellent',
+      engagementLevel: 'excellent',
+      generalEvaluation: 'طالب متميز جداً ما شاء الله',
+      parentNotes: 'نرجو متابعة تكرار السورة مرتين يومياً',
+      importantAlert: 'موعد الحصة القادمة تم تأكيده',
+    }
+
+    const report = await submitReport('s1', {
+      teacherId: 't1',
+      fields: payload,
+    })
+
+    expect(report.status).toBe('submitted')
+    expect(report.todayRecitation).toBe(payload.todayRecitation)
+    expect(report.nextRecitation).toBe(payload.nextRecitation)
+    expect(report.memorizationLevel).toBe('excellent')
+    expect(report.parentNotes).toBe(payload.parentNotes)
+    expect(report.importantAlert).toBe(payload.importantAlert)
+  })
+
   test('a resubmission after correction_requested is logged as "resubmitted", not "submitted"', async () => {
     Session.findOne.mockResolvedValueOnce({ _id: 's1', studentId: 'st1', teacherId: 't1' })
     QuranSessionReport.findOne.mockResolvedValueOnce({ status: 'correction_requested', history: [], save: jest.fn().mockResolvedValue(true) })
     const report = await submitReport('s1', { teacherId: 't1', fields: {} })
     expect(report.history[0].action).toBe('resubmitted')
+  })
+
+  test('replaying a submitted report request is idempotent and creates no duplicate records', async () => {
+    Session.findOne.mockResolvedValueOnce({ _id: 's1', studentId: 'st1', teacherId: 't1' })
+    const report = { status: 'submitted', history: [{ action: 'submitted' }], save: jest.fn() }
+    QuranSessionReport.findOne.mockResolvedValueOnce(report)
+
+    const result = await submitReport('s1', {
+      teacherId: 't1', fields: { todayRecitation: 'سورة الملك' },
+      memorization: [{ surahNumber: 67, fromAyah: 1, toAyah: 5 }],
+    })
+
+    expect(result).toBe(report)
+    expect(result.$locals.idempotentReplay).toBe(true)
+    expect(report.save).not.toHaveBeenCalled()
+    expect(Memorization.create).not.toHaveBeenCalled()
+    expect(Revision.create).not.toHaveBeenCalled()
   })
 
   test('refuses to submit an already-approved report', async () => {

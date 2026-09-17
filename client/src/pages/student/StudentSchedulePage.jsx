@@ -4,7 +4,7 @@ import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
-import { formatDateAr, formatTimeAr, getDayNameAr, isToday } from '../../utils/date.js'
+import { academyDateKey, formatDateKeyAr, formatTimeAr } from '../../utils/date.js'
 
 export default function StudentSchedulePage() {
   const { data: sessions = [], isLoading } = useQuery({
@@ -13,7 +13,7 @@ export default function StudentSchedulePage() {
   })
 
   const groupedByDay = sessions.reduce((acc, s) => {
-    const date = new Date(s.scheduledAt).toDateString()
+    const date = academyDateKey(s.scheduledAt)
     if (!acc[date]) acc[date] = []
     acc[date].push(s)
     return acc
@@ -33,13 +33,11 @@ export default function StudentSchedulePage() {
       ) : (
         <div className="space-y-6">
           {Object.entries(groupedByDay).map(([dateStr, daySessions]) => {
-            const date = new Date(dateStr)
-            const today = isToday(date)
+            const today = dateStr === academyDateKey(new Date())
             return (
               <div key={dateStr}>
                 <div className={`flex items-center gap-3 mb-3 ${today ? 'text-brand-purple' : 'text-[#7c6aaa]'}`}>
-                  <span className="font-heading font-bold">{getDayNameAr(date)}</span>
-                  <span className="text-sm">{formatDateAr(date)}</span>
+                  <span className="font-heading font-bold">{formatDateKeyAr(dateStr)}</span>
                   {today && <Badge variant="purple" dot>اليوم</Badge>}
                 </div>
                 <div className="space-y-2.5">

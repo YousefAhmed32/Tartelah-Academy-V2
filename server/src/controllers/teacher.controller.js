@@ -7,6 +7,7 @@ const ScheduleRule = require('../models/ScheduleRule')
 const Memorization = require('../models/Memorization')
 const Revision = require('../models/Revision')
 const QuranSessionReport = require('../models/QuranSessionReport')
+const TeacherPayrollPeriod = require('../models/TeacherPayrollPeriod')
 const { createNotifications } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
 const { sendSuccess, sendError } = require('../utils/response')
@@ -21,6 +22,8 @@ const { isValidGender } = require('../config/teacherIdentity')
 const { isValidActiveKey } = require('../services/teachingSubject.service')
 const { isValidAudienceCategory } = require('../config/studentAudience')
 const { getOrCreateCurrentPeriod } = require('../services/payrollPeriod.service')
+const { getAcademyTimezone } = require('../services/academySettings.service')
+const { academyDateKey, academyDayBounds, academyMonthBounds } = require('../utils/academyDateTime')
 
 // ── Public (unauthenticated) teacher directory ───────────────────────────────
 // Deliberately separate from /admin/teachers: no salary, email, phone,
@@ -230,9 +233,10 @@ exports.getMyStats = async (req, res, next) => {
   try {
     const teacherId = req.user._id
     const now = new Date()
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const timezone = await getAcademyTimezone()
+    const { start: today, end: todayEnd } = academyDayBounds(now, timezone)
+    const [academyYear, academyMonth] = academyDateKey(now, timezone).split('-').map(Number)
+    const { start: monthStart } = academyMonthBounds(academyYear, academyMonth, timezone)
 
     // Bounded to the last 14 days — old unresolved sessions are an admin
     // review-queue concern (see Operations Center), not something to keep
@@ -241,7 +245,7 @@ exports.getMyStats = async (req, res, next) => {
 
     const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention, ongoingSessions, currentPeriod] = await Promise.all([
       Subscription.countDocuments({ teacherId, status: 'active' }),
-      Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lte: todayEnd } }),
+      Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lt: todayEnd } }),
       Evaluation.countDocuments({ teacherId, createdAt: { $gte: monthStart } }),
       Session.countDocuments({ teacherId, status: 'completed', completedAt: { $gte: monthStart } }),
       Session.find({ teacherId, scheduledAt: { $gte: now }, status: 'scheduled' })
@@ -264,6 +268,17 @@ exports.getMyStats = async (req, res, next) => {
       getOrCreateCurrentPeriod(teacherId).catch(() => null),
     ])
 
+    // Detect active announcement period (approved or paid)
+    let recentApprovedOrPaidPeriod = null
+    if (currentPeriod && ['approved', 'paid'].includes(currentPeriod.status)) {
+      recentApprovedOrPaidPeriod = currentPeriod
+    } else {
+      recentApprovedOrPaidPeriod = await TeacherPayrollPeriod.findOne({
+        teacherId,
+        status: { $in: ['approved', 'paid'] },
+      }).sort({ createdAt: -1 }).lean()
+    }
+
     sendSuccess(res, {
       totalStudents, sessionsToday, pendingEvaluations: pendingEvals, completedThisMonth: completedMonth,
       upcomingSessions, recentStudents, needsAttention,
@@ -271,10 +286,26 @@ exports.getMyStats = async (req, res, next) => {
       payrollSummary: currentPeriod ? {
         periodKey: currentPeriod.periodKey,
         periodId: currentPeriod._id,
+        status: currentPeriod.status,
         netPayable: currentPeriod.netPayable || 0,
         bonusesTotal: currentPeriod.bonusesTotal || 0,
         deductionsTotal: currentPeriod.deductionsTotal || 0,
         grossEntitlement: currentPeriod.grossEntitlement || 0,
+        totalPayableSessions: currentPeriod.totalPayableSessions || 0,
+        paidAt: currentPeriod.paidAt || null,
+        approvedAt: currentPeriod.approvedAt || null,
+      } : null,
+      payrollAnnouncement: recentApprovedOrPaidPeriod ? {
+        periodKey: recentApprovedOrPaidPeriod.periodKey,
+        periodId: recentApprovedOrPaidPeriod._id,
+        status: recentApprovedOrPaidPeriod.status,
+        netPayable: recentApprovedOrPaidPeriod.netPayable || 0,
+        bonusesTotal: recentApprovedOrPaidPeriod.bonusesTotal || 0,
+        deductionsTotal: recentApprovedOrPaidPeriod.deductionsTotal || 0,
+        grossEntitlement: recentApprovedOrPaidPeriod.grossEntitlement || 0,
+        totalPayableSessions: recentApprovedOrPaidPeriod.totalPayableSessions || 0,
+        paidAt: recentApprovedOrPaidPeriod.paidAt || null,
+        approvedAt: recentApprovedOrPaidPeriod.approvedAt || null,
       } : null,
     })
   } catch (err) {

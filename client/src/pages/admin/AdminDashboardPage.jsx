@@ -1,9 +1,25 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  FileCheck,
+  FileText,
+  AlertCircle,
+  ExternalLink,
+  Eye,
+  UserCheck,
+  GraduationCap,
+  Video,
+  CreditCard,
+} from 'lucide-react'
 import api from '../../utils/api.js'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
+import AdminSessionDetailDrawer from '../../components/admin/AdminSessionDetailDrawer.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatNumber, formatCurrency } from '../../utils/format.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
@@ -102,88 +118,286 @@ function PendingTasksCard({ pendingEnrollments, unscheduledStudents, pendingHome
   )
 }
 
-function SessionRow({ session, index }) {
+const STUDENT_ATTENDANCE_CONFIG = {
+  present: { label: 'حاضر', color: '#16a34a', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', dot: 'bg-emerald-500' },
+  late: { label: 'متأخر', color: '#d97706', bg: 'bg-amber-50 text-amber-700 border-amber-200/80', dot: 'bg-amber-500' },
+  absent: { label: 'غائب', color: '#dc2626', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
+  excused: { label: 'معذور', color: '#7c3aed', bg: 'bg-violet-50 text-violet-700 border-violet-200/80', dot: 'bg-violet-500' },
+  left_early: { label: 'غادر مبكراً', color: '#0284c7', bg: 'bg-sky-50 text-sky-700 border-sky-200/80', dot: 'bg-sky-500' },
+  technical_issue: { label: 'مشكلة تقنية', color: '#475569', bg: 'bg-slate-100 text-slate-700 border-slate-200/80', dot: 'bg-slate-500' },
+  pending: { label: 'بانتظار التحضير', color: '#64748b', bg: 'bg-gray-50 text-gray-500 border-gray-200/60', dot: 'bg-gray-400' },
+}
+
+const TEACHER_ATTENDANCE_CONFIG = {
+  on_time: { label: 'حضر في الموعد', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', dot: 'bg-emerald-500' },
+  late: { label: 'متأخر', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
+  absent: { label: 'غائب', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
+  excused: { label: 'معذور', bg: 'bg-violet-50 text-violet-700 border-violet-200/80', dot: 'bg-violet-500' },
+  pending: { label: 'لم يبدأ بعد', bg: 'bg-gray-50 text-gray-500 border-gray-200/60', dot: 'bg-gray-400' },
+}
+
+function SessionRow({ session, index, onInspect }) {
   const student = session.studentId
   const teacher = session.teacherId
 
   const studentUrl = student?._id ? ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', student._id) : null
   const teacherUrl = teacher?._id ? ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', teacher._id) : null
 
+  // Operational status computation
+  const isCompleted = session.status === 'completed'
+  const isCancelled = session.status === 'cancelled'
+  const isOngoing = session.status === 'ongoing' || session.operationalState === 'ongoing'
+  const isLate = session.isLate || (!session.teacherStartedAt && session.operationalState === 'late')
+  const isReportRequired = session.quranReportRequired !== false
+  const hasReport = session.isReportSubmitted || session.report?.status === 'submitted' || session.report?.status === 'approved'
+  const isReportDraft = session.report?.status === 'draft'
+  const isReportMissing = isReportRequired && (isCompleted || isOngoing) && !hasReport && !isReportDraft
+
+  // Student Attendance
+  const stStatusKey = session.studentAttendanceStatus || (isCompleted ? 'present' : (isCancelled ? 'excused' : 'pending'))
+  const stCfg = STUDENT_ATTENDANCE_CONFIG[stStatusKey] || STUDENT_ATTENDANCE_CONFIG.pending
+
+  // Teacher Attendance status
+  const tcStatusKey = session.teacherAttendanceStatus === 'absent' ? 'absent'
+    : session.teacherAttendanceStatus === 'excused' ? 'excused'
+    : (session.teacherStartedAt ? 'on_time' : (isLate ? 'late' : 'pending'))
+  const tcCfg = TEACHER_ATTENDANCE_CONFIG[tcStatusKey] || TEACHER_ATTENDANCE_CONFIG.pending
+  const tcLabel = session.teacherStartedAt
+    ? `بدأ ${formatTimeAr(session.teacherStartedAt)}`
+    : (isLate ? `متأخر (${session.lateMinutes || 5}+ د)` : tcCfg.label)
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: 8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all"
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03 }}
+      onClick={() => onInspect?.(session)}
+      className="group flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white hover:bg-violet-50/20 border border-gray-100/90 hover:border-violet-200 transition-all cursor-pointer shadow-xs hover:shadow-sm"
     >
-      <div className="flex -space-x-2 space-x-reverse flex-none">
-        <Avatar
-          src={getFileUrl(student?.avatar)}
-          firstName={student?.firstNameAr}
-          lastName={student?.lastNameAr}
-          size="sm"
-          className="ring-2 ring-white"
-        />
-        <Avatar
-          src={getFileUrl(teacher?.avatar)}
-          firstName={teacher?.firstNameAr}
-          lastName={teacher?.lastNameAr}
-          size="sm"
-          className="ring-2 ring-white"
-        />
+      {/* 1. Parties & Time: Student + Teacher + Time (Start/Right side) */}
+      <div className="flex items-center gap-3 min-w-0 flex-none xl:w-[260px]">
+        {/* Overlapping Avatars */}
+        <div className="flex -space-x-2 space-x-reverse flex-none">
+          <Avatar
+            src={getFileUrl(student?.avatar)}
+            firstName={student?.firstNameAr}
+            lastName={student?.lastNameAr}
+            size="sm"
+            className="ring-2 ring-white"
+          />
+          <Avatar
+            src={getFileUrl(teacher?.avatar)}
+            firstName={teacher?.firstNameAr}
+            lastName={teacher?.lastNameAr}
+            size="sm"
+            className="ring-2 ring-white"
+          />
+        </div>
+
+        {/* Names & Schedule line */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap text-sm leading-tight">
+            {studentUrl ? (
+              <Link
+                to={studentUrl}
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-gray-900 hover:text-violet-700 hover:underline transition-colors truncate max-w-[110px]"
+                title="فتح ملف الطالب"
+              >
+                {student?.firstNameAr} {student?.lastNameAr || ''}
+              </Link>
+            ) : (
+              <span className="font-bold text-gray-900 truncate max-w-[110px]">{student?.firstNameAr || 'طالب'}</span>
+            )}
+
+            <span className="text-gray-300 text-xs">•</span>
+
+            {teacherUrl ? (
+              <Link
+                to={teacherUrl}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold text-gray-700 hover:text-amber-700 hover:underline transition-colors truncate max-w-[110px]"
+                title="فتح ملف المعلم"
+              >
+                {teacher?.firstNameAr} {teacher?.lastNameAr || ''}
+              </Link>
+            ) : (
+              <span className="font-semibold text-gray-600 truncate max-w-[110px]">{teacher?.firstNameAr || 'معلم'}</span>
+            )}
+          </div>
+
+          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 font-medium text-gray-600">
+              <Clock className="w-3.5 h-3.5 text-gray-400" />
+              {formatTimeAr(session.scheduledAt)}
+            </span>
+            <span className="text-gray-300">•</span>
+            <span>{session.durationMinutes} دقيقة</span>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap text-sm">
-          {/* Student Link */}
-          {studentUrl ? (
-            <Link
-              to={studentUrl}
-              className="inline-flex items-center gap-1 font-bold text-gray-900 hover:text-violet-700 hover:underline transition-colors group/st"
-              title="فتح الملف الشخصي للطالب"
-            >
-              <span>{student?.firstNameAr} {student?.lastNameAr || ''}</span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-violet-50 text-violet-700 border border-violet-100 group-hover/st:bg-violet-100 transition-colors">
-                طالب
-              </span>
-            </Link>
-          ) : (
-            <span className="font-semibold text-gray-800">{student?.firstNameAr || 'طالب'}</span>
-          )}
+      {/* 2. Center Stage / Live Attendance & Operations Capsule (Fills the center empty space) */}
+      <div className="flex-1 min-w-0 px-1 xl:px-3">
+        <div className="bg-slate-50/90 border border-slate-200/70 rounded-xl p-2 px-3 flex items-center justify-between xl:justify-start gap-2.5 sm:gap-4 flex-wrap text-xs shadow-2xs">
+          {/* Teacher Attendance */}
+          <div className="flex items-center gap-1.5 flex-none">
+            <span className="text-gray-400 font-medium text-[11px] flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>المعلم:</span>
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${tcCfg.bg}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${tcCfg.dot} ${isLate ? 'animate-ping' : ''}`} />
+              <span>{tcLabel}</span>
+            </span>
+          </div>
 
-          <span className="text-gray-300 text-xs mx-0.5">•</span>
+          <span className="text-slate-300 hidden sm:inline">|</span>
 
-          {/* Teacher Link */}
-          {teacherUrl ? (
-            <Link
-              to={teacherUrl}
-              className="inline-flex items-center gap-1 font-bold text-gray-900 hover:text-amber-700 hover:underline transition-colors group/tc"
-              title="فتح الملف الشخصي للمعلم"
-            >
-              <span>{teacher?.firstNameAr} {teacher?.lastNameAr || ''}</span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200/50 group-hover/tc:bg-amber-100 transition-colors">
-                معلم
+          {/* Student Attendance */}
+          <div className="flex items-center gap-1.5 flex-none">
+            <span className="text-gray-400 font-medium text-[11px] flex items-center gap-1">
+              <GraduationCap className="w-3.5 h-3.5 text-violet-600" />
+              <span>الطالب:</span>
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${stCfg.bg}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${stCfg.dot}`} />
+              <span>{stCfg.label}</span>
+            </span>
+          </div>
+
+          <span className="text-slate-300 hidden md:inline">|</span>
+
+          {/* Meeting Room */}
+          <div className="flex items-center gap-1.5 flex-none">
+            {session.meetingLink ? (
+              <a
+                href={session.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:text-violet-900 bg-violet-50 hover:bg-violet-100/70 border border-violet-200/70 px-2 py-0.5 rounded-lg transition-colors"
+                title="الانضمام للقاعة المباشرة"
+              >
+                <Video className="w-3 h-3 text-violet-600" />
+                <span>قاعة {session.meetingProvider === 'meet' ? 'Meet' : 'Zoom'}</span>
+                <span className="w-1 h-1 rounded-full bg-emerald-500 ms-0.5" />
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200/70 px-2 py-0.5 rounded-lg" title="لم يتم تعيين رابط لهذه الحصة بعد">
+                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                <span>بلا رابط</span>
               </span>
-            </Link>
-          ) : (
-            <span className="font-semibold text-gray-800">{teacher?.firstNameAr || 'معلم'}</span>
+            )}
+          </div>
+
+          {/* Payroll status indicator if available */}
+          {session.payrollStatus && session.status !== 'scheduled' && (
+            <>
+              <span className="text-slate-300 hidden 2xl:inline">|</span>
+              <div className="hidden 2xl:flex items-center gap-1 text-[11px] font-medium text-gray-500">
+                <CreditCard className="w-3 h-3 text-gray-400" />
+                <span>الراتب:</span>
+                <span className={`font-bold ${session.payrollStatus === 'payable' ? 'text-emerald-700' : session.payrollStatus === 'non_payable' ? 'text-rose-600' : 'text-amber-600'}`}>
+                  {session.payrollStatus === 'payable' ? 'مستحق ✓' : session.payrollStatus === 'non_payable' ? 'غير مستحق' : 'مراجعة'}
+                </span>
+              </div>
+            </>
           )}
-        </div>
-        <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-          <span>{formatTimeAr(session.scheduledAt)}</span>
-          <span>•</span>
-          <span>{session.durationMinutes} دقيقة</span>
         </div>
       </div>
 
-      <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-100 flex-none">
-        {session.meetingProvider}
-      </span>
+      {/* 3. Lifecycle Badge, Report Badge & Quick Actions (End/Left side) */}
+      <div className="flex items-center gap-2 justify-between xl:justify-end flex-none pt-2 xl:pt-0 border-t xl:border-t-0 border-gray-50">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Lifecycle Badge */}
+          {isCompleted ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle2 className="w-3 h-3" />
+              مكتملة
+            </span>
+          ) : isOngoing ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+              جارية ({session.ongoingMinutes || 1} د)
+            </span>
+          ) : isLate ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+              <AlertTriangle className="w-3 h-3" />
+              تأخر المعلم
+            </span>
+          ) : isCancelled ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+              ملغاة
+            </span>
+          ) : (session.isPostponed || Boolean(session.rescheduledFrom)) ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              ⏱️ حصة مؤجلة
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+              مجدولة
+            </span>
+          )}
+
+          {/* Quran Session Report Badge */}
+          {!isReportRequired ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-200" title="حصة سابقة مستوردة ولا تحتاج تقريرًا قرآنيًا">
+              <FileCheck className="w-3 h-3" />
+              التقرير غير مطلوب
+            </span>
+          ) : hasReport ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200" title="تم إرسال تقرير الحلقة القرآني">
+              <FileCheck className="w-3 h-3" />
+              التقرير تم ✓
+            </span>
+          ) : isReportDraft ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title="مسودة تقرير">
+              <FileText className="w-3 h-3" />
+              مسودة
+            </span>
+          ) : isReportMissing ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200" title="لم يقم المعلم بتقديم التقرير بعد">
+              <AlertCircle className="w-3 h-3" />
+              لم يُرسل
+            </span>
+          ) : null}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1.5 ms-auto xl:ms-0">
+          {session.meetingLink && (
+            <a
+              href={session.meetingLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-lg border border-violet-200/80 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+              title="دخول قاعة الاجتماع مباشرة"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onInspect?.(session)
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-50 hover:bg-violet-50 text-gray-700 hover:text-violet-700 border border-gray-200 hover:border-violet-200 text-xs font-semibold transition-all group-hover:bg-violet-100/60"
+            title="معاينة تفاصيل الحصة الكاملة"
+          >
+            <Eye className="w-3.5 h-3.5 text-gray-400 group-hover:text-violet-600" />
+            <span>معاينة</span>
+          </button>
+        </div>
+      </div>
     </motion.div>
   )
 }
 
-function RegistrationRow({ user: u, index }) {
+function RegistrationRow({ user: u, index: _index }) {
   const profileUrl = u.role === 'teacher'
     ? ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', u._id)
     : ROUTES.ADMIN_STUDENT_DETAIL.replace(':id', u._id)
@@ -281,6 +495,7 @@ function OperationsIntelligenceStrip() {
 
 export default function AdminDashboardPage() {
   const { user } = useAuthStore()
+  const [drawerSession, setDrawerSession] = useState(null)
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin', 'dashboard'],
@@ -450,9 +665,14 @@ export default function AdminDashboardPage() {
               <p className="text-sm font-semibold text-gray-500">لا توجد حصص مجدولة اليوم</p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {stats.upcomingSessions.slice(0, 6).map((s, i) => (
-                <SessionRow key={i} session={s} index={i} />
+            <div className="space-y-2">
+              {stats.upcomingSessions.slice(0, 10).map((s, i) => (
+                <SessionRow
+                  key={s._id || i}
+                  session={s}
+                  index={i}
+                  onInspect={(sessionToInspect) => setDrawerSession(sessionToInspect)}
+                />
               ))}
             </div>
           )}
@@ -594,6 +814,15 @@ export default function AdminDashboardPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Session Inspection & Management Drawer */}
+      {drawerSession && (
+        <AdminSessionDetailDrawer
+          session={drawerSession}
+          open={!!drawerSession}
+          onClose={() => setDrawerSession(null)}
+        />
       )}
 
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarClock, Sparkles, AlertTriangle, Check, Plus, X, ArrowLeftRight } from 'lucide-react'
+import { CalendarClock, AlertTriangle, Check, Plus, X, ArrowLeftRight } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -220,7 +220,7 @@ export default function ProposeAlternativeTimeModal({ request, onClose, onSubmit
             {/* Smart suggestions */}
             {!!availability?.suggestions?.length && (
               <div>
-                <div className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1.5"><Sparkles size={13} className="text-violet-600" /> مواعيد مقترحة (اضغط للإضافة)</div>
+                <div className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1.5"><CalendarClock size={13} className="text-violet-600" /> مواعيد مقترحة (اضغط للإضافة)</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {availability.suggestions.map((s) => {
                     const active = selectedDayOfWeeks.includes(s.dayOfWeek) && dayTimes[s.dayOfWeek] === s.time

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { User, Copy, CheckCircle2 } from 'lucide-react'
+import { User, Copy, CheckCircle2, X } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -184,6 +184,7 @@ function CreateStudentModal({ open, onClose }) {
 // navigating straight to it.
 export default function AdminStudentsPage() {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [studentTypeFilter, setStudentTypeFilter] = useState('')
@@ -192,8 +193,14 @@ export default function AdminStudentsPage() {
   const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'students', page, search, statusFilter, studentTypeFilter],
-    queryFn: () => api.get(`/admin/students?page=${page}&limit=15&search=${encodeURIComponent(search)}${statusFilter ? `&status=${statusFilter}` : ''}${studentTypeFilter ? `&studentType=${studentTypeFilter}` : ''}`).then(r => r.data),
+    queryKey: ['admin', 'students', page, pageSize, search, statusFilter, studentTypeFilter],
+    queryFn: () => {
+      const p = new URLSearchParams({ page, limit: pageSize })
+      if (search.trim()) p.set('search', search.trim())
+      if (statusFilter) p.set('status', statusFilter)
+      if (studentTypeFilter) p.set('studentType', studentTypeFilter)
+      return api.get(`/admin/students?${p}`).then(r => r.data)
+    },
     placeholderData: (prev) => prev,
   })
 
@@ -207,6 +214,10 @@ export default function AdminStudentsPage() {
   }, [searchParams, navigate])
 
   const students = data?.data || []
+  const total = data?.total || 0
+  const totalPages = data?.totalPages || 1
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, total)
 
   return (
     <div dir="rtl" className="space-y-5">
@@ -214,7 +225,10 @@ export default function AdminStudentsPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">إدارة الطلاب</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{data?.total || 0} طالب — انقر لعرض الملف الكامل والتعديل</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            إجمالي {total} طالب — عرض {from} إلى {to}
+            {totalPages > 1 && ` (صفحة ${page} من ${totalPages})`}
+          </p>
         </div>
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 bg-violet-600">
@@ -224,14 +238,28 @@ export default function AdminStudentsPage() {
 
       {/* Search + Filters */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
             <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/>
             <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
-            placeholder="بحث بالاسم أو البريد الإلكتروني..."
-            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pr-10 pl-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-violet-400 transition-all" dir="rtl" />
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="بحث بالاسم الكامل، البريد، أو الهاتف..."
+            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pr-10 pl-9 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-violet-400 transition-all"
+            dir="rtl"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setPage(1) }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-md hover:bg-gray-200 transition-colors"
+              title="مسح البحث"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
           {[['', 'الكل'], ['active', 'نشطون'], ['inactive', 'موقوفون']].map(([k, l]) => (
@@ -248,6 +276,21 @@ export default function AdminStudentsPage() {
               {l}
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-1.5 ms-auto">
+          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">عرض:</span>
+          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+            {[15, 25, 50, 100].map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setPageSize(s); setPage(1) }}
+                className={`px-2.5 py-1 rounded-[10px] text-xs font-bold transition-all ${pageSize === s ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -344,9 +387,9 @@ export default function AdminStudentsPage() {
         </>
       )}
 
-      {data?.totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination current={page} total={data.totalPages} onChange={setPage} />
+      {totalPages > 1 && (
+        <div className="flex justify-center pt-2">
+          <Pagination current={page} total={totalPages} onChange={setPage} totalItems={total} />
         </div>
       )}
 

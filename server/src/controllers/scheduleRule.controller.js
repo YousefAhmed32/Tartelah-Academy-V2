@@ -5,14 +5,16 @@ const scheduleService = require('../services/schedule.service')
 const { createNotification } = require('../services/notification.service')
 const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
+const { getAcademyTimezone } = require('../services/academySettings.service')
 
 // Preview session dates from rule params — no DB write
 exports.previewRule = async (req, res, next) => {
   try {
     const { frequency, daysOfWeek, timeOfDay, startDate, endDate, sessionsTotal, skipDates } = req.body
     if (!startDate) return sendError(res, 'startDate مطلوب', 400)
+    const timezone = req.body.timezone || await getAcademyTimezone()
     const dates = scheduleService.previewFromRule(
-      { frequency, daysOfWeek, timeOfDay, startDate, endDate, sessionsTotal, skipDates },
+      { frequency, daysOfWeek, timeOfDay, startDate, endDate, sessionsTotal, skipDates, timezone },
       sessionsTotal || 20
     )
     sendSuccess(res, { dates, count: dates.length })
@@ -29,6 +31,7 @@ exports.createRule = async (req, res, next) => {
       durationMinutes, startDate, endDate, sessionsTotal,
       meetingLink, meetingProvider, titleTemplate, notes,
     } = req.body
+    const timezone = req.body.timezone || await getAcademyTimezone()
 
     // An admin creating a schedule on a teacher's behalf must explicitly
     // name that teacher — defaulting to req.user._id here would silently
@@ -74,6 +77,7 @@ exports.createRule = async (req, res, next) => {
       meetingProvider: resolvedMeetingProvider,
       titleTemplate: titleTemplate || defaultTitle,
       notes,
+      timezone,
     })
 
     const sessions = await scheduleService.generateSessionsFromRule(rule)

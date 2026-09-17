@@ -13,6 +13,8 @@ const { logAction } = require('../services/audit.service')
 const lessonDeduction = require('../services/lessonDeduction.service')
 const payrollLedger = require('../services/payrollLedger.service')
 const bookingService = require('../services/booking.service')
+const { getAcademyTimezone } = require('../services/academySettings.service')
+const { academyMonthBounds, formatAcademyDateTimeAr, parseAcademyDateTime } = require('../utils/academyDateTime')
 
 function isOwnerOrAdmin(session, user) {
   return user.role === 'admin' || session.teacherId.toString() === user._id.toString()
@@ -35,7 +37,7 @@ async function applySystemPayrollStatus(session) {
 
 const ATTENDANCE_STATUS_LABEL_AR = {
   present: 'حاضر', absent: 'غائب', late: 'متأخر', excused: 'معذور',
-  left_early: 'غادر مبكراً', technical_issue: 'مشكلة تقنية',
+  left_early: 'غادر مبكراً', technical_issue: 'مشكلة تقنية', postponed: 'تأجيل الحصة',
 }
 
 exports.createSession = async (req, res, next) => {
@@ -43,7 +45,11 @@ exports.createSession = async (req, res, next) => {
     const { studentId, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
     let { titleAr } = req.body
     const teacherId = req.user._id
-    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
+    const timezone = await getAcademyTimezone()
+    const parsedScheduledAt = parseAcademyDateTime(scheduledAt, timezone)
+    if (Number.isNaN(parsedScheduledAt.getTime())) return sendError(res, 'تاريخ ووقت الحصة غير صالح', 400)
+    if (parsedScheduledAt <= new Date()) return sendError(res, 'لا يمكن جدولة حصة في الماضي', 400)
+    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt: parsedScheduledAt, durationMinutes: durationMinutes || 60 })
 
     if (!titleAr || titleAr === 'حصة' || titleAr === 'حصة تلاوة') {
       const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
@@ -64,7 +70,7 @@ exports.createSession = async (req, res, next) => {
     }
 
     const session = await Session.create({
-      studentId, teacherId, titleAr, scheduledAt, durationMinutes,
+      studentId, teacherId, titleAr, scheduledAt: parsedScheduledAt, durationMinutes,
       meetingLink: resolvedMeetingLink, meetingProvider: resolvedMeetingProvider, notes,
       isMakeup: isMakeup || false,
       isException: true,
@@ -73,7 +79,7 @@ exports.createSession = async (req, res, next) => {
     await createNotification({
       userId: studentId,
       titleAr: 'حصة جديدة مجدولة',
-      bodyAr: `تم جدولة حصة "${titleAr}" في ${new Date(scheduledAt).toLocaleDateString('ar')}`,
+      bodyAr: `تم جدولة حصة "${titleAr}" في ${formatAcademyDateTimeAr(parsedScheduledAt, timezone)}`,
       type: 'session',
       priority: 'medium',
       relatedId: session._id,
@@ -143,8 +149,8 @@ exports.getTeacherSessionsByMonth = async (req, res, next) => {
     const { year, month, studentId } = req.query
     const y = parseInt(year) || new Date().getFullYear()
     const m = parseInt(month) || (new Date().getMonth() + 1)
-    const start = new Date(y, m - 1, 1)
-    const end = new Date(y, m, 0, 23, 59, 59, 999)
+    const timezone = await getAcademyTimezone()
+    const { start, end } = academyMonthBounds(y, m, timezone)
 
     const filter = {
       teacherId: req.user._id,
@@ -364,11 +370,11 @@ exports.completeSession = async (req, res, next) => {
 // up with a session marked complete but no attendance recorded (or vice
 // versa). Reuses the exact same completion/payroll/subscription logic as
 // completeSession above.
-const FINISH_ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused', 'left_early', 'technical_issue']
+const FINISH_ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused', 'left_early', 'technical_issue', 'postponed']
 
 exports.finishSession = async (req, res, next) => {
   try {
-    const { attendanceStatus, attendanceNotes, arrivalTime, teacherNotes, homework, evaluation } = req.body
+    const { attendanceStatus, attendanceNotes, arrivalTime, teacherNotes, homework, evaluation, newScheduledAt, postponedDate, postponeReason } = req.body
     const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
     if (!isOwnerOrAdmin(session, req.user)) return sendError(res, 'غير مصرح', 403)
@@ -379,6 +385,115 @@ exports.finishSession = async (req, res, next) => {
     }
 
     const now = new Date()
+
+    // Special workflow: Postpone / Reschedule session (تأجيل الحصة وتحديد الموعد القادم)
+    if (attendanceStatus === 'postponed') {
+      const targetDate = newScheduledAt || postponedDate
+      if (!targetDate) {
+        return sendError(res, 'يجب تحديد الموعد القادم لتأجيل الحصة', 400)
+      }
+      const timezone = await getAcademyTimezone()
+      const parsedDate = parseAcademyDateTime(targetDate, timezone)
+      if (Number.isNaN(parsedDate.getTime())) {
+        return sendError(res, 'تاريخ الموعد القادم غير صالح', 400)
+      }
+      if (parsedDate <= now) {
+        return sendError(res, 'يجب أن يكون الموعد القادم في المستقبل', 400)
+      }
+
+      // Assert slot conflict
+      try {
+        await bookingService.assertNoConflict({
+          teacherId: session.teacherId,
+          studentId: session.studentId,
+          scheduledAt: parsedDate,
+          durationMinutes: session.durationMinutes || 60,
+        })
+      } catch (conflictErr) {
+        return sendError(res, conflictErr.message || 'يوجد تعارض في الموعد المختار مع حصة أخرى', 409)
+      }
+
+      // 1) Mark original session as excused / postponed attendance record
+      const reasonText = postponeReason || attendanceNotes || 'تم تأجيل الحصة إلى موعد لاحق'
+      const attendance = await Attendance.findOneAndUpdate(
+        { sessionId: session._id, studentId: session.studentId },
+        {
+          sessionId: session._id, studentId: session.studentId, teacherId: session.teacherId,
+          status: 'excused', notes: reasonText,
+          recordedAt: now, isFinalized: true, finalizedAt: now, finalizedBy: req.user._id,
+        },
+        { upsert: true, new: true }
+      )
+
+      // 2) Create the new rescheduled session with isPostponed: true
+      const newSession = await Session.create({
+        studentId: session.studentId,
+        teacherId: session.teacherId,
+        courseId: session.courseId,
+        seriesId: session.seriesId,
+        subscriptionId: session.subscriptionId,
+        durationMinutes: session.durationMinutes || 60,
+        titleAr: session.titleAr,
+        title: session.title,
+        meetingLink: session.meetingLink,
+        meetingProvider: session.meetingProvider || 'zoom',
+        scheduledAt: parsedDate,
+        status: 'scheduled',
+        isPostponed: true,
+        rescheduledFrom: session.scheduledAt,
+        notes: `حصة مؤجلة: ${reasonText}`,
+        teacherNotes: teacherNotes || '',
+        subscriptionConsumed: false,
+        payrollStatus: 'pending',
+      })
+
+      // 3) Update original session — ZERO wallet deduction, ZERO payroll credit
+      if (teacherNotes !== undefined) session.teacherNotes = teacherNotes
+      session.status = 'rescheduled'
+      session.rescheduledAt = now
+      session.outcome = 'rescheduled'
+      session.postponedAt = now
+      session.postponedReason = reasonText
+      session.postponedTo = newSession._id
+      session.rescheduledSessionId = newSession._id
+      session.payrollStatus = 'not_payable'
+      session.payrollStatusReason = 'تم تأجيل الحصة لموعد بديل — لن يُحسب الراتب إلا بعد إتمام الحصة في موعدها'
+      session.payrollStatusSetBy = 'system'
+      session.payrollStatusSetAt = now
+      session.attendanceFinalizedAt = now
+      session.attendanceFinalizedBy = req.user._id
+      session.subscriptionConsumed = false
+      await session.save()
+
+      // 4) Notify student about the new date & time
+      Promise.resolve(createNotification({
+        userId: session.studentId,
+        titleAr: 'تم تأجيل موعد الحصة',
+        bodyAr: `تم تأجيل حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedDate, timezone)}`,
+        type: 'session', priority: 'medium', relatedId: newSession._id,
+        actionUrl: '/student/sessions',
+      })).catch(() => {})
+
+      // 5) Audit log
+      logAction({
+        actorId: req.user._id, actorRole: req.user.role, action: 'session.postpone',
+        entity: 'Session', entityId: session._id,
+        changes: {
+          originalScheduledAt: session.scheduledAt,
+          newScheduledAt: parsedDate,
+          newSessionId: newSession._id,
+          postponeReason: reasonText,
+        }, ip: req.ip,
+      })
+
+      return sendSuccess(res, {
+        session,
+        newSession,
+        attendance,
+        isPostponed: true,
+        walletEffect: { action: 'none', amount: 0, balanceAfter: null },
+      }, 'تم تأجيل الحصة وتحديد الموعد القادم بنجاح')
+    }
 
     // 1) Attendance — finalized immediately (this IS the teacher's confirmed record).
     const attendance = await Attendance.findOneAndUpdate(
@@ -561,13 +676,17 @@ exports.rescheduleSession = async (req, res, next) => {
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
     const isAdmin = req.user.role === 'admin'
     if (!isAdmin && session.teacherId.toString() !== req.user._id.toString()) return sendError(res, 'غير مصرح', 403)
+    const timezone = await getAcademyTimezone()
+    const parsedNewDate = parseAcademyDateTime(newDate, timezone)
+    if (Number.isNaN(parsedNewDate.getTime())) return sendError(res, 'التاريخ الجديد غير صالح', 400)
+    if (parsedNewDate <= new Date()) return sendError(res, 'يجب أن يكون الموعد الجديد في المستقبل', 400)
     await bookingService.assertNoConflict({
       teacherId: session.teacherId, studentId: session.studentId,
-      scheduledAt: newDate, durationMinutes: session.durationMinutes, excludeSessionId: session._id,
+      scheduledAt: parsedNewDate, durationMinutes: session.durationMinutes, excludeSessionId: session._id,
     })
     const previousDate = session.scheduledAt
     session.rescheduledFrom = session.scheduledAt
-    session.scheduledAt = new Date(newDate)
+    session.scheduledAt = parsedNewDate
     session.status = 'scheduled'
     session.isException = true
     await session.save()
@@ -581,7 +700,7 @@ exports.rescheduleSession = async (req, res, next) => {
     await createNotification({
       userId: session.studentId,
       titleAr: 'تم إعادة جدولة الحصة',
-      bodyAr: `تم تغيير موعد حصة "${session.titleAr}" إلى ${new Date(newDate).toLocaleDateString('ar')}`,
+      bodyAr: `تم تغيير موعد حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedNewDate, timezone)}`,
       type: 'session',
       priority: 'high',
       relatedId: session._id,
@@ -690,9 +809,29 @@ exports.adminUpdateSession = async (req, res, next) => {
     const allowed = ['titleAr', 'scheduledAt', 'durationMinutes', 'meetingLink', 'meetingProvider', 'notes', 'teacherNotes', 'status', 'studentId', 'teacherId']
     const updates = {}
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
-    const session = await Session.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
-      .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email')
+    const session = await Session.findById(req.params.id)
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
+
+    if (updates.scheduledAt !== undefined) {
+      const timezone = await getAcademyTimezone()
+      updates.scheduledAt = parseAcademyDateTime(updates.scheduledAt, timezone)
+      if (Number.isNaN(updates.scheduledAt.getTime())) return sendError(res, 'تاريخ ووقت الحصة غير صالح', 400)
+      if (updates.scheduledAt <= new Date()) return sendError(res, 'لا يمكن جدولة حصة في الماضي', 400)
+    }
+
+    if (['scheduledAt', 'durationMinutes', 'teacherId', 'studentId'].some((field) => updates[field] !== undefined)) {
+      await bookingService.assertNoConflict({
+        teacherId: updates.teacherId || session.teacherId,
+        studentId: updates.studentId || session.studentId,
+        scheduledAt: updates.scheduledAt || session.scheduledAt,
+        durationMinutes: updates.durationMinutes || session.durationMinutes || 60,
+        excludeSessionId: session._id,
+      })
+    }
+
+    Object.assign(session, updates)
+    await session.save()
+    await session.populate('studentId teacherId', 'firstNameAr lastNameAr avatar email')
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_update',
@@ -701,6 +840,7 @@ exports.adminUpdateSession = async (req, res, next) => {
 
     sendSuccess(res, session, 'تم تحديث الحصة')
   } catch (err) {
+    if (err.name === 'BookingConflictError') return sendError(res, err.message, err.statusCode, { conflictingSessionId: err.conflictingSessionId })
     next(err)
   }
 }
@@ -710,7 +850,11 @@ exports.adminCreateSession = async (req, res, next) => {
   try {
     const { studentId, teacherId, scheduledAt, durationMinutes, meetingLink, meetingProvider, notes, isMakeup } = req.body
     let { titleAr } = req.body
-    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt, durationMinutes: durationMinutes || 60 })
+    const timezone = await getAcademyTimezone()
+    const parsedScheduledAt = parseAcademyDateTime(scheduledAt, timezone)
+    if (Number.isNaN(parsedScheduledAt.getTime())) return sendError(res, 'تاريخ ووقت الحصة غير صالح', 400)
+    if (parsedScheduledAt <= new Date()) return sendError(res, 'لا يمكن جدولة حصة في الماضي', 400)
+    await bookingService.assertNoConflict({ teacherId, studentId, scheduledAt: parsedScheduledAt, durationMinutes: durationMinutes || 60 })
 
     if (!titleAr || titleAr === 'حصة' || titleAr === 'حصة تلاوة') {
       const student = await User.findById(studentId).select('firstNameAr lastNameAr name')
@@ -731,7 +875,7 @@ exports.adminCreateSession = async (req, res, next) => {
     }
 
     const session = await Session.create({
-      studentId, teacherId, titleAr, scheduledAt,
+      studentId, teacherId, titleAr, scheduledAt: parsedScheduledAt,
       durationMinutes: durationMinutes || 60,
       meetingLink: resolvedMeetingLink, meetingProvider: resolvedMeetingProvider, notes,
       isMakeup: isMakeup || false,
@@ -741,20 +885,20 @@ exports.adminCreateSession = async (req, res, next) => {
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.admin_create',
-      entity: 'Session', entityId: session._id, changes: { studentId, teacherId, scheduledAt }, ip: req.ip,
+      entity: 'Session', entityId: session._id, changes: { studentId, teacherId, scheduledAt: parsedScheduledAt }, ip: req.ip,
     })
 
     await createNotification({
       userId: studentId,
       titleAr: 'حصة جديدة مجدولة',
-      bodyAr: `تم جدولة حصة "${titleAr}" في ${new Date(scheduledAt).toLocaleDateString('ar')}`,
+      bodyAr: `تم جدولة حصة "${titleAr}" في ${formatAcademyDateTimeAr(parsedScheduledAt, timezone)}`,
       type: 'session', priority: 'medium', relatedId: session._id,
       actionUrl: '/student/sessions',
     })
     await createNotification({
       userId: teacherId,
       titleAr: 'حصة جديدة مجدولة',
-      bodyAr: `تم جدولة حصة "${titleAr}" مع طالب في ${new Date(scheduledAt).toLocaleDateString('ar')}`,
+      bodyAr: `تم جدولة حصة "${titleAr}" مع طالب في ${formatAcademyDateTimeAr(parsedScheduledAt, timezone)}`,
       type: 'session', priority: 'medium', relatedId: session._id,
       actionUrl: '/teacher/sessions',
     })

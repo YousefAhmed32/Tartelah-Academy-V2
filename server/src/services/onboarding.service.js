@@ -325,6 +325,7 @@ async function createTeacherWithStudents({ clientRequestId, teacher, workingHour
           notes: studentInput.package.notes,
           lessonsUsed: studentInput.package.lessonsUsed,
           lessonsRemaining: studentInput.package.lessonsRemaining,
+          durationMinutes: Number(studentInput.lessonDurationMinutes || studentInput.schedule?.lessonDurationMinutes) || 60,
           actorId, actorRole,
         })
         createdSubscriptionIds.push(subscriptionResult.subscription._id)

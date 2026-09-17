@@ -35,6 +35,7 @@ describe('reportTracking.getTeacherDailyProgress', () => {
     QuranSessionReport.find.mockReturnValue({ select: () => Promise.resolve([{ sessionId: 's1' }]) })
 
     const result = await getTeacherDailyProgress('t1')
+    expect(Session.find).toHaveBeenCalledWith(expect.objectContaining({ quranReportRequired: { $ne: false } }))
     expect(result.total).toBe(2)
     expect(result.reportedCount).toBe(1)
     expect(result.missing).toHaveLength(1)
@@ -58,6 +59,7 @@ describe('reportTracking.getTeacherOverdueReports', () => {
     QuranSessionReport.find.mockReturnValue({ select: () => Promise.resolve([]) })
 
     const result = await getTeacherOverdueReports('t1', { minAgeHours: 24 })
+    expect(Session.find).toHaveBeenCalledWith(expect.objectContaining({ quranReportRequired: { $ne: false } }))
     expect(result).toHaveLength(1)
     expect(result[0].ageHours).toBeGreaterThanOrEqual(24)
   })
@@ -73,6 +75,7 @@ describe('reportTracking.getAdminReportOverview', () => {
     QuranSessionReport.find.mockReturnValueOnce({ select: () => Promise.resolve(Array.from({ length: 7 }, (_, i) => ({ sessionId: `s${i}` }))) })
 
     const result = await getAdminReportOverview({})
+    expect(Session.find).toHaveBeenCalledWith(expect.objectContaining({ quranReportRequired: { $ne: false } }))
     expect(result.scheduled).toBe(16)
     expect(result.conducted).toBe(12)
     expect(result.reportCompleted).toBe(7)
@@ -87,6 +90,7 @@ describe('reportTracking.getMonthlyCompletionRatio', () => {
     Session.find.mockReturnValueOnce({ select: () => Promise.resolve(Array.from({ length: 60 }, (_, i) => ({ _id: `s${i}` }))) })
     QuranSessionReport.find.mockReturnValueOnce({ select: () => Promise.resolve(Array.from({ length: 30 }, (_, i) => ({ sessionId: `s${i}` }))) })
     const result = await getMonthlyCompletionRatio({ teacherId: 't1', year: 2026, month: 9 })
+    expect(Session.find).toHaveBeenCalledWith(expect.objectContaining({ quranReportRequired: { $ne: false } }))
     expect(result.label).toBe('30 من 60')
   })
 })

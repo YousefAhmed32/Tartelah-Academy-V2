@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { DEFAULT_ACADEMY_TIMEZONE } = require('../config/academyTimezone')
 
 const ScheduleRuleSchema = new mongoose.Schema({
   teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -24,7 +25,7 @@ const ScheduleRuleSchema = new mongoose.Schema({
   titleTemplate: { type: String, default: 'حصة' },
   status: { type: String, enum: ['active', 'paused', 'ended'], default: 'active' },
   skipDates: [{ type: Date }],
-  timezone: { type: String, default: 'Asia/Riyadh' },
+  timezone: { type: String, default: DEFAULT_ACADEMY_TIMEZONE },
   notes: { type: String },
 }, { timestamps: true })
 

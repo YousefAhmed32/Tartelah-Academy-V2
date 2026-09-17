@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
-  FileBarChart, Check, AlertCircle, Sparkles, Calendar, DollarSign,
+  FileBarChart, Check, AlertCircle, Calendar, DollarSign,
   TrendingUp, Users, Clock, AlertTriangle, MessageSquare
 } from 'lucide-react'
 import Modal from '../ui/Modal.jsx'

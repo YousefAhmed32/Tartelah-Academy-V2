@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Video, MonitorPlay, Briefcase, Globe, Copy, Check,
-  ExternalLink, RefreshCw, Sparkles, ShieldCheck,
+  ExternalLink, RefreshCw, ShieldCheck,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import BulkSyncLinksModal from './BulkSyncLinksModal.jsx'

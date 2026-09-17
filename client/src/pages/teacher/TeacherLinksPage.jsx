@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Link2, Video, MonitorPlay, Briefcase, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Link2, Video, MonitorPlay, Briefcase, RefreshCw, Share2, CheckCircle2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -117,7 +117,7 @@ export default function TeacherLinksPage() {
                       className="text-xs font-bold px-2.5 py-1.5 rounded-lg text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors flex items-center gap-1"
                       title="تعيين كرابط عمومي وتعميمه على كافة الحصص"
                     >
-                      <Sparkles size={12} /> تعميم
+                      <Share2 size={12} /> تعميم
                     </button>
                   )}
                   <a href={link.link} target="_blank" rel="noopener noreferrer"

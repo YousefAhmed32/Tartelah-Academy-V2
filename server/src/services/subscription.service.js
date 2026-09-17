@@ -4,7 +4,10 @@
 // balance → wallet credit" flow only exists in one place.
 const Subscription = require('../models/Subscription')
 const Package = require('../models/Package')
+const Session = require('../models/Session')
+const TeacherPayrollEntry = require('../models/TeacherPayrollEntry')
 const walletService = require('./wallet.service')
+const { recordEntry } = require('./payrollLedger.service')
 const { computeOpeningBalance, OpeningBalanceError } = require('../config/lessonPolicy')
 
 class SubscriptionCreationError extends Error {
@@ -32,7 +35,7 @@ class SubscriptionCreationError extends Error {
  */
 async function createSubscriptionWithOpeningBalance({
   studentId, packageId, teacherId, startDate, endDate, remainingDays, notes,
-  lessonsUsed, lessonsRemaining, actorId, actorRole = 'admin',
+  lessonsUsed, lessonsRemaining, durationMinutes, actorId, actorRole = 'admin',
 }) {
   if (!studentId) throw new SubscriptionCreationError('معرف الطالب مطلوب')
   if (!packageId) throw new SubscriptionCreationError('يجب اختيار باقة')
@@ -61,6 +64,9 @@ async function createSubscriptionWithOpeningBalance({
     amountPaid: pkg.price, notes, createdBy: actorId,
   })
 
+  let openingTransaction = null
+  const importedSessionIds = []
+
   try {
     const reasonSuffix = used > 0 ? ` (منها ${used} حصة مستخدمة مسبقًا)` : ''
     const { transaction } = await walletService.applyTransaction({
@@ -70,13 +76,73 @@ async function createSubscriptionWithOpeningBalance({
       relatedSubscriptionId: sub._id, performedByRole: actorRole, performedBy: actorId,
       metadata: { packageTotal: pkg.sessionsPerMonth, lessonsUsedAtOpening: used, lessonsRemainingAtOpening: remaining },
     })
+    openingTransaction = transaction
     sub.walletTransactionId = transaction._id
     await sub.save()
-    return { subscription: sub, package: pkg, transaction, used, remaining }
+
+    // Imported off-platform lessons are represented as real completed sessions
+    // plus payable payroll-ledger rows. This makes the credit immediately visible
+    // in the teacher's current open payroll period without asking for a report for
+    // historical lessons that were delivered before the platform tracked them.
+    if (teacherId && used > 0) {
+      const importedAt = new Date()
+      for (let i = 0; i < used; i++) {
+        const pastSession = await Session.create({
+          studentId,
+          teacherId,
+          subscriptionId: sub._id,
+          titleAr: `حصة سابقة معتمدة (${pkg.nameAr})`,
+          scheduledAt: new Date(importedAt.getTime() + i),
+          durationMinutes: Number(durationMinutes) || 60,
+          status: 'completed',
+          quranReportRequired: false,
+          completedAt: importedAt,
+          subscriptionConsumed: true,
+          subscriptionConsumedAt: importedAt,
+          payrollStatus: 'payable',
+          payrollStatusReason: 'حصة سابقة معتمدة عند إسناد الطالب',
+          payrollStatusSetBy: 'system',
+          payrollStatusSetAt: importedAt,
+          teacherAttendanceStatus: 'on_time',
+          attendanceFinalizedAt: importedAt,
+          attendanceFinalizedBy: actorId,
+          notes: `حصة سابقة معتمدة عند إسناد الطالب بالباقة (${pkg.nameAr}) — لا يلزمها تقرير قرآني`,
+        })
+        importedSessionIds.push(pastSession._id)
+
+        const payrollEntry = await recordEntry(pastSession, {
+          payrollStatus: 'payable',
+          reason: `حصة سابقة معتمدة عند إسناد الطالب بالباقة (${pkg.nameAr})`,
+          businessRule: 'opening_balance_consumed',
+          createdBy: actorId,
+        })
+        if (!payrollEntry) throw new Error('تعذر إضافة الحصة السابقة إلى راتب المعلم')
+      }
+    }
+
+    return { subscription: sub, package: pkg, transaction, used, remaining, importedSessionIds }
   } catch (err) {
-    // Compensating rollback — never leave a Subscription on record with no
-    // matching wallet credit (MongoDB here is a standalone mongod, no
-    // multi-document transactions available — see wallet.service.js).
+    // Standalone MongoDB has no multi-document transaction support here, so
+    // compensate every completed write. Never report success with only some
+    // imported lessons credited to the teacher.
+    if (importedSessionIds.length) {
+      await TeacherPayrollEntry.deleteMany({ sessionId: { $in: importedSessionIds } }).catch(() => {})
+      await Session.deleteMany({ _id: { $in: importedSessionIds } }).catch(() => {})
+    }
+    if (openingTransaction) {
+      await walletService.applyTransaction({
+        studentId,
+        type: 'opening_balance',
+        amount: -remaining,
+        idempotencyKey: `subscription:${sub._id}:opening_balance:rollback`,
+        reason: `إلغاء رصيد افتتاحي لاكتمال إسناد الحصص السابقة بخطأ`,
+        relatedSubscriptionId: sub._id,
+        performedByRole: actorRole,
+        performedBy: actorId,
+        correctsTransactionId: openingTransaction._id,
+        metadata: { packageTotal: -pkg.sessionsPerMonth, lessonsUsedAtOpening: -used, rollback: true },
+      }).catch(() => {})
+    }
     await Subscription.deleteOne({ _id: sub._id }).catch(() => {})
     throw err
   }

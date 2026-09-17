@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useInitAuth } from './hooks/useAuth.js'
 import { useAuthStore } from './store/authStore.js'
 import { ROUTES } from './config/constants.js'
@@ -9,6 +10,7 @@ import RequirePermission from './components/shared/RequirePermission.jsx'
 import { queryClient } from './config/queryClient.js'
 import api from './utils/api.js'
 import { QK } from './services/queryKeys.js'
+import { setAcademyTimezone } from './utils/date.js'
 
 // Layouts
 import PublicLayout from './layouts/PublicLayout.jsx'
@@ -144,9 +146,22 @@ function useHomepagePrefetch() {
   }, [location.pathname])
 }
 
+function useAcademyTimezone() {
+  const { data } = useQuery({
+    queryKey: ['public', 'settings'],
+    queryFn: () => api.get('/website/settings').then((r) => r.data?.data || {}),
+    staleTime: 5 * 60_000,
+  })
+
+  useEffect(() => {
+    setAcademyTimezone(data?.timezone)
+  }, [data?.timezone])
+}
+
 export default function App() {
   useInitAuth()
   useHomepagePrefetch()
+  useAcademyTimezone()
   const { isLoading } = useAuthStore()
 
   if (isLoading) return <LoadingPage dark />

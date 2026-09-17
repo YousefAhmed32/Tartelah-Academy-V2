@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
-  BookOpen, Star, Clock, Check, AlertCircle, Sparkles, ExternalLink, Calendar,
-  User, CheckCircle2, History, AlertTriangle
+  BookOpen, Star, Clock, Check, AlertCircle, ExternalLink, Calendar,
+  User, CheckCircle2, History, AlertTriangle, ShieldAlert, HeartHandshake
 } from 'lucide-react'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -56,6 +56,7 @@ export default function QuranReportDetailModal({
     onSuccess: () => {
       toast.success('تم اعتماد التقرير القرآني بنجاح')
       qc.invalidateQueries({ queryKey: ['admin', 'quran-reports'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'student'] })
       qc.invalidateQueries({ queryKey: ['quranReport', 'detail', sessionId] })
       onStatusChanged?.('approved')
       onClose()
@@ -69,6 +70,7 @@ export default function QuranReportDetailModal({
     onSuccess: () => {
       toast.success('تم إرسال طلب تصحيح التقرير إلى المعلم')
       qc.invalidateQueries({ queryKey: ['admin', 'quran-reports'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'student'] })
       qc.invalidateQueries({ queryKey: ['quranReport', 'detail', sessionId] })
       onStatusChanged?.('correction_requested')
       onClose()
@@ -180,117 +182,149 @@ export default function QuranReportDetailModal({
           </div>
         ) : (
           <>
-            {/* Memorization (الحفظ الجديد) */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <h3 className="font-heading font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
-                <BookOpen size={16} className="text-violet-600" /> الحفظ الجديد في الحصة
+            {/* 📖 أولاً: إنجاز الحلقة */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
+              <h3 className="font-heading font-bold text-sm text-gray-900 flex items-center gap-2">
+                <BookOpen size={16} className="text-violet-600" />
+                <span>📖 أولًا: إنجاز الحلقة</span>
               </h3>
-              {memorization.length === 0 ? (
-                <p className="text-xs text-gray-400">لا يوجد حفظ جديد مسجل في هذه الحصة</p>
-              ) : (
-                <div className="space-y-2">
-                  {memorization.map((m) => (
-                    <div key={m._id} className="p-3 bg-gray-50 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-gray-800 text-sm">
-                          {m.surahName || `سورة رقم ${m.surahNumber}`}
-                        </span>
-                        <div className="text-gray-500 mt-0.5">
-                          {m.ayahFrom && m.ayahTo ? `من آية ${m.ayahFrom} إلى ${m.ayahTo}` : 'كامل السورة'}
-                          {m.pages ? ` · ${m.pages} صفحة` : ''}
-                        </div>
-                      </div>
-                      {m.grade && (
-                        <span className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                          <Star size={13} fill="currentColor" /> {m.grade}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-violet-700">ما تم تسميعه في حلقة اليوم:</div>
+                  <div className="text-gray-800 leading-relaxed whitespace-pre-line font-medium">
+                    {report.todayRecitation || (memorization.length > 0 ? memorization.map(m => `سورة ${m.surahName || m.surahNumber} (آية ${m.ayahFrom || 1}-${m.ayahTo || ''})`).join('، ') : '—')}
+                  </div>
                 </div>
-              )}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-blue-700">ما تم مراجعته:</div>
+                  <div className="text-gray-800 leading-relaxed whitespace-pre-line font-medium">
+                    {report.todayRevision || (revision.length > 0 ? revision.map(r => `سورة ${r.surahName || r.surahNumber}`).join('، ') : '—')}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Revision (المراجعة) */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <h3 className="font-heading font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
-                <History size={16} className="text-blue-600" /> المراجعة (الماضي القريب / البعيد)
+            {/* 🎯 ثانياً: الإنجاز المطلوب للحلقة القادمة */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
+              <h3 className="font-heading font-bold text-sm text-gray-900 flex items-center gap-2">
+                <HeartHandshake size={16} className="text-blue-600" />
+                <span>🎯 ثانيًا: الإنجاز المطلوب للحلقة القادمة</span>
               </h3>
-              {revision.length === 0 ? (
-                <p className="text-xs text-gray-400">لا توجد مراجعة مسجلة في هذه الحصة</p>
-              ) : (
-                <div className="space-y-2">
-                  {revision.map((r) => (
-                    <div key={r._id} className="p-3 bg-gray-50 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-gray-800 text-sm">
-                          {r.surahName || `سورة رقم ${r.surahNumber}`}
-                        </span>
-                        {r.notes && <div className="text-gray-500 mt-0.5">{r.notes}</div>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-gray-500">التسميع المطلوب:</div>
+                  <div className="text-gray-800 font-semibold">{report.nextRecitation || report.nextSessionHomework || '—'}</div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-gray-500">المراجعة المطلوبة:</div>
+                  <div className="text-gray-800 font-semibold">{report.nextRevision || '—'}</div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-gray-500">الآداب / الأحاديث:</div>
+                  <div className="text-gray-800 font-semibold">{report.nextManners || '—'}</div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                  <div className="font-bold text-gray-500">التجويد:</div>
+                  <div className="text-gray-800 font-semibold">{report.nextTajweed || report.tajweedNotes || '—'}</div>
+                </div>
+              </div>
+
+              {/* رابط المصحف */}
+              {(report.quranLink || report.referenceLink) && (
+                <div className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 flex items-center justify-between text-xs">
+                  <span className="font-semibold text-violet-950 flex items-center gap-1.5">
+                    <ExternalLink size={14} className="text-violet-600" />
+                    <span>🔗 رابط المصحف أو المرجع:</span>
+                  </span>
+                  <a
+                    href={report.quranLink || report.referenceLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-violet-700 font-bold hover:underline"
+                  >
+                    فتح الرابط المقترح ←
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* ⭐ ثالثاً: تقييم المعلم للطالب */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
+              <h3 className="font-heading font-bold text-sm text-gray-900 flex items-center gap-2">
+                <Star size={16} className="text-amber-600" />
+                <span>⭐ ثالثًا: تقييم المعلم للطالب</span>
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { label: 'الحفظ والتسميع', val: report.memorizationLevel },
+                  { label: 'المراجعة', val: report.revisionLevel },
+                  { label: 'التجويد والتلاوة', val: report.tajweedLevel },
+                  { label: 'الالتزام والتفاعل', val: report.engagementLevel },
+                ].map((item, idx) => {
+                  const map = {
+                    excellent: { label: 'ممتاز', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                    'ممتاز': { label: 'ممتاز', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                    very_good: { label: 'جيد جدًا', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    'جيد جدًا': { label: 'جيد جدًا', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    good: { label: 'جيد', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+                    'جيد': { label: 'جيد', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+                    needs_followup: { label: 'يحتاج متابعة', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+                    'يحتاج متابعة': { label: 'يحتاج متابعة', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+                  }
+                  const badge = map[item.val] || { label: item.val || '—', cls: 'bg-gray-50 text-gray-700 border-gray-200' }
+                  return (
+                    <div key={idx} className="p-3 bg-gray-50/80 rounded-xl text-center space-y-1">
+                      <div className="text-[11px] text-gray-500 font-semibold">{item.label}</div>
+                      <div className={`text-xs font-bold py-1 px-2 rounded-lg border ${badge.cls}`}>
+                        {badge.label}
                       </div>
-                      {r.grade && (
-                        <span className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                          <Star size={13} fill="currentColor" /> {r.grade}
-                        </span>
-                      )}
                     </div>
-                  ))}
+                  )
+                })}
+              </div>
+
+              {(report.generalEvaluation || report.teacherNotes) && (
+                <div className="bg-amber-50/40 border border-amber-200/60 rounded-xl p-3 text-xs space-y-1">
+                  <div className="font-bold text-amber-900">التقييم العام وملاحظات المعلم:</div>
+                  <div className="text-gray-800 leading-relaxed font-medium">
+                    {report.generalEvaluation || report.teacherNotes}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Observations & Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {report.tajweedNotes && (
+            {/* 👨‍👩‍👧 رابعاً: ملاحظات لولي الأمر والتنبيهات */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
+              <h3 className="font-heading font-bold text-sm text-gray-900 flex items-center gap-2">
+                <User size={16} className="text-emerald-700" />
+                <span>👨‍👩‍👧 رابعًا: ملاحظات وتنبيهات لولي الأمر</span>
+              </h3>
+
+              {report.parentNotes && (
                 <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-                  <div className="font-bold text-violet-700">ملاحظات التجويد ومخارج الحروف:</div>
-                  <div className="text-gray-700 leading-relaxed">{report.tajweedNotes}</div>
+                  <div className="font-bold text-emerald-800">ملاحظات موجهة لولي الأمر:</div>
+                  <div className="text-gray-800 leading-relaxed whitespace-pre-line font-medium">
+                    {report.parentNotes}
+                  </div>
                 </div>
               )}
-              {report.interactiveActivity && (
-                <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-                  <div className="font-bold text-emerald-700">النشاط التفاعلي خلال الحصة:</div>
-                  <div className="text-gray-700 leading-relaxed">{report.interactiveActivity}</div>
+
+              {report.importantAlert && (
+                <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs space-y-1">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <ShieldAlert size={14} className="text-amber-600" />
+                    <span>📌 تنبيه خاص:</span>
+                  </div>
+                  <div className="text-amber-950 font-bold leading-relaxed">
+                    {report.importantAlert}
+                  </div>
                 </div>
               )}
-              {report.nextSessionHomework && (
-                <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-                  <div className="font-bold text-amber-700">مطلوب التحضير للحصة القادمة:</div>
-                  <div className="text-gray-700 leading-relaxed">{report.nextSessionHomework}</div>
-                </div>
-              )}
-              {report.teacherNotes && (
-                <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-                  <div className="font-bold text-gray-700">ملاحظات المعلم العامة:</div>
-                  <div className="text-gray-700 leading-relaxed">{report.teacherNotes}</div>
-                </div>
+
+              {!report.parentNotes && !report.importantAlert && (
+                <p className="text-xs text-gray-400">لا توجد ملاحظات إضافية لولي الأمر</p>
               )}
             </div>
-
-            {/* Reference link if any */}
-            {report.referenceLink && (
-              <div className="bg-violet-50/50 border border-violet-100 rounded-xl p-3 flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-700">رابط المصحف أو المرجع المقترح:</span>
-                <a
-                  href={report.referenceLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-violet-600 font-bold hover:underline"
-                >
-                  <ExternalLink size={13} /> فتح الرابط
-                </a>
-              </div>
-            )}
-
-            {/* Evaluation grade */}
-            {evalData?.score != null && (
-              <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-3 flex items-center justify-between text-xs">
-                <span className="font-bold text-amber-900">تقييم أداء الطالب في الحصة:</span>
-                <span className="text-amber-700 font-extrabold text-sm flex items-center gap-1">
-                  <Star size={14} fill="currentColor" /> {evalData.score} / 10
-                </span>
-              </div>
-            )}
 
             {/* Transition history */}
             {report.history?.length > 0 && (

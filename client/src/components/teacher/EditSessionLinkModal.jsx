@@ -1,7 +1,7 @@
 import { useState, useEffect, useId } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Video, Link2, ExternalLink, Check, Sparkles, AlertCircle } from 'lucide-react'
+import { Video, Link2, ExternalLink, Check, History, AlertCircle } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -151,7 +151,7 @@ export default function EditSessionLinkModal({ open, onClose, session, onSuccess
         {savedLinks.length > 0 && (
           <div>
             <label className="text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1">
-              <Sparkles size={13} className="text-amber-500" />
+              <History size={13} className="text-amber-500" />
               اختيار سريع من روابطك المسجلة:
             </label>
             <div className="flex flex-wrap gap-2">

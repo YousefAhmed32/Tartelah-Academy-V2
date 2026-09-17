@@ -6,6 +6,7 @@ const Session = require('../models/Session')
 const QuranSessionReport = require('../models/QuranSessionReport')
 const Memorization = require('../models/Memorization')
 const Revision = require('../models/Revision')
+const Attendance = require('../models/Attendance')
 
 class QuranReportError extends Error {
   constructor(message, status = 400, field) {
@@ -43,12 +44,23 @@ async function saveDraft(sessionId, { teacherId, fields }) {
   if (!['draft', 'correction_requested'].includes(report.status)) {
     throw new QuranReportError('لا يمكن تعديل هذا التقرير في حالته الحالية إلا عبر إعادة الإرسال', 409)
   }
-  Object.assign(report, fields)
+  Object.assign(report, pickReportFields(fields))
   await report.save()
   return report
 }
 
-const REPORTABLE_FIELDS = ['evaluationId', 'tajweedNotes', 'interactiveActivity', 'nextSessionHomework', 'teacherNotes', 'referenceLink']
+const REPORTABLE_FIELDS = [
+  // أولاً: إنجاز الحلقة
+  'todayRecitation', 'todayRevision',
+  // ثانياً: الإنجاز المطلوب للحلقة القادمة
+  'nextRecitation', 'nextRevision', 'nextManners', 'nextTajweed', 'quranLink',
+  // ثالثاً: تقييم المعلم للطالب
+  'memorizationLevel', 'revisionLevel', 'tajweedLevel', 'engagementLevel', 'generalEvaluation',
+  // رابعاً: ملاحظات لولي الأمر والتنبيه
+  'parentNotes', 'importantAlert',
+  // Legacy fallbacks
+  'evaluationId', 'tajweedNotes', 'interactiveActivity', 'nextSessionHomework', 'teacherNotes', 'referenceLink',
+]
 
 function pickReportFields(input = {}) {
   const out = {}
@@ -70,6 +82,13 @@ async function submitReport(sessionId, { teacherId, fields, memorization = [], r
   let report = await QuranSessionReport.findOne({ sessionId })
   if (!report) {
     report = new QuranSessionReport({ sessionId, studentId: session.studentId, teacherId, createdBy: teacherId, history: [] })
+  }
+  // The completion modal retries only the report request when the session was
+  // already finalized. If the first response was lost after saving, return the
+  // existing submitted report instead of turning a safe retry into a 409.
+  if (report.status === 'submitted') {
+    report.$locals = { ...(report.$locals || {}), idempotentReplay: true }
+    return report
   }
   if (!['draft', 'correction_requested'].includes(report.status)) {
     throw new QuranReportError('لا يمكن إرسال هذا التقرير في حالته الحالية', 409)
@@ -119,7 +138,7 @@ async function approveReport(reportId, { adminId }) {
 /** Full read model for one session's report — the canonical, non-duplicated
  * memorization/revision/evaluation data joined in at read time. */
 async function getSessionReportDetail(sessionId) {
-  const [report, memorization, revision] = await Promise.all([
+  const [report, memorization, revision, attendance] = await Promise.all([
     QuranSessionReport.findOne({ sessionId })
       .populate('studentId', 'firstNameAr lastNameAr avatar')
       .populate('teacherId', 'firstNameAr lastNameAr avatar')
@@ -127,10 +146,11 @@ async function getSessionReportDetail(sessionId) {
       .populate('reviewedBy', 'firstNameAr lastNameAr'),
     Memorization.find({ sessionId }).sort({ createdAt: 1 }),
     Revision.find({ sessionId }).sort({ createdAt: 1 }),
+    Attendance.findOne({ sessionId }),
   ])
   if (!report) return null
   const session = await Session.findById(sessionId).select('scheduledAt durationMinutes actualStartAt actualEndAt status teacherAttendanceStatus delayMinutes')
-  return { report, session, memorization, revision }
+  return { report, session, memorization, revision, attendance }
 }
 
 module.exports = { QuranReportError, saveDraft, submitReport, requestCorrection, approveReport, getSessionReportDetail }

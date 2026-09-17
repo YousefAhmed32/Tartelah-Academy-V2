@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState, useId } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Loader2, ShieldAlert,
-  Copy, X, Sparkles, ChevronDown, ChevronUp, Video,
+  Copy, X, ChevronDown, ChevronUp, Video,
 } from 'lucide-react'
 import api from '../../utils/api.js'
+import { academyDateKey } from '../../utils/date.js'
 import TeachingSubjectCombobox from './TeachingSubjectCombobox.jsx'
 import WeekdayChipSelector from './WeekdayChipSelector.jsx'
 import ScheduleSlotPicker from './ScheduleSlotPicker.jsx'
@@ -24,7 +25,7 @@ export function emptySchedule() {
     enabled: false, specialization: '', lessonDurationMinutes: 30,
     frequency: 'weekly',
     selectedDayOfWeeks: [], dayTimes: {}, singleTime: '16:00',
-    startDate: new Date().toISOString().slice(0, 10), endDate: '', noEndDate: true,
+    startDate: academyDateKey(new Date()), endDate: '', noEndDate: true,
     teachingType: 'individual', notes: '',
     meetingLink: '', meetingProvider: 'zoom',
     immediateOverride: false, overrideReason: '',
@@ -447,7 +448,7 @@ export default function StudentScheduleSection({
         {/* Suggestions */}
         {suggestions.length > 0 && (
           <div className="rounded-xl bg-violet-50 border border-violet-100 p-3 space-y-2">
-            <div className="text-xs font-bold text-violet-700 flex items-center gap-1.5"><Sparkles size={13} /> جدولة مقترحة</div>
+            <div className="text-xs font-bold text-violet-700 flex items-center gap-1.5"><CalendarClock size={13} /> جدولة مقترحة</div>
             <div className="flex flex-wrap gap-2">
               {suggestions.map((s) => (
                 <button key={s.key} type="button" onClick={() => applySuggestion(s)}

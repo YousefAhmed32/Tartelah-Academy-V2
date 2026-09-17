@@ -1,16 +1,26 @@
 const Subscription = require('../models/Subscription')
 const User = require('../models/User')
+const Session = require('../models/Session')
+const ScheduleRule = require('../models/ScheduleRule')
 const walletService = require('../services/wallet.service')
+const { recordEntry } = require('../services/payrollLedger.service')
 const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 const { createNotification } = require('../services/notification.service')
 
 async function notifyTeacherOfStudentAdjustment(studentId, { titleAr, bodyAr }) {
   try {
+    let teacherId = null
     const activeSub = await Subscription.findOne({ studentId, status: 'active' }).select('teacherId')
     if (activeSub?.teacherId) {
+      teacherId = activeSub.teacherId
+    } else {
+      const activeSchedule = await ScheduleRule.findOne({ studentId, status: 'active' }).select('teacherId')
+      if (activeSchedule?.teacherId) teacherId = activeSchedule.teacherId
+    }
+    if (teacherId) {
       await createNotification({
-        userId: activeSub.teacherId,
+        userId: teacherId,
         titleAr,
         bodyAr,
         type: 'subscription',
@@ -132,6 +142,134 @@ exports.adjustWallet = async (req, res, next) => {
     })
 
     sendSuccess(res, { wallet, transaction }, isDeduction ? 'تم خصم الحصص وتحديث المحفظة بنجاح' : 'تم تعديل الرصيد وتحديث المحفظة بنجاح')
+  } catch (err) { next(err) }
+}
+
+// Admin: record consumed lesson(s) — deducts from student balance, marks as consumed,
+// AND credits the completed session(s) to the assigned teacher's payroll & session records!
+exports.consumeLesson = async (req, res, next) => {
+  try {
+    const { amount, reason, teacherId: customTeacherId, scheduledAt, durationMinutes } = req.body
+    const numAmount = Math.max(1, Number(amount) || 1)
+    if (!reason || !reason.trim()) return sendError(res, 'سبب تسجيل الحصة المستهلكة مطلوب', 400)
+
+    const student = await User.findById(req.params.studentId).select('firstNameAr lastNameAr')
+    if (!student) return sendError(res, 'الطالب غير موجود', 404)
+
+    // Resolve assigned teacher: customTeacherId -> active ScheduleRule (الجدول الدوري) -> active Subscription -> recent ScheduleRule
+    let teacherId = customTeacherId
+    let activeSub = null
+
+    if (!teacherId) {
+      const activeSchedule = await ScheduleRule.findOne({ studentId: req.params.studentId, status: 'active' }).select('teacherId')
+      if (activeSchedule?.teacherId) {
+        teacherId = activeSchedule.teacherId
+      }
+    }
+
+    // Also look up active subscription for session attachment and teacher fallback
+    activeSub = await Subscription.findOne({ studentId: req.params.studentId, status: 'active' }).select('teacherId packageId')
+    if (!teacherId && activeSub?.teacherId) {
+      teacherId = activeSub.teacherId
+    }
+
+    if (!teacherId) {
+      const recentSchedule = await ScheduleRule.findOne({ studentId: req.params.studentId, status: { $ne: 'ended' } }).sort({ createdAt: -1 }).select('teacherId')
+      if (recentSchedule?.teacherId) {
+        teacherId = recentSchedule.teacherId
+      }
+    }
+
+    let teacher = null
+    if (teacherId) {
+      teacher = await User.findById(teacherId).select('firstNameAr lastNameAr salaryPerSession hourlyRate')
+    }
+
+    const { transaction, wallet } = await walletService.applyTransaction({
+      studentId: req.params.studentId,
+      type: 'consumption',
+      amount: -numAmount,
+      reason: reason.trim(),
+      performedByRole: 'admin',
+      performedBy: req.user._id,
+      metadata: { teacherId: teacher?._id, consumedManually: true },
+    })
+
+    const createdSessions = []
+    const sessionDate = scheduledAt ? new Date(scheduledAt) : new Date()
+    const dur = Number(durationMinutes) || 60
+    const sName = `${student.firstNameAr || ''} ${student.lastNameAr || ''}`.trim() || 'الطالب'
+
+    if (teacher) {
+      for (let i = 0; i < numAmount; i++) {
+        const session = await Session.create({
+          studentId: req.params.studentId,
+          teacherId: teacher._id,
+          subscriptionId: activeSub?._id,
+          titleAr: `حصة مستهلكة مسجلة إدارياً (${sName})`,
+          scheduledAt: sessionDate,
+          durationMinutes: dur,
+          status: 'completed',
+          completedAt: sessionDate,
+          subscriptionConsumed: true,
+          subscriptionConsumedAt: sessionDate,
+          payrollStatus: 'payable',
+          teacherAttendanceStatus: 'on_time',
+          notes: reason.trim(),
+        })
+
+        await recordEntry(session, {
+          payrollStatus: 'payable',
+          reason: `حصة مستهلكة مسجلة إدارياً للطالب (${sName}) — ${reason.trim()}`,
+          businessRule: 'manual_consumption',
+          createdBy: req.user._id,
+        }).catch(err => {
+          console.error('[consumeLesson] Error recording payroll entry:', err)
+        })
+
+        createdSessions.push(session._id)
+      }
+    }
+
+    logAction({
+      actorId: req.user._id, actorRole: req.user.role, action: 'wallet.consume_session',
+      entity: 'LessonWallet', entityId: wallet._id,
+      changes: { amount: -numAmount, reason, teacherId: teacher?._id, createdSessions }, ip: req.ip,
+    })
+
+    const tName = teacher ? `${teacher.firstNameAr || ''} ${teacher.lastNameAr || ''}`.trim() : 'المعلم'
+    const unitWord = numAmount === 1 ? 'حصة' : 'حصص'
+
+    // Notify Student
+    await createNotification({
+      userId: req.params.studentId,
+      titleAr: 'تسجيل استهلاك حصة دراسية',
+      bodyAr: `تم تسجيل استهلاك ${numAmount} ${unitWord} من رصيدك — المعلم: ${tName} — السبب: ${reason.trim()} (الرصيد المتبقي: ${wallet.remaining} حصة)`,
+      type: 'subscription',
+      priority: 'medium',
+      actionUrl: '/student/subscription',
+    }).catch(() => {})
+
+    // Notify Teacher
+    if (teacher) {
+      await createNotification({
+        userId: teacher._id,
+        titleAr: 'اعتماد حصة دراسية مكتملة',
+        bodyAr: `تم اعتماد تسجيل ${numAmount} ${unitWord} مكتملة مع الطالب (${sName}) وإضافتها لمستحقاتك — السبب: ${reason.trim()}`,
+        type: 'subscription',
+        priority: 'high',
+        actionUrl: '/teacher/dashboard',
+      }).catch(() => {})
+    }
+
+    // Notify Admins
+    await notifyAdmins({
+      titleAr: `تسجيل حصة مستهلكة: ${sName}`,
+      bodyAr: `تم تسجيل استهلاك ${numAmount} ${unitWord} للطالب (${sName}) واحتسابها للمعلم (${tName}) — السبب: ${reason.trim()}`,
+      actionUrl: `/admin/students/${req.params.studentId}`,
+    })
+
+    sendSuccess(res, { wallet, transaction, createdSessions }, `تم تسجيل ${numAmount} ${unitWord} كمستهلكة واحتسابها للمعلم بنجاح`)
   } catch (err) { next(err) }
 }
 

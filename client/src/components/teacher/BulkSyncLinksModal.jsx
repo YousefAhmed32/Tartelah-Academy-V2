@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Video, Link2, Check, CheckSquare, Square, AlertCircle,
-  ExternalLink, RefreshCw, Users, Sparkles, Search, MonitorPlay,
+  ExternalLink, RefreshCw, Users, History, Search, MonitorPlay,
   Briefcase, Globe,
 } from 'lucide-react'
 import api from '../../utils/api.js'
@@ -321,7 +321,7 @@ export default function BulkSyncLinksModal({
         {availableSavedLinks.length > 0 && (
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-              <Sparkles size={13} className="text-amber-500" />
+              <History size={13} className="text-amber-500" />
               أو اختر من روابطك السابقة المحفوظة:
             </label>
             <div className="flex flex-wrap gap-2">

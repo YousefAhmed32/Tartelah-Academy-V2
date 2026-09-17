@@ -16,7 +16,7 @@ import {
   Users,
   XCircle,
   AlertCircle,
-  Sparkles,
+  Send,
 } from 'lucide-react'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -699,7 +699,7 @@ export default function SurveyPromptModal({
             loading={submitMut.isPending}
             disabled={!isRenewalGate && skipMut.isPending}
             onClick={handleSubmit}
-            icon={<Sparkles size={16} />}
+            icon={<Send size={15} />}
             className="font-bold text-xs sm:text-sm px-5 sm:px-7"
           >
             {isRenewalGate ? 'إرسال ومتابعة التجديد' : 'إرسال التقييم'}
@@ -720,7 +720,7 @@ export default function SurveyPromptModal({
                 ? 'bg-amber-100 text-amber-900 border border-amber-200'
                 : 'bg-violet-100/90 text-violet-800'
             }`}>
-              <Sparkles size={13} className={isRenewalGate ? 'text-amber-600' : 'text-amber-500'} />
+              <Star size={13} className={isRenewalGate ? 'text-amber-600' : 'text-amber-500'} fill="currentColor" />
               <span>{isRenewalGate ? 'خطوة أساسية قبل تجديد الاشتراك' : 'استبيان تجربة التعلّم'}</span>
             </div>
             <h3 className="text-base sm:text-lg font-heading font-extrabold text-slate-900 leading-snug">

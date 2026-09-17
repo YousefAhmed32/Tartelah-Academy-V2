@@ -5,21 +5,18 @@
 // {sessionId} unique index (a $lookup-free "does a report exist" check via
 // an in-memory Set, since a day/week's session count is always small).
 const mongoose = require('mongoose')
-const { toZonedTime } = require('date-fns-tz')
 const Session = require('../models/Session')
 const QuranSessionReport = require('../models/QuranSessionReport')
 const User = require('../models/User')
 const { getAcademyTimezone } = require('./academySettings.service')
+const { academyDayBounds } = require('../utils/academyDateTime')
 
 function toObjectId(id) { return new mongoose.Types.ObjectId(id) }
 
 /** Academy-timezone day boundaries for "today" (or a given date). */
 async function dayBoundsInAcademyTz(date = new Date()) {
   const timezone = await getAcademyTimezone()
-  const zoned = toZonedTime(date, timezone)
-  const start = new Date(zoned.getFullYear(), zoned.getMonth(), zoned.getDate())
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
-  return { start, end, timezone }
+  return academyDayBounds(date, timezone)
 }
 
 /** Which of these sessionIds already have a report at/past `submitted`. */
@@ -38,7 +35,7 @@ async function reportedSessionIdSet(sessionIds) {
  */
 async function getTeacherDailyProgress(teacherId, date = new Date()) {
   const { start, end } = await dayBoundsInAcademyTz(date)
-  const sessions = await Session.find({ teacherId, status: 'completed', scheduledAt: { $gte: start, $lt: end } })
+  const sessions = await Session.find({ teacherId, status: 'completed', quranReportRequired: { $ne: false }, scheduledAt: { $gte: start, $lt: end } })
     .select('studentId scheduledAt').populate('studentId', 'firstNameAr lastNameAr avatar').sort({ scheduledAt: 1 })
   const reported = await reportedSessionIdSet(sessions.map((s) => s._id))
   const missing = sessions.filter((s) => !reported.has(String(s._id)))
@@ -54,7 +51,7 @@ async function getTeacherOverdueReports(teacherId, { minAgeHours = 24 } = {}) {
   const now = new Date()
   const cutoff = new Date(now.getTime() - minAgeHours * 60 * 60 * 1000)
   const windowStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000) // bounded lookback
-  const sessions = await Session.find({ teacherId, status: 'completed', scheduledAt: { $gte: windowStart, $lte: cutoff } })
+  const sessions = await Session.find({ teacherId, status: 'completed', quranReportRequired: { $ne: false }, scheduledAt: { $gte: windowStart, $lte: cutoff } })
     .select('studentId scheduledAt').populate('studentId', 'firstNameAr lastNameAr avatar').sort({ scheduledAt: -1 })
   const reported = await reportedSessionIdSet(sessions.map((s) => s._id))
   return sessions.filter((s) => !reported.has(String(s._id)))
@@ -82,7 +79,7 @@ async function getAdminReportOverview({ from, to, teacherId, studentId } = {}) {
   const conducted = (counts.completed || 0) + (counts.no_show || 0)
   const attendanceCompleted = counts.completed || 0 // teacherAttendanceStatus is only meaningfully resolved on 'completed'/'no_show'; completed = the attendance-relevant bucket for reporting purposes
 
-  const completedSessions = await Session.find({ ...match, status: 'completed' }).select('_id')
+  const completedSessions = await Session.find({ ...match, status: 'completed', quranReportRequired: { $ne: false } }).select('_id')
   const reported = await reportedSessionIdSet(completedSessions.map((s) => s._id))
 
   return {
@@ -109,7 +106,7 @@ async function getTeachersWithOverdueReports({ minAgeHours = 24 } = {}) {
 async function getMonthlyCompletionRatio({ teacherId, year, month } = {}) {
   const from = new Date(year, month - 1, 1)
   const to = new Date(year, month, 0, 23, 59, 59, 999)
-  const filter = { status: 'completed', scheduledAt: { $gte: from, $lte: to } }
+  const filter = { status: 'completed', quranReportRequired: { $ne: false }, scheduledAt: { $gte: from, $lte: to } }
   if (teacherId) filter.teacherId = toObjectId(teacherId)
   const completedSessions = await Session.find(filter).select('_id')
   const reported = await reportedSessionIdSet(completedSessions.map((s) => s._id))

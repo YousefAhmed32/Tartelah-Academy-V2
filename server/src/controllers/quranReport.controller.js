@@ -30,13 +30,15 @@ exports.submitReport = async (req, res, next) => {
   try {
     const { memorization, revision, ...fields } = req.body
     const report = await reportService.submitReport(req.params.sessionId, { teacherId: req.user._id, fields, memorization, revision })
-    logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'quranReport.submit', entity: 'QuranSessionReport', entityId: report._id, ip: req.ip })
+    if (!report.$locals?.idempotentReplay) {
+      logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'quranReport.submit', entity: 'QuranSessionReport', entityId: report._id, ip: req.ip })
 
-    const admins = await User.find({ role: 'admin', isActive: true }).select('_id')
-    await createNotifications(admins.map((a) => ({
-      userId: a._id, titleAr: 'تقرير حصة جديد', bodyAr: 'أرسل معلم تقرير حصة قرآنية جديد',
-      type: 'report', relatedId: report._id, actionUrl: '/admin/quran-reports',
-    }))).catch(() => {})
+      const admins = await User.find({ role: 'admin', isActive: true }).select('_id')
+      await createNotifications(admins.map((a) => ({
+        userId: a._id, titleAr: 'تقرير حصة جديد', bodyAr: 'أرسل معلم تقرير حصة قرآنية جديد',
+        type: 'report', relatedId: report._id, actionUrl: '/admin/quran-reports',
+      }))).catch(() => {})
+    }
 
     sendSuccess(res, report, 'تم إرسال التقرير')
   } catch (err) { handleKnownError(err, res, next) }

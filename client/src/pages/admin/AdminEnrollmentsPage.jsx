@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   ClipboardList, Check, CalendarClock, CalendarDays, CheckCircle2,
-  UserCheck, MessageSquare, Copy, Sparkles, Send, ShieldAlert,
+  UserCheck, MessageSquare, Copy, CalendarPlus, Send, ShieldAlert,
   ChevronDown, ChevronUp, AlertCircle, Clock,
 } from 'lucide-react'
 import api from '../../utils/api.js'
@@ -14,7 +14,7 @@ import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
-import { formatDateAr } from '../../utils/date.js'
+import { academyDateKey, formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
 import PrivateImage from '../../components/ui/PrivateImage.jsx'
 import StudentScheduleSection, { emptySchedule } from '../../components/ui/StudentScheduleSection.jsx'
@@ -111,7 +111,7 @@ export default function AdminEnrollmentsPage() {
     initSched.enabled = false
     initSched.specialization = 'quran'
     initSched.lessonDurationMinutes = 45
-    initSched.startDate = new Date().toISOString().slice(0, 10)
+    initSched.startDate = academyDateKey(new Date())
     setSchedule(initSched)
 
     setCustomMessage('')
@@ -554,7 +554,7 @@ export default function AdminEnrollmentsPage() {
                     >
                       <div className="flex items-center justify-between w-full mb-1">
                         <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                          <Sparkles size={14} className="text-emerald-600" /> جدولة مباشرة فورية
+                          <CalendarPlus size={14} className="text-emerald-600" /> جدولة مباشرة فورية
                         </span>
                         <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                           scheduleMode === 'direct' ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300'

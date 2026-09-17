@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   ArrowLeftRight, AlertTriangle, CheckCircle2, XCircle, Loader2, RotateCcw, Ban, Users,
-  History, Sparkles, Search, Calendar, Clock, ShieldCheck, Check, ArrowRight, RefreshCw,
+  History, Search, Calendar, Clock, ShieldCheck, Check, ArrowRight, RefreshCw,
   Info, ChevronLeft, Filter, CheckSquare, Square, UserCheck,
 } from 'lucide-react'
 import PageHeader from '../../components/shared/PageHeader.jsx'
@@ -85,7 +85,7 @@ function MainReplacementView() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Sparkles size={15} />
+            <UserCheck size={15} />
             بدء استبدال جديد
           </button>
           <button
@@ -530,7 +530,7 @@ function SetupStep({ onGoToHistory }) {
               <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-4">
                 <div>
                   <h3 className="font-heading font-bold text-sm text-gray-800 flex items-center gap-2">
-                    <Sparkles size={16} className="text-violet-600" />
+                    <Users size={16} className="text-violet-600" />
                     معاينة الطلاب المتأثرين ({preview.summary.total} طالب)
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">
@@ -813,7 +813,7 @@ function BatchHistoryStep({ onNewReplacement }) {
               يمكنك متابعة حالة أي دفعة سابقة، استئناف الدفعات المسودة، أو إعادة محاولة الطلاب المتعثرين
             </p>
           </div>
-          <Button variant="purple" size="sm" icon={<Sparkles size={14} />} onClick={onNewReplacement}>
+          <Button variant="purple" size="sm" icon={<UserCheck size={14} />} onClick={onNewReplacement}>
             بدء استبدال جديد
           </Button>
         </div>

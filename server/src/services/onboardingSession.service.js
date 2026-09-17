@@ -217,6 +217,7 @@ async function saveStudentToSession({ sessionId, clientRequestId, student, actor
         studentId: studentDoc._id, packageId: student.package.packageId, teacherId: teacher._id,
         startDate: student.package.startDate, notes: student.package.notes,
         lessonsUsed: student.package.lessonsUsed, lessonsRemaining: student.package.lessonsRemaining,
+        durationMinutes: Number(student.lessonDurationMinutes || student.schedule?.lessonDurationMinutes) || 60,
         actorId, actorRole,
       })
     }

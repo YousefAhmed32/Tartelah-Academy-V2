@@ -9,6 +9,7 @@ const Revision = require('../models/Revision')
 const EnrollmentRequest = require('../models/EnrollmentRequest')
 const ScheduleRule = require('../models/ScheduleRule')
 const Notification = require('../models/Notification')
+const QuranSessionReport = require('../models/QuranSessionReport')
 const scheduleService = require('../services/schedule.service')
 const { createNotification } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
@@ -29,6 +30,8 @@ const walletService = require('../services/wallet.service')
 const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
 const { resolveDatePreset } = require('../utils/datePresets')
 const { cleanEmail } = require('../utils/arabicNormalize')
+const { getAcademyTimezone } = require('../services/academySettings.service')
+const { academyDateKey, academyDateKeyBounds, academyDayBounds, academyMonthBounds } = require('../utils/academyDateTime')
 const crypto = require('crypto')
 
 const MONTHS_AR_SHORT = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -57,9 +60,10 @@ function buildMonthSeries(aggResult, monthsBack, now = new Date()) {
 exports.getDashboardStats = async (req, res, next) => {
   try {
     const now = new Date()
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const timezone = await getAcademyTimezone()
+    const { start: today, end: todayEnd } = academyDayBounds(now, timezone)
+    const [academyYear, academyMonth] = academyDateKey(now, timezone).split('-').map(Number)
+    const { start: monthStart } = academyMonthBounds(academyYear, academyMonth, timezone)
 
     const [
       totalStudents, totalTeachers, activeSubscriptions, pendingEnrollments, sessionStats,
@@ -71,12 +75,12 @@ exports.getDashboardStats = async (req, res, next) => {
       Subscription.countDocuments({ status: 'active' }),
       EnrollmentRequest.countDocuments({ status: { $in: ['pending', 'under_review'] } }),
       Session.aggregate([
-        { $group: { _id: null, total: { $sum: 1 }, todayCount: { $sum: { $cond: [{ $and: [{ $gte: ['$scheduledAt', today] }, { $lte: ['$scheduledAt', todayEnd] }] }, 1, 0] } } } }
+        { $group: { _id: null, total: { $sum: 1 }, todayCount: { $sum: { $cond: [{ $and: [{ $gte: ['$scheduledAt', today] }, { $lt: ['$scheduledAt', todayEnd] }] }, 1, 0] } } } }
       ]),
       User.find({ isActive: true }).sort({ createdAt: -1 }).limit(8).select('firstNameAr lastNameAr email avatar role createdAt'),
-      Session.find({ scheduledAt: { $gte: today, $lte: todayEnd }, status: { $in: ['scheduled', 'ongoing'] } })
-        .sort({ scheduledAt: 1 }).limit(10)
-        .populate('studentId teacherId', 'firstNameAr lastNameAr avatar'),
+      Session.find({ scheduledAt: { $gte: today, $lt: todayEnd } })
+        .sort({ scheduledAt: 1 }).limit(20)
+        .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email phone'),
       // Ungraded homework submissions across all assignments — a teacher-grading
       // backlog signal that previously had no admin-visible surface at all.
       Homework.aggregate([
@@ -106,6 +110,59 @@ exports.getDashboardStats = async (req, res, next) => {
       ]),
     ])
 
+    // Fetch reports and student attendance for today's sessions
+    const todaySessionIds = upcomingSessions.map(s => s._id)
+    const [sessionReports, attendances] = await Promise.all([
+      QuranSessionReport.find({ sessionId: { $in: todaySessionIds } })
+        .select('sessionId status submittedAt tajweedNotes generalEvaluation')
+        .lean(),
+      Attendance.find({ sessionId: { $in: todaySessionIds } })
+        .select('sessionId studentId teacherId status notes arrivalTime isFinalized')
+        .lean(),
+    ])
+    const reportMap = new Map(sessionReports.map(r => [r.sessionId.toString(), r]))
+    const attendanceMap = new Map(attendances.map(a => [a.sessionId.toString(), a]))
+
+    const enrichedUpcomingSessions = upcomingSessions.map(s => {
+      const sObj = s.toObject ? s.toObject() : s
+      const rep = reportMap.get(s._id.toString())
+      const att = attendanceMap.get(s._id.toString())
+      const schedTime = new Date(s.scheduledAt).getTime()
+      const nowTime = now.getTime()
+
+      const isLate = s.status === 'scheduled' && !s.teacherStartedAt && (nowTime > schedTime + 5 * 60000)
+      const lateMinutes = isLate ? Math.floor((nowTime - schedTime) / 60000) : (s.teacherLateMinutes || 0)
+      const ongoingMinutes = s.status === 'ongoing'
+        ? Math.max(1, Math.floor((nowTime - new Date(s.teacherStartedAt || s.actualStartAt || s.scheduledAt).getTime()) / 60000))
+        : 0
+
+      // Compute student attendance status accurately
+      let studentAttendanceStatus = att?.status
+      if (!studentAttendanceStatus) {
+        if (s.status === 'completed') studentAttendanceStatus = 'present'
+        else if (s.status === 'no_show' || s.outcome === 'no_students_attended') studentAttendanceStatus = 'absent'
+        else if (s.status === 'cancelled') studentAttendanceStatus = 'excused'
+        else studentAttendanceStatus = 'pending'
+      }
+
+      return {
+        ...sObj,
+        attendance: att || null,
+        studentAttendanceStatus,
+        report: rep ? {
+          status: rep.status,
+          submittedAt: rep.submittedAt,
+          generalEvaluation: rep.generalEvaluation,
+        } : null,
+        hasReport: !!rep,
+        isReportSubmitted: ['submitted', 'approved'].includes(rep?.status),
+        isTeacherStarted: !!s.teacherStartedAt,
+        isLate,
+        lateMinutes,
+        ongoingMinutes,
+      }
+    })
+
     const revenue = await Subscription.aggregate([
       { $group: { _id: null, total: { $sum: '$amountPaid' }, thisMonth: { $sum: { $cond: [{ $gte: ['$createdAt', monthStart] }, '$amountPaid', 0] } } } }
     ])
@@ -125,7 +182,7 @@ exports.getDashboardStats = async (req, res, next) => {
       totalRevenue: revenue[0]?.total || 0,
       totalSessions: sessionStats[0]?.total || 0,
       sessionsToday: sessionStats[0]?.todayCount || 0,
-      recentRegistrations, upcomingSessions,
+      recentRegistrations, upcomingSessions: enrichedUpcomingSessions,
       studentsClosingPackage, studentsClosingPackageCount,
       thisMonth: {
         completedSessions: monthStats.completedSessions || 0,
@@ -282,7 +339,7 @@ exports.getReports = async (req, res, next) => {
 exports.getStudents = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
-    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
+    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone'])
     const filter = { role: 'student', ...searchFilter }
     if (req.query.status === 'active') filter.isActive = true
     if (req.query.status === 'inactive') filter.isActive = false
@@ -360,7 +417,7 @@ exports.deleteStudent = async (req, res, next) => {
 exports.getTeachers = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
-    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'email'])
+    const searchFilter = buildSearchFilter(req.query.search, ['firstNameAr', 'lastNameAr', 'firstName', 'lastName', 'email', 'phone'])
     const filter = { role: 'teacher' }
     if (req.query.status === 'active') filter.isActive = true
     if (req.query.status === 'inactive') filter.isActive = false
@@ -660,8 +717,8 @@ exports.adminResetPassword = async (req, res, next) => {
 
 exports.getSessionStats = async (req, res, next) => {
   try {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+    const timezone = await getAcademyTimezone()
+    const { start: today, end: todayEnd } = academyDayBounds(new Date(), timezone)
 
     const [stats] = await Session.aggregate([
       {
@@ -669,15 +726,15 @@ exports.getSessionStats = async (req, res, next) => {
           totalSessions: [{ $count: 'count' }],
           totalCompleted: [{ $match: { status: 'completed' } }, { $count: 'count' }],
           todayTotal: [
-            { $match: { scheduledAt: { $gte: today, $lte: todayEnd } } },
+            { $match: { scheduledAt: { $gte: today, $lt: todayEnd } } },
             { $count: 'count' },
           ],
           todayCompleted: [
-            { $match: { scheduledAt: { $gte: today, $lte: todayEnd }, status: 'completed' } },
+            { $match: { scheduledAt: { $gte: today, $lt: todayEnd }, status: 'completed' } },
             { $count: 'count' },
           ],
           todayScheduled: [
-            { $match: { scheduledAt: { $gte: today, $lte: todayEnd }, status: { $in: ['scheduled', 'ongoing'] } } },
+            { $match: { scheduledAt: { $gte: today, $lt: todayEnd }, status: { $in: ['scheduled', 'ongoing'] } } },
             { $count: 'count' },
           ],
           needsAction: [
@@ -741,11 +798,15 @@ exports.getAllSessions = async (req, res, next) => {
 
     if (req.query.dateFrom || req.query.dateTo) {
       filter.scheduledAt = {}
-      if (req.query.dateFrom) filter.scheduledAt.$gte = new Date(req.query.dateFrom)
+      const timezone = await getAcademyTimezone()
+      if (req.query.dateFrom) {
+        const bounds = academyDateKeyBounds(req.query.dateFrom, timezone)
+        filter.scheduledAt.$gte = bounds ? bounds.start : new Date(req.query.dateFrom)
+      }
       if (req.query.dateTo) {
-        const dTo = new Date(req.query.dateTo)
-        dTo.setHours(23, 59, 59, 999)
-        filter.scheduledAt.$lte = dTo
+        const bounds = academyDateKeyBounds(req.query.dateTo, timezone)
+        if (bounds) filter.scheduledAt.$lt = bounds.end
+        else filter.scheduledAt.$lte = new Date(req.query.dateTo)
       }
     } else if (req.query.upcoming === 'true') {
       filter.scheduledAt = { $gte: new Date() }
@@ -756,7 +817,40 @@ exports.getAllSessions = async (req, res, next) => {
         .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email phone studentType'),
       Session.countDocuments(filter),
     ])
-    sendPaginated(res, data, total, page, limit)
+
+    const sessionIds = data.map(s => s._id)
+    const [attendances, reports] = await Promise.all([
+      Attendance.find({ sessionId: { $in: sessionIds } }).lean(),
+      QuranSessionReport.find({ sessionId: { $in: sessionIds } }).select('sessionId status generalEvaluation submittedAt').lean(),
+    ])
+
+    const attMap = new Map(attendances.map(a => [a.sessionId.toString(), a]))
+    const repMap = new Map(reports.map(r => [r.sessionId.toString(), r]))
+
+    const enrichedData = data.map(s => {
+      const sObj = s.toObject ? s.toObject() : s
+      const att = attMap.get(s._id.toString())
+      const rep = repMap.get(s._id.toString())
+
+      let studentAttendanceStatus = att?.status
+      if (!studentAttendanceStatus) {
+        if (s.status === 'completed') studentAttendanceStatus = 'present'
+        else if (s.status === 'no_show' || s.outcome === 'no_students_attended') studentAttendanceStatus = 'absent'
+        else if (s.status === 'cancelled') studentAttendanceStatus = 'excused'
+        else studentAttendanceStatus = 'pending'
+      }
+
+      return {
+        ...sObj,
+        attendance: att || null,
+        studentAttendanceStatus,
+        report: rep || null,
+        hasReport: !!rep,
+        isReportSubmitted: ['submitted', 'approved'].includes(rep?.status),
+      }
+    })
+
+    sendPaginated(res, enrichedData, total, page, limit)
   } catch (err) { next(err) }
 }
 
@@ -765,14 +859,48 @@ exports.getAllSessions = async (req, res, next) => {
 exports.getStudentAcademics = async (req, res, next) => {
   try {
     const studentId = req.params.studentId
-    const [evaluations, attendance, homework, memorization, revision] = await Promise.all([
-      Evaluation.find({ studentId }).sort({ createdAt: -1 }).populate('teacherId', 'firstNameAr lastNameAr'),
+    const [evaluations, attendance, homework, memorization, revision, sessions, quranReports] = await Promise.all([
+      Evaluation.find({ studentId }).sort({ createdAt: -1 }).populate('teacherId', 'firstNameAr lastNameAr avatar'),
       Attendance.find({ studentId }).sort({ createdAt: -1 }).populate('sessionId', 'titleAr scheduledAt'),
       Homework.find({ assignedTo: studentId }).sort({ dueDate: -1 }),
-      Memorization.find({ studentId }).sort({ createdAt: -1 }).limit(20),
-      Revision.find({ studentId }).sort({ createdAt: -1 }).limit(20),
+      Memorization.find({ studentId }).sort({ createdAt: -1 }).limit(50),
+      Revision.find({ studentId }).sort({ createdAt: -1 }).limit(50),
+      Session.find({ studentId }).sort({ scheduledAt: -1 }).limit(100).populate('teacherId', 'firstNameAr lastNameAr avatar'),
+      QuranSessionReport.find({ studentId }).sort({ createdAt: -1 }).limit(100).populate('teacherId', 'firstNameAr lastNameAr avatar').populate('reviewedBy', 'firstNameAr lastNameAr'),
     ])
-    sendSuccess(res, { evaluations, attendance, homework, memorization, revision })
+
+    // Map attendance and reports by sessionId for fast consolidation
+    const attMap = {}
+    attendance.forEach(a => {
+      const sId = a.sessionId?._id?.toString() || a.sessionId?.toString()
+      if (sId) attMap[sId] = a
+    })
+
+    const repMap = {}
+    quranReports.forEach(r => {
+      const sId = r.sessionId?.toString()
+      if (sId) repMap[sId] = r
+    })
+
+    // Consolidated chronological stream of sessions with their attendance & Quran reports
+    const consolidatedSessions = sessions.map(s => {
+      const sObj = s.toObject ? s.toObject() : { ...s }
+      const sId = s._id.toString()
+      sObj.attendance = attMap[sId] || null
+      sObj.report = repMap[sId] || null
+      return sObj
+    })
+
+    sendSuccess(res, {
+      evaluations,
+      attendance,
+      homework,
+      memorization,
+      revision,
+      sessions,
+      quranReports,
+      consolidatedSessions,
+    })
   } catch (err) { next(err) }
 }
 
@@ -869,12 +997,13 @@ exports.createScheduleRule = async (req, res, next) => {
       teacherId, studentId, subscriptionId, frequency, daysOfWeek, timeOfDay,
       durationMinutes, startDate, endDate, sessionsTotal,
       meetingLink, meetingProvider, titleTemplate, notes,
-      packageId, subscriptionDays, subscriptionEndDate, lessonsRemaining,
+      packageId, subscriptionDays, subscriptionEndDate, lessonsRemaining, lessonsUsed,
     } = req.body
 
     if (!teacherId) return sendError(res, 'يجب تحديد المعلم عند إنشاء الجدول', 400)
     if (!studentId) return sendError(res, 'يجب تحديد الطالب عند إنشاء الجدول', 400)
     if (!startDate) return sendError(res, 'تاريخ البدء مطلوب', 400)
+    const timezone = req.body.timezone || await getAcademyTimezone()
 
     const [teacherUser, studentUser] = await Promise.all([
       User.findById(teacherId).select('firstNameAr lastNameAr meetingLinks'),
@@ -895,6 +1024,8 @@ exports.createScheduleRule = async (req, res, next) => {
       const subDays = Number(subscriptionDays) || undefined
       const subEnd = subscriptionEndDate ? new Date(subscriptionEndDate) : undefined
 
+      const hasLessonsUsed = lessonsUsed !== undefined && lessonsUsed !== null && lessonsUsed !== '' && Number(lessonsUsed) >= 0
+
       createdSubResult = await createSubscriptionWithOpeningBalance({
         studentId,
         packageId,
@@ -903,7 +1034,9 @@ exports.createScheduleRule = async (req, res, next) => {
         endDate: subEnd,
         remainingDays: subDays,
         notes: notes || 'اشتراك تم تفعيله تلقائياً مع إنشاء الجدول الدوري',
-        lessonsRemaining: lessonsRemaining !== undefined ? Number(lessonsRemaining) : undefined,
+        lessonsUsed: hasLessonsUsed ? Number(lessonsUsed) : undefined,
+        lessonsRemaining: !hasLessonsUsed && lessonsRemaining !== undefined ? Number(lessonsRemaining) : undefined,
+        durationMinutes: Number(durationMinutes) || 60,
         actorId: req.user._id,
         actorRole: 'admin',
       })
@@ -948,6 +1081,7 @@ exports.createScheduleRule = async (req, res, next) => {
       meetingProvider: resolvedMeetingProvider,
       titleTemplate: titleTemplate || defaultTitle,
       notes,
+      timezone,
     })
 
     const sessions = await scheduleService.generateSessionsFromRule(rule)

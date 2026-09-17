@@ -5,8 +5,8 @@ import toast from 'react-hot-toast'
 import {
   ArrowRight, Star, CheckCircle, XCircle, Clock, Edit2, Trash2, ArrowLeftRight,
   Mail, Phone, Calendar, User, KeyRound, Power, PowerOff, LayoutGrid, Wallet, BookOpen,
-  StickyNote, MessageCircle, Gift, RefreshCw, Eye, Sparkles, SlidersHorizontal,
-  CalendarClock, ExternalLink, AlertTriangle, Plus,
+  StickyNote, MessageCircle, Gift, RefreshCw, Eye, SlidersHorizontal,
+  CalendarClock, ExternalLink, AlertTriangle, Plus, Search, X, Compass, CheckCircle2,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Badge from '../../components/ui/Badge.jsx'
@@ -32,10 +32,10 @@ import { useAuthStore } from '../../store/authStore.js'
 const inputCls = 'w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all'
 const labelCls = 'text-xs font-bold text-gray-500 mb-1 block'
 
-const ACADEMIC_TAB_KEYS = ['sessions', 'evaluations', 'attendance', 'homework', 'memorization', 'revision', 'quranReports']
+const ACADEMIC_TAB_KEYS = ['quranReports', 'evaluations']
 const ACADEMIC_TAB_LABELS = {
-  sessions: 'الحصص', evaluations: 'التقييمات', attendance: 'الحضور', homework: 'الواجبات',
-  memorization: 'الحفظ', revision: 'المراجعة', quranReports: 'تقارير الحلقات',
+  quranReports: 'سجل تقارير الحلقات المدمج (الحصص والحضور والواجبات والإنجاز)',
+  evaluations: 'التقييمات والاختبارات الدورية',
 }
 
 const SESSION_STATUS_CFG = {
@@ -383,7 +383,7 @@ function OverviewTab({ student, assignedTeacher, subscription }) {
 
 // ── Subscription & Wallet tab ────────────────────────────────────────────────
 
-function SubscriptionWalletTab({ studentId, student, subscription, enrollmentRequests }) {
+function SubscriptionWalletTab({ studentId, student, subscription, enrollmentRequests, assignedTeacher }) {
   const [walletOpsOpen, setWalletOpsOpen] = useState(false)
   const [renewalOpen, setRenewalOpen] = useState(false)
   const qc = useQueryClient()
@@ -422,7 +422,7 @@ function SubscriptionWalletTab({ studentId, student, subscription, enrollmentReq
           <Button
             variant="purple"
             size="sm"
-            icon={<Sparkles size={14} />}
+            icon={<RefreshCw size={14} />}
             onClick={() => setRenewalOpen(true)}
             className="flex-1 sm:flex-none"
           >
@@ -491,6 +491,8 @@ function SubscriptionWalletTab({ studentId, student, subscription, enrollmentReq
           studentId={studentId}
           studentName={student ? `${student.firstNameAr} ${student.lastNameAr}` : 'الطالب'}
           currentWallet={wallet}
+          assignedTeacher={assignedTeacher || subscription?.teacherId}
+          subscription={subscription}
         />
       )}
 
@@ -512,36 +514,90 @@ function SubscriptionWalletTab({ studentId, student, subscription, enrollmentReq
 // ── Academic tab (existing sessions/evaluations/attendance/... content) ─────
 
 function AcademicTab({ studentId, recentSessions, academics, academicsLoading }) {
-  const [subTab, setSubTab] = useState('evaluations')
+  const [subTab, setSubTab] = useState('quranReports')
+  const [reportFilter, setReportFilter] = useState('all') // 'all' | 'approved' | 'submitted' | 'missing' | 'scheduled'
+  const [searchQuery, setSearchQuery] = useState('')
   const [editEv, setEditEv] = useState(null)
   const [editAtt, setEditAtt] = useState(null)
   const [selectedQuranReport, setSelectedQuranReport] = useState(null)
   const qc = useQueryClient()
+
   const deleteEvMut = useMutation({
     mutationFn: (evId) => api.delete(`/admin/evaluations/${evId}`),
-    onSuccess: () => { toast.success('تم حذف التقييم'); qc.invalidateQueries({ queryKey: ['admin', 'student', 'academics'] }) },
+    onSuccess: () => {
+      toast.success('تم حذف التقييم')
+      qc.invalidateQueries({ queryKey: ['admin', 'student', 'academics'] })
+    },
     onError: () => toast.error('خطأ في الحذف'),
   })
 
   const evalList = academics?.evaluations || []
-  const attList = academics?.attendance || []
-  const hwList = academics?.homework || []
-  const memList = academics?.memorization || []
-  const revList = academics?.revision || []
+  const rawConsolidated = academics?.consolidatedSessions || []
 
-  const { data: quranReportsData } = useQuery({
-    queryKey: ['admin', 'student', studentId, 'quran-reports'],
-    queryFn: () => quranReportService.getAllReports({ studentId, limit: 20 }).then(r => r.data.data),
-    enabled: subTab === 'quranReports',
+  // Combine consolidated sessions with any standalone Quran reports
+  const sessionReportIds = new Set(rawConsolidated.map(s => s.report?._id?.toString()).filter(Boolean))
+  const standaloneReports = (academics?.quranReports || [])
+    .filter(r => r?._id && !sessionReportIds.has(r._id?.toString()))
+    .map(r => ({
+      _id: `rep-${r._id}`,
+      scheduledAt: r.sessionId?.scheduledAt || r.createdAt,
+      durationMinutes: r.sessionId?.durationMinutes || 60,
+      status: 'completed',
+      teacherId: r.teacherId,
+      attendance: null,
+      report: r,
+    }))
+
+  const allConsolidated = [...rawConsolidated, ...standaloneReports].sort((a, b) => {
+    return new Date(b.scheduledAt || 0) - new Date(a.scheduledAt || 0)
   })
-  const quranReportsList = quranReportsData?.reports || []
+
+  // Filter options
+  const filterCounts = {
+    all: allConsolidated.length,
+    approved: allConsolidated.filter(s => s.report?.status === 'approved').length,
+    submitted: allConsolidated.filter(s => s.report?.status === 'submitted').length,
+    missing: allConsolidated.filter(s => s.status === 'completed' && !s.report).length,
+    scheduled: allConsolidated.filter(s => s.status === 'scheduled').length,
+  }
+
+  const filteredList = allConsolidated.filter(s => {
+    if (reportFilter === 'approved' && s.report?.status !== 'approved') return false
+    if (reportFilter === 'submitted' && s.report?.status !== 'submitted') return false
+    if (reportFilter === 'missing' && !(s.status === 'completed' && !s.report)) return false
+    if (reportFilter === 'scheduled' && s.status !== 'scheduled') return false
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      const tName = `${s.teacherId?.firstNameAr || ''} ${s.teacherId?.lastNameAr || ''}`.toLowerCase()
+      const rec = (s.report?.todayRecitation || '').toLowerCase()
+      const rev = (s.report?.todayRevision || '').toLowerCase()
+      const nextR = (s.report?.nextRecitation || '').toLowerCase()
+      const notes = (s.report?.parentNotes || '').toLowerCase()
+      return tName.includes(q) || rec.includes(q) || rev.includes(q) || nextR.includes(q) || notes.includes(q)
+    }
+    return true
+  })
+
+  const RATING_STYLE = {
+    'ممتاز': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'جيد جدًا': 'bg-blue-50 text-blue-700 border-blue-200',
+    'جيد': 'bg-amber-50 text-amber-700 border-amber-200',
+    'يحتاج متابعة': 'bg-rose-50 text-rose-700 border-rose-200',
+  }
 
   return (
-    <div>
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-5 overflow-x-auto max-w-full no-scrollbar">
+    <div className="space-y-5">
+      {/* Sub Tabs Selector */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit overflow-x-auto max-w-full no-scrollbar">
         {ACADEMIC_TAB_KEYS.map(k => (
-          <button key={k} onClick={() => setSubTab(k)}
-            className={`px-4 py-1.5 rounded-[10px] text-sm font-semibold whitespace-nowrap transition-all ${subTab === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+          <button
+            key={k}
+            onClick={() => setSubTab(k)}
+            className={`px-4 py-2 rounded-[10px] text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+              subTab === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
             {ACADEMIC_TAB_LABELS[k]}
           </button>
         ))}
@@ -551,49 +607,366 @@ function AcademicTab({ studentId, recentSessions, academics, academicsLoading })
         <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
       ) : (
         <>
-          {subTab === 'sessions' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {recentSessions.length === 0 ? <div className="text-center py-12 text-gray-500">لا توجد حصص مسجلة بعد</div> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
-                    <thead><tr className="border-b border-gray-100">{['التاريخ', 'المعلم', 'الحالة', 'المدة'].map(h => <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
-                    <tbody>
-                      {recentSessions.map(s => {
-                        const cfg = SESSION_STATUS_CFG[s.status] || { label: s.status, badge: 'gray' }
-                        return (
-                          <tr key={s._id} className="border-b border-gray-50 hover:bg-gray-50/60">
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateTimeAr(s.scheduledAt)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-800">{s.teacherId?.firstNameAr} {s.teacherId?.lastNameAr}</td>
-                            <td className="px-4 py-3"><Badge variant={cfg.badge}>{cfg.label}</Badge></td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{s.durationMinutes || 60} دقيقة</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+          {/* SubTab 1: Consolidated Quran Sessions & Reports Feed */}
+          {subTab === 'quranReports' && (
+            <div className="space-y-4">
+              {/* Search & Filter Toolbar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Filter Chips */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {[
+                    { key: 'all', label: 'الكل', count: filterCounts.all },
+                    { key: 'approved', label: 'معتمد ✓', count: filterCounts.approved, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                    { key: 'submitted', label: 'بانتظار المراجعة', count: filterCounts.submitted, color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                    { key: 'missing', label: 'لم يُرسل التقرير ⚠️', count: filterCounts.missing, color: 'text-rose-700 bg-rose-50 border-rose-200' },
+                    { key: 'scheduled', label: 'الحصص القادمة', count: filterCounts.scheduled, color: 'text-violet-700 bg-violet-50 border-violet-200' },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setReportFilter(tab.key)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                        reportFilter === tab.key
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-mono ${
+                        reportFilter === tab.key ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Instant Search Bar */}
+                <div className="relative w-full sm:w-64 flex-none">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="بحث بالمعلم، السورة، الملاحظات..."
+                    className="w-full h-9 bg-white border border-gray-200 rounded-xl ps-8 pe-8 text-xs text-gray-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all placeholder:text-gray-400"
+                  />
+                  <Search size={14} className="text-gray-400 absolute start-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute end-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="مسح البحث"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Feed of Sessions & Reports */}
+              {filteredList.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 text-gray-400 mx-auto flex items-center justify-center mb-3">
+                    <BookOpen size={24} />
+                  </div>
+                  <h4 className="font-bold text-gray-800 text-sm mb-1">لا توجد حصص أو تقارير مطابقة</h4>
+                  <p className="text-xs text-gray-400">لم يتم العثور على سجلات في هذا التصنيف حالياً</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredList.map((s) => {
+                    const sessionCfg = SESSION_STATUS_CFG[s.status] || { label: s.status, badge: 'gray' }
+                    const rep = s.report
+                    const att = s.attendance
+                    const teacherName = s.teacherId ? `${s.teacherId.firstNameAr || ''} ${s.teacherId.lastNameAr || ''}`.trim() : 'غير محدد'
+
+                    return (
+                      <div
+                        key={s._id}
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-gray-200 transition-all space-y-4"
+                      >
+                        {/* Header: Date, Teacher, Badges */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-violet-50 text-brand-purple flex items-center justify-center flex-shrink-0 font-bold">
+                              <CalendarClock size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-900 text-sm">
+                                  {formatDateTimeAr(s.scheduledAt)}
+                                </span>
+                                <span className="text-xs text-gray-400 font-mono">
+                                  ({s.durationMinutes || 60} دقيقة)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                                <User size={12} className="text-gray-400" />
+                                <span>المعلم: <strong className="text-gray-700">{teacherName}</strong></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status and Badges Cluster */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Attendance Badge */}
+                            {att ? (
+                              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200/80 rounded-lg px-2.5 py-1">
+                                <span className="text-xs font-semibold text-gray-600">
+                                  الحضور: {ATT_CFG[att.status]?.label || att.status}
+                                </span>
+                                <button
+                                  onClick={() => setEditAtt(att)}
+                                  className="text-gray-400 hover:text-violet-600 p-0.5 rounded transition-colors"
+                                  title="تعديل سجل الحضور"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
+                            ) : s.status === 'completed' ? (
+                              <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                                الحضور: لم يُسجل
+                              </span>
+                            ) : null}
+
+                            {/* Session Lifecycle Badge */}
+                            <Badge variant={sessionCfg.badge}>
+                              {sessionCfg.label}
+                            </Badge>
+
+                            {/* Report Status Badge */}
+                            {rep ? (
+                              <Badge
+                                variant={
+                                  rep.status === 'approved'
+                                    ? 'success'
+                                    : rep.status === 'submitted'
+                                    ? 'warning'
+                                    : rep.status === 'correction_requested'
+                                    ? 'danger'
+                                    : 'gray'
+                                }
+                              >
+                                {rep.status === 'approved'
+                                  ? 'تقرير معتمد ✓'
+                                  : rep.status === 'submitted'
+                                  ? 'تقرير بانتظار المراجعة'
+                                  : rep.status === 'correction_requested'
+                                  ? 'مطلوب تصحيح'
+                                  : 'مسودة تقرير'}
+                              </Badge>
+                            ) : s.status === 'completed' ? (
+                              <Badge variant="danger">
+                                ⚠️ لم يُرسل التقرير بعد
+                              </Badge>
+                            ) : null}
+
+                            {/* View / Review Full Report Button */}
+                            {rep && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={<Eye size={13} />}
+                                onClick={() => setSelectedQuranReport(rep)}
+                              >
+                                معاينة واعتماد
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Body: Standard 4 Sections when report exists */}
+                        {rep ? (
+                          <div className="space-y-4 pt-1">
+                            {/* Grid: 2 Columns for Accomplishment and Next Session */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Section 1: Today Accomplishments */}
+                              <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3.5 space-y-2.5">
+                                <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                                  <BookOpen size={14} className="text-emerald-600" />
+                                  <span>أولًا: إنجاز حلقة اليوم</span>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] font-bold text-gray-500 block mb-0.5">ما تم تسميعه:</span>
+                                  <p className="text-xs text-gray-800 bg-white/80 rounded-lg p-2.5 border border-emerald-100 leading-relaxed">
+                                    {rep.todayRecitation || '—'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] font-bold text-gray-500 block mb-0.5">ما تم مراجعته:</span>
+                                  <p className="text-xs text-gray-800 bg-white/80 rounded-lg p-2.5 border border-emerald-100 leading-relaxed">
+                                    {rep.todayRevision || '—'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Section 2: Next Session Assignments */}
+                              <div className="bg-sky-50/40 border border-sky-100 rounded-xl p-3.5 space-y-2.5">
+                                <div className="flex items-center gap-2 text-sky-800 font-bold text-xs">
+                                  <Compass size={14} className="text-sky-600" />
+                                  <span>ثانيًا: الإنجاز المطلوب للحلقة القادمة</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-white/80 rounded-lg p-2 border border-sky-100">
+                                    <span className="text-[11px] font-bold text-gray-500 block mb-0.5">التسميع القادم:</span>
+                                    <p className="text-xs text-gray-800 truncate">{rep.nextRecitation || '—'}</p>
+                                  </div>
+                                  <div className="bg-white/80 rounded-lg p-2 border border-sky-100">
+                                    <span className="text-[11px] font-bold text-gray-500 block mb-0.5">المراجعة القادمة:</span>
+                                    <p className="text-xs text-gray-800 truncate">{rep.nextRevision || '—'}</p>
+                                  </div>
+                                  <div className="bg-white/80 rounded-lg p-2 border border-sky-100">
+                                    <span className="text-[11px] font-bold text-gray-500 block mb-0.5">الآداب / الأحاديث:</span>
+                                    <p className="text-xs text-gray-800 truncate">{rep.nextManners || '—'}</p>
+                                  </div>
+                                  <div className="bg-white/80 rounded-lg p-2 border border-sky-100">
+                                    <span className="text-[11px] font-bold text-gray-500 block mb-0.5">التجويد:</span>
+                                    <p className="text-xs text-gray-800 truncate">{rep.nextTajweed || '—'}</p>
+                                  </div>
+                                </div>
+                                {rep.quranLink && (
+                                  <div className="pt-1">
+                                    <a
+                                      href={rep.quranLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 text-xs text-brand-purple hover:underline bg-white/90 border border-purple-200 px-3 py-1.5 rounded-lg font-medium"
+                                    >
+                                      🔗 رابط المصحف المعتمد
+                                      <ExternalLink size={12} />
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Section 3: Teacher Ratings */}
+                            <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3.5 space-y-2.5">
+                              <div className="flex items-center gap-2 text-gray-800 font-bold text-xs">
+                                <Star size={14} className="text-amber-500 fill-amber-400" />
+                                <span>ثالثًا: تقييم المعلم للطالب</span>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {[
+                                  { label: 'الحفظ والتسميع', val: rep.memorizationLevel },
+                                  { label: 'المراجعة', val: rep.revisionLevel },
+                                  { label: 'التجويد والتلاوة', val: rep.tajweedLevel },
+                                  { label: 'الالتزام والتفاعل', val: rep.engagementLevel },
+                                ].map((item, idx) => (
+                                  <div key={idx} className="bg-white rounded-lg p-2.5 border border-gray-200/80 text-center">
+                                    <span className="text-[10px] font-bold text-gray-500 block mb-1">{item.label}</span>
+                                    <span className={`inline-block px-2.5 py-0.5 text-xs font-bold rounded-md border ${
+                                      RATING_STYLE[item.val] || 'bg-gray-50 text-gray-500 border-gray-200'
+                                    }`}>
+                                      {item.val || '—'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              {rep.generalEvaluation && (
+                                <div className="text-xs text-gray-700 bg-white rounded-lg p-2.5 border border-gray-200/80">
+                                  <span className="font-bold text-gray-900 block mb-0.5">التقييم العام:</span>
+                                  {rep.generalEvaluation}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Section 4: Parent Notes & Alerts */}
+                            {(rep.parentNotes || rep.importantAlert) && (
+                              <div className="space-y-2">
+                                {rep.parentNotes && (
+                                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-xs text-blue-950 flex items-start gap-2.5">
+                                    <MessageCircle size={15} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                      <strong className="block text-blue-900 mb-0.5">ملاحظات لولي الأمر:</strong>
+                                      <span>{rep.parentNotes}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {rep.importantAlert && (
+                                  <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3 text-xs text-rose-950 flex items-start gap-2.5">
+                                    <AlertTriangle size={15} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                      <strong className="block text-rose-900 mb-0.5">📌 تنبيه هام لولي الأمر:</strong>
+                                      <span>{rep.importantAlert}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : s.status === 'completed' ? (
+                          /* Missing Report Alert for Completed Sessions */
+                          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
+                              <span>الحصة مسجلة كمكتملة، ولكن لم يقم المعلم برفع تقرير الحلقة حتى الآن.</span>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Scheduled future session info */
+                          <div className="bg-gray-50 border border-gray-200/60 rounded-xl p-3 text-xs text-gray-500">
+                            حصة مجدولة قادمة في موعدها. سيكون تقرير الحلقة متاحاً هنا فور إنهائها من قِبل المعلم.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
 
+          {/* SubTab 2: Periodic Evaluations & Tests */}
           {subTab === 'evaluations' && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {evalList.length === 0 ? <div className="text-center py-12 text-gray-500">لا توجد تقييمات</div> : (
+              {evalList.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-sm">لا توجد تقييمات دورية مسجلة بعد</div>
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[600px]">
-                    <thead><tr className="border-b border-gray-100">{['التاريخ', 'المعلم', 'النوع', 'الدرجة', 'ملاحظات', ''].map(h => <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        {['التاريخ', 'المعلم', 'النوع', 'الدرجة', 'ملاحظات', ''].map(h => (
+                          <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
                     <tbody>
                       {evalList.map(ev => (
                         <tr key={ev._id} className="border-b border-gray-50 hover:bg-gray-50/60">
                           <td className="px-4 py-3 text-sm text-gray-600">{formatDateAr(ev.createdAt)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-800">{ev.teacherId?.firstNameAr} {ev.teacherId?.lastNameAr}</td>
-                          <td className="px-4 py-3"><Badge variant="purple">{ev.type === 'monthly' ? 'شهري' : ev.type === 'weekly' ? 'أسبوعي' : ev.type === 'session' ? 'حصة' : 'نهائي'}</Badge></td>
-                          <td className="px-4 py-3"><span className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={13} fill="currentColor" /> {ev.score ?? '—'}</span></td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px] truncate">{ev.notesAr || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-800">
+                            {ev.teacherId?.firstNameAr} {ev.teacherId?.lastNameAr}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="purple">
+                              {ev.type === 'monthly' ? 'شهري' : ev.type === 'weekly' ? 'أسبوعي' : ev.type === 'session' ? 'حصة' : 'نهائي'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="flex items-center gap-1 text-sm font-bold text-amber-600">
+                              <Star size={13} fill="currentColor" /> {ev.score ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px] truncate">
+                            {ev.notesAr || '—'}
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
-                              <button onClick={() => setEditEv(ev)} className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg"><Edit2 size={12} /></button>
-                              <button onClick={() => { if (window.confirm('حذف التقييم؟')) deleteEvMut.mutate(ev._id) }} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={12} /></button>
+                              <button
+                                onClick={() => setEditEv(ev)}
+                                className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg"
+                                title="تعديل"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                onClick={() => { if (window.confirm('حذف التقييم؟')) deleteEvMut.mutate(ev._id) }}
+                                className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"
+                                title="حذف"
+                              >
+                                <Trash2 size={12} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -602,123 +975,6 @@ function AcademicTab({ studentId, recentSessions, academics, academicsLoading })
                   </table>
                 </div>
               )}
-            </div>
-          )}
-
-          {subTab === 'attendance' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {attList.length === 0 ? <div className="text-center py-12 text-gray-500">لا توجد سجلات حضور</div> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
-                    <thead><tr className="border-b border-gray-100">{['التاريخ', 'الحصة', 'الحالة', 'ملاحظات', ''].map(h => <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
-                    <tbody>
-                      {attList.map(att => {
-                        const cfg = ATT_CFG[att.status] || { label: att.status, badge: 'gray' }
-                        return (
-                          <tr key={att._id} className="border-b border-gray-50 hover:bg-gray-50/60">
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateAr(att.createdAt)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-800">{att.sessionId?.titleAr || '—'}</td>
-                            <td className="px-4 py-3"><Badge variant={cfg.badge}>{cfg.label}</Badge></td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{att.notes || '—'}</td>
-                            <td className="px-4 py-3"><button onClick={() => setEditAtt(att)} className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg"><Edit2 size={12} /></button></td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {subTab === 'homework' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {hwList.length === 0 ? <div className="text-center py-12 text-gray-500">لا توجد واجبات</div> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
-                    <thead><tr className="border-b border-gray-100">{['الواجب', 'الاستحقاق', 'الحالة', 'التسليم'].map(h => <th key={h} className="text-right px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
-                    <tbody>
-                      {hwList.map(hw => {
-                        const mySub = hw.submissions?.find(s => s.studentId?.toString() === studentId || s.content)
-                        return (
-                          <tr key={hw._id} className="border-b border-gray-50 hover:bg-gray-50/60">
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">{hw.titleAr}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateAr(hw.dueDate)}</td>
-                            <td className="px-4 py-3"><Badge variant={hw.status === 'active' ? 'success' : 'gray'}>{hw.status === 'active' ? 'نشط' : 'مكتمل'}</Badge></td>
-                            <td className="px-4 py-3">
-                              {mySub ? <span className="text-xs text-emerald-600 font-semibold">سُلِّم {mySub.grade !== undefined ? `· درجة: ${mySub.grade}` : ''}</span>
-                                : <span className="text-xs text-amber-600 font-semibold">لم يُسلَّم</span>}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {subTab === 'memorization' && (
-            <div className="space-y-3">
-              {memList.length === 0 ? <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 text-gray-500">لا توجد سجلات حفظ</div>
-                : memList.map(m => (
-                  <div key={m._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex justify-between items-center gap-3">
-                    <div>
-                      <div className="font-semibold text-gray-800">{m.surahName || m.surahNumber}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{m.ayahFrom && m.ayahTo ? `آية ${m.ayahFrom} – ${m.ayahTo}` : ''}{m.pages ? ` · ${m.pages} صفحة` : ''}</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {m.grade && <span className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={12} fill="currentColor" />{m.grade}</span>}
-                      <span className="text-xs text-gray-500">{formatDateAr(m.createdAt)}</span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-
-          {subTab === 'revision' && (
-            <div className="space-y-3">
-              {revList.length === 0 ? <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 text-gray-500">لا توجد سجلات مراجعة</div>
-                : revList.map(r => (
-                  <div key={r._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex justify-between items-center gap-3">
-                    <div><div className="font-semibold text-gray-800">{r.surahName || r.surahNumber}</div><div className="text-xs text-gray-500 mt-0.5">{r.notes || ''}</div></div>
-                    <div className="flex items-center gap-3">
-                      {r.grade && <span className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={12} fill="currentColor" />{r.grade}</span>}
-                      <span className="text-xs text-gray-500">{formatDateAr(r.createdAt)}</span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-
-          {subTab === 'quranReports' && (
-            <div className="space-y-3">
-              {quranReportsList.length === 0 ? <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 text-gray-500">لا توجد تقارير حلقات بعد</div>
-                : quranReportsList.map((r) => (
-                  <div key={r._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-md transition-shadow">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-gray-900 text-sm">معلم: {r.teacherId?.firstNameAr} {r.teacherId?.lastNameAr}</span>
-                        <span className="text-xs text-gray-400">· {formatDateAr(r.sessionId?.scheduledAt || r.createdAt)}</span>
-                      </div>
-                      {r.tajweedNotes && <div className="text-xs text-gray-600 truncate max-w-md">{r.tajweedNotes}</div>}
-                    </div>
-                    <div className="flex items-center gap-2 flex-none">
-                      <Badge variant={r.status === 'approved' ? 'success' : r.status === 'submitted' ? 'warning' : 'gray'}>
-                        {r.status === 'approved' ? 'معتمد' : r.status === 'submitted' ? 'بانتظار المراجعة' : r.status}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<Eye size={13} />}
-                        onClick={() => setSelectedQuranReport(r)}
-                      >
-                        عرض التفاصيل
-                      </Button>
-                    </div>
-                  </div>
-                ))}
             </div>
           )}
         </>
@@ -1018,7 +1274,7 @@ export default function AdminStudentDetailPage() {
       </div>
 
       {tab === 'overview' && <OverviewTab student={student} assignedTeacher={assignedTeacher} subscription={sub} />}
-      {tab === 'subscription' && <SubscriptionWalletTab studentId={id} student={student} subscription={sub} enrollmentRequests={enrollmentRequests} />}
+      {tab === 'subscription' && <SubscriptionWalletTab studentId={id} student={student} subscription={sub} enrollmentRequests={enrollmentRequests} assignedTeacher={assignedTeacher} />}
       {tab === 'academic' && <AcademicTab studentId={id} recentSessions={recentSessions} academics={academics} academicsLoading={loadAcademics} />}
       {tab === 'transfers' && hasPermission('transfers.view') && (
         <TransfersTab studentId={id} canTransfer={hasPermission('transfers.execute')} subscriptionActive={sub?.status === 'active'} onOpenTransfer={() => setTransferOpen(true)} />

@@ -12,8 +12,10 @@ const credentialDefaultsCtrl = require('../controllers/credentialDefaults.contro
 const payrollCtrl = require('../controllers/payroll.controller')
 const transferCtrl = require('../controllers/transfer.controller')
 const maintenanceCtrl = require('../controllers/maintenance.controller')
+const renewalCtrl = require('../controllers/renewal.controller')
+const subscriptionLifecycleCtrl = require('../controllers/subscriptionLifecycle.controller')
 const { authenticate } = require('../middleware/auth.middleware')
-const { requirePermission } = require('../middleware/rbac.middleware')
+const { requirePermission, requireAnyPermission } = require('../middleware/rbac.middleware')
 
 router.use(authenticate)
 
@@ -42,6 +44,18 @@ router.post('/students/:id/reset-password', requirePermission('students.manage')
 
 // Academic records per student
 router.get('/students/:studentId/academics', requirePermission('students.view'), ctrl.getStudentAcademics)
+
+// Subscriptions: Renewal requests (Phase 2 §9)
+router.get('/subscriptions/renewal-requests', requirePermission('subscriptions.view'), renewalCtrl.getAllRequests)
+router.get('/subscriptions/renewal-requests/pending-count', requirePermission('subscriptions.view'), renewalCtrl.getPendingCount)
+router.get('/subscriptions/renewal-requests/:id', requirePermission('subscriptions.view'), renewalCtrl.getRequest)
+router.patch('/subscriptions/renewal-requests/:id/review', requirePermission('subscriptions.manage'), renewalCtrl.reviewRequest)
+
+// Subscriptions: Pause / resume lifecycle (Phase 2 meeting addendum §2)
+router.get('/subscriptions/:id/pause-preview', requirePermission('subscriptions.view'), subscriptionLifecycleCtrl.previewPause)
+router.get('/subscriptions/:studentId/pause-history', requirePermission('subscriptions.view'), subscriptionLifecycleCtrl.getPauseHistory)
+router.post('/subscriptions/:id/pause', requireAnyPermission('subscriptions.pause_resume', 'subscriptions.manage'), subscriptionLifecycleCtrl.pauseSubscription)
+router.post('/subscriptions/:id/resume', requireAnyPermission('subscriptions.pause_resume', 'subscriptions.manage'), subscriptionLifecycleCtrl.resumeSubscription)
 
 // Teachers
 router.get('/teachers', requirePermission('teachers.view'), ctrl.getTeachers)

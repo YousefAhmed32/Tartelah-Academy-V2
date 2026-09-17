@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   X,
   Calendar,
@@ -16,6 +16,9 @@ import {
   FileText,
   CreditCard,
   UserCheck,
+  GraduationCap,
+  FileCheck,
+  AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Avatar from '../ui/Avatar.jsx'
@@ -33,6 +36,16 @@ const STATUS_MAP = {
   no_show: { label: 'غياب', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
 }
 
+const STUDENT_STATUS_MAP = {
+  present: { label: 'حاضر', color: '#16a34a', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  late: { label: 'متأخر', color: '#d97706', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  absent: { label: 'غائب', color: '#dc2626', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+  excused: { label: 'معذور', color: '#7c3aed', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+  left_early: { label: 'غادر مبكراً', color: '#0284c7', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+  technical_issue: { label: 'مشكلة تقنية', color: '#475569', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
+  pending: { label: 'بانتظار التحضير', color: '#64748b', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' },
+}
+
 export default function AdminSessionDetailDrawer({
   session,
   open,
@@ -43,6 +56,7 @@ export default function AdminSessionDetailDrawer({
   onCancel,
 }) {
   const [copied, setCopied] = useState(false)
+  const navigate = useNavigate()
 
   if (!open || !session) return null
 
@@ -240,41 +254,165 @@ export default function AdminSessionDetailDrawer({
               )}
             </div>
 
-            {/* Attendance & Payroll Card */}
+            {/* 1. Student & Teacher Attendance Card */}
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <UserCheck size={14} className="text-emerald-600" />
-                <span>حضور المعلم والراتب</span>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-emerald-600" />
+                  <span>حضور الطرفين والالتزام</span>
+                </div>
+                <span className="text-[11px] text-gray-400 font-normal">تسجيل الحضور الفعلي</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                  <div className="text-[11px] text-gray-400">حضور المعلم</div>
-                  <div className="mt-1">
+                {/* Teacher Attendance */}
+                <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-100 space-y-1.5">
+                  <div className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                    <UserCheck size={12} className="text-amber-600" />
+                    <span>حضور المعلم</span>
+                  </div>
+                  <div>
                     <AttendanceStatusBadge status={session.teacherAttendanceStatus || 'pending'} size="sm" />
                   </div>
+                  <div className="text-[11px] text-gray-500 pt-0.5 leading-tight">
+                    {session.teacherStartedAt ? (
+                      <span className="text-emerald-700 font-medium">بدأ {formatTimeAr(session.teacherStartedAt)}</span>
+                    ) : session.isLate || session.teacherAttendanceStatus === 'late' ? (
+                      <span className="text-rose-600 font-bold">متأخر ({session.lateMinutes || session.teacherLateMinutes || 5}+ د)</span>
+                    ) : session.teacherAttendanceStatus === 'absent' ? (
+                      <span className="text-rose-600 font-bold">غائب عن الحصة</span>
+                    ) : (
+                      <span className="text-gray-400">بانتظار بدء المعلم</span>
+                    )}
+                  </div>
+                  {session.teacherAttendanceNotes && (
+                    <div className="text-[10px] text-gray-400 border-t border-gray-200/50 pt-1">
+                      {session.teacherAttendanceNotes}
+                    </div>
+                  )}
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                  <div className="text-[11px] text-gray-400">استحقاق الراتب</div>
-                  <div className="mt-1 flex items-center gap-1">
+                {/* Student Attendance */}
+                {(() => {
+                  const stKey = session.studentAttendanceStatus
+                    || session.attendance?.status
+                    || (session.status === 'completed' ? 'present' : (session.status === 'scheduled' ? 'pending' : 'pending'))
+                  const stCfg = STUDENT_STATUS_MAP[stKey] || STUDENT_STATUS_MAP.pending
+                  return (
+                    <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-100 space-y-1.5">
+                      <div className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                        <GraduationCap size={12} className="text-violet-600" />
+                        <span>حضور الطالب</span>
+                      </div>
+                      <div>
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${stCfg.bg} ${stCfg.text} ${stCfg.border}`}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: stCfg.color }} />
+                          <span>{stCfg.label}</span>
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-gray-500 pt-0.5 leading-tight">
+                        {session.attendance?.arrivalTime ? (
+                          <span className="text-emerald-700 font-medium">حضر {formatTimeAr(session.attendance.arrivalTime)}</span>
+                        ) : stKey === 'present' ? (
+                          <span className="text-emerald-700 font-medium">حضر الحصة ✓</span>
+                        ) : stKey === 'absent' ? (
+                          <span className="text-rose-600 font-bold">غائب</span>
+                        ) : (
+                          <span className="text-gray-400">بانتظار تسجيل الحضور</span>
+                        )}
+                      </div>
+                      {session.attendance?.notes && (
+                        <div className="text-[10px] text-gray-400 border-t border-gray-200/50 pt-1">
+                          {session.attendance.notes}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+
+            {/* 2. Payroll & Quran Report Card */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <CreditCard size={14} className="text-blue-600" />
+                  <span>الراتب وتقرير الحلقة القرآني</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* Payroll Readiness */}
+                <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-100 space-y-1.5">
+                  <div className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                    <CreditCard size={12} className="text-gray-400" />
+                    <span>استحقاق الراتب</span>
+                  </div>
+                  <div>
                     <span
                       className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full"
                       style={{ background: `${payrollCfg.color}18`, color: payrollCfg.color }}
                     >
-                      <CreditCard size={11} />
                       {payrollCfg.label}
                     </span>
                   </div>
+                  {session.payrollStatusReason && (
+                    <div className="text-[10px] text-gray-500 pt-0.5 leading-tight">
+                      {session.payrollStatusReason}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {session.payrollStatusReason && (
-                <div className="p-2.5 rounded-xl bg-gray-50 text-xs text-gray-600">
-                  <span className="font-semibold text-gray-700">ملاحظة الراتب: </span>
-                  {session.payrollStatusReason}
-                </div>
-              )}
+                {/* Quran Session Report */}
+                {(() => {
+                  const rep = session.report
+                  const isReportRequired = session.quranReportRequired !== false
+                  const hasRep = session.hasReport || session.isReportSubmitted || ['submitted', 'approved'].includes(rep?.status)
+                  const isDraft = rep?.status === 'draft'
+                  const isMissing = isReportRequired && ['completed', 'ongoing'].includes(session.status) && !hasRep && !isDraft
+
+                  return (
+                    <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-100 space-y-1.5">
+                      <div className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                        <FileCheck size={12} className="text-emerald-600" />
+                        <span>تقرير الحلقة</span>
+                      </div>
+                      <div>
+                        {!isReportRequired ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            <FileCheck size={11} />
+                            <span>غير مطلوب — حصة سابقة معتمدة</span>
+                          </span>
+                        ) : hasRep ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <FileCheck size={11} />
+                            <span>{rep?.status === 'approved' ? 'معتمد ✓' : 'تم الإرسال'}</span>
+                          </span>
+                        ) : isDraft ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            <FileText size={11} />
+                            <span>مسودة تقرير</span>
+                          </span>
+                        ) : isMissing ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                            <AlertCircle size={11} />
+                            <span>لم يُرسل التقرير</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400">
+                            <span>بانتظار انتهاء الحلقة</span>
+                          </span>
+                        )}
+                      </div>
+                      {hasRep && (
+                        <div className="text-[10px] text-emerald-700 pt-0.5">
+                          {rep?.generalEvaluation ? `التقييم: ${rep.generalEvaluation}` : 'تقرير مكتمل'}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
 
             {/* Notes if any */}
@@ -300,62 +438,75 @@ export default function AdminSessionDetailDrawer({
             )}
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-4 border-t border-gray-100 bg-gray-50/80 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onEdit(session)
-                }}
-                className="h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
-              >
-                <Edit2 size={13} />
-                <span>تعديل الحصة</span>
-              </button>
+          {/* Footer Actions with Safe Fallbacks */}
+          {(() => {
+            const handleEdit = () => {
+              onClose()
+              if (typeof onEdit === 'function') onEdit(session)
+              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+            }
+            const handleCorrect = () => {
+              onClose()
+              if (typeof onCorrect === 'function') onCorrect(session)
+              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+            }
+            const handleReschedule = () => {
+              onClose()
+              if (typeof onReschedule === 'function') onReschedule(session)
+              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+            }
+            const handleCancelAction = () => {
+              onClose()
+              if (typeof onCancel === 'function') onCancel(session)
+              else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
+            }
 
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onCorrect(session)
-                }}
-                className="h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
-              >
-                <ShieldAlert size={13} />
-                <span>تصحيح الحضور</span>
-              </button>
-            </div>
+            return (
+              <div className="p-4 border-t border-gray-100 bg-gray-50/80 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleEdit}
+                    className="h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Edit2 size={13} />
+                    <span>تعديل الحصة</span>
+                  </button>
 
-            {canCancel && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose()
-                    onReschedule(session)
-                  }}
-                  className="flex-1 h-9 rounded-xl border border-gray-200 hover:bg-white text-gray-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <RefreshCw size={12} />
-                  <span>إعادة جدولة</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleCorrect}
+                    className="h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <ShieldAlert size={13} />
+                    <span>تصحيح الحضور</span>
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose()
-                    onCancel(session)
-                  }}
-                  className="flex-1 h-9 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <XCircle size={12} />
-                  <span>إلغاء الحصة</span>
-                </button>
+                {canCancel && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReschedule}
+                      className="flex-1 h-9 rounded-xl border border-gray-200 hover:bg-white text-gray-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={12} />
+                      <span>إعادة جدولة</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCancelAction}
+                      className="flex-1 h-9 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <XCircle size={12} />
+                      <span>إلغاء الحصة</span>
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            )
+          })()}
         </motion.div>
       </div>
     </div>

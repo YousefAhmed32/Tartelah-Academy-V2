@@ -241,9 +241,15 @@ function NextSessionCard({ session, countdown }) {
 
       {/* Session info */}
       <div className="flex-1 min-w-0">
-        <div className="text-[12px] font-semibold mb-1" style={{ color: 'rgba(167,143,214,0.7)' }}>الحصة القادمة</div>
-        <div className="font-heading font-bold text-xl text-white truncate mb-1">
-          {session.titleAr || session.title || 'حصة قرآن'}
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <div className="font-heading font-bold text-xl text-white truncate">
+            {session.titleAr || session.title || 'حصة قرآن'}
+          </div>
+          {session.isPostponed && (
+            <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
+              <span>⏱️</span> حصة مؤجلة
+            </span>
+          )}
         </div>
         <div className="text-[13px]" style={{ color: '#a78fd6' }}>
           {formatDateAr(session.scheduledAt)} · {formatTimeAr(session.scheduledAt)}
@@ -482,8 +488,15 @@ function SessionRow({ session }) {
         </svg>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-brand-textBody text-sm truncate">
-          {session.titleAr || session.title || 'حصة قرآن'}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-brand-textBody text-sm truncate">
+            {session.titleAr || session.title || 'حصة قرآن'}
+          </span>
+          {session.isPostponed && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+              <span>⏱️</span> حصة مؤجلة
+            </span>
+          )}
         </div>
         <div className="text-xs text-[#7c6aaa] mt-0.5">
           {formatDateAr(session.scheduledAt)} · {formatTimeAr(session.scheduledAt)}

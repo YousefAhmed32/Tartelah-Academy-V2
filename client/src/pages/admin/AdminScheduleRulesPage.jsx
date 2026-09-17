@@ -13,7 +13,9 @@ import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
-import { formatDateAr } from '../../utils/date.js'
+import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
+import { formatDateAr, getAcademyTimezoneLabel } from '../../utils/date.js'
+import { formatTimeArabic12Strict } from '../../utils/assignmentSchedule.js'
 import { getFileUrl, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ROUTES } from '../../config/constants.js'
 
 const STATUS_CONFIG = {
@@ -152,6 +154,8 @@ export default function AdminScheduleRulesPage() {
         }
       />
 
+      <AcademyTimezoneNotice className="mb-4" />
+
       {/* Filters row */}
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="flex gap-1 p-1 bg-[#f0ecf8] rounded-xl">
@@ -198,7 +202,7 @@ export default function AdminScheduleRulesPage() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#7c6aaa]">
                       <span className="flex items-center gap-1"><Calendar size={11} /> {days}</span>
-                      <span className="flex items-center gap-1"><Clock size={11} /> {rule.timeOfDay}</span>
+                      <span className="flex items-center gap-1"><Clock size={11} /> {formatTimeArabic12Strict(rule.timeOfDay)} · {getAcademyTimezoneLabel(rule.timezone)}</span>
                       {rule.endDate && <span>حتى: {formatDateAr(rule.endDate)}</span>}
                       {rule.durationMinutes && <span>{rule.durationMinutes} دقيقة</span>}
                       {rule.stats && <span>{rule.stats.completed}/{rule.stats.total} حصة مكتملة</span>}

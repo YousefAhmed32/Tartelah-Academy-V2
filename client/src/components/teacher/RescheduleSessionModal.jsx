@@ -5,7 +5,8 @@ import { CalendarClock, Check, AlertCircle } from 'lucide-react'
 import api from '../../utils/api.js'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
-import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import AcademyTimezoneNotice from '../ui/AcademyTimezoneNotice.jsx'
+import { formatDateAr, formatTimeAr, toAcademyDateTimeLocal } from '../../utils/date.js'
 
 export default function RescheduleSessionModal({ open, onClose, session, onSuccess }) {
   const qc = useQueryClient()
@@ -15,10 +16,7 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
     if (session?.scheduledAt) {
       // Default to scheduled time formatted for datetime-local
       try {
-        const d = new Date(session.scheduledAt)
-        const pad = (n) => String(n).padStart(2, '0')
-        const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-        setNewDate(formatted)
+        setNewDate(toAcademyDateTimeLocal(session.scheduledAt))
       } catch {
         setNewDate('')
       }
@@ -75,6 +73,7 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
       }
     >
       <div className="space-y-3.5 text-start" dir="rtl">
+        <AcademyTimezoneNotice compact />
         <div className="rounded-xl p-3 bg-amber-50/70 border border-amber-100 text-xs text-amber-800 space-y-1">
           <div className="font-bold flex items-center gap-1.5">
             <CalendarClock size={15} className="text-amber-600" />

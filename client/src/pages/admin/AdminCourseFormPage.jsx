@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FileText, BookOpen, Target, Search, Info, ChevronLeft, Upload, Save, X, Plus, Link2, WandSparkles } from 'lucide-react'
+import { FileText, BookOpen, Target, Search, Info, ChevronLeft, Upload, Save, X, Plus, Link2 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -676,7 +676,7 @@ export default function AdminCourseFormPage() {
             title="تعبئة النموذج ببيانات تجريبية واقعية لأغراض الاختبار"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border active:scale-[0.98] bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 hover:border-violet-300"
           >
-            <WandSparkles size={15} strokeWidth={1.8} />
+            <FileText size={15} strokeWidth={1.8} />
             إضافة محتوى تجريبي
           </button>
 

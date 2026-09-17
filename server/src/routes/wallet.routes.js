@@ -12,6 +12,7 @@ router.get('/:studentId', isAdminOrTeacher, ctrl.getStudentWallet)
 router.get('/:studentId/transactions', isAdminOrTeacher, ctrl.getStudentTransactions)
 
 router.post('/:studentId/adjust', requirePermission('subscriptions.manage'), ctrl.adjustWallet)
+router.post('/:studentId/consume', requirePermission('subscriptions.manage'), ctrl.consumeLesson)
 router.post('/:studentId/freeze', requirePermission('subscriptions.manage'), ctrl.freezeWallet)
 router.post('/:studentId/resume', requirePermission('subscriptions.manage'), ctrl.resumeWallet)
 router.post('/:studentId/transfer', requirePermission('subscriptions.manage'), ctrl.transferLessons)

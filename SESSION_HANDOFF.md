@@ -1,6 +1,236 @@
 # Session Handoff — Tartelah Online
 
 ## Session Date
+2026-09-17 — Canonical Academy-Time Scheduling Hardening
+
+## Status
+- Confirmed the reported 9→6 discrepancy: persisted session instants were UTC-correct, but several client render/input paths still used the browser timezone. A 9:00 Cairo lesson is legitimately stored as 06:00Z; the UI was exposing the storage timezone instead of academy wall time.
+- Added one client-side academy-time source of truth (`utils/date.js`) initialized from public academy settings. Session dates, times, day grouping, datetime-local prefill, and today/week/month filters now use it instead of the device timezone.
+- Added one backend academy datetime boundary/parser utility. Bare `datetime-local` values are interpreted in the configured academy timezone, explicit-offset ISO values remain absolute, and day/month filters use academy calendar boundaries even when Node runs in UTC.
+- Hardened teacher/admin create, edit, reschedule, postpone, recurring-rule, dashboard-today, monthly-list, and report-tracking flows. Admin session updates also gained the booking-conflict guard that creation/rescheduling already had.
+- New recurring rules inherit `AcademySettings.timezone` instead of the legacy `Asia/Riyadh` default. Existing rules retain their explicit per-rule timezone for backward compatibility and are labeled in the UI.
+- Added a reusable visible timezone notice to all affected scheduling forms. The teacher wizard now shows both `21:00 (9:00 م)` and a live summary `9:00 مساءً`, followed by `القاهرة (Africa/Cairo)`; fixed responsive weekday/form grids and the invalid admin meeting provider value (`google_meet` → `meet`).
+- Read-only data audit: academy timezone is `Africa/Cairo`; all 309 future scheduled sessions linked to active rules match their rule time when interpreted in the rule timezone (0 stored-data mismatches). No database migration or destructive write was needed.
+- Live browser QA verified the real teacher schedules page and the recurring-schedule wizard: selecting 21:00 visibly remained `9:00 مساءً` with the Cairo timezone notice. No schedule was submitted and no QA data was created.
+- Verification: frontend production build passed; full client suite passed (90/90); full backend suite passed (53 suites, 588/588 tests); touched backend files pass syntax checks. Targeted ESLint found zero errors; its non-zero exit is from pre-existing warnings in large legacy components.
+
+---
+
+## Session Date
+2026-09-17 — Unified Finish + Quran Report Workflow and Guaranteed Imported-Lesson Payroll Credit
+
+## Status
+- `FinishSessionModal.jsx` is now the single teacher workflow for attendance and the Quran report. Present/late requires at least today's recitation or revision, then one action finishes the session and submits the full four-section report. Absent and postponed sessions do not create meaningless Quran reports. The former separate report route remains available only for overdue reports and correction requests.
+- Removed the old finish-form teacher notes, generic homework, and generic evaluation controls from this flow. Their Quran-specific equivalents now live in `QuranReportInlineForm.jsx` (today's achievement, next-session requirements, four performance ratings, and parent notes/alerts).
+- Report submission retries are safe: after attendance/session completion succeeds, a report-only failure leaves the modal open and retries only the report request, never the wallet/payroll completion a second time.
+- Imported off-platform lessons created with a student's opening package balance now create one completed payable Session and one payroll ledger entry per used lesson in the teacher's current open payroll period. Partial payroll import can no longer fail silently; compensating rollback removes imported rows and reverses the wallet counters if any required write fails.
+- Imported lessons carry `quranReportRequired: false`, so they are excluded from teacher overdue-report queues and admin/monthly missing-report ratios. Admin session surfaces label them "report not required" instead of showing a false missing-report warning.
+- Replaying a report submission after a lost response is idempotent: the already-submitted report is returned without duplicating memorization/revision records, audit events, or admin notifications.
+- All onboarding entry points now pass the student's real lesson duration into imported payroll sessions.
+- Admin and student Quran-report readers already expose the standardized report fields; verified they remain compatible with the unified submission payload.
+- Mobile live-browser QA at 360px verified all four report sections, required-state button behavior, and zero horizontal overflow. The related teacher-session tabs were changed to a 2-column mobile layout with 44px targets after the QA found a 7px overflow. Temporary QA data was deleted afterward.
+- Verification: client production build passed; targeted ESLint passed with zero warnings; full backend suite passed (`52` suites, `582` tests); targeted subscription/report-tracking/Quran-report tests passed (`26` tests).
+
+---
+
+## Session Date
+2026-09-16 — 4-Option Finish Session & Rescheduling + Pre-consumed Lessons Sync ("تسمع عند الاثنين") + Teacher Payroll Announcement Banner
+
+## Status
+- **User Request**:
+  1. **نافذة إنهاء الحصة بأربعة خيارات صريحة**: (حاضر، متأخر، غائب، تأجيل الحصة) مع واجهة ذكية لتحديد الموعد القادم (يوم إيه والساعة كام) مع خيارات سريعة وبديهية، وتمييز الحصة المؤجلة ببادج `⏱️ حصة مؤجلة`، وعدم احتساب الراتب للمعلم ولا خصم رصيد من الطالب حتى إتمام الحصة بالفعل.
+  2. **إسناد الطالب للمعلم مع تحديد الحصص المستهلكة السابقة ("تسمع عند الاثنين")**: عند إسناد الطالب للمعلم واختيار الباقة وتحديد الحصص المستهلكة (مثلاً 6 من 12)، يتم خصم 6 حصص من محفظة الطالب وإصدار استحقاق الراتب للمعلم عن الـ 6 حصص فوراً.
+  3. **بانر إشعار اعتماد وصرف مسير الرواتب للمعلمين**: ظهور إعلان/بانر بارز ومميز في أعلى لوحة تحكم المعلم عند اعتماد المسير (`approved`) أو صرفه (`paid`) مع تفاصيل المكافآت والخصومات وصافي الراتب.
+- **Backend Architecture**:
+  - `server/src/models/Session.js`: إضافة حقول التأجيل `isPostponed: { type: Boolean, default: false }`، `postponedAt: Date`، `postponedReason: String`، `postponedTo: ObjectId`، و `rescheduledSessionId: ObjectId`.
+  - `server/src/controllers/session.controller.js`:
+    - إضافة `postponed` إلى `FINISH_ATTENDANCE_STATUSES` و `ATTENDANCE_STATUS_LABEL_AR`.
+    - مسار تأجيل الحصة في `finishSession`: فحص التعارض الزمني عبر `bookingService.assertNoConflict`، وسم الحصة الأصلية كـ `rescheduled` بحالة راتب `not_payable` وبقاء `subscriptionConsumed: false` (0 خصم من الطالب و 0 راتب)، وإنشاء الحصة الجديدة المجدولة بحالة `scheduled` و `isPostponed: true` و `subscriptionConsumed: false` و `payrollStatus: 'pending'`.
+    - إرسال إشعار لحظي للطالب وتوثيق العملية في سجل التدقيق `logAction`.
+  - `server/src/services/subscription.service.js`: دعم تمرير `durationMinutes` لإنشاء حصص الراتب المستحقة السابقة بدقة مع تحديد رصيد المحفظة المتبقي.
+  - `server/src/controllers/admin.controller.js`: استخراج `lessonsUsed` وتمريرها في `createScheduleRule` لضمان الخصم المتزامن من محفظة الطالب والاستحقاق المالي المتزامن للمعلم.
+  - `server/src/controllers/teacher.controller.js`: إضافة استعلام `TeacherPayrollPeriod` للتحقق من وجود دورة رواتب معتمدة أو مدفوعة وإرفاقها في `stats.payrollAnnouncement`.
+- **Frontend Architecture**:
+  - `FinishSessionModal.jsx`: إعادة بناء النافذة بـ 4 بطاقات تفاعلية واضحة (حاضر / متأخر / غائب / تأجيل الحصة)، وقسم إعادة الجدولة الذكي بأزرار سريعة (`غداً نفس الموعد`، `بعد يومين`، `الأسبوع القادم`، `موعد مخصص`) مع صندوق التأكيد والتطمين المالي الصارم.
+  - شارات التمييز `⏱️ حصة مؤجلة`: تم إضافتها في لوحة وجدول حصص المعلم، وجدول حصص الطالب، وجدول ولوحة تحكم الإدارة.
+  - `EditScheduleRuleModal.jsx`: بطاقة المزامنة المزدوجة التبادلية (الحصص المستهلكة للمعلم + رصيد الحصص المتبقي للطالب) مع شرائح سريعة وملخص توضيحي مرئي.
+  - `TeacherDashboardPage.jsx`: إضافة مكون `TeacherPayrollAnnouncementBanner` أعلى لوحة تحكم المعلم مع شارات المكافآت والخصومات وصافي الراتب، وإخفاء البطاقة المكررة عند ظهور البانر.
+- **Verification**:
+  - `npm run build` في client: خالي من الأخطاء (100%).
+  - اختبارات Vitest في client: 86 passed / 86 total.
+  - اختبارات Jest في server: 52 test suites, 577 passed / 577 total.
+
+---
+
+## Session Date
+2026-09-16 — Live Operations & Attendance Preview Integration in Admin Dashboard Today's Sessions + Drawer Deep Analytics Upgrade (دمج معاينة حضور المعلم والطالب وقاعة الاجتماع بالكامل في السطر الخارجي لبطاقة حصص اليوم مع ترقية درج المعاينة الشامل)
+
+## Status
+- **User Request**:
+  - استغلال المساحة الفارغة الكبيرة في سطر بطاقة "حصص اليوم" في لوحة تحكم الإدارة لدمج تفاصيل المعاينة الأساسية وحضور المعلم والطالب وقاعة الاجتماع مباشرة في السطر الخارجي دون الحاجة لفتح نافذة المعاينة، مع مراعاة التجاوب التام والرشيق (Responsive UI/UX) عبر الجوال، التابلت، والشاشات الكبيرة، مع الاحتفاظ بزر "معاينة" لفتح الدرج الجانبي بتفاصيل وإجراءات أعمق وأشمل.
+- **Backend Architecture (`server/src/controllers/admin.controller.js`)**:
+  - في `getDashboardStats`:
+    - جلب سجلات الحضور الفعلية `Attendance` لجميع حصص اليوم بشكل متزامن مع تقارير الحلقات `QuranSessionReport`.
+    - إرفاق كائن الحضور `attendance` وحساب `studentAttendanceStatus` بدقة (حاضر / متأخر / غائب / معذور / بانتظار التحضير).
+    - تعزيز بيانات الحصة المرجعة بحالة حضور وبدء المعلم وتأخره (`isTeacherStarted`, `teacherStartedAt`, `isLate`, `lateMinutes`, `ongoingMinutes`).
+  - في `getAllSessions`:
+    - جلب سجلات الحضور وتقارير الحلقات لجميع الحصص المعروضة في صفحة إدارة الحصص (`AdminSessionsPage`).
+- **Frontend Architecture (`AdminDashboardPage.jsx` & `AdminSessionDetailDrawer.jsx`)**:
+  - `AdminDashboardPage.jsx`:
+    - إعادة بناء `SessionRow` كلياً وفق معايير Linear / Apple للتصميم المؤسسي:
+      - **الطرفين والموعد (Start / Right)**: أطراف الحصة (صور رمزية متراكبة للطالب والمعلم، أسماء مع شارات قابلة للنقر، ووقت الحصة ومدتها بالدقائق).
+      - **كبسولة العمليات والمعاينة اللحظية (Center Stage)**: استغلال المساحة الفارغة بكبسولة رمادية ناعمة تتضمن:
+        - **حضور المعلم**: مع مؤشر لوني ونبض تأخير (`بدأ 12:05 ص`، `متأخر +28 د`، `حضر في الموعد`، أو `لم يبدأ بعد`).
+        - **حضور الطالب**: مع شارة ملونة لحالة الطالب الحقيقية (`حاضر`، `غائب`، `متأخر`، `معذور`، أو `بانتظار التحضير`).
+        - **قاعة الاجتماع**: رابط وبادج القاعة (`قاعة Zoom` أو `Meet` مع نقطة خضراء تفيد بجاهزية القاعة، أو تنبيه `بلا رابط ⚠️`).
+        - **استحقاق الراتب**: عرض استحقاق الراتب (`مستحق ✓` أو `غير مستحق` أو `مراجعة`) عند انتهاء الحصة.
+      - **الشارات والإجراءات (End / Left)**: شارة دورة حياة الحصة، شارة تقرير الحلقة القرآني، زر دخول القاعة السريع، وزر "معاينة" الشامل.
+      - **التجاوب الكامل (Responsive UI/UX)**:
+        - **الشاشات الكبيرة (Desktop)**: سطر أفقي متزن ومترابط يملأ الفراغ بانسيابية.
+        - **الأجهزة اللوحية (Tablet)**: تقسيم السطر إلى مستويين متناسقين (أطراف الحصة والشارات بالأعلى، وكبسولة الحضور والعمليات بعرض البطاقة بالكامل).
+        - **الهواتف المحمولة (Mobile)**: بطاقة عمودية متراصة بوضوح وأزرار لمسية مريحة (44px+).
+  - `AdminSessionDetailDrawer.jsx`:
+    - ترقية الدرج الجانبي ليعرض حضور الطالب جنباً إلى جنب مع حضور المعلم، مع وقت الحضور والملاحظات.
+    - عرض حالة وتفاصيل تقرير الحلقة القرآني (التقييم العام، حالة الاعتماد، رابط المعاينة).
+    - توفير آليات حماية وتوجيه آمن (Safe Fallbacks) لجميع أزرار الإجراءات في أسفل الدرج (`onEdit`, `onCorrect`, `onReschedule`, `onCancel`) بحيث تعمل بسلاسة من لوحة التحكم الرئيسية وصفحة الحصص دون أي أخطاء.
+- **Verification**:
+  - جميع اختبارات الواجهة (86/86) واختبارات السيرفر خضراء 100%.
+  - بناء العميل الإنتاجي `npm run build` مكتمل بنجاح تام وبسرعة فائقة (10.34s) بـ 0 أخطاء.
+
+---
+
+## Session Date
+2026-09-16 — Auto-Assign Recurring Schedule Teacher for Consumed Lessons & Resilient Fallback Architecture (إسناد الحصة المستهلكة تلقائياً لمعلم الطالب في الجدول الدوري مع حرية التغيير)
+
+## Status
+- **User Request**:
+  - في تبويب "حصة مستهلكة" في نافذة إدارة المحفظة، يجب أن يتم إسناد الحصة تلقائياً لنفس المعلم المقيد معه الطالب في "الجدول الدوري" (ScheduleRule) كخيار افتراضي مباشر، مع إمكانية تغيير المعلم لأي معلم آخر عند الحاجة.
+- **Frontend Architecture (`WalletOperationsModal.jsx` & `AdminStudentDetailPage.jsx`)**:
+  - `AdminStudentDetailPage.jsx`: تمرير `assignedTeacher` و `subscription` كـ props لنافذة `WalletOperationsModal`.
+  - `WalletOperationsModal.jsx`:
+    - جلب القواعد الدورية للطالب (`/admin/schedule-rules?studentId=...`) عبر TanStack Query.
+    - تحديد المعلم الأساسي (`primaryTeacher`) بترتيب الأولوية: المعلم في الجدول الدوري النشط (`activeScheduleRule.teacherId`) ثم المعلم في الاشتراك النشط (`subscription.teacherId`).
+    - التحديد التلقائي لمعلم الطالب كقيمة افتراضية في الـ `select` فور فتح النافذة أو اكتمال جلب البيانات.
+    - إضافة بادج تمييز أنيق: `معلم الطالب في (الجدول الدوري / الاشتراك)` بلون زمردي واضح بجانب الحقل.
+    - تمييز المعلم في القائمة المنسدلة بعلامة `⭐ (معلم الطالب الحالي)`.
+    - توفير إمكانية اختيار أي معلم آخر بحرية تامة إذا تطلب الأمر استهلاك الحصة لصالح معلم بديل.
+- **Backend Architecture (`server/src/controllers/wallet.controller.js`)**:
+  - في دالة `consumeLesson`:
+    - اعتماد ترتيب استنتاج المعلم: `customTeacherId` (المحدد في الـ dropdown) -> `ScheduleRule` النشط (الجدول الدوري) -> `Subscription` النشط -> أحدث `ScheduleRule`.
+    - إصلاح نطاق تعريف `activeSub` لمنع أي `ReferenceError` ولربط الحصة بالاشتراك الساري بصورة آمنة.
+    - تسجيل الحصة كـ `completed` وإصدار استحقاق الراتب للمعلم في `TeacherPayrollPeriod`، وإشعار المعلم والطالب وإدارة الأكاديمية تلقائياً.
+  - في دالة `notifyTeacherOfStudentAdjustment`:
+    - الاستعلام التلقائي عن معلم الطالب في الجدول الدوري النشط كبديل موثوق إذا لم يتوفر اشتراك نشط.
+- **Verification**:
+  - جميع اختبارات الواجهة (86/86) واختبارات السيرفر (576/576) ناجحة 100%.
+  - اختبار بناء العميل الإنتاجي `npm run build` مكتمل بنجاح تام (0 أخطاء).
+
+---
+
+## Session Date
+2026-09-16 — Full-Name & Normalized Arabic Search Engine Overhaul + Student List Page Size & Display Context Upgrade (تطوير محرك البحث ليدعم الأسماء الكاملة والمركبة وتطبيع الحروف العربية، وإضافة التحكم بعدد عناصر الصفحة وإظهار نطاق العرض للطلاب)
+
+## Status
+- **Root Cause of User's Report**:
+  - In `AdminStudentsPage.jsx`, the page limit was fixed to 15. With 30 students in the database, students were split across 2 pages (15 on page 1, 15 on page 2).
+  - The two students sharing the name "نورة القحطاني" (`student17@tartelah.com` on page 1, `student2@tartelah.com` on page 2) were on different pages.
+  - When searching for the full name "نورة القحطاني", the backend `buildSearchFilter` previously executed `$or` on `firstNameAr` and `lastNameAr` individually, which caused any multi-word/full-name search to return 0 results!
+- **Backend Fixes (`pagination.js` & `admin.controller.js`)**:
+  - Upgraded `buildSearchFilter` to support:
+    - Arabic normalization (أ/إ/آ -> [أإآا], ة/ه -> [ةه], ي/ى -> [يى], stripping diacritics/tashkeel).
+    - Whitespace flexibility (`\s*`) so "عبد الله" matches "عبدالله" and vice-versa.
+    - Concatenated Arabic (`firstNameAr + ' ' + lastNameAr`) and English (`firstName + ' ' + lastName`) name search matching using `$expr` + `$regexMatch`.
+    - Added `phone` and English names to searchable fields in `getStudents` and `getTeachers`.
+- **Frontend Upgrades (`AdminStudentsPage.jsx` & `Pagination.jsx`)**:
+  - Added dynamic page size selector (`15`, `25`, `50`, `100`), defaulting to `25` so the admin can see all or most students without unnecessary pagination splits.
+  - Added precise range context in the header: "إجمالي 30 طالب — عرض 1 إلى 25 (صفحة 1 من 2)".
+  - Added clear button (X) in search input.
+  - Fixed `Pagination.jsx` to support both `page/pages/onPageChange` and `current/total/onChange` prop interfaces.
+- **Verification**:
+  - All 52 server test suites (576 tests) passing 100%.
+  - All 6 client test suites (86 tests) passing 100%.
+  - Client build (`npm run build`) passed with exit code 0.
+
+---
+
+## Session Date
+2026-09-16 — Mounted Admin Subscription Renewal Requests & Pause/Resume Lifecycle Endpoints (إصلاح مسارات طلبات تجديد الاشتراكات ودورة حياة إيقاف/استئناف الاشتراكات في مسارات الإدارة)
+
+## Status
+- Resolved `404 Not Found` error when fetching `GET /api/v1/admin/subscriptions/renewal-requests?studentId=...&limit=10` from `SubscriptionWalletTab` (`AdminStudentDetailPage.jsx`).
+- Root cause: The controller functions `getAllRequests`, `getPendingCount`, `getRequest`, `reviewRequest` were implemented in `renewal.controller.js` but were missing from `server/src/routes/admin.routes.js`.
+- Additionally mounted the full subscription pause/resume lifecycle endpoints (`pauseSubscription`, `resumeSubscription`, `previewPause`, `getPauseHistory`) in `admin.routes.js` matching frontend `AdminSubscriptionsPage.jsx` calls.
+- Verified backend test suites (`renewal.service.test.js`, `subscriptionLifecycle.service.test.js`) both passing 100%.
+- Verified client build `npm run build` completed cleanly with exit code 0.
+
+---
+
+## Session Date
+2026-09-16 — Standardized Quran Session Report Template Overhaul & Consolidated Academic History Feed in Admin Portal (اعتماد نموذج تقرير الحلقة الجديد لترتيلة online ودمج السجل الأكاديمي للحصص في لوحة تحكم الإدارة)
+
+## Status
+Delivered an end-to-end implementation fulfilling all user requirements:
+1. **New Standardized Quran Session Report Template (نموذج تقرير الحلقة المعتمد الجديد)**:
+   - Completely replaced old report structure with the 4 standardized sections:
+     - **أولًا: إنجاز حلقة اليوم:** ما تم تسميعه (`todayRecitation`) + ما تم مراجعته (`todayRevision`).
+     - **ثانيًا: الإنجاز المطلوب للحلقة القادمة:** التسميع (`nextRecitation`) + المراجعة (`nextRevision`) + الآداب/الأحاديث (`nextManners`) + التجويد (`nextTajweed`) + 🔗 رابط المصحف المعتمد (`quranLink`).
+     - **ثالثًا: تقييم المعلم للطالب:** 4 مستويات محددة (ممتاز / جيد جدًا / جيد / يحتاج متابعة) لـ: الحفظ والتسميع (`memorizationLevel`), المراجعة (`revisionLevel`), التجويد والتلاوة (`tajweedLevel`), الالتزام والتفاعل (`engagementLevel`) + التقييم العام (`generalEvaluation`).
+     - **رابعًا: ملاحظات لولي الأمر والتنبيه:** ملاحظات لولي الأمر (`parentNotes`) + 📌 تنبيه هام لولي الأمر (`importantAlert`).
+   - Updated backend schema in `QuranSessionReport.js` and report service in `quranReport.service.js`.
+   - Updated teacher report creation view in `TeacherQuranReportPage.jsx` with instant validation and semantic pill selectors.
+   - Updated `FinishSessionModal.jsx` to automatically redirect the teacher to `/teacher/quran-reports/:sessionId` immediately upon completing a session.
+   - Updated student/parent view in `StudentQuranReportsPage.jsx`.
+   - Updated admin report review and approval modal in `QuranReportDetailModal.jsx`.
+2. **Consolidated Academic History Feed in Admin Portal (سجل تقارير الحلقات المدمج)**:
+   - In `AdminStudentDetailPage.jsx`, consolidated the fragmented 7 sub-tabs into a single unified stream: "سجل تقارير الحلقات المدمج (الحصص والحضور والواجبات والإنجاز)".
+   - Backend `getStudentAcademics` in `admin.controller.js` combines sessions, attendance, and Quran reports into `consolidatedSessions`.
+   - Admin can view every session with its date/time, teacher link, attendance status, session lifecycle, and Quran report status.
+   - Filter chips with live counters: "الكل", "معتمد ✓", "بانتظار المراجعة", "لم يُرسل التقرير ⚠️", "الحصص القادمة".
+   - Direct inline modal triggers for "معاينة واعتماد التقرير" and "تعديل الحضور".
+   - Periodic exam evaluations preserved in a clean secondary tab (`evaluations`).
+3. **Verification**:
+   - Client build (`npm run build`) passed with exit code 0.
+   - All 25 service test suites (321 tests) passed cleanly (100% green).
+
+---
+
+## Session Date
+2026-09-16 — Deducted vs. Consumed Sessions Decoupling, Opening Balance Teacher Crediting & Admin Dashboard Operational Intelligence Center (فصل الحصص المخصومة عن المستهلكة، احتساب رصيد البداية للمعلم، ومركز العمليات الذكي لبطاقة حصص اليوم)
+
+## Status
+Delivered an end-to-end implementation fulfilling all user requirements:
+1. **Deducted vs. Consumed Sessions (حصة مخصومة vs حصة مستهلكة)**:
+   - **Administrative Deduction (الحصة المخصومة)**:
+     - Deducts only from the student's lesson balance (`remaining -= amount`).
+     - Increments `deductedLessons` in `LessonWallet` for audit and reporting.
+     - Strictly decoupled from `totalUsed` (does not increment `totalUsed`).
+     - Does not credit any teacher or generate payroll entries.
+     - Updated in `wallet.service.js`, `student.controller.js`, and `wallet.service.test.js`.
+   - **Consumed Session (الحصة المستهلكة - "تسمع عند الاثنين")**:
+     - Deducts from the student's lesson balance (`remaining -= amount`).
+     - Increments `totalUsed` in `LessonWallet` (`totalUsed += amount`).
+     - Creates completed `Session` record with `payrollStatus: 'payable'`.
+     - Credits the assigned teacher's payroll in `TeacherPayrollPeriod` via `payrollLedger.service.js#recordEntry` as `session_payable`.
+     - Available in `POST /api/wallets/:studentId/consume`.
+     - Frontend: Dedicated "إضافة حصة مستهلكة" tab added to `WalletOperationsModal.jsx` with teacher selection, date, duration, and audit reason, clearly distinguished from administrative debit/credit adjustments.
+2. **Assigning Student with Attended Lessons Crediting Teacher (إسناد طالب بحصص سابقة)**:
+   - In `subscription.service.js#createSubscriptionWithOpeningBalance`: When assigning a student with a package and specifying attended sessions (`used > 0`), the system now creates the corresponding completed `Session` records and records payroll entries (`session_payable`) for the assigned teacher.
+   - The teacher's session count, completed sessions, and payable earnings accurately reflect the attended lessons.
+3. **Operational Intelligence Center in Admin Dashboard "حصص اليوم" (`AdminDashboardPage.jsx`)**:
+   - Backend `admin.controller.js`: Fetches all today's sessions, cross-references with `QuranSessionReport`, and enriches sessions with `report`, `isReportSubmitted`, `isLate`, `lateMinutes`, and `ongoingMinutes`.
+   - Frontend `AdminDashboardPage.jsx`:
+     - Rebuilt `SessionRow` with interactive student & teacher badges, profile links, time, and check-in status (بدأ المعلم / لم يسجل الحضور).
+     - Lifecycle badge: مكتملة ✓ (Emerald), جارية الآن (Blue pulse), تأخر المعلم (Rose pulse), مجدولة (Violet), or ملغاة (Gray).
+     - Quran report status badge: التقرير تم ✓, مسودة تقرير, or لم يُرسل التقرير ⚠️.
+     - Action buttons for direct meeting links and "معاينة" button.
+     - Integrated `AdminSessionDetailDrawer` directly into the dashboard page so admins can inspect, reschedule, cancel, or edit any session without leaving the dashboard.
+4. **Verification**:
+   - Client build (`npm run build`) passed with exit code 0.
+   - All 25 service test suites (320 tests) passed cleanly (100% green).
+
+---
+
+## Session Date
 2026-09-15 — Student Renewal Modal Overhaul (2 Options, Payment Details & Optional Receipt) + Admin Surveys CRM Hub & 460px Slide-Over Detail Drawer (تطوير نافذة تجديد الاشتراك للطلاب ومركز إدارة الاستبيانات والدرج الجانبي للأدمن)
 
 ## Status

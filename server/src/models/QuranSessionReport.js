@@ -15,16 +15,51 @@ const QuranSessionReportSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
+  // ── أولاً: إنجاز الحلقة ──────────────────────────────────────────────────
+  todayRecitation: { type: String, trim: true, maxlength: 2000 }, // ما تم تسميعه في حلقة اليوم
+  todayRevision: { type: String, trim: true, maxlength: 2000 },   // ما تم مراجعته
+
+  // ── ثانياً: الإنجاز المطلوب للحلقة القادمة ────────────────────────────────
+  nextRecitation: { type: String, trim: true, maxlength: 2000 },  // التسميع
+  nextRevision: { type: String, trim: true, maxlength: 2000 },    // المراجعة
+  nextManners: { type: String, trim: true, maxlength: 2000 },     // الآداب / الأحاديث
+  nextTajweed: { type: String, trim: true, maxlength: 2000 },     // التجويد
+  quranLink: { type: String, trim: true, maxlength: 1000 },       // رابط المصحف
+
+  // ── ثالثاً: تقييم المعلم للطالب ──────────────────────────────────────────
+  memorizationLevel: {
+    type: String,
+    enum: ['excellent', 'very_good', 'good', 'needs_followup', 'ممتاز', 'جيد جدًا', 'جيد', 'يحتاج متابعة'],
+    trim: true,
+  },
+  revisionLevel: {
+    type: String,
+    enum: ['excellent', 'very_good', 'good', 'needs_followup', 'ممتاز', 'جيد جدًا', 'جيد', 'يحتاج متابعة'],
+    trim: true,
+  },
+  tajweedLevel: {
+    type: String,
+    enum: ['excellent', 'very_good', 'good', 'needs_followup', 'ممتاز', 'جيد جدًا', 'جيد', 'يحتاج متابعة'],
+    trim: true,
+  },
+  engagementLevel: {
+    type: String,
+    enum: ['excellent', 'very_good', 'good', 'needs_followup', 'ممتاز', 'جيد جدًا', 'جيد', 'يحتاج متابعة'],
+    trim: true,
+  },
+  generalEvaluation: { type: String, trim: true, maxlength: 2000 }, // التقييم العام للطالب
+
+  // ── رابعاً: ملاحظات لولي الأمر ──────────────────────────────────────────
+  parentNotes: { type: String, trim: true, maxlength: 2000 },    // ملاحظات لولي الأمر
+  importantAlert: { type: String, trim: true, maxlength: 2000 }, // تنبيه
+
+  // ── Legacy fallbacks (preserved for backward compatibility) ───────────────
   evaluationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Evaluation', default: null },
   tajweedNotes: { type: String, trim: true, maxlength: 1000 },
   interactiveActivity: { type: String, trim: true, maxlength: 500 },
-  // Lightweight freeform "what to prepare next time" note — deliberately
-  // NOT the formal multi-student Homework system (models/Homework.js); a
-  // report can optionally ALSO create/link a real Homework assignment, but
-  // this field always exists as the simple per-session note the brief asks for.
   nextSessionHomework: { type: String, trim: true, maxlength: 500 },
   teacherNotes: { type: String, trim: true, maxlength: 1000 },
-  referenceLink: { type: String, trim: true, maxlength: 500 }, // Mushaf/playlist/useful link
+  referenceLink: { type: String, trim: true, maxlength: 500 },
 
   status: {
     type: String,

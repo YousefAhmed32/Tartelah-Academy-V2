@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Gift, ShieldAlert, Clock, Sparkles, AlertCircle, Calendar } from 'lucide-react'
+import { Gift, ShieldAlert, Clock, AlertCircle, Calendar } from 'lucide-react'
 import { payrollService } from '../../services/payroll.service.js'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'

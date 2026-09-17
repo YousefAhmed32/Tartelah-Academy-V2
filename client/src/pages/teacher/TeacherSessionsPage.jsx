@@ -6,12 +6,11 @@ import toast from 'react-hot-toast'
 import {
   Check, Star, FileText, X, Users, CalendarDays, Calendar,
   CircleCheck, Clock, ExternalLink, AlertTriangle, BookOpen,
-  Sparkles, Hourglass, CheckCheck, PlayCircle, BookMarked,
+  CalendarClock, Hourglass, CheckCheck, PlayCircle, BookMarked,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import { ROUTES } from '../../config/constants.js'
 import Avatar from '../../components/ui/Avatar.jsx'
-import Badge from '../../components/ui/Badge.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
@@ -20,9 +19,10 @@ import ErrorState from '../../components/shared/ErrorState.jsx'
 import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
 import FinishReceiptModal from '../../components/teacher/FinishReceiptModal.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
+import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
 import { useCountdown } from '../../hooks/useCountdown.js'
-import { formatDateAr, formatTimeAr } from '../../utils/date.js'
+import { academyDateKey, formatDateAr, formatDateKeyAr, formatTimeAr, getAcademyTimezoneLabel } from '../../utils/date.js'
 import { toArray } from '../../utils/format.js'
 import { SESSION_STATUS, DAYS_OF_WEEK, SCHEDULE_FREQUENCY, ATT_OPTIONS, DELAY_REASON, getFileUrl } from '../../config/constants.js'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
@@ -200,6 +200,7 @@ function RescheduleModal({ session, onClose, qc }) {
       }
     >
       <div className="space-y-3" dir="rtl">
+        <AcademyTimezoneNotice compact />
         <p className="text-sm text-[#7c6aaa]">الموعد الحالي: {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}</p>
         <div>
           <label className={LBL}>الموعد الجديد *</label>
@@ -385,7 +386,7 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
         {featured && !isOngoing && (
           <div className="flex items-center justify-between gap-1.5 px-4 pt-3">
             <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-violet-600">
-              <Sparkles size={12} strokeWidth={2.4} /> الحصة التالية
+              <CalendarClock size={12} strokeWidth={2.4} /> الحصة التالية
             </span>
             {canStart && (
               <span className="text-[11px] font-bold text-gray-400">
@@ -416,6 +417,11 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.bg || '#f3f4f6', color: ATT_OPTIONS.find(o => o.value === existingAtt.status)?.color || '#6b7280' }}>
                 {ATT_OPTIONS.find(o => o.value === existingAtt.status)?.label || ''}
+              </span>
+            )}
+            {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center gap-1">
+                ⏱️ حصة مؤجلة
               </span>
             )}
             {session.teacherAttendanceStatus && session.teacherAttendanceStatus !== 'pending' && (
@@ -603,7 +609,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
     timeMinute: '00',
     durationMinutes: 60,
     sessionsCount: 8,
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: academyDateKey(new Date()),
     meetingLink: '',
     meetingProvider: 'zoom',
     titleTemplate: 'حصة',
@@ -770,10 +776,10 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
             {form.frequency !== 'daily' && (
               <div>
                 <label className={LBL}>أيام الأسبوع {form.daysOfWeek.length > 0 && <span className="text-brand-purple">({form.daysOfWeek.length} أيام)</span>}</label>
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                   {DAYS_OF_WEEK.map(d => (
                     <button key={d.value} onClick={() => toggleDay(d.value)}
-                      className="py-2 rounded-xl text-xs font-bold transition-all"
+                      className="min-h-[44px] py-2 rounded-xl text-xs font-bold transition-all"
                       style={{
                         background: form.daysOfWeek.includes(d.value) ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.04)',
                         color: form.daysOfWeek.includes(d.value) ? '#c4b5fd' : '#7c6aaa',
@@ -805,24 +811,26 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <div>
                 <label className={LBL}>المدة</label>
                 <select value={form.durationMinutes} onChange={e => set('durationMinutes', Number(e.target.value))} className={FIELD}>
-                  <option value={30}>٣٠ د</option>
-                  <option value={45}>٤٥ د</option>
-                  <option value={60}>٦٠ د</option>
-                  <option value={90}>٩٠ د</option>
+                  <option value={30}>30 د</option>
+                  <option value={45}>45 د</option>
+                  <option value={60}>60 د</option>
+                  <option value={90}>90 د</option>
                 </select>
               </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-semibold border border-violet-100">
               <Clock size={14} className="text-violet-600 shrink-0" />
-              <span>الموعد المختار للحصة: {formatTime12h(`${form.timeHour}:${form.timeMinute}`)} (بتوقيت مكة المكرمة)</span>
+              <span>الموعد المختار للحصة: {formatTime12h(`${form.timeHour}:${form.timeMinute}`)}</span>
             </div>
+            <AcademyTimezoneNotice compact />
           </div>
         )}
 
         {/* Step 3 — Period + Meeting */}
         {step === 3 && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <AcademyTimezoneNotice compact />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={LBL}>تاريخ البدء *</label>
                 <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} className={FIELD} />
@@ -855,7 +863,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <p className="text-xs text-[#7c6aaa] mt-1">سيتم إضافة رقم تسلسلي تلقائياً (حصة ١، حصة ٢...)</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={LBL}>منصة الاجتماع</label>
                 <select value={form.meetingProvider} onChange={e => set('meetingProvider', e.target.value)} className={FIELD}>
@@ -877,6 +885,7 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
         {/* Step 4 — Preview */}
         {step === 4 && (
           <div className="space-y-4">
+            <AcademyTimezoneNotice compact />
             {selectedStudent && (
               <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
                 <Avatar src={getFileUrl(selectedStudent.avatar)} firstName={selectedStudent.firstNameAr} lastName={selectedStudent.lastNameAr} size="sm" />
@@ -983,9 +992,9 @@ function OverdueReportRow({ report }) {
 }
 
 function TodayFocusView({ sessions, isLoading, isError, isFetching, onRetry, onEval, onHomework, overdueReports }) {
-  const todayKey = new Date().toDateString()
+  const todayKey = academyDateKey(new Date())
   const todaySessions = useMemo(
-    () => sessions.filter((s) => new Date(s.scheduledAt).toDateString() === todayKey),
+    () => sessions.filter((s) => academyDateKey(s.scheduledAt) === todayKey),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions]
   )
@@ -1055,6 +1064,7 @@ function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
 
   return (
     <div className="space-y-3">
+      <AcademyTimezoneNotice compact />
       {rules.map(rule => (
         <div key={rule._id} className="rounded-2xl p-4 bg-white border border-gray-100 shadow-sm">
           <div className="flex items-start gap-3">
@@ -1067,6 +1077,7 @@ function ScheduleRulesView({ rules, isLoading, isError, isFetching, onRetry }) {
                   <span>•  {rule.daysOfWeek.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label).join(' + ')}</span>
                 )}
                 <span>• {rule.timeOfDay ? `${formatTime12h(rule.timeOfDay)} (${rule.timeOfDay})` : '—'}</span>
+                <span>• {getAcademyTimezoneLabel(rule.timezone)}</span>
                 <span>• {rule.durationMinutes} دقيقة</span>
               </div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -1198,15 +1209,15 @@ export default function TeacherSessionsPage() {
 
   // Group sessions by date for month view
   const grouped = sessions.reduce((acc, s) => {
-    const k = new Date(s.scheduledAt).toDateString()
+    const k = academyDateKey(s.scheduledAt)
     if (!acc[k]) acc[k] = []
     acc[k].push(s)
     return acc
   }, {})
 
-  const todayKey = now.toDateString()
+  const todayKey = academyDateKey(now)
   const todayActionableCount = sessions.filter((s) => {
-    if (new Date(s.scheduledAt).toDateString() !== todayKey) return false
+    if (academyDateKey(s.scheduledAt) !== todayKey) return false
     return s.status === 'ongoing' || s.status === 'scheduled' || s.status === 'missed' || s.status === 'no_show'
   }).length
 
@@ -1247,10 +1258,10 @@ export default function TeacherSessionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 p-1 rounded-xl w-fit bg-gray-100">
+      <div className="grid grid-cols-2 sm:flex gap-1.5 p-1 rounded-xl w-full sm:w-fit bg-gray-100">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-1.5 rounded-[10px] text-xs font-semibold transition-all flex items-center gap-1.5 ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`min-h-[44px] px-3 sm:px-4 py-2 rounded-[10px] text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.label}
             {t.count != null && t.count > 0 && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-violet-100 text-violet-700' : 'bg-gray-200 text-gray-500'}`}>
@@ -1315,7 +1326,7 @@ export default function TeacherSessionsPage() {
                 <div key={dateKey}>
                   <div className="flex items-center gap-2 mb-2.5">
                     <div className="text-xs font-bold px-3 py-1 rounded-full bg-violet-100 text-violet-700">
-                      {formatDateAr(new Date(dateKey))}
+                      {formatDateKeyAr(dateKey)}
                     </div>
                     <div className="flex-1 h-px bg-gray-100" />
                     <span className="text-xs text-gray-500">{daySessions.length} حصة</span>
@@ -1380,6 +1391,7 @@ export default function TeacherSessionsPage() {
         }
       >
         <div className="space-y-4" dir="rtl">
+          <AcademyTimezoneNotice compact />
           <div>
             <label className={LBL}>الطالب *</label>
             <select name="studentId" value={manualForm.studentId} onChange={chg} className={FIELD}>
@@ -1391,7 +1403,7 @@ export default function TeacherSessionsPage() {
             <label className={LBL}>عنوان الحصة *</label>
             <input name="titleAr" value={manualForm.titleAr} onChange={chg} className={FIELD} placeholder="مثال: حصة محمد أحمد" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LBL}>التاريخ والوقت *</label>
               <input type="datetime-local" name="scheduledAt" value={manualForm.scheduledAt} onChange={chg} className={FIELD} />
@@ -1399,14 +1411,14 @@ export default function TeacherSessionsPage() {
             <div>
               <label className={LBL}>المدة</label>
               <select name="durationMinutes" value={manualForm.durationMinutes} onChange={chg} className={FIELD}>
-                <option value={30}>٣٠ دقيقة</option>
-                <option value={45}>٤٥ دقيقة</option>
-                <option value={60}>٦٠ دقيقة</option>
-                <option value={90}>٩٠ دقيقة</option>
+                <option value={30}>30 دقيقة</option>
+                <option value={45}>45 دقيقة</option>
+                <option value={60}>60 دقيقة</option>
+                <option value={90}>90 دقيقة</option>
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LBL}>المنصة</label>
               <select name="meetingProvider" value={manualForm.meetingProvider} onChange={chg} className={FIELD}>

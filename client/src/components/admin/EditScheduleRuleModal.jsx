@@ -13,8 +13,9 @@ import Button from '../ui/Button.jsx'
 import Avatar from '../ui/Avatar.jsx'
 import Badge from '../ui/Badge.jsx'
 import ConfirmDialog from '../shared/ConfirmDialog.jsx'
+import AcademyTimezoneNotice from '../ui/AcademyTimezoneNotice.jsx'
 import { DAYS_OF_WEEK, SCHEDULE_FREQUENCY } from '../../config/constants.js'
-import { formatDateAr } from '../../utils/date.js'
+import { academyDateKey, formatDateAr } from '../../utils/date.js'
 
 const STATUS_CONFIG = {
   active: { label: 'نشط ومستمر' },
@@ -228,7 +229,7 @@ export default function EditScheduleRuleModal({
   const resolvedInitialTeacherId = initialTeacherId || rule?.teacherId?._id || rule?.teacherId || ''
   const resolvedInitialStudentId = initialStudentId || rule?.studentId?._id || rule?.studentId || ''
 
-  const defaultStartDate = rule?.startDate ? rule.startDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
+  const defaultStartDate = rule?.startDate ? rule.startDate.slice(0, 10) : academyDateKey(new Date())
 
   const [form, setForm] = useState({
     teacherId: resolvedInitialTeacherId,
@@ -251,6 +252,7 @@ export default function EditScheduleRuleModal({
     subscriptionDays: 30,
     subscriptionEndDate: computeEndDateStr(defaultStartDate, 30),
     lessonsRemaining: 8,
+    lessonsUsed: 0,
     overrideSubscription: false,
   })
 
@@ -321,14 +323,39 @@ export default function EditScheduleRuleModal({
         subscriptionDays: days,
         subscriptionEndDate: calculatedEnd,
         lessonsRemaining: sessions,
+        lessonsUsed: 0,
         sessionsTotal: sessions,
       }))
     } else {
       setForm((p) => ({
         ...p,
         packageId: '',
+        lessonsUsed: 0,
       }))
     }
+  }
+
+  // Dual-sync handlers for used vs remaining lessons: (used + remaining = total)
+  const handleLessonsUsedChange = (val) => {
+    const total = Number(selectedPackage?.sessionsPerMonth || form.sessionsTotal || 8)
+    const used = val === '' ? '' : Math.max(0, Math.min(total, Number(val) || 0))
+    const rem = used === '' ? total : Math.max(0, total - used)
+    setForm((p) => ({
+      ...p,
+      lessonsUsed: used,
+      lessonsRemaining: rem,
+    }))
+  }
+
+  const handleLessonsRemainingChange = (val) => {
+    const total = Number(selectedPackage?.sessionsPerMonth || form.sessionsTotal || 8)
+    const rem = val === '' ? '' : Math.max(0, Math.min(total, Number(val) || 0))
+    const used = rem === '' ? 0 : Math.max(0, total - rem)
+    setForm((p) => ({
+      ...p,
+      lessonsRemaining: rem,
+      lessonsUsed: used,
+    }))
   }
 
   // Handle Duration Days Change
@@ -414,8 +441,9 @@ export default function EditScheduleRuleModal({
         payload.packageId = data.packageId
         payload.subscriptionDays = Number(data.subscriptionDays) || 30
         payload.subscriptionEndDate = data.subscriptionEndDate || undefined
+        payload.lessonsUsed = data.lessonsUsed !== undefined && data.lessonsUsed !== '' ? Number(data.lessonsUsed) : 0
         payload.lessonsRemaining =
-          data.lessonsRemaining !== undefined ? Number(data.lessonsRemaining) : undefined
+          data.lessonsRemaining !== undefined && data.lessonsRemaining !== '' ? Number(data.lessonsRemaining) : undefined
       }
 
       if (isEdit) {
@@ -823,45 +851,135 @@ export default function EditScheduleRuleModal({
                   </div>
                 </div>
 
-                {/* Opening Balance Lessons */}
-                <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-700">
-                      رصيد الحصص الافتتاحي في محفظة الطالب
-                    </label>
-                    <span className="text-[11px] text-slate-400">يُشحن فور حفظ الجدول</span>
+                {/* Opening Balance Lessons & Teacher Credit Sync */}
+                <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 sm:p-4 space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-100">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block">
+                        توزيع رصيد الباقة وتوريد استحقاق المعلم المالي
+                      </label>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        حدد الحصص المستهلكة سابقاً مع المعلم والرصيد المتبقي للطالب (يسمع عند الاثنين تلقائياً)
+                      </p>
+                    </div>
+                    <span className="text-xs font-extrabold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-lg">
+                      إجمالي الباقة: {selectedPackage?.sessionsPerMonth || form.sessionsTotal || 8} حصص
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {PRESET_SESSION_COUNTS.map((n) => {
-                      const isSelected = Number(form.lessonsRemaining) === n
-                      return (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => set('lessonsRemaining', n)}
-                          className={`h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-violet-600 text-white shadow-xs border border-violet-600'
-                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/80'
-                          }`}
-                        >
-                          {n} حصص
-                        </button>
-                      )
-                    })}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* 1. Consumed Lessons (Credited to Teacher) */}
+                    <div className="bg-amber-50/40 border border-amber-200/70 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                          <span>حصص مستهلكة سابقاً مع المعلم</span>
+                        </label>
+                        <span className="text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md">
+                          لحساب المعلم
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-amber-800/80 leading-relaxed">
+                        لو الطالب قديم وأتمّ حصصاً خارج المنصة، حددها هنا لتُسجل كحصص مكتملة وتُحسب في راتب المعلم.
+                      </p>
+
+                      <div className="grid grid-cols-5 gap-1 pt-1">
+                        {[0, 2, 4, 6, 8].map((n) => {
+                          const isSelected = Number(form.lessonsUsed) === n
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => handleLessonsUsedChange(n)}
+                              className={`h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-amber-600 text-white shadow-2xs border border-amber-600'
+                                  : 'bg-white text-slate-700 hover:bg-amber-100/60 border border-amber-200/60'
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <input
+                        type="number"
+                        min={0}
+                        max={selectedPackage?.sessionsPerMonth || form.sessionsTotal || 100}
+                        value={form.lessonsUsed === '' ? '' : form.lessonsUsed}
+                        onChange={(e) => handleLessonsUsedChange(e.target.value)}
+                        className="w-full h-9 bg-white border border-amber-200 rounded-lg px-3 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                        placeholder="أدخل عدد الحصص المستهلكة..."
+                      />
+                    </div>
+
+                    {/* 2. Remaining Lessons (Credited to Student Wallet) */}
+                    <div className="bg-emerald-50/40 border border-emerald-200/70 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                          <span>رصيد الحصص المتبقي للطالب</span>
+                        </label>
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                          في محفظة الطالب
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-emerald-800/80 leading-relaxed">
+                        الرصيد الفعلي الذي سيتم شحنه في محفظة الطالب لحضور الحصص القادمة عبر المنصة.
+                      </p>
+
+                      <div className="grid grid-cols-5 gap-1 pt-1">
+                        {[2, 4, 6, 8, 12].map((n) => {
+                          const isSelected = Number(form.lessonsRemaining) === n
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => handleLessonsRemainingChange(n)}
+                              className={`h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-600 text-white shadow-2xs border border-emerald-600'
+                                  : 'bg-white text-slate-700 hover:bg-emerald-100/60 border border-emerald-200/60'
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <input
+                        type="number"
+                        min={0}
+                        max={selectedPackage?.sessionsPerMonth || form.sessionsTotal || 100}
+                        value={form.lessonsRemaining === '' ? '' : form.lessonsRemaining}
+                        onChange={(e) => handleLessonsRemainingChange(e.target.value)}
+                        className="w-full h-9 bg-white border border-emerald-200 rounded-lg px-3 text-xs font-bold text-emerald-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="أدخل الحصص المتبقية..."
+                      />
+                    </div>
                   </div>
 
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={form.lessonsRemaining || ''}
-                    onChange={(e) => set('lessonsRemaining', e.target.value ? Number(e.target.value) : '')}
-                    className="w-full h-10 bg-slate-50 border border-slate-200 rounded-xl px-3.5 text-sm font-semibold text-slate-800 outline-none transition-all hover:border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-100 placeholder:text-slate-400"
-                    placeholder="أو اكتب رصيد حصص مخصص..."
-                    style={{ lineHeight: 'normal' }}
-                  />
+                  {/* Dual Sync Confirmation Pill */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-xs space-y-1 text-slate-700">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 flex-none" />
+                      <span>
+                        سيتم شحن محفظة الطالب برصيد: <b>{form.lessonsRemaining || 0} حصص متبقية</b>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span className={`w-2 h-2 rounded-full ${Number(form.lessonsUsed) > 0 ? 'bg-amber-500' : 'bg-slate-300'} flex-none`} />
+                      <span>
+                        {Number(form.lessonsUsed) > 0 ? (
+                          <>
+                            سيتم احتساب <b>{form.lessonsUsed} حصص كمكتملة</b> وإضافتها لاستحقاق مسير رواتب المعلم (<b>{teacherDisplayName || 'المعلم'}</b>) تلقائياً
+                          </>
+                        ) : (
+                          'لا توجد حصص سابقة مخصومة (الباقة جديدة بالكامل للمعلم والطالب)'
+                        )}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -936,6 +1054,7 @@ export default function EditScheduleRuleModal({
                 options={DURATION_OPTIONS}
               />
             </div>
+            <AcademyTimezoneNotice compact />
 
             {/* Days of Week (Weekly & Biweekly) */}
             {(form.frequency === 'weekly' || form.frequency === 'biweekly') && (

@@ -25,7 +25,7 @@ import LatestNotificationsWidget from '../../components/shared/LatestNotificatio
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
 import { formatDateAr, formatTimeAr, timeFromNow } from '../../utils/date.js'
-import { toArray } from '../../utils/format.js'
+import { toArray, formatCurrency, formatNumber } from '../../utils/format.js'
 import { ROUTES, getFileUrl } from '../../config/constants.js'
 import { dayLabel, durationLabel, TEACHING_TYPE_OPTIONS } from '../../utils/assignmentSchedule.js'
 import { subjectLabel } from '../../utils/teacherProfile.js'
@@ -36,6 +36,7 @@ const DEFAULT_STATS = {
   upcomingSessions: [], recentStudents: [], needsAttention: 0,
   currentSession: null, ongoingCount: 0,
   payrollSummary: null,
+  payrollAnnouncement: null,
 }
 
 function useCountdown(targetDate) {
@@ -129,7 +130,14 @@ function NextSessionCard({ session }) {
       <div className="flex items-start gap-4 mb-4 relative">
         <Avatar src={getFileUrl(session.studentId?.avatar)} firstName={session.studentId?.firstNameAr} lastName={session.studentId?.lastNameAr} size="md" />
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-bold mb-1 text-violet-600">الحصة القادمة</div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-bold text-violet-600">الحصة القادمة</span>
+            {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                ⏱️ حصة مؤجلة
+              </span>
+            )}
+          </div>
           <div className="text-gray-900 font-heading font-bold text-base truncate">{session.titleAr}</div>
           <div className="text-sm mt-0.5 text-gray-500 truncate">
             {session.studentId?.firstNameAr} {session.studentId?.lastNameAr}
@@ -502,6 +510,113 @@ function ActionItem({ icon, title, count, color, onClick }) {
   )
 }
 
+function TeacherPayrollAnnouncementBanner({ announcement, summary }) {
+  const navigate = useNavigate()
+  const period = announcement || (summary && ['approved', 'paid'].includes(summary.status) ? summary : null)
+  if (!period) return null
+
+  const isPaid = period.status === 'paid'
+  const isApproved = period.status === 'approved'
+
+  if (!isPaid && !isApproved) return null
+
+  const targetUrl = period.periodId
+    ? ROUTES.TEACHER_PAYROLL_PERIOD.replace(':periodId', period.periodId)
+    : ROUTES.TEACHER_PAYROLL
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl p-4 sm:p-5 border shadow-sm transition-all ${
+        isPaid
+          ? 'bg-gradient-to-l from-emerald-50/70 via-white to-white border-emerald-200'
+          : 'bg-gradient-to-l from-indigo-50/70 via-white to-white border-indigo-200'
+      }`}
+      dir="rtl"
+    >
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        {/* Right Info */}
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-1 rounded-full ${
+                isPaid
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300/60'
+                  : 'bg-indigo-100 text-indigo-800 border border-indigo-300/60'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-indigo-600 animate-pulse'}`} />
+              {isPaid ? 'تم صرف الراتب بنجاح' : 'تم اعتماد مسير الراتب وجارٍ الصرف'}
+            </span>
+            <span className="text-xs font-bold text-slate-500">
+              شهر {period.periodKey}
+            </span>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-heading font-black text-slate-900">
+            {isPaid
+              ? `تم تحويل وصرف مستحقاتك المالية لشهر ${period.periodKey} بنجاح 🎉`
+              : `تم اعتماد مسير رواتبك لشهر ${period.periodKey} من الإدارة وجارٍ التجهيز للصرف`}
+          </h2>
+
+          <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
+            {isPaid
+              ? 'تم إيداع الراتب في حسابك المالي المعتمد بنجاح. يمكنك مراجعة قسيمة الراتب وكشف الحصص والمكافآت في أي وقت.'
+              : 'اعتمدت الإدارة الحصص المؤداة والمكافآت والخصومات المسجلة بالكامل، وسيصلك إشعار لحظي فور إتمام التحويل البنكي.'}
+          </p>
+
+          {/* Itemized Adjustments / Badges */}
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            {Number(period.bonusesTotal) > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Gift size={12} /> مكافأة مضافة: +{formatCurrency(period.bonusesTotal)}
+              </span>
+            )}
+            {Number(period.deductionsTotal) > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
+                <AlertCircle size={12} /> خصم مسجل: -{formatCurrency(period.deductionsTotal)}
+              </span>
+            )}
+            {period.totalPayableSessions !== undefined && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700">
+                <Check size={12} /> {period.totalPayableSessions} حصة مستحقة
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Left Net Value & Action Button */}
+        <div className="flex sm:flex-col items-center sm:items-end justify-between w-full lg:w-auto gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex-none">
+          <div className="text-start sm:text-end">
+            <span className="text-[11px] font-bold text-slate-500 block">صافي الراتب المستحق</span>
+            <span
+              className={`text-2xl sm:text-3xl font-heading font-black block ${
+                isPaid ? 'text-emerald-700' : 'text-indigo-700'
+              }`}
+            >
+              {formatCurrency(period.netPayable)}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate(targetUrl)}
+            className={`min-h-[42px] px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+              isPaid
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            <span>عرض تفاصيل المسير</span>
+            <ChevronLeft size={14} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function TeacherDashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
@@ -523,6 +638,7 @@ export default function TeacherDashboardPage() {
         currentSession: d.currentSession || null,
         ongoingCount: d.ongoingCount || 0,
         payrollSummary: d.payrollSummary || null,
+        payrollAnnouncement: d.payrollAnnouncement || null,
       }
     }),
     placeholderData: DEFAULT_STATS,
@@ -570,6 +686,9 @@ export default function TeacherDashboardPage() {
           <BookOpen size={15} /> كيف تعمل الحصة؟
         </button>
       </motion.div>
+
+      {/* Monthly Payroll Announcement Hero Banner (approved / paid) */}
+      <TeacherPayrollAnnouncementBanner announcement={stats?.payrollAnnouncement} summary={stats?.payrollSummary} />
 
       {/* New-student assignment requests awaiting this teacher's approval —
           placed high, right after the greeting, per the brief. */}
@@ -709,8 +828,8 @@ export default function TeacherDashboardPage() {
 
         {/* Right Column: Stats + Students + Sessions */}
         <div className="lg:col-span-2 flex flex-col gap-5">
-          {/* Payroll & Financial Summary Card */}
-          {stats?.payrollSummary && (
+          {/* Payroll & Financial Summary Card (routine/open cycle when not announced above) */}
+          {stats?.payrollSummary && !stats?.payrollAnnouncement && !['approved', 'paid'].includes(stats?.payrollSummary?.status) && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

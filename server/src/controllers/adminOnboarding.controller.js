@@ -119,6 +119,7 @@ exports.addStudentToTeacher = async (req, res, next) => {
           studentId: student._id, packageId: pkgInput.packageId, teacherId: teacher._id,
           startDate: pkgInput.startDate, notes: pkgInput.notes,
           lessonsUsed: pkgInput.lessonsUsed, lessonsRemaining: pkgInput.lessonsRemaining,
+          durationMinutes: Number(lessonDurationMinutes) || 60,
           actorId: req.user._id, actorRole: 'admin',
         })
         subscription = result.subscription

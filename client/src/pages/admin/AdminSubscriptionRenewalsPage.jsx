@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { RefreshCw, Check, Sparkles, Plus } from 'lucide-react'
+import { RefreshCw, Check, Plus } from 'lucide-react'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 import Button from '../../components/ui/Button.jsx'
@@ -88,7 +88,7 @@ export default function AdminSubscriptionRenewalsPage() {
             <Button
               variant="purple"
               size="sm"
-              icon={<Sparkles size={14} />}
+              icon={<Plus size={14} />}
               onClick={() => setDirectRenewalOpen(true)}
             >
               تجديد اشتراك مباشر

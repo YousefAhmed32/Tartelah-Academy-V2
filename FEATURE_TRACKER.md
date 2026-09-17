@@ -2,7 +2,34 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
-## UX Hardening Pass — Session Lifecycle Docs, Teacher Daily Focus, Check-in Window, Wizard Progress, Student Transparency — 2026-09-08 (latest)
+## Canonical Academy-Time Scheduling Hardening — 2026-09-17 (latest)
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Canonical academy-time display | ✅ fixed | All session date/time formatters and calendar-day grouping explicitly use `AcademySettings.timezone`; device/browser timezone no longer changes visible lesson time. |
+| Safe datetime-local input | ✅ fixed | Teacher/admin create, edit, postpone, and reschedule send wall-clock values; the backend interprets them in academy time while preserving explicit-offset ISO values. |
+| Academy calendar boundaries | ✅ fixed | Today/month dashboards, teacher month queries, admin date filters, and Quran-report daily tracking use timezone-safe half-open boundaries rather than server-local midnight. |
+| Recurring rules | ✅ fixed | New rules inherit the academy timezone, generation remains `date-fns-tz` based, and the UI exposes the timezone clearly. Existing explicit per-rule zones remain backward compatible. |
+| Booking/provider correctness | ✅ fixed | Admin session edits now re-check teacher/student overlap; invalid `google_meet` UI value corrected to the model's `meet` enum. |
+| Data integrity audit | ✅ | 309 future scheduled sessions linked to active rules checked; 0 rule-time mismatches and no data rewrite required. |
+| Verification | ✅ | Client: full 90/90 tests + production build. Server: full 53 suites / 588 tests. Live wizard QA confirmed 21:00 stays 9:00 مساءً under Cairo time. |
+
+## Unified Session Completion, Opening Balance Teacher Crediting & Admin Today's Sessions Operational Hub — 2026-09-17
+
+Full detail in `SESSION_HANDOFF.md`'s matching entry.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Decouple Deducted vs Consumed Sessions | ✅ | Deductions decrement remaining balance and increment `deductedLessons` only. Does NOT increment `totalUsed` or affect teacher payroll. |
+| Add "إضافة حصة مستهلكة" Capability | ✅ | Dedicated endpoint `POST /api/wallets/:studentId/consume` and UI in `WalletOperationsModal.jsx`. Decrements student balance, increments `totalUsed`, creates completed `Session`, and credits assigned teacher's payroll period. |
+| Teacher Crediting on Opening Balance Attended Lessons | ✅ | `subscription.service.js#createSubscriptionWithOpeningBalance` automatically creates completed sessions and payable payroll entries for attended lessons (`used > 0`) in the current open payroll period. All-or-nothing compensation prevents a partial/silent import. Imported sessions explicitly require no Quran report and are excluded from missing/overdue report metrics. |
+| Unified Finish Session + Quran Report | ✅ | The teacher now records attendance and completes the standardized four-section Quran report inside one modal and submits both from one action. Old generic notes/homework/evaluation fields were removed from this workflow; absent/postponed sessions correctly skip a meaningless report. Report-only retries cannot double-apply wallet/payroll completion or duplicate submitted report data/notifications. |
+| Admin Dashboard Today's Classes Operational Intelligence | ✅ | `AdminDashboardPage.jsx` enriched with live lifecycle states (مكتملة, جارية الآن, تأخر المعلم, مجدولة), teacher check-in status (بدأ المعلم / لم يسجل), and truthful Quran report status including "التقرير غير مطلوب" for imported lessons, plus the 1-click inspection drawer. |
+| Verification | ✅ | Backend: 52/52 suites and 582/582 tests passed. Frontend production build and targeted ESLint passed. Live QA at 360px confirmed the merged modal, required-state behavior, 44px touch targets, and zero horizontal overflow. |
+
+## UX Hardening Pass — Session Lifecycle Docs, Teacher Daily Focus, Check-in Window, Wizard Progress, Student Transparency — 2026-09-08
 
 Full detail in `SESSION_HANDOFF.md`'s matching entry. Phase 1 of a large 5-work-package UX brief (onboarding wizard, premium schedule builder, teacher/student/admin lesson lifecycle UX, lifecycle audit+docs) — delivered the packages completable end-to-end with real verification; the largest items (full drag-and-drop weekly planner, `ScheduleReservationLock` concurrency hardening, full multi-student onboarding workspace rebuild) are explicitly scoped out with a documented reason, not silently skipped.
 

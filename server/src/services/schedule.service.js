@@ -1,6 +1,7 @@
 const Session = require('../models/Session')
 const mongoose = require('mongoose')
 const { fromZonedTime, formatInTimeZone } = require('date-fns-tz')
+const { DEFAULT_ACADEMY_TIMEZONE } = require('../config/academyTimezone')
 
 let User
 try {
@@ -37,7 +38,7 @@ function generateDates(rule, overrideLimit) {
     endDate,
     sessionsTotal,
     skipDates = [],
-    timezone = 'Asia/Riyadh',
+    timezone = DEFAULT_ACADEMY_TIMEZONE,
   } = rule
 
   const skipSet = new Set(skipDates.map(d => new Date(d).toDateString()))
@@ -82,7 +83,7 @@ function generateDates(rule, overrideLimit) {
       // in the rule's own timezone — not the server's — or a "6pm Cairo"
       // rule silently becomes 6pm-wherever-the-server-happens-to-run.
       const dateStr = `${cur.getFullYear()}-${pad2(cur.getMonth() + 1)}-${pad2(cur.getDate())} ${timeOfDay}`
-      dates.push(fromZonedTime(dateStr, timezone))
+      dates.push(fromZonedTime(dateStr, timezone || DEFAULT_ACADEMY_TIMEZONE))
     }
 
     cur.setDate(cur.getDate() + 1)
@@ -206,7 +207,7 @@ exports.generateSessionsFromRule = async (rule) => {
 async function syncFutureSessionsForRule(rule) {
   if (!rule?._id) return { updatedCount: 0 }
 
-  const tz = rule.timezone || 'Asia/Riyadh'
+  const tz = rule.timezone || DEFAULT_ACADEMY_TIMEZONE
   const todayStr = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
   const startOfToday = fromZonedTime(`${todayStr} 00:00:00`, tz)
 

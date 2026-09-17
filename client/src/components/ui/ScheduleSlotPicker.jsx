@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Clock, ChevronDown, AlertTriangle, CheckCircle2, LockKeyhole, Sparkles, TimerReset } from 'lucide-react'
+import { Clock, ChevronDown, AlertTriangle, CheckCircle2, LockKeyhole, TimerReset } from 'lucide-react'
 import {
   formatTimeArabic12Strict, addMinutesToTime, describeAvailability, generateTimeSlots,
   groupSlotsByPeriod, PERIOD_LABELS_AR, buildSlotStatusMap,
@@ -90,7 +90,7 @@ export default function ScheduleSlotPicker({
                 {slots[0] && (
                   <button type="button" onClick={() => pick(slots[0])}
                     className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500">
-                    <Sparkles size={12} /> اختيار أقرب موعد
+                    <Clock size={12} /> اختيار أقرب موعد
                   </button>
                 )}
               </div>
