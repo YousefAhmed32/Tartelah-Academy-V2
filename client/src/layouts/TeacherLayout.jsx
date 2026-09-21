@@ -139,8 +139,8 @@ export default function TeacherLayout() {
             </div>
             <div style={{ lineHeight: 1.2 }}>
               <div className="font-heading font-extrabold text-[20px] text-white">ترتيلة</div>
-              <div className="text-[10px] font-semibold tracking-wide" style={{ color: '#E8C76A', letterSpacing: '0.08em' }}>
-                Tartelah Online
+              <div className="text-[10px] font-semibold tracking-wide" style={{ color: '#E8C76A' }}>
+                ترتيلة أونلاين
               </div>
             </div>
           </div>

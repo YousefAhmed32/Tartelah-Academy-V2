@@ -538,10 +538,10 @@ export default function StudentScheduleSection({
                 value={value.meetingProvider || 'zoom'}
                 onChange={(e) => set({ meetingProvider: e.target.value })}
               >
-                <option value="zoom">Zoom</option>
-                <option value="meet">Google Meet</option>
-                <option value="teams">Microsoft Teams</option>
-                <option value="other">رابط آخر</option>
+                <option value="zoom">زووم</option>
+                <option value="meet">جوجل ميت</option>
+                <option value="teams">مايكروسوفت تيمز</option>
+                <option value="other">رابط مخصص</option>
               </select>
             </div>
           </div>

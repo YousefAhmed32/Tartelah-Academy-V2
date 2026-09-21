@@ -18,12 +18,12 @@ import EmptyState from '../../components/shared/EmptyState.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import Pagination from '../../components/ui/Pagination.jsx'
 import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx'
-import DateRangePresetPicker from '../../components/shared/DateRangePresetPicker.jsx'
+import DateRangePresetPicker, { DATE_PRESETS } from '../../components/shared/DateRangePresetPicker.jsx'
 import OperationsTableView from '../../components/admin/OperationsTableView.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import { formatDateAr, formatTimeAr, formatDateTimeAr } from '../../utils/date.js'
 import { formatCurrency } from '../../utils/format.js'
-import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, ROUTES, getFileUrl } from '../../config/constants.js'
+import { SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE, CONFIDENCE_LEVEL, ROUTES, getFileUrl, TEACHER_ATTENDANCE_STATUS_LABELS, MEETING_PROVIDERS } from '../../config/constants.js'
 
 const inputCls = 'h-9 bg-gray-50 border border-gray-200 rounded-xl px-3 text-sm text-gray-700 outline-none focus:border-violet-400 cursor-pointer'
 
@@ -309,7 +309,7 @@ function TimelineRow({ session }) {
         <div className="px-4 pb-4 pt-1 border-t border-gray-50 space-y-2 text-xs text-gray-600">
           <div>{session.titleAr}</div>
           {session.meetingLink ? (
-            <div>رابط الاجتماع: <span className="text-violet-600">{session.meetingProvider}</span></div>
+            <div>رابط الاجتماع: <span className="text-violet-600">{MEETING_PROVIDERS[session.meetingProvider]?.label || session.meetingProvider || 'الاجتماع'}</span></div>
           ) : (
             <div className="text-amber-600">لا يوجد رابط اجتماع مسجّل</div>
           )}
@@ -340,7 +340,7 @@ function TimelineRow({ session }) {
 
 // ── Inline Correction Form ──────────────────────────────────────────────────
 
-const ATT_STATUSES = ['pending', 'on_time', 'late', 'absent', 'excused']
+const ATT_STATUSES = ['pending', 'on_time', 'late', 'absent', 'excused', 'postponed']
 
 function InlineCorrectionForm({ session, onDone }) {
   const qc = useQueryClient()
@@ -364,7 +364,7 @@ function InlineCorrectionForm({ session, onDone }) {
     <div className="mt-2 p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <select className={inputCls + ' w-full'} value={attStatus} onChange={e => setAttStatus(e.target.value)}>
-          {ATT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {ATT_STATUSES.map(s => <option key={s} value={s}>{TEACHER_ATTENDANCE_STATUS_LABELS[s] || s}</option>)}
         </select>
         <select className={inputCls + ' w-full'} value={payrollStatus} onChange={e => setPayrollStatus(e.target.value)}>
           {Object.entries(PAYROLL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -512,7 +512,7 @@ function TimelineTab({ initialFilters = {}, onGoToReview }) {
           </span>
           {dateFilter.preset && dateFilter.preset !== 'today' && (
             <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
-              الفترة: {dateFilter.preset}
+              الفترة: {DATE_PRESETS.find(p => p.key === dateFilter.preset)?.label || dateFilter.preset}
               <button onClick={() => setDateFilter({ preset: 'today', startDate: '', endDate: '' })} className="hover:text-red-600"><X size={12} /></button>
             </span>
           )}

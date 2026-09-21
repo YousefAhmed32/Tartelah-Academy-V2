@@ -167,7 +167,7 @@ export default function EditSessionLinkModal({ open, onClose, session, onSuccess
                   }`}
                 >
                   <Video size={12} />
-                  <span>{s.label || s.title || (s.provider === 'meet' ? 'Google Meet' : 'Zoom')}</span>
+                  <span>{s.label || s.title || (s.provider === 'meet' ? 'جوجل ميت' : s.provider === 'teams' ? 'مايكروسوفت تيمز' : 'زووم')}</span>
                 </button>
               ))}
             </div>

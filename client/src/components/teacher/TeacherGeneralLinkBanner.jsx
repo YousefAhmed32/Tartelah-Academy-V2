@@ -13,7 +13,7 @@ import { MEETING_PROVIDERS } from '../../config/constants.js'
 function getProviderMeta(providerKey) {
   if (providerKey === 'meet') {
     return {
-      label: 'Google Meet',
+      label: 'جوجل ميت',
       color: '#00897B',
       bgColor: 'rgba(0,137,123,0.1)',
       borderColor: 'rgba(0,137,123,0.25)',
@@ -22,7 +22,7 @@ function getProviderMeta(providerKey) {
   }
   if (providerKey === 'zoom') {
     return {
-      label: 'Zoom',
+      label: 'زووم',
       color: '#2D8CFF',
       bgColor: 'rgba(45,140,255,0.1)',
       borderColor: 'rgba(45,140,255,0.25)',
@@ -31,7 +31,7 @@ function getProviderMeta(providerKey) {
   }
   if (providerKey === 'teams') {
     return {
-      label: 'Microsoft Teams',
+      label: 'مايكروسوفت تيمز',
       color: '#6264A7',
       bgColor: 'rgba(98,100,167,0.1)',
       borderColor: 'rgba(98,100,167,0.25)',

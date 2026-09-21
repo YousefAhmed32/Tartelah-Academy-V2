@@ -46,7 +46,7 @@ export default function StudentQuranReportsPage() {
 
   const copyReportSummary = (r) => {
     const lines = [
-      '📋 *تقرير الحلقة – ترتيلة online*',
+      '📋 *تقرير الحلقة – ترتيلة أونلاين*',
       `📅 التاريخ: ${formatDateAr(r.sessionId?.scheduledAt || r.createdAt)}`,
       `👤 المعلم: ${r.teacherId?.firstNameAr || ''} ${r.teacherId?.lastNameAr || ''}`,
       '',

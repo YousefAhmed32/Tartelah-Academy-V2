@@ -26,7 +26,7 @@ function detectProvider(url) {
 const PROVIDER_CARDS = [
   {
     key: 'meet',
-    label: 'Google Meet',
+    label: 'جوجل ميت',
     desc: 'موصى به لحصص جوجل',
     color: '#00897B',
     bgLight: 'rgba(0,137,123,0.08)',
@@ -36,7 +36,7 @@ const PROVIDER_CARDS = [
   },
   {
     key: 'zoom',
-    label: 'Zoom',
+    label: 'زووم',
     desc: 'روابط غرف زووم',
     color: '#2D8CFF',
     bgLight: 'rgba(45,140,255,0.08)',
@@ -46,7 +46,7 @@ const PROVIDER_CARDS = [
   },
   {
     key: 'teams',
-    label: 'Microsoft Teams',
+    label: 'مايكروسوفت تيمز',
     desc: 'فصول مايكروسوفت',
     color: '#6264A7',
     bgLight: 'rgba(98,100,167,0.08)',

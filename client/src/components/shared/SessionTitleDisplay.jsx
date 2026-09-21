@@ -39,12 +39,6 @@ export default function SessionTitleDisplay({
           </span>
         )}
 
-        {isPastApproved && (
-          <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100/60 text-amber-900 border border-amber-200/50">
-            سابقة معتمدة
-          </span>
-        )}
-
         {showStatusIndicator && session.status === 'completed' && !isPastApproved && (
           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/50">
             <CheckCircle2 size={10} className="text-emerald-600" />

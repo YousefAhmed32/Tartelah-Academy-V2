@@ -11,7 +11,7 @@ import { formatDateAr, formatTimeAr, formatDateTimeAr } from '../../utils/date.j
 import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import {
   SESSION_STATUS, PAYROLL_STATUS, REVIEW_SEVERITY, REVIEW_STATE,
-  CONFIDENCE_LEVEL, ROUTES, getFileUrl,
+  CONFIDENCE_LEVEL, ROUTES, getFileUrl, MEETING_PROVIDERS,
 } from '../../config/constants.js'
 
 export default function OperationsTableView({
@@ -126,7 +126,7 @@ export default function OperationsTableView({
                         title={s.meetingLink}
                       >
                         <Video size={12} />
-                        <span>{s.meetingProvider || 'الاجتماع'}</span>
+                        <span>{MEETING_PROVIDERS[s.meetingProvider]?.label || 'الاجتماع'}</span>
                         <ExternalLink size={10} className="text-brand-purple/70" />
                       </a>
                     ) : (

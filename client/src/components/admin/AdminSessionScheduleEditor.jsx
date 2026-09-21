@@ -218,10 +218,10 @@ export default function AdminSessionScheduleEditor({ open, session, mode = 'edit
                     <div>
                       <label className={LABEL} htmlFor="session-provider">منصة الاجتماع</label>
                       <select id="session-provider" className={FIELD} value={form.meetingProvider || 'zoom'} onChange={(e) => setForm((p) => ({ ...p, meetingProvider: e.target.value }))}>
-                        <option value="zoom">Zoom</option>
-                        <option value="meet">Google Meet</option>
-                        <option value="teams">Microsoft Teams</option>
-                        <option value="other">أخرى</option>
+                        <option value="zoom">زووم</option>
+                        <option value="meet">جوجل ميت</option>
+                        <option value="teams">مايكروسوفت تيمز</option>
+                        <option value="other">رابط مخصص</option>
                       </select>
                     </div>
                     <div>

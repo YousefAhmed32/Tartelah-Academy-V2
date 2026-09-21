@@ -271,7 +271,7 @@ export default function AdminLayout() {
           </div>
           <div>
             <div className="font-heading font-extrabold text-[17px] text-gray-900 leading-tight">ترتيلة</div>
-            <div className="text-[10px] font-medium tracking-wider text-violet-500">Tartelah Online</div>
+            <div className="text-[10px] font-medium tracking-wider text-violet-500">ترتيلة أونلاين</div>
           </div>
         </div>
 

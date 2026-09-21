@@ -32,10 +32,10 @@ const DURATION_OPTIONS = [
 ]
 
 const MEETING_PROVIDERS = [
-  { value: 'zoom', label: 'Zoom' },
-  { value: 'meet', label: 'Google Meet' },
-  { value: 'teams', label: 'Microsoft Teams' },
-  { value: 'other', label: 'منصة أخرى' },
+  { value: 'zoom', label: 'زووم' },
+  { value: 'meet', label: 'جوجل ميت' },
+  { value: 'teams', label: 'مايكروسوفت تيمز' },
+  { value: 'other', label: 'رابط مخصص' },
 ]
 
 const PRESET_SESSION_COUNTS = [4, 8, 12, 16, 24]

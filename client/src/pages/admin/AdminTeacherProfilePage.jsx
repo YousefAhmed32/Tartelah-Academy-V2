@@ -433,7 +433,7 @@ function OverviewTab({ teacher, workingHours, scheduleRules, subjects, id, onSyn
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-gray-800">
-                          {ml.label || ml.title || (ml.provider === 'meet' ? 'Google Meet' : 'Zoom')}
+                          {ml.label || ml.title || (ml.provider === 'meet' ? 'جوجل ميت' : ml.provider === 'teams' ? 'مايكروسوفت تيمز' : ml.provider === 'other' ? 'رابط مخصص' : 'زووم')}
                         </span>
                         {idx === 0 && (
                           <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-md">
@@ -603,6 +603,8 @@ const CORRECTION_OPTIONS = [
   { value: 'late', label: 'متأخر' },
   { value: 'absent', label: 'غائب' },
   { value: 'excused', label: 'معذور' },
+  { value: 'postponed', label: 'مؤجلة' },
+  { value: 'pending', label: 'قيد الانتظار' },
 ]
 
 function AttendanceCorrectionMenu({ session }) {
@@ -742,8 +744,8 @@ function PerformanceTab({ teacherId, recentSessions }) {
                     <div className="text-[10px] text-gray-500">{formatDateAr(s.scheduledAt)} • {formatTimeAr(s.scheduledAt)}</div>
                   </div>
                   <div className="flex items-center gap-2 flex-none">
-                    <Badge variant={s.teacherAttendanceStatus === 'on_time' ? 'success' : s.teacherAttendanceStatus === 'late' ? 'warning' : s.teacherAttendanceStatus === 'absent' ? 'danger' : 'gray'}>
-                      {{ on_time: 'في الموعد', late: 'متأخر', absent: 'غائب', excused: 'معذور' }[s.teacherAttendanceStatus] || s.teacherAttendanceStatus || 'قيد الانتظار'}
+                    <Badge variant={s.teacherAttendanceStatus === 'on_time' ? 'success' : s.teacherAttendanceStatus === 'late' ? 'warning' : s.teacherAttendanceStatus === 'absent' ? 'danger' : s.teacherAttendanceStatus === 'postponed' ? 'warning' : 'gray'}>
+                      {{ on_time: 'في الموعد', late: 'متأخر', absent: 'غائب', excused: 'معذور', pending: 'قيد الانتظار', postponed: 'مؤجلة' }[s.teacherAttendanceStatus] || 'قيد الانتظار'}
                     </Badge>
                     <AttendanceCorrectionMenu session={s} />
                   </div>

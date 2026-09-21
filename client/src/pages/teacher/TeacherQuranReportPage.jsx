@@ -163,7 +163,7 @@ export default function TeacherQuranReportPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-xs font-bold mb-2">
-            <span>📋 تقرير الحلقة – ترتيلة online</span>
+            <span>📋 تقرير الحلقة – ترتيلة أونلاين</span>
           </div>
           <h1 className="font-heading font-extrabold text-2xl text-gray-900">
             تقرير الحصة القرآنية

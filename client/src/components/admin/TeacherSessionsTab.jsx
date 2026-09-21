@@ -1412,12 +1412,12 @@ function AdminSessionModal({
               value={form.status}
               onChange={(e) => set('status', e.target.value)}
             >
-              <option value="scheduled">مجدولة (Scheduled)</option>
-              <option value="ongoing">جارية الآن (Ongoing)</option>
-              <option value="completed">مكتملة (Completed)</option>
-              <option value="cancelled">ملغاة (Cancelled)</option>
-              <option value="missed">بحاجة متابعة (Missed)</option>
-              <option value="no_show">غياب (No Show)</option>
+              <option value="scheduled">مجدولة</option>
+              <option value="ongoing">جارية الآن</option>
+              <option value="completed">مكتملة</option>
+              <option value="cancelled">ملغاة</option>
+              <option value="missed">بحاجة متابعة</option>
+              <option value="no_show">غياب</option>
             </select>
           </div>
         )}

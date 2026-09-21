@@ -61,7 +61,7 @@ export default function Footer() {
                 <img src="/images/logo.jpg" alt="ترتيلة" style={{ width: 50, height: 50, borderRadius: 13, objectFit: 'cover', border: '1px solid rgba(212,175,55,.4)', boxShadow: '0 6px 18px rgba(0,0,0,.4)' }} />
                 <div style={{ lineHeight: 1.18 }}>
                   <div style={{ fontFamily: 'Cairo', fontWeight: 800, fontSize: 18, color: '#F3E6C0' }}>ترتيلة</div>
-                  <div style={{ fontSize: 10, letterSpacing: 3, fontWeight: 600, color: '#7c6aaa' }}>ONLINE</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#7c6aaa' }}>أونلاين</div>
                 </div>
               </Link>
               <p style={{ color: '#a89ec8', fontSize: 14.5, lineHeight: 1.85, maxWidth: 260 }}>{footerDesc}</p>

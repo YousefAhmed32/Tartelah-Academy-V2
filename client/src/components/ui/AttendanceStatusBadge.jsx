@@ -5,6 +5,7 @@ const TEACHER_STATUS = {
   late:     { label: 'متأخر',         color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   absent:   { label: 'غائب',          color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
   excused:  { label: 'معذور',         color: '#7c3aed', bg: 'rgba(124,58,237,0.15)' },
+  postponed:{ label: 'مؤجلة',         color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
 }
 
 export default function AttendanceStatusBadge({ status, size = 'md' }) {

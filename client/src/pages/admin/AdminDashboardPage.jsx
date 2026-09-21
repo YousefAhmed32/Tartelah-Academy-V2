@@ -133,6 +133,7 @@ const TEACHER_ATTENDANCE_CONFIG = {
   late: { label: 'متأخر', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
   absent: { label: 'غائب', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
   excused: { label: 'معذور', bg: 'bg-violet-50 text-violet-700 border-violet-200/80', dot: 'bg-violet-500' },
+  postponed: { label: 'مؤجلة', bg: 'bg-amber-50 text-amber-700 border-amber-200/80', dot: 'bg-amber-500' },
   pending: { label: 'لم يبدأ بعد', bg: 'bg-gray-50 text-gray-500 border-gray-200/60', dot: 'bg-gray-400' },
 }
 
@@ -160,6 +161,7 @@ function SessionRow({ session, index, onInspect }) {
   // Teacher Attendance status
   const tcStatusKey = session.teacherAttendanceStatus === 'absent' ? 'absent'
     : session.teacherAttendanceStatus === 'excused' ? 'excused'
+    : session.teacherAttendanceStatus === 'postponed' ? 'postponed'
     : (session.teacherStartedAt ? 'on_time' : (isLate ? 'late' : 'pending'))
   const tcCfg = TEACHER_ATTENDANCE_CONFIG[tcStatusKey] || TEACHER_ATTENDANCE_CONFIG.pending
   const tcLabel = session.teacherStartedAt
@@ -280,7 +282,7 @@ function SessionRow({ session, index, onInspect }) {
                 title="الانضمام للقاعة المباشرة"
               >
                 <Video className="w-3 h-3 text-violet-600" />
-                <span>قاعة {session.meetingProvider === 'meet' ? 'Meet' : 'Zoom'}</span>
+                <span>قاعة {session.meetingProvider === 'meet' ? 'جوجل ميت' : session.meetingProvider === 'teams' ? 'مايكروسوفت تيمز' : 'زووم'}</span>
                 <span className="w-1 h-1 rounded-full bg-emerald-500 ms-0.5" />
               </a>
             ) : (

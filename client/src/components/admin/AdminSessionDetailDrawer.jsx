@@ -26,7 +26,7 @@ import AttendanceStatusBadge from '../ui/AttendanceStatusBadge.jsx'
 import AdminSessionScheduleEditor from './AdminSessionScheduleEditor.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatSessionTitle } from '../../utils/sessionTitle.js'
-import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
+import { PAYROLL_STATUS, ROUTES, getFileUrl, MEETING_PROVIDERS } from '../../config/constants.js'
 
 const STATUS_MAP = {
   scheduled: { label: 'مجدولة', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
@@ -215,8 +215,8 @@ export default function AdminSessionDetailDrawer({
                   <Video size={14} className="text-violet-600" />
                   <span>قاعة الاجتماع</span>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 uppercase">
-                  {session.meetingProvider || 'Zoom'}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                  {MEETING_PROVIDERS[session.meetingProvider]?.label || 'زووم'}
                 </span>
               </div>
 

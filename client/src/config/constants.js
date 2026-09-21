@@ -270,11 +270,20 @@ export function buildTeacherAddStudentUrl(teacherId) {
 }
 
 export const MEETING_PROVIDERS = {
-  zoom: { label: 'Zoom', color: '#2D8CFF' },
-  meet: { label: 'Google Meet', color: '#00897B' },
-  teams: { label: 'Microsoft Teams', color: '#6264A7' },
+  zoom: { label: 'زووم', color: '#2D8CFF' },
+  meet: { label: 'جوجل ميت', color: '#00897B' },
+  teams: { label: 'مايكروسوفت تيمز', color: '#6264A7' },
   other: { label: 'رابط مخصص', color: '#7c3aed' },
   custom: { label: 'رابط مخصص', color: '#7c3aed' },
+}
+
+export const TEACHER_ATTENDANCE_STATUS_LABELS = {
+  pending: 'لم تُحدَّد بعد (قيد الانتظار)',
+  on_time: 'حضر في الموعد',
+  late: 'متأخر',
+  absent: 'غائب',
+  excused: 'معذور',
+  postponed: 'مؤجلة',
 }
 
 export const SESSION_STATUS_NO_SHOW = 'no_show'

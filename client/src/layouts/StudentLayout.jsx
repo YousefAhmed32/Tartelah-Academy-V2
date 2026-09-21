@@ -139,7 +139,7 @@ export default function StudentLayout() {
           <div style={{ lineHeight: 1.2 }}>
             <div className="font-heading font-extrabold text-[22px] text-white">ترتيلة</div>
             <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#a78fd6' }}>
-              Tartelah Online
+              ترتيلة أونلاين
             </div>
           </div>
         </div>

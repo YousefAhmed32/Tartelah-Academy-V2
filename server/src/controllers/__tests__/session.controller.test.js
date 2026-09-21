@@ -171,7 +171,7 @@ describe('session.controller.finishSession — postponement and rescheduling wor
     expect(session.save).not.toHaveBeenCalled()
   })
 
-  test('successfully reschedules with zero wallet deduction and not_payable payroll until completed', async () => {
+  test('successfully reschedules with zero wallet deduction and no duplicate session created', async () => {
     const session = buildSessionForFinish()
     Session.findById.mockResolvedValue(session)
 
@@ -193,24 +193,18 @@ describe('session.controller.finishSession — postponement and rescheduling wor
     const json = jsonOf(res)
     expect(json.success).toBe(true)
 
-    // Original session assertions
-    expect(session.status).toBe('rescheduled')
-    expect(session.payrollStatus).toBe('not_payable')
+    // Original session assertions: moved cleanly without duplication
+    expect(session.status).toBe('scheduled')
+    expect(session.isPostponed).toBe(true)
+    expect(session.teacherAttendanceStatus).toBe('pending')
+    expect(session.teacherLateMinutes).toBe(0)
+    expect(session.payrollStatus).toBe('pending')
     expect(session.subscriptionConsumed).toBe(false)
-    expect(session.postponedTo).toBe('new_rescheduled_id')
     expect(session.save).toHaveBeenCalled()
 
-    // New session creation assertions
-    expect(Session.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        studentId,
-        teacherId,
-        isPostponed: true,
-        status: 'scheduled',
-        subscriptionConsumed: false,
-        payrollStatus: 'pending',
-      })
-    )
+    // Zero duplicate session created
+    expect(Session.create).not.toHaveBeenCalled()
+    expect(Attendance.deleteMany).toHaveBeenCalledWith({ sessionId: 'session1' })
   })
 })
 

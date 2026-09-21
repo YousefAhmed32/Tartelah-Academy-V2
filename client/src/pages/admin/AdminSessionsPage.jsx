@@ -37,7 +37,7 @@ import {
   getAcademyWeekdayIndex, shiftDateKey, toAcademyDateTimeLocal,
 } from '../../utils/date.js'
 import { formatNumber } from '../../utils/format.js'
-import { PAYROLL_STATUS, ROUTES, getFileUrl } from '../../config/constants.js'
+import { PAYROLL_STATUS, ROUTES, getFileUrl, TEACHER_ATTENDANCE_STATUS_LABELS, MEETING_PROVIDERS } from '../../config/constants.js'
 import Can from '../../components/shared/Can.jsx'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
 import { formatSessionTitle } from '../../utils/sessionTitle.js'
@@ -258,10 +258,10 @@ function SessionModal({ session, onClose, teachers, students }) {
                 value={form.meetingProvider}
                 onChange={(e) => set('meetingProvider', e.target.value)}
               >
-                <option value="zoom">Zoom</option>
-                <option value="meet">Google Meet</option>
-                <option value="teams">Microsoft Teams</option>
-                <option value="other">أخرى</option>
+                <option value="zoom">زووم</option>
+                <option value="meet">جوجل ميت</option>
+                <option value="teams">مايكروسوفت تيمز</option>
+                <option value="other">رابط مخصص</option>
               </select>
             </Field>
             {isEditing && (
@@ -434,9 +434,9 @@ function CorrectionModal({ session, onClose }) {
         <div className="space-y-3">
           <Field label="حالة حضور المعلم">
             <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-              {['pending', 'on_time', 'late', 'absent', 'excused'].map((s) => (
+              {['pending', 'on_time', 'late', 'absent', 'excused', 'postponed'].map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {TEACHER_ATTENDANCE_STATUS_LABELS[s] || s}
                 </option>
               ))}
             </select>
@@ -507,8 +507,8 @@ function SessionCardItem({ session, onSelect, onEdit, onReschedule, onCancel, on
               </span>
             )}
           </div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 uppercase">
-            {session.meetingProvider || 'Zoom'}
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
+            {MEETING_PROVIDERS[session.meetingProvider]?.label || 'زووم'}
           </span>
         </div>
 

@@ -18,6 +18,7 @@ import AttendanceStatusBadge from '../../components/ui/AttendanceStatusBadge.jsx
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import FinishSessionModal from '../../components/teacher/FinishSessionModal.jsx'
 import FinishReceiptModal from '../../components/teacher/FinishReceiptModal.jsx'
+import RescheduleSessionModal from '../../components/teacher/RescheduleSessionModal.jsx'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
 import { useElapsed } from '../../hooks/useElapsed.js'
@@ -175,41 +176,6 @@ function QuickHomeworkModal({ session, onClose }) {
   )
 }
 
-// ─── Reschedule Modal ─────────────────────────────────────────────────────────
-function RescheduleModal({ session, onClose, qc }) {
-  const [newDate, setNewDate] = useState('')
-  const mutation = useMutation({
-    mutationFn: () => api.patch(`/sessions/${session._id}/reschedule`, { newDate }),
-    onSuccess: () => {
-      toast.success('تم إعادة الجدولة')
-      qc.invalidateQueries({ queryKey: ['teacher', 'sessions', 'month'] })
-      onClose()
-    },
-    // Surfaces the real server message (e.g. a 409 booking-conflict: "يوجد
-    // تعارض في الجدول...") instead of a generic "حدث خطأ".
-    onError: (e) => toast.error(e?.response?.data?.message || 'حدث خطأ'),
-  })
-
-  return (
-    <Modal open onClose={onClose} title="إعادة جدولة" size="sm"
-      footer={
-        <>
-          <Button variant="ghost" className="!bg-gray-100 !text-gray-600 hover:!bg-gray-200 !border-transparent" onClick={onClose}>إلغاء</Button>
-          <Button variant="purple" onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!newDate}>تأكيد</Button>
-        </>
-      }
-    >
-      <div className="space-y-3" dir="rtl">
-        <AcademyTimezoneNotice compact />
-        <p className="text-sm text-[#7c6aaa]">الموعد الحالي: {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}</p>
-        <div>
-          <label className={LBL}>الموعد الجديد *</label>
-          <input type="datetime-local" value={newDate} onChange={e => setNewDate(e.target.value)} className={FIELD} />
-        </div>
-      </div>
-    </Modal>
-  )
-}
 
 // ─── Delay Report Modal ────────────────────────────────────────────────────────
 // For a minor/same-day delay (session started later than scheduled) — NOT a
@@ -580,7 +546,7 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
       </motion.div>
 
       {showReschedule && (
-        <RescheduleModal session={session} onClose={() => setShowReschedule(false)} qc={qc} />
+        <RescheduleSessionModal open={showReschedule} session={session} onClose={() => setShowReschedule(false)} />
       )}
       {showDelay && (
         <DelayModal session={session} onClose={() => setShowDelay(false)} qc={qc} />
@@ -867,10 +833,10 @@ function ScheduleWizard({ students, onClose, onSuccess }) {
               <div>
                 <label className={LBL}>منصة الاجتماع</label>
                 <select value={form.meetingProvider} onChange={e => set('meetingProvider', e.target.value)} className={FIELD}>
-                  <option value="zoom">Zoom</option>
-                  <option value="meet">Google Meet</option>
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="other">أخرى</option>
+                  <option value="zoom">زووم</option>
+                  <option value="meet">جوجل ميت</option>
+                  <option value="teams">مايكروسوفت تيمز</option>
+                  <option value="other">رابط مخصص</option>
                 </select>
               </div>
               <div>
@@ -1422,10 +1388,10 @@ export default function TeacherSessionsPage() {
             <div>
               <label className={LBL}>المنصة</label>
               <select name="meetingProvider" value={manualForm.meetingProvider} onChange={chg} className={FIELD}>
-                <option value="zoom">Zoom</option>
-                <option value="meet">Google Meet</option>
-                <option value="teams">Microsoft Teams</option>
-                <option value="other">أخرى</option>
+                <option value="zoom">زووم</option>
+                <option value="meet">جوجل ميت</option>
+                <option value="teams">مايكروسوفت تيمز</option>
+                <option value="other">رابط مخصص</option>
               </select>
             </div>
             <div>

@@ -43,7 +43,7 @@ export default function PublicBrand({ progress }) {
           style={{ opacity: subtitleOpacity, height: subtitleHeight }}
           className="overflow-hidden text-[10px] font-semibold tracking-[3px] text-[#7c6aaa]"
         >
-          ONLINE
+          أونلاين
         </motion.div>
       </div>
     </Link>

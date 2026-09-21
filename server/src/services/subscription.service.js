@@ -97,8 +97,8 @@ async function createSubscriptionWithOpeningBalance({
       const importedAt = new Date()
       for (let i = 0; i < used; i++) {
         const seqTitle = studentName
-          ? `حصة ${studentName} (${i + 1} من ${pkg.sessionsPerMonth})`
-          : `حصة سابقة (${i + 1} من ${pkg.sessionsPerMonth})`
+          ? `${studentName} ${i + 1} من ${pkg.sessionsPerMonth}`
+          : `${i + 1} من ${pkg.sessionsPerMonth}`
         const pastSession = await Session.create({
           studentId,
           teacherId,

@@ -1004,9 +1004,9 @@ export default function AdminTeacherOnboardingWizardPage() {
               <div className="space-y-2.5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { key: 'zoom', label: 'Zoom', color: '#2D8CFF' },
-                    { key: 'meet', label: 'Google Meet', color: '#00897B' },
-                    { key: 'teams', label: 'Teams', color: '#6264A7' },
+                    { key: 'zoom', label: 'زووم', color: '#2D8CFF' },
+                    { key: 'meet', label: 'جوجل ميت', color: '#00897B' },
+                    { key: 'teams', label: 'مايكروسوفت تيمز', color: '#6264A7' },
                     { key: 'other', label: 'رابط مخصص', color: '#7c3aed' },
                   ].map((p) => (
                     <button

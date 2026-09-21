@@ -12,7 +12,7 @@ import Pagination from '../../components/ui/Pagination.jsx'
 import Avatar from '../../components/ui/Avatar.jsx'
 import EmptyState from '../../components/shared/EmptyState.jsx'
 import LessonTransactionTable from '../../components/shared/LessonTransactionTable.jsx'
-import DateRangePresetPicker from '../../components/shared/DateRangePresetPicker.jsx'
+import DateRangePresetPicker, { DATE_PRESETS } from '../../components/shared/DateRangePresetPicker.jsx'
 import { formatDateAr } from '../../utils/date.js'
 import { getFileUrl } from '../../config/constants.js'
 import { QK } from '../../services/queryKeys.js'
@@ -471,13 +471,13 @@ export default function AdminSubscriptionsPage() {
           )}
           {statusFilter && (
             <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
-              الحالة: {tabs.find(t => t.key === statusFilter)?.label || statusFilter}
+              الحالة: {tabs.find(t => t.key === statusFilter)?.label || STATUS_CONFIG[statusFilter]?.label || statusFilter}
               <button onClick={() => setStatusFilter('')} className="hover:text-red-600"><X size={12} /></button>
             </span>
           )}
           {dateFilter.preset && (
             <span className="inline-flex items-center gap-1 text-xs bg-white px-2.5 py-1 rounded-lg border border-[#e2d8f3] text-[#1f1147] font-semibold">
-              الفترة: {dateFilter.preset}
+              الفترة: {DATE_PRESETS.find(p => p.key === dateFilter.preset)?.label || dateFilter.preset}
               <button onClick={() => setDateFilter({ preset: '', startDate: '', endDate: '' })} className="hover:text-red-600"><X size={12} /></button>
             </span>
           )}

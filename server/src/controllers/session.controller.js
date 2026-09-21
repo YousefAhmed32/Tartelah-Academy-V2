@@ -408,88 +408,73 @@ exports.finishSession = async (req, res, next) => {
           studentId: session.studentId,
           scheduledAt: parsedDate,
           durationMinutes: session.durationMinutes || 60,
+          excludeSessionId: session._id,
         })
       } catch (conflictErr) {
         return sendError(res, conflictErr.message || 'يوجد تعارض في الموعد المختار مع حصة أخرى', 409)
       }
 
-      // 1) Mark original session as excused / postponed attendance record
       const reasonText = postponeReason || attendanceNotes || 'تم تأجيل الحصة إلى موعد لاحق'
-      const attendance = await Attendance.findOneAndUpdate(
-        { sessionId: session._id, studentId: session.studentId },
-        {
-          sessionId: session._id, studentId: session.studentId, teacherId: session.teacherId,
-          status: 'excused', notes: reasonText,
-          recordedAt: now, isFinalized: true, finalizedAt: now, finalizedBy: req.user._id,
-        },
-        { upsert: true, new: true }
-      )
 
-      // 2) Create the new rescheduled session with isPostponed: true
-      const newSession = await Session.create({
-        studentId: session.studentId,
-        teacherId: session.teacherId,
-        courseId: session.courseId,
-        seriesId: session.seriesId,
-        subscriptionId: session.subscriptionId,
-        durationMinutes: session.durationMinutes || 60,
-        titleAr: session.titleAr,
-        title: session.title,
-        meetingLink: session.meetingLink,
-        meetingProvider: session.meetingProvider || 'zoom',
-        scheduledAt: parsedDate,
-        status: 'scheduled',
-        isPostponed: true,
-        rescheduledFrom: session.scheduledAt,
-        notes: `حصة مؤجلة: ${reasonText}`,
-        teacherNotes: teacherNotes || '',
-        subscriptionConsumed: false,
-        payrollStatus: 'pending',
-      })
+      // Clean up any preliminary attendance record so no phantom attendance remains
+      await Attendance.deleteMany({ sessionId: session._id })
 
-      // 3) Update original session — ZERO wallet deduction, ZERO payroll credit
-      if (teacherNotes !== undefined) session.teacherNotes = teacherNotes
-      session.status = 'rescheduled'
-      session.rescheduledAt = now
-      session.outcome = 'rescheduled'
+      // Move original session directly to the new appointment — ZERO DUPLICATION
+      const previousDate = session.scheduledAt
+      session.rescheduledFrom = previousDate
+      session.scheduledAt = parsedDate
+      session.status = 'scheduled'
+      session.isPostponed = true
       session.postponedAt = now
       session.postponedReason = reasonText
-      session.postponedTo = newSession._id
-      session.rescheduledSessionId = newSession._id
-      session.payrollStatus = 'not_payable'
-      session.payrollStatusReason = 'تم تأجيل الحصة لموعد بديل — لن يُحسب الراتب إلا بعد إتمام الحصة في موعدها'
+      session.isException = true
+      if (teacherNotes !== undefined) session.teacherNotes = teacherNotes
+
+      // CLEAR all lateness, start times, and execution timestamps
+      session.teacherStartedAt = undefined
+      session.teacherAttendanceStatus = 'pending'
+      session.teacherAttendanceMarkedBy = undefined
+      session.teacherAttendanceNotes = undefined
+      session.teacherLateMinutes = 0
+      session.actualStartAt = undefined
+      session.actualEndAt = undefined
+      session.delayMinutes = 0
+      session.delayReasonCode = undefined
+      session.delayNote = undefined
+      session.outcome = 'pending_review'
+      session.payrollStatus = 'pending'
+      session.payrollStatusReason = undefined
       session.payrollStatusSetBy = 'system'
-      session.payrollStatusSetAt = now
-      session.attendanceFinalizedAt = now
-      session.attendanceFinalizedBy = req.user._id
+      session.payrollStatusSetAt = undefined
+      session.attendanceFinalizedAt = undefined
+      session.attendanceFinalizedBy = undefined
       session.subscriptionConsumed = false
+      session.subscriptionConsumedAt = undefined
+
       await session.save()
 
-      // 4) Notify student about the new date & time
+      // Notify student about the new date & time
       Promise.resolve(createNotification({
         userId: session.studentId,
         titleAr: 'تم تأجيل موعد الحصة',
-        bodyAr: `تم تأجيل حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedDate, timezone)}`,
-        type: 'session', priority: 'medium', relatedId: newSession._id,
+        bodyAr: `تم تأجيل حصة "${session.titleAr}" إلى ${formatAcademyDateTimeAr(parsedDate, timezone)} — السبب: ${reasonText}`,
+        type: 'session', priority: 'medium', relatedId: session._id,
         actionUrl: '/student/sessions',
       })).catch(() => {})
 
-      // 5) Audit log
+      // Audit log
       logAction({
         actorId: req.user._id, actorRole: req.user.role, action: 'session.postpone',
         entity: 'Session', entityId: session._id,
         changes: {
-          originalScheduledAt: session.scheduledAt,
+          originalScheduledAt: previousDate,
           newScheduledAt: parsedDate,
-          newSessionId: newSession._id,
           postponeReason: reasonText,
         }, ip: req.ip,
       })
 
       return sendSuccess(res, {
         session,
-        newSession,
-        attendance,
         isPostponed: true,
         walletEffect: { action: 'none', amount: 0, balanceAfter: null },
       }, 'تم تأجيل الحصة وتحديد الموعد القادم بنجاح')
@@ -686,6 +671,8 @@ exports.rescheduleSession = async (req, res, next) => {
       teacherId: session.teacherId, studentId: session.studentId,
       scheduledAt: parsedNewDate, durationMinutes: session.durationMinutes, excludeSessionId: session._id,
     })
+    await Attendance.deleteMany({ sessionId: session._id })
+
     const previousDate = session.scheduledAt
     session.rescheduledFrom = session.scheduledAt
     session.scheduledAt = parsedNewDate
@@ -696,6 +683,32 @@ exports.rescheduleSession = async (req, res, next) => {
       session.postponedAt = new Date()
       session.postponedReason = reason
     }
+
+    // Reset all lateness, start times, and execution timestamps
+    session.teacherStartedAt = undefined
+    session.teacherEndedAt = undefined
+    session.teacherAttendanceStatus = 'pending'
+    session.teacherAttendanceMarkedBy = undefined
+    session.teacherAttendanceNotes = undefined
+    session.teacherLateMinutes = 0
+    session.studentAttendanceStatus = 'pending'
+    session.studentJoinedAt = undefined
+    session.actualStartAt = undefined
+    session.actualEndAt = undefined
+    session.duration = 0
+    session.delayMinutes = 0
+    session.delayReasonCode = undefined
+    session.delayNote = undefined
+    session.outcome = 'pending_review'
+    session.payrollStatus = 'pending'
+    session.payrollStatusReason = undefined
+    session.payrollStatusSetBy = 'system'
+    session.payrollStatusSetAt = undefined
+    session.attendanceFinalizedAt = undefined
+    session.attendanceFinalizedBy = undefined
+    session.subscriptionConsumed = false
+    session.subscriptionConsumedAt = undefined
+
     await session.save()
 
     logAction({

@@ -94,13 +94,21 @@ function NextSessionCard({ session }) {
   const [showReschedule, setShowReschedule] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
 
+  const msUntilStart = session?.scheduledAt ? new Date(session.scheduledAt).getTime() - Date.now() : 0
+  const isTooEarlyToCheckIn = msUntilStart > 60 * 60 * 1000 // Check-in opens 60 mins before scheduled start
+  const canCheckIn = ['scheduled', 'missed', 'no_show'].includes(session?.status) && !isTooEarlyToCheckIn
+
   const startMutation = useMutation({
     mutationFn: () => api.patch(`/sessions/${session._id}/start`),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['teacher', 'dashboard'] })
-      if (res.data.data.teacherAttendanceStatus === 'late') {
+      if (res.data?.data?.teacherAttendanceStatus === 'late') {
         toast('بدأت الحصة متأخراً — تم تسجيل ذلك في سجل حضورك', { icon: '⏱️' })
       }
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.message || 'تعذر بدء الحصة'
+      toast.error(msg)
     },
   })
 
@@ -116,12 +124,16 @@ function NextSessionCard({ session }) {
     )
   }
 
-  const canCheckIn = ['scheduled', 'missed', 'no_show'].includes(session.status)
-
   function handleJoin() {
-    if (canCheckIn) startMutation.mutate()
+    if (canCheckIn) {
+      startMutation.mutate()
+    } else if (isTooEarlyToCheckIn) {
+      toast('يفتح تسجيل الحضور قبل موعد الحصة بـ 60 دقيقة — تم فتح الرابط للمعاينة', { icon: 'ℹ️' })
+    }
     api.post(`/sessions/${session._id}/link-opened`).catch(() => {})
-    window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+    if (session.meetingLink) {
+      window.open(session.meetingLink, '_blank', 'noopener,noreferrer')
+    }
   }
 
   return (
@@ -187,14 +199,22 @@ function NextSessionCard({ session }) {
 
       {/* Main Action Button */}
       {session.meetingLink ? (
-        <button
-          onClick={handleJoin}
-          disabled={startMutation.isPending}
-          className="btn-purple w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
-        >
-          <Video size={16} strokeWidth={2} />
-          {canCheckIn ? 'تسجيل الحضور وبدء الحصة' : 'فتح الفصل الخارجي'}
-        </button>
+        <div>
+          <button
+            onClick={handleJoin}
+            disabled={startMutation.isPending}
+            className="btn-purple w-full text-center flex items-center justify-center gap-2 rounded-xl py-3 font-extrabold shadow-sm transition-all"
+          >
+            <Video size={16} strokeWidth={2} />
+            {canCheckIn ? 'تسجيل الحضور وبدء الحصة' : 'فتح الفصل الخارجي'}
+          </button>
+          {isTooEarlyToCheckIn && (
+            <p className="text-[11px] text-gray-400 mt-1.5 text-center flex items-center justify-center gap-1">
+              <Clock size={12} className="text-violet-500" />
+              <span>يفتح تسجيل الحضور قبل موعد الحصة بـ 60 دقيقة</span>
+            </p>
+          )}
+        </div>
       ) : (
         <button
           onClick={() => setShowEditLink(true)}
@@ -269,6 +289,8 @@ function CurrentSessionCard({ session, ongoingCount }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [showFinish, setShowFinish] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [showEditLink, setShowEditLink] = useState(false)
   const elapsed = useElapsed(session.teacherStartedAt)
 
   const linkOpenMutation = useMutation({
@@ -330,6 +352,28 @@ function CurrentSessionCard({ session, ongoingCount }) {
           )}
         </div>
 
+        {/* Secondary Actions Toolbar: Reschedule & Edit Link */}
+        <div className="grid grid-cols-2 gap-2 mt-2.5">
+          <button
+            type="button"
+            onClick={() => setShowReschedule(true)}
+            className="py-2 px-1.5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 flex items-center justify-center gap-1.5 transition-colors"
+            title="تأجيل الحصة لموعد آخر"
+          >
+            <CalendarClock size={13} className="text-amber-600 flex-none" />
+            <span className="truncate">تأجيل الحصة</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEditLink(true)}
+            className="py-2 px-1.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center gap-1.5 transition-colors"
+            title="تعديل رابط الحصة"
+          >
+            <Link2 size={13} className="text-violet-600 flex-none" />
+            <span className="truncate">تعديل الرابط</span>
+          </button>
+        </div>
+
         {ongoingCount > 1 && (
           <button
             onClick={() => navigate(ROUTES.TEACHER_SESSIONS)}
@@ -342,6 +386,20 @@ function CurrentSessionCard({ session, ongoingCount }) {
 
       {showFinish && (
         <FinishSessionModal session={session} onClose={() => setShowFinish(false)} qc={qc} />
+      )}
+      {showReschedule && (
+        <RescheduleSessionModal
+          open={showReschedule}
+          onClose={() => setShowReschedule(false)}
+          session={session}
+        />
+      )}
+      {showEditLink && (
+        <EditSessionLinkModal
+          open={showEditLink}
+          onClose={() => setShowEditLink(false)}
+          session={session}
+        />
       )}
     </>
   )
