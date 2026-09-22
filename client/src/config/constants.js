@@ -294,6 +294,7 @@ export const SESSION_STATUS = {
   completed:   { label: 'مكتملة',   labelEn: 'Completed',   color: '#64748b', bg: 'rgba(100,116,139,0.15)' },
   cancelled:   { label: 'ملغاة',    labelEn: 'Cancelled',   color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
   rescheduled: { label: 'معاد جدولتها', labelEn: 'Rescheduled', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  postponed:   { label: 'مؤجلة',        labelEn: 'Postponed',   color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   missed:      { label: 'فائتة',    labelEn: 'Missed',      color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
   no_show:     { label: 'لم يحضر',  labelEn: 'No Show',     color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
 }

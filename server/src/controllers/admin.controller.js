@@ -75,11 +75,37 @@ exports.getDashboardStats = async (req, res, next) => {
       Subscription.countDocuments({ status: 'active' }),
       EnrollmentRequest.countDocuments({ status: { $in: ['pending', 'under_review'] } }),
       Session.aggregate([
-        { $group: { _id: null, total: { $sum: 1 }, todayCount: { $sum: { $cond: [{ $and: [{ $gte: ['$scheduledAt', today] }, { $lt: ['$scheduledAt', todayEnd] }] }, 1, 0] } } } }
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            todayCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $and: [{ $gte: ['$scheduledAt', today] }, { $lt: ['$scheduledAt', todayEnd] }] },
+                      { $and: [{ $gte: ['$rescheduledFrom', today] }, { $lt: ['$rescheduledFrom', todayEnd] }] },
+                      { $and: [{ $eq: ['$isPostponed', true] }, { $gte: ['$postponedAt', today] }, { $lt: ['$postponedAt', todayEnd] }] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
       ]),
       User.find({ isActive: true }).sort({ createdAt: -1 }).limit(8).select('firstNameAr lastNameAr email avatar role createdAt'),
-      Session.find({ scheduledAt: { $gte: today, $lt: todayEnd } })
-        .sort({ scheduledAt: 1 }).limit(20)
+      Session.find({
+        $or: [
+          { scheduledAt: { $gte: today, $lt: todayEnd } },
+          { rescheduledFrom: { $gte: today, $lt: todayEnd } },
+          { isPostponed: true, postponedAt: { $gte: today, $lt: todayEnd } },
+        ],
+      })
+        .sort({ scheduledAt: 1 }).limit(30)
         .populate('studentId teacherId', 'firstNameAr lastNameAr avatar email phone'),
       // Ungraded homework submissions across all assignments — a teacher-grading
       // backlog signal that previously had no admin-visible surface at all.
@@ -130,7 +156,19 @@ exports.getDashboardStats = async (req, res, next) => {
       const schedTime = new Date(s.scheduledAt).getTime()
       const nowTime = now.getTime()
 
-      const isLate = s.status === 'scheduled' && !s.teacherStartedAt && (nowTime > schedTime + 5 * 60000)
+      const isPostponed = Boolean(s.isPostponed || s.rescheduledFrom)
+      const reschedFromTime = s.rescheduledFrom ? new Date(s.rescheduledFrom).getTime() : 0
+      const postponedAtTime = s.postponedAt ? new Date(s.postponedAt).getTime() : 0
+      const isPostponedFromToday = isPostponed &&
+        ((reschedFromTime >= today.getTime() && reschedFromTime < todayEnd.getTime()) ||
+         (postponedAtTime >= today.getTime() && postponedAtTime < todayEnd.getTime())) &&
+        schedTime >= todayEnd.getTime()
+
+      const isPostponedToToday = isPostponed &&
+        schedTime >= today.getTime() && schedTime < todayEnd.getTime() &&
+        Boolean(s.rescheduledFrom || s.isPostponed)
+
+      const isLate = !isPostponedFromToday && s.status === 'scheduled' && !s.teacherStartedAt && (nowTime > schedTime + 5 * 60000)
       const lateMinutes = isLate ? Math.floor((nowTime - schedTime) / 60000) : (s.teacherLateMinutes || 0)
       const ongoingMinutes = s.status === 'ongoing'
         ? Math.max(1, Math.floor((nowTime - new Date(s.teacherStartedAt || s.actualStartAt || s.scheduledAt).getTime()) / 60000))
@@ -138,7 +176,9 @@ exports.getDashboardStats = async (req, res, next) => {
 
       // Compute student attendance status accurately
       let studentAttendanceStatus = att?.status
-      if (!studentAttendanceStatus) {
+      if (isPostponedFromToday) {
+        studentAttendanceStatus = 'postponed'
+      } else if (!studentAttendanceStatus) {
         if (s.status === 'completed') studentAttendanceStatus = 'present'
         else if (s.status === 'no_show' || s.outcome === 'no_students_attended') studentAttendanceStatus = 'absent'
         else if (s.status === 'cancelled') studentAttendanceStatus = 'excused'
@@ -147,6 +187,10 @@ exports.getDashboardStats = async (req, res, next) => {
 
       return {
         ...sObj,
+        isPostponed,
+        isPostponedFromToday,
+        isPostponedToToday,
+        teacherAttendanceStatus: isPostponedFromToday ? 'postponed' : s.teacherAttendanceStatus,
         attendance: att || null,
         studentAttendanceStatus,
         report: rep ? {
@@ -726,7 +770,15 @@ exports.getSessionStats = async (req, res, next) => {
           totalSessions: [{ $count: 'count' }],
           totalCompleted: [{ $match: { status: 'completed' } }, { $count: 'count' }],
           todayTotal: [
-            { $match: { scheduledAt: { $gte: today, $lt: todayEnd } } },
+            {
+              $match: {
+                $or: [
+                  { scheduledAt: { $gte: today, $lt: todayEnd } },
+                  { rescheduledFrom: { $gte: today, $lt: todayEnd } },
+                  { isPostponed: true, postponedAt: { $gte: today, $lt: todayEnd } },
+                ],
+              },
+            },
             { $count: 'count' },
           ],
           todayCompleted: [
@@ -742,7 +794,7 @@ exports.getSessionStats = async (req, res, next) => {
               $match: {
                 $or: [
                   { status: 'missed' },
-                  { status: 'scheduled', scheduledAt: { $lt: new Date() } },
+                  { status: 'scheduled', isPostponed: { $ne: true }, scheduledAt: { $lt: new Date() } },
                   { teacherAttendanceStatus: 'late' },
                   { payrollStatus: 'review_required' },
                 ],
@@ -771,7 +823,13 @@ exports.getAllSessions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query)
     const filter = {}
-    if (req.query.status) filter.status = req.query.status
+    if (req.query.status) {
+      if (req.query.status === 'postponed') {
+        filter.$or = [{ isPostponed: true }, { status: 'rescheduled' }]
+      } else {
+        filter.status = req.query.status
+      }
+    }
     if (req.query.teacherId) filter.teacherId = req.query.teacherId
     if (req.query.studentId) filter.studentId = req.query.studentId
     if (req.query.payrollStatus) filter.payrollStatus = req.query.payrollStatus
@@ -789,24 +847,43 @@ exports.getAllSessions = async (req, res, next) => {
         ],
       }).select('_id').lean()
       const userIds = matchedUsers.map(u => u._id)
-      filter.$or = [
+      const searchOr = [
         { titleAr: regex },
         { studentId: { $in: userIds } },
         { teacherId: { $in: userIds } },
       ]
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }]
+        delete filter.$or
+      } else {
+        filter.$or = searchOr
+      }
     }
 
     if (req.query.dateFrom || req.query.dateTo) {
-      filter.scheduledAt = {}
+      const dateRange = {}
       const timezone = await getAcademyTimezone()
       if (req.query.dateFrom) {
         const bounds = academyDateKeyBounds(req.query.dateFrom, timezone)
-        filter.scheduledAt.$gte = bounds ? bounds.start : new Date(req.query.dateFrom)
+        dateRange.$gte = bounds ? bounds.start : new Date(req.query.dateFrom)
       }
       if (req.query.dateTo) {
         const bounds = academyDateKeyBounds(req.query.dateTo, timezone)
-        if (bounds) filter.scheduledAt.$lt = bounds.end
-        else filter.scheduledAt.$lte = new Date(req.query.dateTo)
+        if (bounds) dateRange.$lt = bounds.end
+        else dateRange.$lte = new Date(req.query.dateTo)
+      }
+      const dateOrClause = [
+        { scheduledAt: dateRange },
+        { rescheduledFrom: dateRange },
+        { isPostponed: true, postponedAt: dateRange },
+      ]
+      if (filter.$and) {
+        filter.$and.push({ $or: dateOrClause })
+      } else if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: dateOrClause }]
+        delete filter.$or
+      } else {
+        filter.$or = dateOrClause
       }
     } else if (req.query.upcoming === 'true') {
       filter.scheduledAt = { $gte: new Date() }

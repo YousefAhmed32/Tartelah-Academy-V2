@@ -45,7 +45,13 @@ exports.getLiveSummary = async (req, res, next) => {
     const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0)
     const dayEnd = new Date(now); dayEnd.setHours(23, 59, 59, 999)
 
-    const today = await Session.find({ scheduledAt: { $gte: dayStart, $lte: dayEnd } })
+    const today = await Session.find({
+      $or: [
+        { scheduledAt: { $gte: dayStart, $lte: dayEnd } },
+        { rescheduledFrom: { $gte: dayStart, $lte: dayEnd } },
+        { isPostponed: true, postponedAt: { $gte: dayStart, $lte: dayEnd } },
+      ],
+    })
       .select(TIMELINE_SELECT)
       .populate('teacherId', 'firstNameAr lastNameAr avatar')
       .populate('studentId', 'firstNameAr lastNameAr avatar')
@@ -54,7 +60,7 @@ exports.getLiveSummary = async (req, res, next) => {
     const buckets = {
       liveNow: [], startingSoon: [], missingCheckIn: [], missingLink: [],
       lateTeachers: [], attendancePending: [], recentlyCompleted: [], cancelledOrRescheduled: [],
-      noShow: [],
+      noShow: [], postponed: [],
     }
 
     // Teacher on-time rate — computed only over today's sessions where the
@@ -64,22 +70,29 @@ exports.getLiveSummary = async (req, res, next) => {
 
     for (const s of today) {
       const window = getSessionWindow(s.scheduledAt, s.durationMinutes, now)
-      if (s.status === 'ongoing') buckets.liveNow.push(s)
-      if (s.status === 'scheduled' && window.phase === 'pre_session') buckets.startingSoon.push(s)
-      if (s.status === 'scheduled' && s.teacherAttendanceStatus === 'pending' &&
-          ['in_progress', 'grace_period', 'extended_completion', 'overdue'].includes(window.phase)) {
-        buckets.missingCheckIn.push(s)
-      }
-      if (!s.meetingLink && s.status === 'scheduled' && ['pre_session', 'in_progress'].includes(window.phase)) {
-        buckets.missingLink.push(s)
-      }
-      if (s.teacherAttendanceStatus === 'late') buckets.lateTeachers.push(s)
-      if (s.status === 'completed' && !s.attendanceFinalizedAt) buckets.attendancePending.push(s)
-      if (s.status === 'completed') buckets.recentlyCompleted.push(s)
-      if (['cancelled', 'rescheduled'].includes(s.status)) buckets.cancelledOrRescheduled.push(s)
-      if (s.status === 'no_show') buckets.noShow.push(s)
+      const isPostponed = Boolean(s.isPostponed || s.status === 'rescheduled')
 
-      if (['on_time', 'late', 'absent'].includes(s.teacherAttendanceStatus)) {
+      if (isPostponed) {
+        buckets.postponed.push(s)
+        buckets.cancelledOrRescheduled.push(s)
+      } else {
+        if (s.status === 'ongoing') buckets.liveNow.push(s)
+        if (s.status === 'scheduled' && window.phase === 'pre_session') buckets.startingSoon.push(s)
+        if (s.status === 'scheduled' && s.teacherAttendanceStatus === 'pending' &&
+            ['in_progress', 'grace_period', 'extended_completion', 'overdue'].includes(window.phase)) {
+          buckets.missingCheckIn.push(s)
+        }
+        if (!s.meetingLink && s.status === 'scheduled' && ['pre_session', 'in_progress'].includes(window.phase)) {
+          buckets.missingLink.push(s)
+        }
+        if (s.teacherAttendanceStatus === 'late') buckets.lateTeachers.push(s)
+        if (s.status === 'completed' && !s.attendanceFinalizedAt) buckets.attendancePending.push(s)
+        if (s.status === 'completed') buckets.recentlyCompleted.push(s)
+        if (s.status === 'cancelled') buckets.cancelledOrRescheduled.push(s)
+        if (s.status === 'no_show') buckets.noShow.push(s)
+      }
+
+      if (!isPostponed && ['on_time', 'late', 'absent'].includes(s.teacherAttendanceStatus)) {
         teacherResolvedCount++
         if (s.teacherAttendanceStatus === 'on_time') teacherOnTimeCount++
       }
@@ -128,6 +141,7 @@ exports.getLiveSummary = async (req, res, next) => {
         attendancePending: buckets.attendancePending.length,
         recentlyCompleted: buckets.recentlyCompleted.length,
         cancelledOrRescheduled: buckets.cancelledOrRescheduled.length,
+        postponed: buckets.postponed.length,
         noShow: buckets.noShow.length,
         payrollReviewCount,
         needsReviewCount,
@@ -148,6 +162,7 @@ exports.getLiveSummary = async (req, res, next) => {
         missingLink: buckets.missingLink.slice(0, 10),
         lateTeachers: buckets.lateTeachers.slice(0, 10),
         attendancePending: buckets.attendancePending.slice(0, 10),
+        postponed: buckets.postponed.slice(0, 10),
         noShow: buckets.noShow.slice(0, 10),
       },
     })
@@ -161,24 +176,44 @@ exports.getTimeline = async (req, res, next) => {
     const { page, limit, skip } = getPagination(req.query)
     const { date, startDate, endDate, preset, teacherId, status, payrollStatus, needsReview, hasMeetingLink } = req.query
 
+    const makeDateFilter = (start, end) => ({
+      $or: [
+        { scheduledAt: { $gte: start, $lte: end } },
+        { rescheduledFrom: { $gte: start, $lte: end } },
+        { isPostponed: true, postponedAt: { $gte: start, $lte: end } },
+      ],
+    })
+
     let filter
     if (date) {
       const d = new Date(date); d.setHours(0, 0, 0, 0)
       const dEnd = new Date(date); dEnd.setHours(23, 59, 59, 999)
-      filter = { scheduledAt: { $gte: d, $lte: dEnd } }
+      filter = makeDateFilter(d, dEnd)
     } else if (preset) {
       const range = resolveDatePreset(preset, startDate, endDate)
-      filter = { scheduledAt: { $gte: range.start, $lte: range.end } }
+      filter = makeDateFilter(range.start, range.end)
     } else if (startDate && endDate) {
       const d = new Date(startDate); d.setHours(0, 0, 0, 0)
       const dEnd = new Date(endDate); dEnd.setHours(23, 59, 59, 999)
-      filter = { scheduledAt: { $gte: d, $lte: dEnd } }
+      filter = makeDateFilter(d, dEnd)
     } else {
       const { from, to } = clampRange(req.query.dateFrom, req.query.dateTo, 3, 3)
-      filter = { scheduledAt: { $gte: from, $lte: to } }
+      filter = makeDateFilter(from, to)
     }
     if (teacherId) filter.teacherId = teacherId
-    if (status) filter.status = status
+    if (status) {
+      if (status === 'postponed') {
+        const postponeOr = [{ isPostponed: true }, { status: 'rescheduled' }]
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, { $or: postponeOr }]
+          delete filter.$or
+        } else {
+          filter.$or = postponeOr
+        }
+      } else {
+        filter.status = status
+      }
+    }
     if (payrollStatus) filter.payrollStatus = payrollStatus
     if (hasMeetingLink === 'true') filter.meetingLink = { $exists: true, $ne: '' }
     if (hasMeetingLink === 'false') filter.meetingLink = { $in: [null, ''] }

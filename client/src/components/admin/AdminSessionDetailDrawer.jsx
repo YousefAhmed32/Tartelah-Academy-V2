@@ -19,11 +19,13 @@ import {
   GraduationCap,
   FileCheck,
   AlertCircle,
+  CalendarClock,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Avatar from '../ui/Avatar.jsx'
 import AttendanceStatusBadge from '../ui/AttendanceStatusBadge.jsx'
 import AdminSessionScheduleEditor from './AdminSessionScheduleEditor.jsx'
+import RescheduleSessionModal from '../teacher/RescheduleSessionModal.jsx'
 import { formatDateAr, formatTimeAr } from '../../utils/date.js'
 import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import { PAYROLL_STATUS, ROUTES, getFileUrl, MEETING_PROVIDERS } from '../../config/constants.js'
@@ -60,6 +62,7 @@ export default function AdminSessionDetailDrawer({
 }) {
   const [copied, setCopied] = useState(false)
   const [inlineAction, setInlineAction] = useState(null)
+  const [showPostponeModal, setShowPostponeModal] = useState(false)
   const navigate = useNavigate()
 
   if (!open || !session) return null
@@ -144,6 +147,34 @@ export default function AdminSessionDetailDrawer({
                 </div>
               </div>
             </div>
+
+            {/* Postponement Card */}
+            {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
+              <div className="bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Clock size={15} className="text-amber-600" />
+                  <span>تفاصيل تأجيل الحصة</span>
+                </div>
+                <div className="text-xs text-amber-900 space-y-1">
+                  {session.rescheduledFrom && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-amber-700/80">الموعد الأصلي:</span>
+                      <span className="font-semibold">{formatDateAr(session.rescheduledFrom)} — {formatTimeAr(session.rescheduledFrom)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-amber-700/80">الموعد الجديد:</span>
+                    <span className="font-bold text-amber-900">{formatDateAr(session.scheduledAt)} — {formatTimeAr(session.scheduledAt)}</span>
+                  </div>
+                  {session.postponedReason && (
+                    <div className="pt-1 border-t border-amber-200/60 mt-1">
+                      <span className="text-amber-700/80">سبب التأجيل: </span>
+                      <span className="font-medium text-amber-950">{session.postponedReason}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Parties: Student & Teacher */}
             <div className="space-y-3">
@@ -457,12 +488,12 @@ export default function AdminSessionDetailDrawer({
               if (typeof onCorrect === 'function') onCorrect(session)
               else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
             }
-            const handleReschedule = () => {
+            const handlePostpone = () => {
               if (typeof onReschedule === 'function') {
                 onClose()
                 onReschedule(session)
               } else {
-                setInlineAction('reschedule')
+                setShowPostponeModal(true)
               }
             }
             const handleCancelAction = () => {
@@ -471,54 +502,81 @@ export default function AdminSessionDetailDrawer({
               else navigate(`${ROUTES.ADMIN_SESSIONS}?search=${session._id}`)
             }
 
+            const canPostpone = !['completed', 'cancelled'].includes(session.status)
+
             return (
               <div className="p-4 border-t border-gray-100 bg-gray-50/80 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
+                  {canPostpone ? (
+                    <button
+                      type="button"
+                      onClick={handlePostpone}
+                      className="h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                      title="تأجيل موعد الحصة (نظام التأجيل المعتمد)"
+                    >
+                      <CalendarClock size={14} />
+                      <span>تأجيل الحصة</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="h-10 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold flex items-center justify-center gap-1.5 opacity-60 cursor-not-allowed"
+                    >
+                      <CalendarClock size={14} />
+                      <span>مكتملة / ملغاة</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleEdit}
                     className="h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    title="تعديل بيانات الحصة (الرابط، منصة الاجتماع، الملاحظات)"
                   >
                     <Edit2 size={13} />
                     <span>تعديل الحصة</span>
                   </button>
+                </div>
 
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleCorrect}
-                    className="h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    className="flex-1 h-9 rounded-xl border border-amber-200/90 bg-white hover:bg-amber-50 text-amber-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="تصحيح الحضور والراتب"
                   >
                     <ShieldAlert size={13} />
                     <span>تصحيح الحضور</span>
                   </button>
-                </div>
 
-                {canCancel && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleReschedule}
-                      className="flex-1 h-9 rounded-xl border border-gray-200 hover:bg-white text-gray-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <RefreshCw size={12} />
-                      <span>إعادة جدولة</span>
-                    </button>
-
+                  {canCancel && (
                     <button
                       type="button"
                       onClick={handleCancelAction}
-                      className="flex-1 h-9 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="flex-1 h-9 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      title="إلغاء الحصة"
                     >
                       <XCircle size={12} />
                       <span>إلغاء الحصة</span>
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )
           })()}
         </motion.div>
       </div>
+      {showPostponeModal && (
+        <RescheduleSessionModal
+          open={showPostponeModal}
+          session={session}
+          onClose={() => setShowPostponeModal(false)}
+          onSuccess={(updatedSession) => {
+            onSessionUpdated?.(updatedSession)
+          }}
+        />
+      )}
       <AdminSessionScheduleEditor
         open={!!inlineAction}
         session={session}

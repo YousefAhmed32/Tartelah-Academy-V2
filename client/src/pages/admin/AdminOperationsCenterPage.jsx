@@ -205,7 +205,7 @@ function LiveTab({ onGoToTimeline, onGoToReview }) {
       </div>
 
       {/* Stat grid — colored by urgency (critical → warning → info → positive/neutral) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatTile label="جارية الآن" value={c.liveNow} Icon={Radio} color="#22c55e" tone="positive" onClick={() => onGoToTimeline({ status: 'ongoing' })} />
         <StatTile label="تبدأ قريباً" value={c.startingSoon} Icon={Clock} color="#7c3aed" tone="info" onClick={() => onGoToTimeline({ status: 'scheduled' })} />
         <StatTile label="لم يسجّل المعلم حضوره" value={c.missingCheckIn} Icon={UserX} color="#ef4444" tone="critical" onClick={onGoToReview} />
@@ -215,7 +215,8 @@ function LiveTab({ onGoToTimeline, onGoToReview }) {
         <StatTile label="حضور بانتظار الاعتماد" value={c.attendancePending} Icon={ClipboardCheck} color="#0ea5e9" tone="warning" onClick={() => onGoToTimeline({ status: 'completed' })} />
         <StatTile label="غياب طلاب اليوم" value={c.studentAbsencesToday} Icon={UserX} color="#f59e0b" tone="warning" onClick={() => onGoToTimeline({ status: 'completed' })} />
         <StatTile label="اكتملت اليوم" value={c.recentlyCompleted} Icon={CheckCircle2} color="#22c55e" tone="positive" onClick={() => onGoToTimeline({ status: 'completed' })} />
-        <StatTile label="ملغاة / معاد جدولتها" value={c.cancelledOrRescheduled} Icon={Ban} color="#6b7280" tone="neutral" onClick={() => onGoToTimeline({ status: 'cancelled' })} />
+        <StatTile label="حصص مؤجلة" value={c.postponed} Icon={Clock} color="#d97706" tone="warning" onClick={() => onGoToTimeline({ status: 'postponed' })} />
+        <StatTile label="ملغاة اليوم" value={c.cancelledOrRescheduled} Icon={Ban} color="#6b7280" tone="neutral" onClick={() => onGoToTimeline({ status: 'cancelled' })} />
       </div>
 
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">

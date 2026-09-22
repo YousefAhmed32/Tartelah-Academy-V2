@@ -114,7 +114,17 @@ exports.getUpcomingSessions = async (req, res, next) => {
   try {
     const userId = req.user._id
     const role = req.user.role
-    const filter = { scheduledAt: { $gte: new Date() }, status: { $in: ['scheduled', 'ongoing'] } }
+    const now = new Date()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+    const filter = {
+      $or: [
+        { scheduledAt: { $gte: now } },
+        { status: 'ongoing' },
+        { status: 'scheduled', scheduledAt: { $gte: todayStart } },
+      ],
+      status: { $in: ['scheduled', 'ongoing'] },
+    }
     if (role === 'student') filter.studentId = userId
     else if (role === 'teacher') filter.teacherId = userId
     const sessions = await Session.find(filter).sort({ scheduledAt: 1 }).limit(50)
@@ -154,7 +164,11 @@ exports.getTeacherSessionsByMonth = async (req, res, next) => {
 
     const filter = {
       teacherId: req.user._id,
-      scheduledAt: { $gte: start, $lte: end },
+      $or: [
+        { scheduledAt: { $gte: start, $lte: end } },
+        { rescheduledFrom: { $gte: start, $lte: end } },
+        { isPostponed: true, postponedAt: { $gte: start, $lte: end } },
+      ],
     }
     if (studentId) filter.studentId = studentId
 
@@ -677,12 +691,9 @@ exports.rescheduleSession = async (req, res, next) => {
     session.rescheduledFrom = session.scheduledAt
     session.scheduledAt = parsedNewDate
     session.status = 'scheduled'
-    session.isException = true
-    if (changeType === 'postpone') {
-      session.isPostponed = true
-      session.postponedAt = new Date()
-      session.postponedReason = reason
-    }
+    session.isPostponed = true
+    session.postponedAt = new Date()
+    session.postponedReason = reason || (changeType === 'postpone' ? 'تم تأجيل الحصة' : 'تم تعديل موعد الحصة')
 
     // Reset all lateness, start times, and execution timestamps
     session.teacherStartedAt = undefined

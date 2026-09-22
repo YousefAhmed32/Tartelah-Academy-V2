@@ -123,6 +123,7 @@ const STUDENT_ATTENDANCE_CONFIG = {
   late: { label: 'متأخر', color: '#d97706', bg: 'bg-amber-50 text-amber-700 border-amber-200/80', dot: 'bg-amber-500' },
   absent: { label: 'غائب', color: '#dc2626', bg: 'bg-rose-50 text-rose-700 border-rose-200/80', dot: 'bg-rose-500' },
   excused: { label: 'معذور', color: '#7c3aed', bg: 'bg-violet-50 text-violet-700 border-violet-200/80', dot: 'bg-violet-500' },
+  postponed: { label: 'مؤجل', color: '#f59e0b', bg: 'bg-amber-50 text-amber-700 border-amber-200/80', dot: 'bg-amber-500' },
   left_early: { label: 'غادر مبكراً', color: '#0284c7', bg: 'bg-sky-50 text-sky-700 border-sky-200/80', dot: 'bg-sky-500' },
   technical_issue: { label: 'مشكلة تقنية', color: '#475569', bg: 'bg-slate-100 text-slate-700 border-slate-200/80', dot: 'bg-slate-500' },
   pending: { label: 'بانتظار التحضير', color: '#64748b', bg: 'bg-gray-50 text-gray-500 border-gray-200/60', dot: 'bg-gray-400' },
@@ -145,28 +146,35 @@ function SessionRow({ session, index, onInspect }) {
   const teacherUrl = teacher?._id ? ROUTES.ADMIN_TEACHER_PROFILE.replace(':id', teacher._id) : null
 
   // Operational status computation
+  const isPostponed = Boolean(session.isPostponed || session.rescheduledFrom || session.status === 'postponed' || session.isPostponedFromToday)
+  const isPostponedFromToday = Boolean(session.isPostponedFromToday)
+  const isPostponedToToday = Boolean(session.isPostponedToToday || (session.rescheduledFrom && !isPostponedFromToday))
+  const isPostponedAway = isPostponedFromToday
   const isCompleted = session.status === 'completed'
   const isCancelled = session.status === 'cancelled'
   const isOngoing = session.status === 'ongoing' || session.operationalState === 'ongoing'
-  const isLate = session.isLate || (!session.teacherStartedAt && session.operationalState === 'late')
+  const isLate = !isPostponedAway && (session.isLate || (!session.teacherStartedAt && session.operationalState === 'late'))
   const isReportRequired = session.quranReportRequired !== false
   const hasReport = session.isReportSubmitted || session.report?.status === 'submitted' || session.report?.status === 'approved'
   const isReportDraft = session.report?.status === 'draft'
   const isReportMissing = isReportRequired && (isCompleted || isOngoing) && !hasReport && !isReportDraft
 
   // Student Attendance
-  const stStatusKey = session.studentAttendanceStatus || (isCompleted ? 'present' : (isCancelled ? 'excused' : 'pending'))
+  const stStatusKey = isPostponedAway ? 'postponed' : (session.studentAttendanceStatus || (isCompleted ? 'present' : (isCancelled ? 'excused' : 'pending')))
   const stCfg = STUDENT_ATTENDANCE_CONFIG[stStatusKey] || STUDENT_ATTENDANCE_CONFIG.pending
 
   // Teacher Attendance status
-  const tcStatusKey = session.teacherAttendanceStatus === 'absent' ? 'absent'
+  const tcStatusKey = isPostponedAway ? 'postponed'
+    : session.teacherAttendanceStatus === 'absent' ? 'absent'
     : session.teacherAttendanceStatus === 'excused' ? 'excused'
     : session.teacherAttendanceStatus === 'postponed' ? 'postponed'
     : (session.teacherStartedAt ? 'on_time' : (isLate ? 'late' : 'pending'))
   const tcCfg = TEACHER_ATTENDANCE_CONFIG[tcStatusKey] || TEACHER_ATTENDANCE_CONFIG.pending
-  const tcLabel = session.teacherStartedAt
-    ? `بدأ ${formatTimeAr(session.teacherStartedAt)}`
-    : (isLate ? `متأخر (${session.lateMinutes || 5}+ د)` : tcCfg.label)
+  const tcLabel = isPostponedAway
+    ? 'مؤجلة'
+    : session.teacherStartedAt
+      ? `بدأ ${formatTimeAr(session.teacherStartedAt)}`
+      : (isLate ? `متأخر (${session.lateMinutes || 5}+ د)` : tcCfg.label)
 
   return (
     <motion.div
@@ -228,10 +236,23 @@ function SessionRow({ session, index, onInspect }) {
             )}
           </div>
 
-          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1 font-medium text-gray-600">
               <Clock className="w-3.5 h-3.5 text-gray-400" />
-              {formatTimeAr(session.scheduledAt)}
+              {isPostponedFromToday ? (
+                <span className="text-amber-700 font-semibold" title={session.postponedReason || 'حصة مؤجلة'}>
+                  كانت {formatTimeAr(session.rescheduledFrom)} ➔ تأجلت إلى {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}
+                </span>
+              ) : isPostponedToToday ? (
+                <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-gray-800">{formatTimeAr(session.scheduledAt)}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/80" title={session.postponedReason || 'حصة مؤجلة سابقاً'}>
+                    ⏱️ مؤجلة سابقاً {session.rescheduledFrom ? `(كانت ${formatDateAr(session.rescheduledFrom)})` : ''}
+                  </span>
+                </span>
+              ) : (
+                <span>{formatTimeAr(session.scheduledAt)}</span>
+              )}
             </span>
             <span className="text-gray-300">•</span>
             <span>{session.durationMinutes} دقيقة</span>
@@ -332,9 +353,13 @@ function SessionRow({ session, index, onInspect }) {
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
               ملغاة
             </span>
-          ) : (session.isPostponed || Boolean(session.rescheduledFrom)) ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-              ⏱️ حصة مؤجلة
+          ) : isPostponedFromToday ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title={session.postponedReason || 'حصة مؤجلة'}>
+              ⏱️ مؤجلة إلى {formatDateAr(session.scheduledAt)}
+            </span>
+          ) : isPostponed && !isPostponedToToday ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title={session.postponedReason || 'حصة مؤجلة'}>
+              ⏱️ مؤجلة {session.scheduledAt ? `إلى ${formatDateAr(session.scheduledAt)}` : ''}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-100">

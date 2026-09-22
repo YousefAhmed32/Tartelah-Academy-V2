@@ -116,9 +116,13 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
       })
     },
     onSuccess: (res) => {
-      toast.success('تم تأجيل الحصة بنجاح وإشعار الطالب بالموعد الجديد')
+      toast.success('تم تأجيل الحصة بنجاح وإشعار الطالب والمعلم بالموعد الجديد')
       qc.invalidateQueries({ queryKey: ['teacher', 'dashboard'] })
       qc.invalidateQueries({ queryKey: ['teacher', 'sessions'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'dashboard'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'operations'] })
+      qc.invalidateQueries({ queryKey: ['operations', 'live'] })
       qc.invalidateQueries({ queryKey: ['sessions'] })
       onSuccess?.(res.data?.data)
       onClose()
@@ -132,6 +136,11 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
   const studentName = student && typeof student === 'object' && student.firstNameAr
     ? `${student.firstNameAr} ${student.lastNameAr || ''}`.trim()
     : (student?.name || 'الطالب')
+
+  const teacher = session.teacherId
+  const teacherName = teacher && typeof teacher === 'object' && teacher.firstNameAr
+    ? `${teacher.firstNameAr} ${teacher.lastNameAr || ''}`.trim()
+    : (teacher?.name || '')
 
   return (
     <Modal
@@ -169,18 +178,37 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
       }
     >
       <div className="space-y-4 text-start" dir="rtl">
-        {/* ── Top Bar: Clean Compact Student & Current Schedule ── */}
-        <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar
-              src={getFileUrl(student?.avatar)}
-              firstName={student?.firstNameAr}
-              lastName={student?.lastNameAr}
-              size="sm"
-              className="ring-1 ring-slate-200 flex-none"
-            />
+        {/* ── Top Bar: Clean Compact Student & Teacher & Current Schedule ── */}
+        <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/80 rounded-2xl gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex -space-x-2 space-x-reverse flex-none">
+              <Avatar
+                src={getFileUrl(student?.avatar)}
+                firstName={student?.firstNameAr}
+                lastName={student?.lastNameAr}
+                size="sm"
+                className="ring-2 ring-white flex-none"
+              />
+              {teacher && (
+                <Avatar
+                  src={getFileUrl(teacher?.avatar)}
+                  firstName={teacher?.firstNameAr}
+                  lastName={teacher?.lastNameAr}
+                  size="sm"
+                  className="ring-2 ring-white flex-none"
+                />
+              )}
+            </div>
             <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">{studentName}</div>
+              <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
+                <span>{studentName}</span>
+                {teacherName && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-600 font-medium">المعلم: {teacherName}</span>
+                  </>
+                )}
+              </div>
               <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                 <span>الموعد الحالي:</span>
                 <strong className="text-slate-700 font-semibold">{formatDateAr(session.scheduledAt)} • {formatTimeAr(session.scheduledAt)}</strong>
@@ -363,7 +391,7 @@ export default function RescheduleSessionModal({ open, onClose, session, onSucce
             </div>
             <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
               <CheckCircle2 size={13} className="text-emerald-600 flex-none" />
-              <span>سيتم إشعار الطالب تلقائياً بالموعد الجديد دون خصم رصيد.</span>
+              <span>سيتم إشعار الطالب والمعلم تلقائياً بالموعد الجديد دون خصم رصيد.</span>
             </div>
           </div>
         )}

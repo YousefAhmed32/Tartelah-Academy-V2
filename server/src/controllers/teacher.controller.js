@@ -245,15 +245,27 @@ exports.getMyStats = async (req, res, next) => {
 
     const [totalStudents, sessionsToday, pendingEvals, completedMonth, upcomingSessions, recentStudents, needsAttention, ongoingSessions, currentPeriod] = await Promise.all([
       Subscription.countDocuments({ teacherId, status: 'active' }),
-      Session.countDocuments({ teacherId, scheduledAt: { $gte: today, $lt: todayEnd } }),
+      Session.countDocuments({
+        teacherId,
+        $or: [
+          { scheduledAt: { $gte: today, $lt: todayEnd } },
+          { rescheduledFrom: { $gte: today, $lt: todayEnd } },
+          { isPostponed: true, postponedAt: { $gte: today, $lt: todayEnd } },
+        ],
+      }),
       Evaluation.countDocuments({ teacherId, createdAt: { $gte: monthStart } }),
       Session.countDocuments({ teacherId, status: 'completed', completedAt: { $gte: monthStart } }),
-      Session.find({ teacherId, scheduledAt: { $gte: now }, status: 'scheduled' })
+      Session.find({
+        teacherId,
+        status: 'scheduled',
+        $or: [{ scheduledAt: { $gte: now } }, { scheduledAt: { $gte: today, $lt: todayEnd } }],
+      })
         .sort({ scheduledAt: 1 }).limit(6).populate('studentId', 'firstNameAr lastNameAr avatar'),
       User.find({ _id: { $in: (await Subscription.find({ teacherId, status: 'active' }).distinct('studentId')) } })
         .limit(5).select('firstNameAr lastNameAr avatar'),
       Session.countDocuments({
         teacherId,
+        isPostponed: { $ne: true },
         scheduledAt: { $gte: attentionWindowStart, $lte: now },
         $or: [
           { status: 'missed' },

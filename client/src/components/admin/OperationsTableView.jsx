@@ -73,6 +73,11 @@ export default function OperationsTableView({
                         <div className="text-[10px] text-gray-400 mt-0.5">
                           {formatDateAr(s.scheduledAt)}
                         </div>
+                        {(s.isPostponed || Boolean(s.rescheduledFrom)) && (
+                          <div className="text-[10px] font-bold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 border border-amber-200/80 inline-block" title={s.postponedReason || 'حصة مؤجلة'}>
+                            ⏱️ مؤجلة {s.rescheduledFrom ? `(كانت ${formatDateAr(s.rescheduledFrom)})` : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>

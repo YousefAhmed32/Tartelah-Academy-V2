@@ -157,7 +157,7 @@ function assessSessionReview(session, attendance = null) {
   if (session.status === 'missed') {
     flag('missed_unresolved', 'الحصة تجاوزت موعدها بوقت طويل بدون أي إجراء من المعلم', 'high')
   }
-  if (session.status === 'scheduled' && session.teacherAttendanceStatus === 'pending' &&
+  if (session.status === 'scheduled' && !session.isPostponed && session.teacherAttendanceStatus === 'pending' &&
       ['grace_period', 'extended_completion', 'overdue'].includes(window.phase)) {
     flag('missing_checkin', 'لم يسجّل المعلم حضوره رغم تجاوز موعد الحصة', 'high')
   }
@@ -218,6 +218,7 @@ const TIMELINE_LABELS_AR = {
   completed_with_notes: 'مكتملة (مع ملاحظات)',
   completed_without_notes: 'مكتملة',
   started: 'جارية الآن',
+  postponed: 'مؤجلة',
   rescheduled: 'أُعيدت جدولتها',
   teacher_declined: 'رفضها المعلم',
   awaiting_teacher_acceptance: 'بانتظار موافقة المعلم',
@@ -230,7 +231,7 @@ const TIMELINE_COLORS = {
   cancelled_by_student: 'gray', cancelled_by_teacher: 'gray', cancelled_by_admin: 'gray', cancelled: 'gray',
   teacher_no_show: 'danger', missed: 'warning', student_no_show: 'warning',
   completed_with_notes: 'success', completed_without_notes: 'success', started: 'blue',
-  rescheduled: 'purple', teacher_declined: 'danger', awaiting_teacher_acceptance: 'warning',
+  postponed: 'purple', rescheduled: 'purple', teacher_declined: 'danger', awaiting_teacher_acceptance: 'warning',
   confirmed: 'blue', waiting: 'blue', booked: 'gray',
 }
 
@@ -251,6 +252,7 @@ function getLessonTimelineLabel(session, attendance = null) {
   else if (session.status === 'completed' && session.teacherNotes) code = 'completed_with_notes'
   else if (session.status === 'completed') code = 'completed_without_notes'
   else if (session.status === 'ongoing') code = 'started'
+  else if (session.isPostponed && session.status === 'scheduled') code = 'postponed'
   else if (session.rescheduledFrom && session.status === 'scheduled') code = 'rescheduled'
   else if (session.teacherAcceptanceStatus === 'declined') code = 'teacher_declined'
   else if (session.teacherAcceptanceStatus === 'pending') code = 'awaiting_teacher_acceptance'

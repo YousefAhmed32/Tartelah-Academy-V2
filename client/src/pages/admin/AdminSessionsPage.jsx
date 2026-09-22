@@ -26,6 +26,7 @@ import {
   SlidersHorizontal,
   X,
   ChevronDown,
+  CalendarClock,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import Avatar from '../../components/ui/Avatar.jsx'
@@ -43,6 +44,7 @@ import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx
 import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import SessionLifecycleGuide from '../../components/shared/SessionLifecycleGuide.jsx'
 import AdminSessionDetailDrawer from '../../components/admin/AdminSessionDetailDrawer.jsx'
+import RescheduleSessionModal from '../../components/teacher/RescheduleSessionModal.jsx'
 import AcademyTimezoneNotice from '../../components/ui/AcademyTimezoneNotice.jsx'
 
 const STATUS_CONFIG = {
@@ -51,6 +53,7 @@ const STATUS_CONFIG = {
   completed:    { label: 'مكتملة',       bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-100' },
   cancelled:    { label: 'ملغاة',        bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500',     border: 'border-red-100' },
   rescheduled:  { label: 'معادة',        bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-100' },
+  postponed:    { label: 'مؤجلة',        bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-200' },
   missed:       { label: 'بحاجة متابعة', bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-100' },
   no_show:      { label: 'غياب',         bg: 'bg-gray-100',   text: 'text-gray-600',    dot: 'bg-gray-400',    border: 'border-gray-200' },
 }
@@ -319,67 +322,7 @@ function SessionModal({ session, onClose, teachers, students }) {
   )
 }
 
-// ── Reschedule Modal ──────────────────────────────────────────────────────────
 
-function RescheduleModal({ session, onClose }) {
-  const qc = useQueryClient()
-  const [newDate, setNewDate] = useState('')
-
-  const mut = useMutation({
-    mutationFn: () =>
-      api.patch(`/sessions/${session._id}/reschedule`, { newDate }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success('تم تحديث موعد الحصة')
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] })
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions', 'stats'] })
-      onClose()
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || 'حدث خطأ'),
-  })
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-        <h2 className="font-heading font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <RefreshCw size={18} className="text-amber-500" /> إعادة جدولة الحصة
-        </h2>
-        <p className="text-sm text-gray-500 mb-4">
-          الحصة الحالية:{' '}
-          <span className="font-semibold text-gray-700">
-            {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}
-          </span>
-        </p>
-        <Field label="الموعد الجديد *">
-          <input
-            type="datetime-local"
-            className={inputCls}
-            value={newDate}
-            onChange={(e) => setNewDate(e.target.value)}
-            required
-            min={toAcademyDateTimeLocal(new Date())}
-          />
-        </Field>
-        <div className="mt-3">
-          <AcademyTimezoneNotice compact />
-        </div>
-        <div className="flex gap-3 mt-4">
-          <button
-            onClick={() => mut.mutate()}
-            disabled={!newDate || mut.isPending}
-            className="flex-1 h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-          >
-            {mut.isPending && <Spinner size="sm" color="border-white" />}
-            تأكيد الموعد الجديد
-          </button>
-          <button onClick={onClose} className="px-4 h-10 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm cursor-pointer">
-            إلغاء
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
 
 // ── Payroll status badge ──────────────────────────────────────────────────────
 
@@ -502,8 +445,8 @@ function SessionCardItem({ session, onSelect, onEdit, onReschedule, onCancel, on
               {sc.label}
             </span>
             {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                ⏱️ حصة مؤجلة
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title={session.postponedReason || 'حصة مؤجلة'}>
+                ⏱️ مؤجلة {session.rescheduledFrom ? `(كانت ${formatDateAr(session.rescheduledFrom)})` : ''}
               </span>
             )}
           </div>
@@ -590,6 +533,18 @@ function SessionCardItem({ session, onSelect, onEdit, onReschedule, onCancel, on
         </div>
 
         <div className="flex items-center gap-1">
+          {canCancel && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onReschedule(session)
+              }}
+              className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
+              title="تأجيل الحصة"
+            >
+              <CalendarClock size={14} />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -725,8 +680,8 @@ function SessionTableRow({ session, onSelect, onEdit, onReschedule, onCancel, on
             {sc.label}
           </span>
           {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-              ⏱️ مؤجلة
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title={session.postponedReason || 'حصة مؤجلة'}>
+              ⏱️ مؤجلة {session.rescheduledFrom ? `(كانت ${formatDateAr(session.rescheduledFrom)})` : ''}
             </span>
           )}
         </div>
@@ -760,9 +715,9 @@ function SessionTableRow({ session, onSelect, onEdit, onReschedule, onCancel, on
             <button
               onClick={() => onReschedule(session)}
               className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 transition-colors"
-              title="إعادة جدولة"
+              title="تأجيل الحصة"
             >
-              <RefreshCw size={15} />
+              <CalendarClock size={15} />
             </button>
           )}
           {canCancel && (
@@ -901,6 +856,7 @@ export default function AdminSessionsPage() {
     { key: 'ongoing', label: 'جارية' },
     { key: 'completed', label: 'مكتملة' },
     { key: 'cancelled', label: 'ملغاة' },
+    { key: 'postponed', label: 'مؤجلة' },
     { key: 'missed', label: 'بحاجة متابعة' },
     { key: 'no_show', label: 'غياب' },
   ]
@@ -1327,7 +1283,11 @@ export default function AdminSessionsPage() {
           <SessionModal session={editSession} onClose={() => setEditSession(null)} teachers={teachers} students={students} />
         )}
         {rescheduleSession && (
-          <RescheduleModal session={rescheduleSession} onClose={() => setRescheduleSession(null)} />
+          <RescheduleSessionModal
+            open={!!rescheduleSession}
+            session={rescheduleSession}
+            onClose={() => setRescheduleSession(null)}
+          />
         )}
         {correctSession && (
           <CorrectionModal session={correctSession} onClose={() => setCorrectSession(null)} />

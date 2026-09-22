@@ -274,10 +274,17 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
   const [showCancel, setShowCancel] = useState(false)
   const [receipt, setReceipt] = useState(null)
 
+  const todayKey = academyDateKey(new Date())
+  const isPostponed = Boolean(session.isPostponed || session.rescheduledFrom)
+  const isPostponedFromToday = isPostponed &&
+    ((session.rescheduledFrom && academyDateKey(session.rescheduledFrom) === todayKey) ||
+     (session.postponedAt && academyDateKey(session.postponedAt) === todayKey)) &&
+    academyDateKey(session.scheduledAt) !== todayKey
+
   const isOngoing = session.status === 'ongoing'
   const isDone = session.status === 'completed'
   const isCancelled = session.status === 'cancelled'
-  const canStart = ['scheduled', 'missed', 'no_show'].includes(session.status)
+  const canStart = !isPostponedFromToday && ['scheduled', 'missed', 'no_show'].includes(session.status)
   const window_ = session.window || null
   // The check-in window opens PRE_SESSION_ACCESS_MINUTES before the scheduled
   // start (server/src/config/attendancePolicy.js) — enforced authoritatively
@@ -372,8 +379,16 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
             <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap text-gray-500">
               <span>{session.studentId?.firstNameAr} {session.studentId?.lastNameAr}</span>
               <span>•</span>
-              <span>{formatDateAr(session.scheduledAt)}</span>
-              <span>{formatTimeAr(session.scheduledAt)}</span>
+              {isPostponedFromToday ? (
+                <span className="text-amber-700 font-semibold" title={session.postponedReason || 'حصة مؤجلة'}>
+                  كانت {formatTimeAr(session.rescheduledFrom)} ➔ تأجلت إلى {formatDateAr(session.scheduledAt)} {formatTimeAr(session.scheduledAt)}
+                </span>
+              ) : (
+                <>
+                  <span>{formatDateAr(session.scheduledAt)}</span>
+                  <span>{formatTimeAr(session.scheduledAt)}</span>
+                </>
+              )}
               <span>•</span>
               <span>{session.durationMinutes} د</span>
             </div>
@@ -385,11 +400,15 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
                 {ATT_OPTIONS.find(o => o.value === existingAtt.status)?.label || ''}
               </span>
             )}
-            {(session.isPostponed || Boolean(session.rescheduledFrom)) && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center gap-1">
-                ⏱️ حصة مؤجلة
+            {isPostponedFromToday ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center gap-1" title={session.postponedReason || 'حصة مؤجلة'}>
+                ⏱️ مؤجلة إلى {formatDateAr(session.scheduledAt)}
               </span>
-            )}
+            ) : isPostponed ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center gap-1" title={session.postponedReason || 'حصة مؤجلة سابقاً'}>
+                ⏱️ مؤجلة سابقاً {session.rescheduledFrom ? `(كانت ${formatDateAr(session.rescheduledFrom)})` : ''}
+              </span>
+            ) : null}
             {session.teacherAttendanceStatus && session.teacherAttendanceStatus !== 'pending' && (
               <AttendanceStatusBadge status={session.teacherAttendanceStatus} size="sm" />
             )}
@@ -503,6 +522,30 @@ function SessionCard({ session, onEval, onHomework, featured = false }) {
                       <button onClick={() => setShowCancel(true)}
                         className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-all flex items-center gap-1">
                         <X size={12} strokeWidth={2.5} /> إلغاء
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── State 1c: Postponed to another date ────────────── */}
+                {isPostponedFromToday && (
+                  <div className="pt-3">
+                    <div className="rounded-2xl p-4 text-center bg-amber-50/70 border border-amber-200">
+                      <Clock size={20} strokeWidth={2} className="mx-auto mb-1.5 text-amber-600" />
+                      <div className="text-xs font-bold text-amber-900 mb-1">تم تأجيل هذه الحصة إلى موعد لاحق</div>
+                      <div className="text-xs text-amber-800 font-medium">
+                        الموعد القادم: <b className="font-bold">{formatDateAr(session.scheduledAt)} — {formatTimeAr(session.scheduledAt)}</b>
+                      </div>
+                      {session.postponedReason && (
+                        <div className="text-[11px] text-amber-700/80 mt-1.5 bg-white/70 rounded-lg p-2 border border-amber-200/60">
+                          سبب التأجيل: {session.postponedReason}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
+                      <button onClick={() => setShowReschedule(true)}
+                        className="py-1.5 px-3 rounded-lg text-[11px] font-semibold text-amber-800 bg-amber-100/70 hover:bg-amber-200 border border-amber-300 transition-all">
+                        ⏱️ تعديل موعد التأجيل
                       </button>
                     </div>
                   </div>
@@ -960,21 +1003,33 @@ function OverdueReportRow({ report }) {
 function TodayFocusView({ sessions, isLoading, isError, isFetching, onRetry, onEval, onHomework, overdueReports }) {
   const todayKey = academyDateKey(new Date())
   const todaySessions = useMemo(
-    () => sessions.filter((s) => academyDateKey(s.scheduledAt) === todayKey),
+    () => sessions.filter((s) => {
+      const isSchedToday = academyDateKey(s.scheduledAt) === todayKey
+      const isReschedFromToday = s.rescheduledFrom && academyDateKey(s.rescheduledFrom) === todayKey
+      const isPostponedToday = s.isPostponed && s.postponedAt && academyDateKey(s.postponedAt) === todayKey
+      return isSchedToday || isReschedFromToday || isPostponedToday
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions]
   )
 
-  const ongoing = todaySessions.filter((s) => s.status === 'ongoing')
-  const needsCompletion = todaySessions.filter((s) =>
+  const postponedToday = todaySessions.filter((s) =>
+    (s.isPostponed || Boolean(s.rescheduledFrom)) && academyDateKey(s.scheduledAt) !== todayKey
+  )
+  const activeTodaySessions = todaySessions.filter((s) =>
+    academyDateKey(s.scheduledAt) === todayKey
+  )
+
+  const ongoing = activeTodaySessions.filter((s) => s.status === 'ongoing')
+  const needsCompletion = activeTodaySessions.filter((s) =>
     ['missed', 'no_show'].includes(s.status) ||
-    (s.status === 'scheduled' && ['grace_period', 'extended_completion', 'overdue'].includes(s.window?.phase))
+    (s.status === 'scheduled' && !s.isPostponed && ['grace_period', 'extended_completion', 'overdue'].includes(s.window?.phase))
   )
   const needsCompletionIds = new Set(needsCompletion.map((s) => s._id))
-  const upcoming = todaySessions
+  const upcoming = activeTodaySessions
     .filter((s) => s.status === 'scheduled' && !needsCompletionIds.has(s._id))
     .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
-  const completedToday = todaySessions.filter((s) => s.status === 'completed')
+  const completedToday = activeTodaySessions.filter((s) => s.status === 'completed')
 
   const featured = ongoing[0] || upcoming[0] || needsCompletion[0] || null
   const restOngoing = ongoing.filter((s) => s._id !== featured?._id)
@@ -984,17 +1039,19 @@ function TodayFocusView({ sessions, isLoading, isError, isFetching, onRetry, onE
   if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
   if (isError) return <ErrorState onRetry={onRetry} isRetrying={isFetching} />
 
+  const hasAnyTodayActivity = featured || postponedToday.length > 0 || completedToday.length > 0 || overdueReports.length > 0
+
   return (
     <div className="space-y-6">
       {featured ? (
         <SessionCard session={featured} onEval={onEval} onHomework={onHomework} featured />
-      ) : (
+      ) : !hasAnyTodayActivity ? (
         <div className="rounded-2xl p-10 text-center bg-white border-2 border-dashed border-gray-200">
           <Calendar size={38} strokeWidth={1.3} className="mb-2.5 mx-auto text-gray-300" />
           <p className="text-gray-900 font-semibold">لا توجد حصص مجدولة اليوم</p>
           <p className="text-xs mt-1 text-gray-500">استعرض الشهر الحالي أو أنشئ جدولاً دورياً جديداً</p>
         </div>
-      )}
+      ) : null}
 
       <GroupSection title="الآن" icon={PlayCircle} count={restOngoing.length} tone="green">
         {restOngoing.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
@@ -1011,6 +1068,10 @@ function TodayFocusView({ sessions, isLoading, isError, isFetching, onRetry, onE
 
       <GroupSection title="المنتهية اليوم" icon={CheckCheck} count={completedToday.length} tone="gray">
         {completedToday.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
+      </GroupSection>
+
+      <GroupSection title="حصص تم تأجيلها اليوم" icon={Clock} count={postponedToday.length} tone="amber">
+        {postponedToday.map((s) => <SessionCard key={s._id} session={s} onEval={onEval} onHomework={onHomework} />)}
       </GroupSection>
     </div>
   )

@@ -44,7 +44,7 @@ const SessionSchema = new mongoose.Schema({
   teacherStartedAt: { type: Date },
   teacherAttendanceStatus: {
     type: String,
-    enum: ['pending', 'on_time', 'late', 'absent', 'excused'],
+    enum: ['pending', 'on_time', 'late', 'absent', 'excused', 'postponed'],
     default: 'pending',
   },
   teacherAttendanceMarkedBy: { type: String, enum: ['system', 'admin', 'teacher'] },

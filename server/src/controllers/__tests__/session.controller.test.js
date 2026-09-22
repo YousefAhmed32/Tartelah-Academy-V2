@@ -271,3 +271,53 @@ describe('session.controller — admin schedule changes notify both parties', ()
     expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 'teacher1' }))
   })
 })
+
+describe('session.controller.getTeacherSessionsByMonth — preserves postponed session visibility', () => {
+  const teacherId = 'teacher1'
+  const teacher = { _id: teacherId, role: 'teacher' }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  test('includes rescheduledFrom and postponedAt in the date filter query', async () => {
+    const mockFindChain = {
+      sort: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockResolvedValue([
+        {
+          _id: 's1',
+          teacherId,
+          scheduledAt: new Date('2026-04-10T10:00:00Z'),
+          rescheduledFrom: new Date('2026-03-25T10:00:00Z'),
+          isPostponed: true,
+          durationMinutes: 60,
+          toObject: () => ({ _id: 's1', isPostponed: true, scheduledAt: new Date('2026-04-10T10:00:00Z'), durationMinutes: 60 }),
+        },
+      ]),
+    }
+    Session.find.mockReturnValue(mockFindChain)
+
+    const req = {
+      user: teacher,
+      query: { year: '2026', month: '3' },
+    }
+    const res = mockRes()
+
+    await ctrl.getTeacherSessionsByMonth(req, res, jest.fn())
+
+    expect(Session.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teacherId,
+        $or: expect.arrayContaining([
+          expect.objectContaining({ scheduledAt: expect.any(Object) }),
+          expect.objectContaining({ rescheduledFrom: expect.any(Object) }),
+          expect.objectContaining({ isPostponed: true, postponedAt: expect.any(Object) }),
+        ]),
+      })
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(jsonOf(res).success).toBe(true)
+    expect(jsonOf(res).data).toHaveLength(1)
+  })
+})
+
