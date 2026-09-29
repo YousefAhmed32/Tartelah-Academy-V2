@@ -14,6 +14,9 @@ const AuditLogSchema = new mongoose.Schema({
 AuditLogSchema.index({ actorId: 1, createdAt: -1 })
 AuditLogSchema.index({ entity: 1, entityId: 1 })
 AuditLogSchema.index({ createdAt: -1 })
+AuditLogSchema.index({ action: 1, 'changes.team': 1, createdAt: -1 })
+AuditLogSchema.index({ action: 1, 'changes.teams': 1, createdAt: -1 })
+AuditLogSchema.index({ action: 1, 'changes.supervisionTeam': 1, createdAt: -1 })
 
 AuditLogSchema.set('toJSON', { virtuals: true })
 

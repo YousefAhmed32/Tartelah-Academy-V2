@@ -14,6 +14,7 @@ const Subscription = require('../../models/Subscription')
 const User = require('../../models/User')
 const walletService = require('../../services/wallet.service')
 const assignmentService = require('../../services/assignment.service')
+const { createNotification } = require('../../services/notification.service')
 const ctrl = require('../enrollment.controller')
 
 function mockRes() {
@@ -56,6 +57,7 @@ describe('enrollment.controller.reviewRequest with Scheduling', () => {
     walletService.applyTransaction.mockResolvedValue({
       transaction: { _id: 'tx1' },
     })
+    createNotification.mockResolvedValue({})
   })
 
   test('rejects an invalid review action', async () => {
@@ -175,17 +177,13 @@ describe('enrollment.controller.reviewRequest with Scheduling', () => {
     expect(jsonOf(res).message).toBe('تمت الموافقة وتفعيل الاشتراك وإرسال طلب الإسناد للمعلم')
   })
 
-  test('rolls back subscription and wallet if scheduling throws conflict error', async () => {
+  test('refunds the purchase without deleting ledger history if scheduling conflicts', async () => {
     const conflictErr = new Error('الموعد المحدد غير متاح')
     conflictErr.status = 409
     conflictErr.conflicts = [{ dayOfWeek: 0, time: '16:00', reason: 'teacher_conflict' }]
     assignmentService.createAssignmentRequest.mockRejectedValue(conflictErr)
 
     Subscription.deleteOne = jest.fn().mockResolvedValue(true)
-    const LessonWallet = require('../../models/LessonWallet')
-    LessonWallet.deleteOne = jest.fn().mockResolvedValue(true)
-    const LessonTransaction = require('../../models/LessonTransaction')
-    LessonTransaction.deleteOne = jest.fn().mockResolvedValue(true)
 
     const req = {
       params: { id: 'enr1' },
@@ -209,6 +207,9 @@ describe('enrollment.controller.reviewRequest with Scheduling', () => {
     expect(jsonOf(res).message).toBe('الموعد المحدد غير متاح')
     expect(jsonOf(res).conflicts).toBeDefined()
     expect(Subscription.deleteOne).toHaveBeenCalled()
-    expect(LessonTransaction.deleteOne).toHaveBeenCalled()
+    expect(walletService.applyTransaction).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'refund', amount: -8, correctsTransactionId: 'tx1',
+      idempotencyKey: 'enrollment:enr1:purchase:rollback',
+    }))
   })
 })

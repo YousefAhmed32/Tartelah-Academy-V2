@@ -24,5 +24,11 @@ const NotificationSchema = new mongoose.Schema({
 NotificationSchema.index({ userId: 1, isRead: 1, isArchived: 1, createdAt: -1 })
 NotificationSchema.index({ userId: 1, type: 1, createdAt: -1 })
 NotificationSchema.index({ userId: 1, isArchived: 1, createdAt: -1 })
+// Reminder delivery must be atomic across overlapping cron ticks and server
+// instances. This applies only to new V3 reminder keys, not legacy rows.
+NotificationSchema.index({ userId: 1, 'metadata.reminderKey': 1 }, {
+  unique: true,
+  partialFilterExpression: { 'metadata.reminderKey': { $type: 'string' } },
+})
 
 module.exports = mongoose.model('Notification', NotificationSchema)

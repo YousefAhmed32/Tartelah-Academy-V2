@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
 import Spinner from '../../components/ui/Spinner.jsx'
-import Badge from '../../components/ui/Badge.jsx'
 import { formatDateAr } from '../../utils/date.js'
+import { supervisionService } from '../../services/supervision.service.js'
 
 const SURAH_NAMES = ['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه']
 
@@ -15,6 +15,7 @@ function useProgress() {
 
 export default function StudentProgressPage() {
   const { memorization, revision, isLoading } = useProgress()
+  const plans = useQuery({ queryKey: ['student', 'academic-plans'], queryFn: () => supervisionService.academicPlans({ limit: 30 }) })
 
   const qualityColor = { excellent: '#22c55e', good: '#7c3aed', fair: '#f59e0b', weak: '#ef4444' }
   const qualityLabel = { excellent: 'ممتاز', good: 'جيد', fair: 'مقبول', weak: 'ضعيف' }
@@ -22,6 +23,13 @@ export default function StudentProgressPage() {
   return (
     <div dir="rtl">
       <PageHeader title="المستويات والتقدم" subtitle="متابعة الحفظ والمراجعة" />
+      <section className="card-light mb-6 p-6">
+        <h2 className="font-heading text-lg font-bold text-brand-textBody">خطتي التعليمية</h2>
+        {plans.isLoading && <p className="mt-3 text-sm text-gray-500">جارٍ تحميل الخطة...</p>}
+        {plans.isError && <p role="alert" className="mt-3 text-sm text-red-700">تعذر تحميل الخطة التعليمية</p>}
+        {!plans.isLoading && !plans.isError && !plans.data?.data?.length && <p className="mt-3 text-sm text-gray-500">لم تُنشر خطة تعليمية لك بعد</p>}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{(plans.data?.data || []).map((plan) => <article key={plan._id} className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4"><h3 className="font-bold text-violet-950">{plan.courseId?.nameAr || plan.subjectKey} · {plan.level}</h3><p className="mt-2 text-sm text-gray-700">الهدف: {plan.goal}</p><p className="mt-1 text-sm text-gray-700">القادم: {plan.nextStep || 'سيحدده الإشراف'}</p><div className="mt-3 space-y-2">{plan.milestones?.map((step) => <div key={step._id} className="rounded-xl bg-white p-3 text-sm"><span className="font-semibold">{step.title}</span><span className="mr-2 text-xs text-gray-500">{step.status === 'completed' ? 'منجز' : step.status === 'in_progress' ? 'قيد العمل' : 'مخطط'}</span>{step.externalTest?.testedAt && <p className="mt-1 text-xs text-emerald-700">نتيجة الاختبار: {step.externalTest.result}</p>}</div>)}</div><div className="mt-3 flex flex-wrap gap-2">{plan.materialLinks?.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-violet-700 underline">{link.title}</a>)}</div></article>)}</div>
+      </section>
 
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner color="border-brand-purple" /></div>

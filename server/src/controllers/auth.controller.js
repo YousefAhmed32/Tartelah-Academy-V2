@@ -197,17 +197,22 @@ exports.devLogin = async (req, res, next) => {
       teacher:        { dbRole: 'teacher', email: 'teacher@tartelah.com' },
       teacher_female: { dbRole: 'teacher', email: 'teacher.female@tartelah.com', gender: 'female' },
       student:        { dbRole: 'student', email: 'student@tartelah.com' },
+      academic_supervisor: { dbRole: 'staff', email: 'academic.supervisor@tartelah.com', supervisionTeam: 'academic', supervisionPosition: 'supervisor' },
+      administrative_supervisor: { dbRole: 'staff', email: 'administrative.supervisor@tartelah.com', supervisionTeam: 'administrative', supervisionPosition: 'supervisor' },
+      academic_manager: { dbRole: 'manager', email: 'academic.manager@tartelah.com', supervisionTeam: 'academic', supervisionPosition: 'manager' },
+      administrative_manager: { dbRole: 'manager', email: 'administrative.manager@tartelah.com', supervisionTeam: 'administrative', supervisionPosition: 'manager' },
     }
     const account = DEV_ACCOUNTS[role]
     if (!account) {
-      return sendError(res, 'Invalid role. Use: admin | teacher | teacher_female | student', 400)
+      return sendError(res, 'Invalid quick-login role', 400)
     }
-    // Prefer the specific dev account, fall back to any active user matching the role (+gender, if relevant)
-    let user = await User.findOne({ email: account.email, isActive: true }).select('+tokenVersion')
-    if (!user) {
-      const fallbackFilter = { role: account.dbRole, isActive: true }
-      if (account.gender) fallbackFilter.gender = account.gender
-      user = await User.findOne(fallbackFilter).select('+tokenVersion')
+    // Supervision quick access is restricted to the four explicit demo identities.
+    // Keep the older role fallback only for legacy admin/teacher/student demo buttons.
+    const identity = { role: account.dbRole, ...(account.gender ? { gender: account.gender } : {}),
+      ...(account.supervisionTeam ? { supervisionTeam: account.supervisionTeam, supervisionPosition: account.supervisionPosition } : {}) }
+    let user = await User.findOne({ email: account.email, isActive: true, ...identity }).select('+tokenVersion')
+    if (!user && !account.supervisionTeam) {
+      user = await User.findOne({ isActive: true, ...identity }).select('+tokenVersion')
     }
     if (!user) return sendError(res, `No active ${account.dbRole} account found. Run npm run seed first.`, 404)
     const accessToken = issueTokens(user, res)

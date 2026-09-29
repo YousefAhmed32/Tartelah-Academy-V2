@@ -28,6 +28,8 @@ const PERMISSION_LABELS = {
   'users.reset_password': 'إعادة تعيين كلمات المرور',
   'admins.create': 'إنشاء حسابات إدارية',
   'admins.update': 'تعديل الأدوار الإدارية',
+  'supervision.view': 'عرض الإشراف داخل الفريق',
+  'supervision.manage': 'إدارة الشيفتات والتكليفات داخل الفريق',
   'admins.disable': 'إيقاف الحسابات الإدارية',
   'permissions.view': 'عرض الصلاحيات',
   'permissions.assign': 'منح / سحب الصلاحيات',
@@ -212,7 +214,7 @@ function PermissionSelector({ allPermissions, actorPermissions, isPrimaryAdminAc
 }
 
 function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCreated }) {
-  const initial = { firstNameAr: '', lastNameAr: '', email: '', phone: '', role: '', displayRoleName: '', jobTitle: '', password: '', notes: '', permissions: [] }
+  const initial = { firstNameAr: '', lastNameAr: '', email: '', phone: '', role: '', displayRoleName: '', jobTitle: '', password: '', notes: '', permissions: [], supervisionTeam: '', supervisionPosition: '' }
   const [form, setForm] = useState(initial)
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const qc = useQueryClient()
@@ -221,8 +223,20 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
 
   function onRoleChange(role) {
     const meta = roles.find((r) => r.key === role)
-    set('role', role)
-    set('permissions', meta?.defaultPermissions?.filter((p) => actor.isPrimaryAdmin() || actor.permissions.includes(p)) || [])
+    setForm((prev) => ({ ...prev, role, supervisionTeam: '', supervisionPosition: '', permissions: meta?.defaultPermissions?.filter((p) => actor.isPrimaryAdmin() || actor.permissions.includes(p)) || [] }))
+  }
+
+  function onTeamChange(team) {
+    if (team === 'none') {
+      setForm((prev) => ({ ...prev, supervisionTeam: '', supervisionPosition: '', role: '', permissions: [] }))
+      return
+    }
+    setForm((prev) => ({ ...prev, supervisionTeam: team, supervisionPosition: 'supervisor', role: 'staff', permissions: ['supervision.view'], displayRoleName: team === 'academic' ? 'مشرف أكاديمي' : 'مشرف إداري' }))
+  }
+
+  function onPositionChange(position) {
+    const manager = position === 'manager'
+    setForm((prev) => ({ ...prev, supervisionPosition: position, role: manager ? 'manager' : 'staff', permissions: manager ? ['supervision.view', 'supervision.manage'] : ['supervision.view'], displayRoleName: `${manager ? 'مدير الإشراف' : 'مشرف'} ${prev.supervisionTeam === 'academic' ? 'الأكاديمي' : 'الإداري'}` }))
   }
 
   const createMutation = useMutation({
@@ -238,7 +252,7 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
   })
 
   const isAdminFamily = ADMIN_FAMILY_ROLES.includes(form.role)
-  const canSubmit = form.firstNameAr && form.lastNameAr && form.email && form.role
+  const canSubmit = form.firstNameAr && form.lastNameAr && form.email && form.role && (!form.supervisionTeam || form.supervisionPosition)
 
   return (
     <Modal open={open} onClose={onClose} title="إضافة حساب جديد" size="lg"
@@ -255,8 +269,19 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
         <Input label="رقم الهاتف" variant="light" value={form.phone} onChange={(e) => set('phone', e.target.value)} dir="ltr" />
 
         <div>
+          <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">هل الحساب تابع للإشراف؟</label>
+          <Select value={form.supervisionTeam || 'none'} onValueChange={onTeamChange} options={[{ value: 'none', label: 'حساب عادي' }, { value: 'academic', label: 'الإشراف الأكاديمي' }, { value: 'administrative', label: 'الإشراف الإداري' }]} />
+        </div>
+
+        {form.supervisionTeam && <div>
+          <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">الوظيفة داخل الفريق</label>
+          <Select value={form.supervisionPosition} onValueChange={onPositionChange} options={[{ value: 'supervisor', label: 'مشرف' }, { value: 'manager', label: 'مدير الإشراف' }]} />
+          <p className="text-xs text-gray-500 mt-1">الحساب يرى فريقه فقط. المدير يوزع الشيفتات والتكليفات؛ المشرف يرى المسند إليه.</p>
+        </div>}
+
+        <div>
           <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">الدور الوظيفي (Role)</label>
-          <Select value={form.role} onValueChange={onRoleChange} options={roleOptions} placeholder="اختر الدور" />
+          {form.supervisionTeam ? <div className="rounded-xl bg-violet-50 px-3 py-2.5 text-sm text-violet-800">{form.supervisionPosition === 'manager' ? 'مدير فريق الإشراف' : 'مشرف الفريق'}</div> : <Select value={form.role} onValueChange={onRoleChange} options={roleOptions} placeholder="اختر الدور" />}
           {isAdminFamily && (
             <p className="text-[11px] text-amber-600 mt-1.5">يتطلب إنشاء هذا الدور صلاحية admins.create.</p>
           )}
@@ -271,7 +296,7 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
 
         <Input label="كلمة مرور مخصصة (اختياري — سيتم توليدها تلقائياً إن تُركت فارغة)" type="password" variant="light" value={form.password} onChange={(e) => set('password', e.target.value)} />
 
-        {form.role && (
+        {form.role && !form.supervisionTeam && (
           <div>
             <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">الصلاحيات</label>
             <PermissionSelector

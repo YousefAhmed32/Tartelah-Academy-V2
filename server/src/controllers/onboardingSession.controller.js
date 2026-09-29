@@ -7,6 +7,7 @@
 const { sendSuccess, sendError } = require('../utils/response')
 const { userHasPermission } = require('../middleware/rbac.middleware')
 const onboardingSessionService = require('../services/onboardingSession.service')
+const { notifyAcademicNewTeacher } = require('../services/supervisionNotification.service')
 
 function handleKnownError(err, res, next) {
   if (err.status) {
@@ -101,6 +102,7 @@ exports.finalizeSession = async (req, res, next) => {
         sessionId: req.params.id, actorId: req.user._id, actorRole: req.user.role,
       })
     } catch (err) { return handleKnownError(err, res, next) }
+    if (!result.replayed) await notifyAcademicNewTeacher({ teacherId: result.teacher?._id, teacherName: `${result.teacher?.firstNameAr || ''} ${result.teacher?.lastNameAr || ''}`.trim(), actorId: req.user._id })
     sendSuccess(res, result, result.replayed ? 'تم إنهاء هذه العملية مسبقًا' : 'تم إنهاء إعداد المعلم بنجاح')
   } catch (err) { next(err) }
 }

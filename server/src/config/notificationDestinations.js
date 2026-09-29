@@ -20,7 +20,7 @@ const STATIC_PATHS = new Set([
   '/student/subscription', '/student/enrollment', '/student/notifications',
   '/student/settings', '/student/quran-reports',
 
-  '/teacher', '/teacher/students', '/teacher/sessions', '/teacher/attendance',
+  '/teacher', '/teacher/students', '/teacher/sessions', '/teacher/guidance', '/teacher/attendance',
   '/teacher/evaluations', '/teacher/homework', '/teacher/progress',
   '/teacher/meeting-links', '/teacher/performance', '/teacher/payroll',
   '/teacher/monthly-reports', '/teacher/notifications', '/teacher/settings',
@@ -34,7 +34,9 @@ const STATIC_PATHS = new Set([
   '/admin/success-stories', '/admin/teacher-performance', '/admin/operations',
   '/admin/assignment-requests', '/admin/teachers/replace', '/admin/payroll',
   '/admin/subscriptions/renewals', '/admin/quran-reports', '/admin/monthly-reports',
-  '/admin/surveys',
+  '/admin/surveys', '/admin/supervision',
+  '/admin/supervision/academic', '/admin/supervision/administrative',
+  '/admin/supervision/academic-manager', '/admin/supervision/administrative-manager',
 ])
 
 // Dynamic (":id"-style) destinations — one regex per real parameterized route.

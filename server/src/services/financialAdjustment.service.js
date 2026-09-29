@@ -6,6 +6,7 @@
 // immutable once created; a correction is a new offsetting row
 // (`reverseAdjustment`), never an edit in place.
 const TeacherPayrollEntry = require('../models/TeacherPayrollEntry')
+const TeacherPayrollPeriod = require('../models/TeacherPayrollPeriod')
 const User = require('../models/User')
 const { getOrCreatePeriod, getOrCreateCurrentPeriod } = require('./payrollPeriod.service')
 
@@ -28,7 +29,11 @@ const ADJUSTMENT_TYPES = ['bonus', 'penalty', 'manual_adjustment']
  *   manual_adjustment  -> signed as given (a settlement/correction can go
  *                         either way — pass a negative `amount` for a debit)
  */
-async function createTeacherAdjustment({ teacherId, type, amount, reason, year, month, createdBy }) {
+async function createTeacherAdjustment({ teacherId, type, amount, reason, year, month, createdBy, idempotencyKey }) {
+  if (idempotencyKey) {
+    const existing = await TeacherPayrollEntry.findOne({ idempotencyKey })
+    if (existing) return { entry: existing, period: await TeacherPayrollPeriod.findById(existing.periodId) }
+  }
   if (!ADJUSTMENT_TYPES.includes(type)) throw new FinancialAdjustmentError('نوع الحركة المالية غير صالح', 400, 'type')
   if (!reason?.trim()) throw new FinancialAdjustmentError('سبب الحركة المالية مطلوب', 400, 'reason')
   const rawAmount = Number(amount)
@@ -43,11 +48,18 @@ async function createTeacherAdjustment({ teacherId, type, amount, reason, year, 
     throw new FinancialAdjustmentError('هذه الفترة معتمدة أو مدفوعة بالفعل — أعد فتحها أولًا لإضافة حركة جديدة', 409, 'period')
   }
 
-  const entry = await TeacherPayrollEntry.create({
-    teacherId, type, amount: signedAmount, currency: 'EGP',
-    reason: reason.trim(), businessRule: type === 'bonus' ? 'manual_bonus' : type === 'penalty' ? 'manual_penalty' : 'manual_settlement',
-    createdBy, periodId: period._id, status: 'pending',
-  })
+  let entry
+  try {
+    entry = await TeacherPayrollEntry.create({
+      teacherId, type, amount: signedAmount, currency: 'EGP',
+      reason: reason.trim(), businessRule: type === 'bonus' ? 'manual_bonus' : type === 'penalty' ? 'manual_penalty' : 'manual_settlement',
+      createdBy, periodId: period._id, status: 'pending', ...(idempotencyKey ? { idempotencyKey } : {}),
+    })
+  } catch (error) {
+    if (error.code !== 11000 || !idempotencyKey) throw error
+    entry = await TeacherPayrollEntry.findOne({ idempotencyKey })
+    if (!entry) throw error
+  }
   return { entry, period }
 }
 

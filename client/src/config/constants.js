@@ -109,6 +109,12 @@ export const PERMISSION_GROUPS = [
   {
     key: 'platform', label: 'المنصة',
     permissions: ['dashboard.view', 'operations.view', 'enrollments.view', 'enrollments.manage'],
+    // V3 supervision uses its own scoped endpoints; it does not grant access
+    // to the existing academy-wide student/teacher/admin screens.
+  },
+  {
+    key: 'supervision', label: 'الإشراف',
+    permissions: ['supervision.view', 'supervision.manage'],
   },
   {
     key: 'accounts', label: 'إدارة المستخدمين',
@@ -174,6 +180,7 @@ export const ROUTES = {
   TEACHER_STUDENTS: '/teacher/students',
   TEACHER_STUDENT_DETAIL: '/teacher/students/:studentId',
   TEACHER_SESSIONS: '/teacher/sessions',
+  TEACHER_GUIDANCE: '/teacher/guidance',
   TEACHER_ATTENDANCE: '/teacher/attendance',
   TEACHER_EVALUATIONS: '/teacher/evaluations',
   TEACHER_HOMEWORK: '/teacher/homework',
@@ -190,6 +197,11 @@ export const ROUTES = {
   TEACHER_ASSIGNMENT_REQUEST_DETAIL: '/teacher/assignment-requests/:id',
 
   ADMIN_DASHBOARD: '/admin',
+  ADMIN_SUPERVISION: '/admin/supervision',
+  SUPERVISION_ACADEMIC: '/admin/supervision/academic',
+  SUPERVISION_ADMINISTRATIVE: '/admin/supervision/administrative',
+  SUPERVISION_ACADEMIC_MANAGER: '/admin/supervision/academic-manager',
+  SUPERVISION_ADMINISTRATIVE_MANAGER: '/admin/supervision/administrative-manager',
   ADMIN_STUDENTS: '/admin/students',
   ADMIN_STUDENT_DETAIL: '/admin/students/:id',
   ADMIN_TEACHERS: '/admin/teachers',

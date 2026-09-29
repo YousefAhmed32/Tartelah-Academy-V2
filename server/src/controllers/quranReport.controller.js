@@ -12,6 +12,12 @@ const reportService = require('../services/quranReport.service')
 const trackingService = require('../services/reportTracking.service')
 const User = require('../models/User')
 
+const STUDENT_REPORT_FIELDS = '_id sessionId studentId teacherId status submittedAt createdAt todayRecitation todayRevision nextRecitation nextRevision nextManners nextTajweed quranLink memorizationLevel revisionLevel tajweedLevel engagementLevel generalEvaluation parentNotes importantAlert tajweedNotes interactiveActivity nextSessionHomework teacherNotes referenceLink'
+function studentReportView(report) {
+  const source = report.toObject ? report.toObject() : report
+  return Object.fromEntries(STUDENT_REPORT_FIELDS.split(' ').filter((field) => source[field] !== undefined).map((field) => [field, source[field]]))
+}
+
 function handleKnownError(err, res, next) {
   if (err.status) return sendError(res, err.message, err.status, err.field ? { field: err.field } : undefined)
   next(err)
@@ -38,6 +44,13 @@ exports.submitReport = async (req, res, next) => {
         userId: a._id, titleAr: 'تقرير حصة جديد', bodyAr: 'أرسل معلم تقرير حصة قرآنية جديد',
         type: 'report', relatedId: report._id, actionUrl: '/admin/quran-reports',
       }))).catch(() => {})
+      // Student reports are readable as soon as the teacher submits them.
+      // Notify at the same point instead of waiting for an optional review.
+      await createNotification({
+        userId: report.studentId, titleAr: 'تقرير حصتك متاح', bodyAr: 'أرسل المعلم تقرير حصتك ويمكنك مراجعته الآن',
+        type: 'report', relatedId: report._id, actionUrl: '/student/quran-reports',
+        metadata: { dedupeKey: `student-quran-report:${report._id}:${new Date(report.submittedAt).getTime()}` },
+      }).catch(() => {})
     }
 
     sendSuccess(res, report, 'تم إرسال التقرير')
@@ -82,7 +95,7 @@ exports.getSessionReport = async (req, res, next) => {
     const isAdmin = req.user.role === 'admin'
     if (!isOwnerTeacher && !isAdmin && !isOwnerStudent) return sendError(res, 'غير مصرح', 403)
     if (isOwnerStudent && !['submitted', 'approved'].includes(report.status)) return sendError(res, 'التقرير غير متاح بعد', 404)
-    sendSuccess(res, detail)
+    sendSuccess(res, isOwnerStudent ? { report: studentReportView(report), session: detail.session, memorization: detail.memorization, revision: detail.revision } : detail)
   } catch (err) { handleKnownError(err, res, next) }
 }
 
@@ -93,7 +106,7 @@ exports.getMyStudentReports = async (req, res, next) => {
     const { page, limit, skip } = getPagination(req.query)
     const filter = { studentId: req.user._id, status: { $in: ['submitted', 'approved'] } }
     const [reports, total] = await Promise.all([
-      QuranSessionReport.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+      QuranSessionReport.find(filter).select(STUDENT_REPORT_FIELDS).sort({ createdAt: -1 }).skip(skip).limit(limit)
         .populate('teacherId', 'firstNameAr lastNameAr avatar').populate('sessionId', 'scheduledAt'),
       QuranSessionReport.countDocuments(filter),
     ])
@@ -137,10 +150,6 @@ exports.approveReport = async (req, res, next) => {
   try {
     const report = await reportService.approveReport(req.params.id, { adminId: req.user._id })
     logAction({ actorId: req.user._id, actorRole: req.user.role, action: 'quranReport.approve', entity: 'QuranSessionReport', entityId: report._id, ip: req.ip })
-    await createNotification({
-      userId: report.studentId, titleAr: 'تقرير حصة جديد', bodyAr: 'تمت إضافة تقرير جديد لحصتك',
-      type: 'report', relatedId: report._id, actionUrl: '/student/quran-reports',
-    }).catch(() => {})
     sendSuccess(res, report, 'تم اعتماد التقرير')
   } catch (err) { handleKnownError(err, res, next) }
 }

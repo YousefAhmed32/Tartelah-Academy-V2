@@ -26,4 +26,19 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.js'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split heavy vendor dependencies into cacheable chunks so the main
+          // bundle stays well under the 500 kB warning threshold.
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-charts': ['recharts'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-export': ['html2canvas', 'jspdf', 'jspdf-autotable'],
+        },
+      },
+    },
+  },
 })

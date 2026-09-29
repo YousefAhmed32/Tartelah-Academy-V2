@@ -105,6 +105,10 @@ async function syncLessonConsumption(session, attendanceStatus, opts = {}) {
 async function handleCancellation(session, { cancelledByRole, now = new Date(), reason, performedBy } = {}) {
   if (cancelledByRole === 'teacher' || cancelledByRole === 'admin') {
     await releaseLesson(session, { reason: 'إلغاء من الأكاديمية — إرجاع الحصة', performedByRole: cancelledByRole, performedBy })
+    // A makeup already represents a credit granted for its original lesson.
+    // Cancelling the replacement leaves that credit available for a new slot;
+    // granting another credit here would count the same disruption twice.
+    if (session.isMakeup && session.makeupForSessionId) return { deducted: false, compensationGranted: false, existingCreditPreserved: true }
     await compensationService.grantCompensation(session, {
       reason: reason || 'إلغاء الحصة من طرف الأكاديمية',
       grantedByRole: cancelledByRole, grantedBy: performedBy,
@@ -124,6 +128,7 @@ async function handleCancellation(session, { cancelledByRole, now = new Date(), 
 /** Teacher no-show (sweep-detected): never costs the student, auto-compensated. */
 async function handleTeacherNoShow(session, { reason, performedBy } = {}) {
   await releaseLesson(session, { reason: 'غياب المعلم — إرجاع الحصة', performedByRole: 'system', performedBy })
+  if (session.isMakeup && session.makeupForSessionId) return { deducted: false, compensationGranted: false, existingCreditPreserved: true }
   const result = await compensationService.grantCompensation(session, {
     reason: reason || 'غياب المعلم عن الحصة — حصة تعويضية',
     grantedByRole: 'system', grantedBy: performedBy,

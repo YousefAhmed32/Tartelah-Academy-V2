@@ -5,11 +5,23 @@ const { isValidGender } = require('../config/teacherIdentity')
 const { uploadBuffer, deleteFile } = require('../services/media.service')
 const { createNotification } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
+const { hasFutureWork } = require('../services/supervisionPersonnel.service')
 const { generateTempPassword } = require('../utils/tempPassword')
 const {
   ALL_PERMISSIONS, ALL_ROLES, ADMIN_FAMILY_ROLES, DEFAULT_PERMISSIONS_BY_ROLE,
+  SUPERVISION_TEAMS, SUPERVISION_POSITIONS, SUPERVISION_PERMISSIONS,
   isValidPermission, isValidRole,
 } = require('../config/permissions')
+
+function validSupervisionIdentity(role, team, position) {
+  if (!team && !position) return true
+  return SUPERVISION_TEAMS.includes(team) && SUPERVISION_POSITIONS.includes(position) &&
+    role === (position === 'manager' ? 'manager' : 'staff')
+}
+
+function validSupervisionGrants(permissions) {
+  return permissions.every((p) => ['supervision.view', 'supervision.manage'].includes(p))
+}
 
 exports.updateMe = async (req, res, next) => {
   try {
@@ -118,10 +130,13 @@ exports.createUser = async (req, res, next) => {
     const {
       firstNameAr, lastNameAr, firstName, lastName, email, phone,
       role, displayRoleName, jobTitle, roleDescription, notes,
-      password, isActive, mustChangePassword, permissions,
+      password, isActive, mustChangePassword, permissions, supervisionTeam, supervisionPosition,
     } = req.body
 
     if (!isValidRole(role)) return sendError(res, 'الدور غير صالح', 400)
+    if (!validSupervisionIdentity(role, supervisionTeam, supervisionPosition)) {
+      return sendError(res, 'الفريق والوظيفة الإشرافية لا يتوافقان مع دور الحساب', 400)
+    }
 
     // Creating any admin-family account (admin/assistant_admin/operator/
     // manager/staff) requires the explicit admins.create authority — a plain
@@ -133,7 +148,12 @@ exports.createUser = async (req, res, next) => {
     const existing = await User.findOne({ email })
     if (existing) return sendError(res, 'البريد الإلكتروني مسجل مسبقاً', 409)
 
-    const requestedPermissions = Array.isArray(permissions) ? permissions : (DEFAULT_PERMISSIONS_BY_ROLE[role] || [])
+    const requestedPermissions = Array.isArray(permissions)
+      ? permissions
+      : (supervisionTeam ? SUPERVISION_PERMISSIONS[supervisionPosition] : DEFAULT_PERMISSIONS_BY_ROLE[role]) || []
+    if (supervisionTeam && !validSupervisionGrants(requestedPermissions)) {
+      return sendError(res, 'حساب الإشراف لا يُمنح صلاحيات عامة خارج نطاق فريقه', 400)
+    }
     if (requestedPermissions.some((p) => !isValidPermission(p))) {
       return sendError(res, 'قائمة الصلاحيات تحتوي على صلاحية غير صالحة', 400)
     }
@@ -150,6 +170,8 @@ exports.createUser = async (req, res, next) => {
       lastName: lastName || lastNameAr,
       email, phone,
       role,
+      supervisionTeam: supervisionTeam || null,
+      supervisionPosition: supervisionPosition || null,
       displayRoleName: displayRoleName || null,
       jobTitle: jobTitle || null,
       roleDescription: roleDescription || null,
@@ -166,7 +188,7 @@ exports.createUser = async (req, res, next) => {
       actorId: req.user._id, actorRole: req.user.role,
       action: ADMIN_FAMILY_ROLES.includes(role) ? 'create_admin' : 'create_user',
       entity: 'User', entityId: user._id,
-      changes: { role, permissions: requestedPermissions },
+      changes: { role, supervisionTeam: supervisionTeam || null, supervisionPosition: supervisionPosition || null, permissions: requestedPermissions },
       ip: req.ip,
     })
 
@@ -186,7 +208,7 @@ exports.updateUser = async (req, res, next) => {
 
     const {
       firstNameAr, lastNameAr, firstName, lastName, email, phone,
-      displayRoleName, jobTitle, roleDescription, notes, role,
+      displayRoleName, jobTitle, roleDescription, notes, role, supervisionTeam, supervisionPosition,
     } = req.body
 
     const updates = {}
@@ -217,13 +239,36 @@ exports.updateUser = async (req, res, next) => {
       updates.role = role
     }
 
-    const before = { role: target.role, displayRoleName: target.displayRoleName, jobTitle: target.jobTitle }
+    if (supervisionTeam !== undefined || supervisionPosition !== undefined) {
+      if (!req.user.hasPermission('admins.update') || !req.user.hasPermission('permissions.assign')) {
+        return sendError(res, 'ليس لديك صلاحية لتغيير هوية الإشراف', 403)
+      }
+      const nextTeam = supervisionTeam === undefined ? target.supervisionTeam : supervisionTeam
+      const nextPosition = supervisionPosition === undefined ? target.supervisionPosition : supervisionPosition
+      if (!validSupervisionIdentity(updates.role || target.role, nextTeam, nextPosition)) {
+        return sendError(res, 'الفريق والوظيفة الإشرافية لا يتوافقان مع دور الحساب', 400)
+      }
+      if (nextTeam && !validSupervisionGrants(target.permissions || [])) {
+        return sendError(res, 'اسحب الصلاحيات العامة قبل نقل الحساب إلى الإشراف', 400)
+      }
+      updates.supervisionTeam = nextTeam || null
+      updates.supervisionPosition = nextPosition || null
+    }
+    if (target.supervisionTeam && updates.role && !validSupervisionIdentity(updates.role, updates.supervisionTeam === undefined ? target.supervisionTeam : updates.supervisionTeam, updates.supervisionPosition === undefined ? target.supervisionPosition : updates.supervisionPosition)) {
+      return sendError(res, 'غيّر الوظيفة الإشرافية مع دور الحساب في نفس الطلب', 400)
+    }
+    if (target.supervisionTeam && (updates.supervisionTeam && updates.supervisionTeam !== target.supervisionTeam || updates.supervisionPosition && updates.supervisionPosition !== target.supervisionPosition) && await hasFutureWork(target._id)) {
+      return sendError(res, 'انقل التكليفات والشيفتات القادمة قبل تغيير هوية عضو الإشراف', 409)
+    }
+    if (target.supervisionTeam && updates.supervisionPosition && updates.supervisionPosition !== target.supervisionPosition) updates.permissions = SUPERVISION_PERMISSIONS[updates.supervisionPosition]
+
+    const before = { role: target.role, supervisionTeam: target.supervisionTeam, supervisionPosition: target.supervisionPosition, displayRoleName: target.displayRoleName, jobTitle: target.jobTitle }
     Object.assign(target, updates)
     await target.save()
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'update_user',
-      entity: 'User', entityId: target._id, changes: { before, after: updates }, ip: req.ip,
+      entity: 'User', entityId: target._id, changes: { team: target.supervisionTeam || null, teams: [before.supervisionTeam, target.supervisionTeam].filter(Boolean), before, after: updates }, ip: req.ip,
     })
 
     sendSuccess(res, target.toPublic(), 'تم تحديث بيانات الحساب')
@@ -243,6 +288,9 @@ exports.updateUserPermissions = async (req, res, next) => {
     if (!Array.isArray(permissions) || permissions.some((p) => !isValidPermission(p))) {
       return sendError(res, 'قائمة الصلاحيات غير صالحة', 400)
     }
+    if (target.supervisionTeam && !validSupervisionGrants(permissions)) {
+      return sendError(res, 'حساب الإشراف لا يُمنح صلاحيات عامة خارج نطاق فريقه', 400)
+    }
 
     const before = target.permissions || []
     const added = permissions.filter((p) => !before.includes(p))
@@ -258,7 +306,7 @@ exports.updateUserPermissions = async (req, res, next) => {
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'update_permissions',
-      entity: 'User', entityId: target._id, changes: { before, after: permissions }, ip: req.ip,
+      entity: 'User', entityId: target._id, changes: { team: target.supervisionTeam || null, before, after: permissions }, ip: req.ip,
     })
 
     sendSuccess(res, target.toPublic(), 'تم تحديث الصلاحيات')
@@ -275,6 +323,7 @@ exports.updateUserStatus = async (req, res, next) => {
     if (typeof isActive !== 'boolean') return sendError(res, 'قيمة الحالة غير صالحة', 400)
 
     if (!isActive) {
+      if (target.supervisionTeam && await hasFutureWork(target._id)) return sendError(res, 'انقل التكليفات والشيفتات القادمة قبل إيقاف عضو الإشراف', 409)
       if (String(target._id) === String(req.user._id)) {
         return sendError(res, 'لا يمكنك إيقاف حسابك الخاص', 403)
       }
@@ -296,7 +345,7 @@ exports.updateUserStatus = async (req, res, next) => {
     logAction({
       actorId: req.user._id, actorRole: req.user.role,
       action: isActive ? 'reactivate_user' : 'disable_user',
-      entity: 'User', entityId: target._id, ip: req.ip,
+      entity: 'User', entityId: target._id, changes: { team: target.supervisionTeam || null }, ip: req.ip,
     })
 
     sendSuccess(res, target.toPublic(), isActive ? 'تم تفعيل الحساب' : 'تم إيقاف الحساب')

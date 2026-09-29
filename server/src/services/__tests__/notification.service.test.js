@@ -44,6 +44,12 @@ describe('notification.service — actionUrl safety', () => {
 })
 
 describe('notification.service — dedup', () => {
+  test('an atomic reminder-key collision does not create a duplicate socket event', async () => {
+    Notification.create.mockRejectedValue(Object.assign(new Error('duplicate key'), { code: 11000 }))
+    const result = await createNotification({ userId: 'u1', titleAr: 'تذكير', type: 'session', metadata: { reminderKey: 'session:s1:time:5:u1' } })
+    expect(result).toBeNull()
+    expect(socketService.emitToUser).not.toHaveBeenCalled()
+  })
   test('createNotification is a no-op when the dedupeKey already exists for this user+type', async () => {
     Notification.find.mockReturnValue({
       select: () => ({ lean: () => Promise.resolve([{ userId: 'u1', type: 'attendance', metadata: { dedupeKey: 'attendance:s1:no_show' } }]) }),

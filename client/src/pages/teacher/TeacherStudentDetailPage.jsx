@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowRight, CheckCircle2, XCircle, Wallet, CalendarClock, StickyNote, BookOpen,
+  ArrowRight, Wallet, CalendarClock, StickyNote, BookOpen,
 } from 'lucide-react'
 import api from '../../utils/api.js'
 import PageHeader from '../../components/shared/PageHeader.jsx'
@@ -12,6 +12,7 @@ import Spinner from '../../components/ui/Spinner.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import { formatDateAr, formatDateTimeAr } from '../../utils/date.js'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
+import { supervisionService } from '../../services/supervision.service.js'
 
 const SESSION_STATUS_AR = {
   scheduled: 'قادمة', ongoing: 'جارية', completed: 'مكتملة',
@@ -43,6 +44,7 @@ export default function TeacherStudentDetailPage() {
     queryKey: ['teacher', 'student', studentId],
     queryFn: () => api.get(`/teachers/me/students/${studentId}`).then(r => r.data?.data),
   })
+  const plans = useQuery({ queryKey: ['teacher', 'student-plans', studentId], queryFn: () => supervisionService.academicPlans({ studentId, limit: 30 }) })
 
   if (isLoading) return <div className="flex justify-center py-16"><Spinner color="border-brand-purple" /></div>
   if (isError || !data) return <ErrorState onRetry={refetch} isRetrying={isFetching} />
@@ -57,6 +59,7 @@ export default function TeacherStudentDetailPage() {
       </Link>
 
       <PageHeader title={`${st.firstNameAr} ${st.lastNameAr}`} subtitle={data.packageName || (data.scheduleStatus === 'schedule_only' ? 'جدول بلا اشتراك' : '')} />
+      <section className="card-light p-5"><h2 className="font-heading text-lg font-bold text-gray-900">الخطة التعليمية</h2>{plans.isLoading && <p className="mt-2 text-sm">جارٍ تحميل الخطة...</p>}{plans.isError && <p role="alert" className="mt-2 text-sm text-red-700">تعذر تحميل الخطة</p>}{!plans.isLoading && !plans.isError && !plans.data?.data?.length && <p className="mt-2 text-sm text-gray-500">لم تُنشر خطة لهذا الطالب بعد</p>}<div className="mt-3 grid gap-3 md:grid-cols-2">{(plans.data?.data || []).map((plan) => <article key={plan._id} className="rounded-xl bg-violet-50 p-4 text-sm"><h3 className="font-bold">{plan.courseId?.nameAr || plan.subjectKey} · {plan.level}</h3><p className="mt-2">الهدف: {plan.goal}</p><p className="mt-1">القادم: {plan.nextStep || 'لم يحدد'}</p><div className="mt-2 space-y-1">{plan.milestones?.map((step) => <p key={step._id}>{step.title} · {step.status === 'completed' ? 'منجز' : step.status === 'in_progress' ? 'قيد العمل' : 'مخطط'}{step.externalTest?.result ? ` · نتيجة اختبار خارجي: ${step.externalTest.result}` : ''}</p>)}</div><div className="mt-2 flex flex-wrap gap-2">{plan.materialLinks?.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="font-semibold text-violet-700 underline">{link.title}</a>)}</div></article>)}</div></section>
 
       <div className="card-light p-5">
         <div className="flex items-start gap-4 flex-wrap">

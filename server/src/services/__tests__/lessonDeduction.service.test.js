@@ -126,6 +126,13 @@ describe('handleCancellation — the full cancellation matrix', () => {
     expect(walletService.applyTransaction).toHaveBeenCalledWith(expect.objectContaining({ type: 'reversal', amount: 1 }))
     expect(session.subscriptionConsumed).toBe(false)
   })
+
+  test('a cancelled makeup preserves the original credit without granting a second one', async () => {
+    const session = makeSession({ isMakeup: true, makeupForSessionId: 'original1' })
+    const result = await lessonDeduction.handleCancellation(session, { cancelledByRole: 'teacher' })
+    expect(result.existingCreditPreserved).toBe(true)
+    expect(compensationService.grantCompensation).not.toHaveBeenCalled()
+  })
 })
 
 describe('handleTeacherNoShow', () => {
@@ -136,5 +143,12 @@ describe('handleTeacherNoShow', () => {
     expect(compensationService.grantCompensation).toHaveBeenCalledTimes(1)
     expect(result.deducted).toBe(false)
     expect(result.compensationGranted).toBe(true)
+  })
+
+  test('a makeup no-show does not grant the same compensation twice', async () => {
+    const session = makeSession({ isMakeup: true, makeupForSessionId: 'original1' })
+    const result = await lessonDeduction.handleTeacherNoShow(session)
+    expect(result.existingCreditPreserved).toBe(true)
+    expect(compensationService.grantCompensation).not.toHaveBeenCalled()
   })
 })

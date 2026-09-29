@@ -80,12 +80,21 @@ exports.renewSubscription = async (req, res, next) => {
     existing.renewsIntoSubscriptionId = renewed._id
     await existing.save()
 
-    const { transaction } = await walletService.applyTransaction({
-      studentId: existing.studentId, type: 'renewal', amount: pkg.sessionsPerMonth,
-      idempotencyKey: `subscription:${renewed._id}:renew`,
-      reason: `تجديد باقة "${pkg.nameAr}"`,
-      relatedSubscriptionId: renewed._id, performedByRole: 'admin', performedBy: req.user._id,
-    })
+    let transaction
+    try {
+      ;({ transaction } = await walletService.applyTransaction({
+        studentId: existing.studentId, type: 'renewal', amount: pkg.sessionsPerMonth,
+        idempotencyKey: `subscription:${renewed._id}:renew`,
+        reason: `تجديد باقة "${pkg.nameAr}"`,
+        relatedSubscriptionId: renewed._id, performedByRole: 'admin', performedBy: req.user._id,
+      }))
+    } catch (walletErr) {
+      // Compensating rollback: revert the subscription created above so the
+      // student doesn't end up with a dangling, lesson-less subscription.
+      await Subscription.deleteOne({ _id: renewed._id }).catch(() => {})
+      await Subscription.findByIdAndUpdate(existing._id, { $unset: { renewsIntoSubscriptionId: '' } }).catch(() => {})
+      throw walletErr
+    }
     renewed.walletTransactionId = transaction._id
     await renewed.save()
     await renewed.populate(['packageId', 'studentId', 'teacherId'])

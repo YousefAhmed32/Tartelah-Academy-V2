@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ROLES, ADMIN_FAMILY_ROLES, ROLE_DISPLAY_NAMES } from '../config/constants.js'
+import { ROLES, ADMIN_FAMILY_ROLES, ROLE_DISPLAY_NAMES, ROUTES } from '../config/constants.js'
 
 // RBAC + PBAC auth store. `user` (hydrated from GET /auth/me, see
 // hooks/useAuth.js) already carries `role` (the stable systemRole),
@@ -79,7 +79,12 @@ export const useAuthStore = create((set, get) => ({
   getJobTitle: () => get().user?.jobTitle || null,
 
   getDashboardPath: () => {
-    const role = get().user?.role
+    const user = get().user
+    const role = user?.role
+    if (user?.supervisionTeam === 'academic' && user?.supervisionPosition === 'manager') return ROUTES.SUPERVISION_ACADEMIC_MANAGER
+    if (user?.supervisionTeam === 'academic' && user?.supervisionPosition === 'supervisor') return ROUTES.SUPERVISION_ACADEMIC
+    if (user?.supervisionTeam === 'administrative' && user?.supervisionPosition === 'manager') return ROUTES.SUPERVISION_ADMINISTRATIVE_MANAGER
+    if (user?.supervisionTeam === 'administrative' && user?.supervisionPosition === 'supervisor') return ROUTES.SUPERVISION_ADMINISTRATIVE
     if (ADMIN_FAMILY_ROLES.includes(role)) return '/admin'
     if (role === ROLES.TEACHER) return '/teacher'
     if (role === ROLES.STUDENT) return '/student'

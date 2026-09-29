@@ -14,5 +14,7 @@ const RevisionSchema = new mongoose.Schema({
 
 RevisionSchema.index({ studentId: 1, surahNumber: 1 })
 RevisionSchema.index({ teacherId: 1, recordedAt: -1 })
+RevisionSchema.index({ studentId: 1, recordedAt: -1 })
+RevisionSchema.index({ recordedAt: -1, teacherId: 1 })
 
 module.exports = mongoose.model('Revision', RevisionSchema)

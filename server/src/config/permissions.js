@@ -121,7 +121,18 @@ const ALL_PERMISSIONS = [
   // raw responses are not a teacher-facing surface in this pass).
   'surveys.view',
   'surveys.manage',
+  // V3 supervision foundation. Team/ownership checks are mandatory in the
+  // supervision routes even when these coarse permissions are present.
+  'supervision.view',
+  'supervision.manage',
 ]
+
+const SUPERVISION_TEAMS = ['academic', 'administrative']
+const SUPERVISION_POSITIONS = ['manager', 'supervisor']
+const SUPERVISION_PERMISSIONS = {
+  manager: ['supervision.view', 'supervision.manage'],
+  supervisor: ['supervision.view'],
+}
 
 // Internal role identifiers (User.role). Stable — never rename these values,
 // only their displayRoleName/jobTitle (per-user, customizable). No
@@ -189,6 +200,7 @@ const DEFAULT_PERMISSIONS_BY_ROLE = {
     'quranReports.view', 'quranReports.manage',
     'monthlyReports.view', 'monthlyReports.manage',
     'surveys.view', 'surveys.manage',
+    'supervision.view', 'supervision.manage',
     // 'assignments.override', 'credentials.manage_defaults', and
     // 'payroll.approve'/'payroll.pay' deliberately excluded even for a plain
     // 'admin' account — the immediate-assignment-without-teacher-approval
@@ -244,6 +256,9 @@ module.exports = {
   ADMINISTRATIVE_ROLES,
   DEFAULT_PERMISSIONS_BY_ROLE,
   DEFAULT_DISPLAY_NAMES,
+  SUPERVISION_TEAMS,
+  SUPERVISION_POSITIONS,
+  SUPERVISION_PERMISSIONS,
   isValidPermission,
   isValidRole,
 }

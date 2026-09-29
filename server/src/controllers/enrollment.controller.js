@@ -47,7 +47,7 @@ exports.submitRequest = async (req, res, next) => {
       relatedId: request._id,
       actionUrl: '/admin/enrollments',
     }))
-    if (adminNotifs.length) await createNotifications(adminNotifs)
+    if (adminNotifs.length) createNotifications(adminNotifs).catch(() => {})
 
     sendSuccess(res, request, 'تم إرسال طلب التسجيل بنجاح', 201)
   } catch (err) {
@@ -271,11 +271,23 @@ exports.reviewRequest = async (req, res, next) => {
         } catch (scheduleErr) {
           // If scheduling step fails (e.g. availability conflict or invalid slots),
           // roll back the subscription and wallet transaction cleanly.
-          await Promise.allSettled([
-            require('../models/LessonWallet').deleteOne({ idempotencyKey: `enrollment:${request._id}:purchase` }).catch(() => {}),
-            require('../models/LessonTransaction').deleteOne({ _id: transaction._id }).catch(() => {}),
-            Subscription.deleteOne({ _id: subscription._id }).catch(() => {}),
-          ])
+          // A failed purchase must reduce totalPurchased, not count as a
+          // consumed lesson. Keep the original ledger entry for audit.
+          try {
+            await walletService.applyTransaction({
+              studentId: request.studentId._id,
+              type: 'refund',
+              amount: -(pkg.sessionsPerMonth),
+              idempotencyKey: `enrollment:${request._id}:purchase:rollback`,
+              reason: 'إلغاء تلقائي — فشل جدولة الحصص عند الموافقة على طلب التسجيل',
+              relatedSubscriptionId: subscription._id,
+              correctsTransactionId: transaction._id,
+              performedByRole: 'system',
+            })
+            await Subscription.deleteOne({ _id: subscription._id })
+          } catch (rollbackError) {
+            return sendError(res, 'فشلت الجدولة وتعذر إلغاء الرصيد أو الاشتراك تلقائيًا؛ يرجى مراجعة العملية قبل إعادة المحاولة', 500)
+          }
 
           if (scheduleErr.status) {
             return sendError(res, scheduleErr.message, scheduleErr.status, {
@@ -287,22 +299,29 @@ exports.reviewRequest = async (req, res, next) => {
           throw scheduleErr
         }
       }
+    }
 
-      // Notify student: approved
-      await createNotification({
+    // Persist the reviewed request BEFORE dispatching notifications — if
+    // save() fails, no misleading approval/rejection notification reaches
+    // the student or teacher.
+    await request.save()
+    await request.populate(['packageId', 'studentId', 'teacherId', 'reviewedBy', 'assignmentRequestId'])
+
+    // Notifications are best-effort: never crash the HTTP response.
+    if (action === 'approved') {
+      const pkgName = request.packageId?.nameAr || ''
+      createNotification({
         userId: request.studentId._id,
         titleAr: 'تمت الموافقة على طلب تسجيلك',
-        bodyAr: `تمت الموافقة على طلبك وتم تفعيل باقة "${pkg.nameAr}". يمكنك الآن الوصول إلى حصصك.`,
+        bodyAr: `تمت الموافقة على طلبك وتم تفعيل باقة "${pkgName}". يمكنك الآن الوصول إلى حصصك.`,
         type: 'enrollment',
         priority: 'high',
         relatedId: request._id,
         actionUrl: '/student/subscription',
-      })
+      }).catch(() => {})
 
-      // Notify teacher: if scheduleConfig was NOT enabled, send the generic prompt to schedule first lesson.
-      // If scheduleConfig was enabled, assignmentService has already sent the comprehensive notification.
       if (!assignmentRequest) {
-        await createNotification({
+        createNotification({
           userId: teacherId,
           titleAr: 'تم تعيين طالب جديد',
           bodyAr: `تم تعيين الطالب ${request.studentId.firstNameAr} ${request.studentId.lastNameAr} إليك. يرجى جدولة أول حصة.`,
@@ -310,11 +329,10 @@ exports.reviewRequest = async (req, res, next) => {
           priority: 'high',
           relatedId: request._id,
           actionUrl: '/teacher/students',
-        })
+        }).catch(() => {})
       }
     } else {
-      // Notify student: rejected
-      await createNotification({
+      createNotification({
         userId: request.studentId._id,
         titleAr: 'طلب التسجيل — يحتاج مراجعة',
         bodyAr: adminNotes || 'تم رفض طلبك. يرجى التواصل مع الإدارة للاستفسار.',
@@ -322,11 +340,8 @@ exports.reviewRequest = async (req, res, next) => {
         priority: 'medium',
         relatedId: request._id,
         actionUrl: '/student/enrollment',
-      })
+      }).catch(() => {})
     }
-
-    await request.save()
-    await request.populate(['packageId', 'studentId', 'teacherId', 'reviewedBy', 'assignmentRequestId'])
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: `enrollment.${action}`,

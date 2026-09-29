@@ -22,6 +22,7 @@ const AcademySettings = require('../models/AcademySettings')
 const SuccessStory = require('../models/SuccessStory')
 const ContactMessage = require('../models/ContactMessage')
 const AuditLog = require('../models/AuditLog')
+const { SUPERVISION_PERMISSIONS } = require('../config/permissions')
 
 // ── Small deterministic helpers (no new dependency — manual Arabic pools) ────
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)]
@@ -55,7 +56,7 @@ function makeUser(role, gender, i) {
 }
 
 async function seed() {
-  await mongoose.connect(process.env.MONGO_URI, { dbName: 'tartelah' })
+  await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.MONGO_DB_NAME || 'tartelah' })
   console.log('✅ Connected to MongoDB')
 
   // ── Clear existing data ──────────────────────────────────────────────────────
@@ -78,6 +79,22 @@ async function seed() {
   // ── Users ────────────────────────────────────────────────────────────────────
   const admin = await User.create({ firstNameAr: 'أحمد', lastNameAr: 'الإداري', firstName: 'Ahmed', lastName: 'Admin', email: 'admin@tartelah.com', password: 'Admin1234!', role: 'admin', phone: '+966501234567', isEmailVerified: true })
   const admin2 = await User.create({ firstNameAr: 'سلمى', lastNameAr: 'المشرفة', firstName: 'Salma', lastName: 'Supervisor', email: 'admin2@tartelah.com', password: 'Admin1234!', role: 'admin', phone: '+966501234000', isEmailVerified: true })
+
+  // Development quick-login identities for the four supervision workspaces.
+  // They carry only their team's explicit permissions; no generic admin access.
+  const supervisionDemoAccounts = [
+    { email: 'academic.supervisor@tartelah.com', firstNameAr: 'مشرف', lastNameAr: 'أكاديمي', role: 'staff', supervisionTeam: 'academic', supervisionPosition: 'supervisor' },
+    { email: 'administrative.supervisor@tartelah.com', firstNameAr: 'مشرف', lastNameAr: 'إداري', role: 'staff', supervisionTeam: 'administrative', supervisionPosition: 'supervisor' },
+    { email: 'academic.manager@tartelah.com', firstNameAr: 'مدير', lastNameAr: 'الإشراف الأكاديمي', role: 'manager', supervisionTeam: 'academic', supervisionPosition: 'manager' },
+    { email: 'administrative.manager@tartelah.com', firstNameAr: 'مدير', lastNameAr: 'الإشراف الإداري', role: 'manager', supervisionTeam: 'administrative', supervisionPosition: 'manager' },
+  ]
+  await Promise.all(supervisionDemoAccounts.map((account) => User.create({
+    ...account,
+    password: 'Supervisor123!',
+    permissions: SUPERVISION_PERMISSIONS[account.supervisionPosition],
+    isEmailVerified: true,
+    isActive: true,
+  })))
 
   const teacher1 = await User.create({ firstNameAr: 'محمد', lastNameAr: 'العمري', firstName: 'Mohammed', lastName: 'Al-Omari', email: 'teacher1@tartelah.com', password: 'Teacher1234!', role: 'teacher', gender: 'male', phone: '+966507654321', bioAr: 'حافظ للقرآن الكريم بالروايات العشر، متخصص في التجويد وعلوم القرآن، خبرة 15 عاماً في التعليم', specialization: 'تجويد وحفظ', salaryPerSession: 45, isEmailVerified: true, meetingLinks: [{ provider: 'zoom', label: 'Zoom الأساسي', link: 'https://zoom.us/j/1234567890' }, { provider: 'meet', label: 'Google Meet', link: 'https://meet.google.com/abc-defg-hij' }] })
   const teacher2 = await User.create({ firstNameAr: 'فاطمة', lastNameAr: 'الزهراني', firstName: 'Fatima', lastName: 'Al-Zahrani', email: 'teacher2@tartelah.com', password: 'Teacher1234!', role: 'teacher', gender: 'female', phone: '+966509876543', bioAr: 'معلمة القرآن والتجويد للأطفال والنساء، حاصلة على إجازة برواية حفص عن عاصم', specialization: 'تعليم الأطفال والتجويد', salaryPerSession: 40, isEmailVerified: true, meetingLinks: [{ provider: 'zoom', label: 'حصص الأطفال', link: 'https://zoom.us/j/9876543210' }] })
@@ -777,6 +794,10 @@ async function seed() {
   console.log('   Teacher:          teacher@tartelah.com        / Teacher123!')
   console.log('   Teacher (female): teacher.female@tartelah.com / Teacher123!')
   console.log('   Student:          student@tartelah.com        / Student123!')
+  console.log('   Academic supervisor: academic.supervisor@tartelah.com / Supervisor123!')
+  console.log('   Administrative supervisor: administrative.supervisor@tartelah.com / Supervisor123!')
+  console.log('   Academic manager: academic.manager@tartelah.com / Supervisor123!')
+  console.log('   Administrative manager: administrative.manager@tartelah.com / Supervisor123!')
   console.log('   Other realistic accounts:')
   console.log('   Teacher1: teacher1@tartelah.com / Teacher1234!')
   console.log('   Teacher2: teacher2@tartelah.com / Teacher1234!')

@@ -10,6 +10,7 @@ const { sendSuccess, sendError } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 const { createSubscriptionWithOpeningBalance } = require('../services/subscription.service')
 const { createTeacherWithStudents } = require('../services/onboarding.service')
+const { notifyAcademicNewTeacher } = require('../services/supervisionNotification.service')
 const { resolveCredentialInput, CredentialError } = require('../config/credentialMode')
 const { userHasPermission } = require('../middleware/rbac.middleware')
 const { validateWorkingHoursDays, buildDefaultWorkingHours } = require('../config/workingHours')
@@ -207,6 +208,7 @@ exports.createTeacherWithStudentsHandler = async (req, res, next) => {
         changes: { studentCount: result.students.length },
         ip: req.ip,
       })
+      await notifyAcademicNewTeacher({ teacherId: result.teacher?._id, teacherName: `${result.teacher?.firstNameAr || ''} ${result.teacher?.lastNameAr || ''}`.trim(), actorId: req.user._id })
     }
 
     sendSuccess(res, result, result.replayed ? 'تم إنشاء هذا الطلب مسبقًا' : 'تم إنشاء المعلم والطلاب بنجاح', 201)

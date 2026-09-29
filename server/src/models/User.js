@@ -1,6 +1,6 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
-const { ALL_ROLES, DEFAULT_DISPLAY_NAMES } = require('../config/permissions')
+const { ALL_ROLES, DEFAULT_DISPLAY_NAMES, SUPERVISION_TEAMS, SUPERVISION_POSITIONS } = require('../config/permissions')
 const { SHIFT_VALUES } = require('../config/teacherProfile')
 const { AUDIENCE_CATEGORIES } = require('../config/studentAudience')
 
@@ -17,6 +17,13 @@ const UserSchema = new mongoose.Schema({
   // (assistant_admin/operator/manager/staff) introduced by the RBAC+PBAC
   // upgrade; existing admin/teacher/student accounts are unaffected.
   role: { type: String, enum: ALL_ROLES, default: 'student' },
+  // V3: a function within the existing admin-family identity. A team member
+  // never inherits access to the generic, academy-wide admin endpoints.
+  supervisionTeam: { type: String, enum: SUPERVISION_TEAMS, default: null },
+  supervisionPosition: { type: String, enum: SUPERVISION_POSITIONS, default: null },
+  // Planning tags only; dated teacher assignments remain the source of
+  // responsibility for real sessions.
+  supervisionCategories: { type: [String], default: [] },
   // Per-account customizable label shown in the UI instead of the raw role
   // (e.g. "Operations Supervisor" for an assistant_admin). Falls back to
   // DEFAULT_DISPLAY_NAMES[role] in toPublic() below when unset — role stays
@@ -147,6 +154,7 @@ const UserSchema = new mongoose.Schema({
 }, { timestamps: true })
 
 UserSchema.index({ role: 1, isActive: 1 })
+UserSchema.index({ supervisionTeam: 1, supervisionPosition: 1, isActive: 1 })
 UserSchema.index({ createdAt: -1 })
 UserSchema.index({ role: 1, category: 1 })
 UserSchema.index({ role: 1, studentType: 1 })

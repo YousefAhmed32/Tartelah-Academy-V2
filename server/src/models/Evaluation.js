@@ -15,5 +15,6 @@ const EvaluationSchema = new mongoose.Schema({
 EvaluationSchema.index({ studentId: 1, createdAt: -1 })
 EvaluationSchema.index({ teacherId: 1, createdAt: -1 })
 EvaluationSchema.index({ studentId: 1, type: 1 })
+EvaluationSchema.index({ createdAt: -1, teacherId: 1 })
 
 module.exports = mongoose.model('Evaluation', EvaluationSchema)

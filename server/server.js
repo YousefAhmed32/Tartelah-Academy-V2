@@ -47,12 +47,19 @@ connectDB().then(async () => {
   await seedTeachingSubjects().catch(err => console.warn('[migration] seedTeachingSubjects warning:', err.message))
 
   if (process.env.NODE_ENV !== 'test') {
+    // Reminder notifications rely on their unique occurrence index for
+    // cross-instance idempotency; build it before starting the cron workers.
+    await require('./src/models/Notification').init()
     const { startSessionReminderJob } = require('./src/jobs/sessionReminder.job')
+    const { startTeacherReportFollowupJob } = require('./src/jobs/teacherReportFollowup.job')
+    const { startAcademicObservationFollowupJob } = require('./src/jobs/academicObservationFollowup.job')
     const { startSubscriptionExpiryJob } = require('./src/jobs/subscriptionExpiry.job')
     const { startTeacherAttendanceSweepJob } = require('./src/jobs/teacherAttendanceSweep.job')
     const { startMonthlyReportJob } = require('./src/jobs/monthlyReport.job')
     const { startSurveyTriggerJob } = require('./src/jobs/surveyTrigger.job')
     startSessionReminderJob()
+    startTeacherReportFollowupJob()
+    startAcademicObservationFollowupJob()
     startSubscriptionExpiryJob()
     startTeacherAttendanceSweepJob()
     startMonthlyReportJob()

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { BookOpen, Search, Star, Pin, Mail } from 'lucide-react'
 import api from '../../utils/api.js'
+import DOMPurify from 'dompurify'
 import { getFileUrl, ROUTES } from '../../config/constants.js'
 import { useAuthStore } from '../../store/authStore.js'
 import { formatDateAr as formatDate } from '../../utils/date.js'
@@ -290,7 +291,10 @@ export default function ArticleDetailPage() {
     ? `${article.author.firstNameAr || article.author.firstName || ''} ${article.author.lastNameAr || article.author.lastName || ''}`.trim()
     : 'ترتيلة'
 
-  const processedContent = injectHeadingIds(article.contentAr || article.content || '')
+  const processedContent = DOMPurify.sanitize(
+    injectHeadingIds(article.contentAr || article.content || ''),
+    { ADD_ATTR: ['target'] }
+  )
   const headings = extractHeadings(processedContent)
 
   return (

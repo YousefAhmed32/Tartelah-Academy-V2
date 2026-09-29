@@ -60,11 +60,13 @@ const TeacherPayrollEntrySchema = new mongoose.Schema({
 
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   notes: { type: String },
+  idempotencyKey: { type: String },
 }, { timestamps: true })
 
 TeacherPayrollEntrySchema.index({ teacherId: 1, createdAt: -1 })
 TeacherPayrollEntrySchema.index({ teacherId: 1, status: 1 })
 TeacherPayrollEntrySchema.index({ periodId: 1, voided: 1 })
+TeacherPayrollEntrySchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $exists: true } }, name: 'uniq_payroll_adjustment_key' })
 TeacherPayrollEntrySchema.index(
   { sessionId: 1 },
   { unique: true, partialFilterExpression: { sessionId: { $exists: true }, voided: false }, name: 'uniq_active_session_entry' }

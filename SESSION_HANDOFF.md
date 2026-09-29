@@ -1,5 +1,127 @@
 # Session Handoff — Tartelah Online
 
+## 2026-09-29 — V3-8 periodic analytics, reports and recognition
+
+- Implemented scoped `academicPeriodic.service` using dated assignments, distinct Session rows, finalized Attendance only, R1 observation/rating/submission flags, exceptions and existing Memorization/Revision/Evaluation records. Cairo local week/month boundaries; status denominator excludes cancelled/rescheduled and names unresolved/unknown. Manager/admin get the same definitions; administrative manager sees own team metrics without academic R1 content. Optional R1 observation category groups submitted reports only; historical free text remains unclassified. Source evidence pages and teacher activity counts are not quality rankings.
+- Added `AcademicPeriodicReport` R3/R4 with descriptive analysis, nominations, actual shift intervals, frozen metrics and source fingerprint. Supervisor saves/submits; academic manager/admin approves or requests completion, and explicit approved correction retains previous snapshot/version and reason. Drift is visible on detail. Monthly `AcademicRecognition` selects up to 10 students plus male/female teacher from approved R4 nominees, with a historical revision; no auto points or publication. Bounded academic search and role tabs added.
+- Verification: latest V3-8 service/controller/R1/daily targeted tests 23/23, client build, targeted lint and 97/97 client tests passed. Full server run before final source-navigation refinement: 69/70 suites, 675/679 tests; same four pre-existing enrollment failures only. Live Mongo and browser role/RTL QA are V3-9. No WhatsApp sync or automatic R3/R4 deadlines were added.
+
+## 2026-09-29 — V3-7 academic plans, directives and development
+
+- Added `StudentAcademicPlan` keyed by student and dynamic subject, with optional published Course, curriculum milestones, private individual needs, HTTPS material visibility, manager publishing, and manually recorded external test results. Supervisor edits to a published plan remain in `pendingRevision`; the old approved plan stays visible until the manager accepts or rejects the proposal. Student and teacher see published safe fields only; academic staff see scoped data. Existing Memorization, Revision, Evaluation and R1 remain the sole sources of historical achievement and lesson ratings.
+- Added manager directives to an individual, subject cohort or whole academic team. `AcademicDirectiveReceipt` snapshots each recipient and stores a separate response, status and manager verification. Manager lists show status totals and page through recipients. Teacher inbox and academic supervisor workspace show only their own directives. `AcademicDevelopmentCase` captures dated improvement follow-up for teachers/supervisors without numeric ranking.
+- New academic learning/directives tabs in existing role workspaces; student progress and teacher student detail show relevant plans. Server authorization checks student ownership and current assignment/schedule/subscription. Added indexes on student progress and R1 history.
+- Targeted server tests: 18/18; client build, lint and 97/97 client tests passed. Full server suite before final development-case additions: 67/68 suites and 659/663 tests; the same four preexisting enrollment controller failures. Re-run targeted V3-7 suite after any follow-up edit. Live Mongo and browser role/RTL checks remain V3-9; actual test execution, pass policy and WhatsApp groups remain outside this stage. Next: V3-8 R3/R4 and period analytics.
+
+## 2026-09-29 — V3-6 academic observation and R1
+
+- Added `AcademicObservationReport` with dated assignment/shift ownership, manual observation source and time, frozen due date, narrative R1, descriptive rating, draft/submit/review/correction history, published teacher guidance, separate teacher reply, and linked next-session action. Academic supervisors see only their own reports; academic managers see their team; primary admin sees all; teacher receives only published guidance; student has no R1 access.
+- Academic daily list now shows each assigned supervisor's report state and overdue flag. New academic tab supports authoring and manager review/correction. Teacher guidance page supports acknowledge/will apply/applied/needs discussion. Bounded five-minute job alerts overdue missing reports after shift + grace and retries one-time submission/guidance notifications with unique reminder keys. R2 counts observed lessons, submitted observation reports, and ratings separately and preserves submitted snapshot drift warning.
+- Client build, targeted lint, all 97 client tests, and 18 targeted server tests passed after final adjustments. Full server suite: 65/66 suites, 651/655 tests passed; the same four enrollment-controller failures as V3-5. Live Mongo and four-role browser QA remain V3-9. Next planned stage is V3-7 teacher/student progress, curricula and tests; no WhatsApp integration or numeric teacher ranking added here.
+
+## 2026-09-29 — V3-5 shift handoff and new-student start
+
+- Added `SupervisionShiftRecord` per shift/member for check-in/out, operational handoff and immutable-on-submit R2 snapshot. `/supervision/shift-records` enforces team/member scope; manager/admin see team delivery and 120-minute missing/late state. Handoff feed shows live cases/actions under their current owners, and next-shift members receive a notification. Report submission does not depend on attendance check-in. A started shift cannot be cancelled or rescheduled by the management API.
+- R2 preliminary numbers come from canonical Session, Attendance and SupervisionException within dated assignments; observed-supervisor lessons are explicitly unknown until V3-6 R1. Financial movement summary reads the existing ledgers only for administrative managers and authorized admins.
+- Added `StudentStartFollowup`: eligible student submits feedback once after first actual completed session, administrative team sees recently joined students and can confirm stabilization only with a completed lesson and active recurring schedule. The existing teacher-onboarding flows notify academic managers once completion succeeds, without adding group setup.
+- Targeted server controller/service tests, client build and all 97 client tests passed. Full server suite after V3-5: 64/65 suites, 645/649 tests passed; the same four pre-existing enrollment-controller failures remain. Live Mongo and browser role/RTL verification remain in V3-9. Next V3-6 must link R1 observed sessions into R2 before final acceptance.
+
+## 2026-09-28 — V3-4 exceptions, compensation and adjustment decisions
+
+- Added `SupervisionException` (session, original/current teacher, owner, due date, one action, result and resolution) and `SupervisionAdjustmentRequest` (account owner/unit/requested amount, manager decision and canonical ledger reference). Endpoints and RTL tab let the administrative team log/apologize/reschedule/cancel/substitute/update links/record delays/schedule makeup, managers reassign cases, and academic staff read cases for their dated teacher cohort. Student and teacher schedules and notifications use the existing Session record.
+- One-off substitutes retain the original teacher cohort on Session; neither the recurring ScheduleRule nor other lessons change. Booking conflicts are checked before schedule/substitute/makeup changes. Compensation uses the existing wallet service and a unique makeup link per source Session. A cancellation with owed compensation opens a follow-up case; makeup completion closes its own case. The teacher-attendance sweep now advances `missed` to `no_show`, processes at most 500 records per run, opens an owned compensation case and notifies academic supervision.
+- Administrative supervisors request deductions; only administrative manager/authorized admin decides. Reject creates no ledger row; approve may modify amount; bonus conversion creates only a bonus. Student lessons go through the append-only wallet, teacher currency through payroll entries, each with a request-specific idempotency key and a retry path for interrupted decisions. Existing paid/approved payroll periods still require the established reopen/correction workflow.
+- Targeted server tests and client lint/build/97 tests passed. Full server suite retains four pre-existing enrollment-controller test failures; live Mongo and role/browser verification belongs to V3-9. Next is V3-5 formal shift handoff and new-student feedback. Existing WhatsApp groups remain external.
+
+## 2026-09-28 — V3-3 daily supervision operations
+
+- Implemented `/supervision/daily-sessions`, `/daily-dispatch`, `/daily-actions`, readiness update and teacher-report follow-up. Daily pages use canonical `Session` and dated assignments, with manager/admin/supervisor scopes. Administrative readiness is manual and resets on schedule/participant/link changes; action items have owner, status and audit. Academic recipients open the live schedule, not a copied snapshot.
+- Reworked reminder cron from 30 minutes to 15 seconds, retaining 24h/1h/15m and adding 30m/5m. Each in-app notification has a unique partial-indexed `reminderKey` based on session, absolute schedule, offset and recipient, with a current-session recheck. A bounded missing teacher-report job alerts teacher and academic staff after 10 minutes. Student notification now fires on submit, and student report API omits internal correction/review data.
+- Verification: targeted server tests for daily access/readiness/handoff, reminder timing/reschedule, missing-report alert, notification dedup and student report visibility passed; client build, 97 client tests and targeted ESLint passed. Full server suite: 60/61 suites and 624/628 tests passed. The four failures remain in the pre-existing dirty enrollment-controller tests, unrelated to V3-3. Live Mongo/role/browser trial remains for V3-9.
+- Next: V3-4 exception, substitute, compensation and deduction approval workflows; do not treat daily action notes as a replacement for those financial/schedule state machines. WhatsApp messages/groups still external.
+
+## 2026-09-28 — Manager specification and report templates incorporated
+
+- User supplied expanded attachment `e8f9e562-cb66-4519-89d9-01483051bcb8/Pasted text.txt` and requested updated full V3 plan, separate integration addendum, readiness and delivery estimate. Planning authorization only; no unequivocal OK to begin V3-1, so code remains untouched.
+- Reviewed new academic manager account specification (13 sections) and four report templates: R1 lesson observation (short and detailed versions merged), R2 daily shift, R3 weekly, R4 monthly. Added M01–M13 source coverage, every report field/author/audience, source-derived numbers versus human analysis, two Mermaid flows, phase acceptance/dependencies and estimate to main plan §§9–13. Addendum §§6–9 maps admin/managers/supervisors/teacher/student surfaces, data/versioning/aggregation and verification.
+- New manager specifics: supervisor attendance distinct from teacher/student attendance, group directives with per-recipient state, teacher/supervisor improvement history, curriculum review, cross-entity scoped search, linked metrics and repeated observation categories. All academic data within manager scope, not administrative financial/internal access. Existing explicit owner exclusions/permissions survive repetition of original WhatsApp briefs.
+- Descriptive rating is now source-defined: excellent/very good/good/needs improvement. The numerical 20-point proposal/ranking formula remains unapproved; exam milestone/pass criteria also pending. No fake numeric mapping. Report close dates/denominators are implementation proposals to review during the report stage.
+- Keep 10 stages V3-0…V3-9. V3-2 establishes manager framework; data-dependent manager sections finish in V3-6…8. R2 skeleton in V3-5 only accepted after R1 linkage in V3-6. No additional major subsystem or WhatsApp group management/importer assumed.
+- Preliminary estimate explicitly assumption-based: 35–50 working days = 7–10 weeks for one full-time developer (~6 focused hours/day, 5 days/week), including integration/QA/client trial. Per stages 1…9: 4–6, 4–5, 3–4, 5–7, 3–4, 4–6, 3–5, 4–6, 5–7 days. First usable management demo 8–11 days (~2–3 weeks). Operational pilot after V3-6 at 23–32 days. External provider approval/waiting and scope growth excluded; reassess after V3-2. Readiness ~90% is qualitative requirements readiness, not implemented completion.
+- Updated main plan, integration addendum, decision log and operating-model pointer. Validated local links, text encoding and fence balance, 10 stage headings, 13 manager requirement entries, 4 report definitions and 35–50-day arithmetic. Tracked handoff diff check passed with CRLF warning. No application feature implementation or application tests in this documentation-only session.
+
+## 2026-09-25 — Administrative permissions resolved; teacher scoring proposal
+
+- Planning only; no V3-1 authorization yet. Owner answered the remaining operational questions. Updated decision log, requested scope, operating model and integration addendum; latest 2026-09-25 decisions supersede unresolved items in earlier entries below.
+- Admin supervisor may change session time, select substitute, and add compensation directly within scope; actions visible to their manager. A deduction is a separate request requiring administrative manager decision: approve/reject/modify/convert to bonus. Apply only final authorized outcome once through existing financial systems, without broad financial read access for ordinary supervisors. Admin has full visibility/control.
+- Accounting means system-derived dues/payments/teacher and student balances, visible to administrative manager/admin. Teacher records student attendance at session closure using current flow; supervisor observes/reports discrepancies. Do not infer student presence from teacher start. 30m/5m reminders include student/teacher/assigned supervisors/relevant team manager scoped to their data; deduplicate roles and retries. External delivery if feasible, internal-only acceptable.
+- Added a proposed 5-axis teacher rubric, 0–4 each, total 20 per class, and monthly quality average plus sum/count/coverage. Not approved yet; points do not cause payroll deductions automatically. Ranking visibility recommendation remains academic manager/admin. Do not infer an already existing teacher points ledger from student Evaluation records.
+- Located exact original exam requirement: academic brief section eight, test after a defined curriculum segment. Quoted it in decision log §7 and mapped to V3-7. Milestone/pass criteria remain undecided; no new online exam engine assumed.
+- Only policy review still needed for later phases: teacher rubric/ranking proposal and exam milestone/pass rule. No repeat of answered operational questions; V3-1 awaits explicit OK. Documentation checks recorded after review; no application code changed or application tests required.
+
+## 2026-09-24 — Owner answers reconciled with both supervision briefs
+
+- Planning only; V3-1 still awaits explicit owner OK. Created `PHASE_3_DECISIONS_AND_OPEN_QUESTIONS_AR.md` as latest decision authority with all 30 answers reconciled against the attached 12-part administrative and 11-part academic briefs. Updated requested scope, integration addendum and V3-0 operating model; no feature code changes.
+- Confirmed team-only manager scope, dated teacher/student cohort assignments rotated by team manager/admin, every assigned lesson monitored, teacher evaluation after every lesson, manager reviews all reports and can amend with history. Supervisor report is private to author/team manager/admin; teacher receives directed feedback and must respond. Academic staff own follow-up of missing teacher reports. Preserve current teacher-report publication to student.
+- Supervisor report grace period ends 2 hours after shift end; show missing work during grace, late only afterward, permit later submission with timestamp. Proposed immediate operational handoff alongside report grace; do not give new-assignment access or automatic paid overtime for grace. Preserve historical responsibility when supervisors rotate.
+- Owner explicitly excludes group creation/update AND tracking its setup. Do not reintroduce WhatsApp group/banner checklists from earlier docs. Reuse existing teacher onboarding; platform should gently request trial/first-lesson feedback. Sheet migration is manual, not a new importer.
+- Internal 30m/5m reminders required; external if feasible, internal-only acceptable. Accounting access limited to administrative manager/admin, fields still unknown. Ranking recommendation: academic manager/admin, show sum/count/average to expose workload bias; exact rubric/formula not approved. Existing `Evaluation` is student score 1–10, not verified teacher points ledger.
+- Remaining questions: schedule-change approval, substitute suitability/approval, compensation approval and meaning of reason for deduction, accounting fields, teacher points rubric, exam milestone/pass rule, reminder recipients, student attendance confirmer. General curriculum owner/statistics/emergency duties already answered by briefs; avoid repeating. Draft only needs explanation if independent content still requested outside excluded group work.
+- Verified UTF text, local Markdown links, balanced fences and exactly 30 answer entries. `git diff --check` passed with CRLF warnings. Relevant code read only; no application tests necessary for documentation-only work.
+
+## Session Date
+2026-09-24 — Administrative-supervision brief incorporated (planning only)
+
+## Status
+- Owner supplied the missing 12-part administrative-supervision workflow and repeated the 11-part academic workflow. Expanded `PHASE_3_REQUESTED_CHANGES_AR.md` §2 with every administrative item and §8 with a 12/12 coverage audit; the academic 11/11 audit remains in §7. Split the formerly oversized administrative stage into V3-3 (daily operations/reminders), V3-4 (exceptions/compensation), and V3-5 (new people/shift handoff), making 10 total stages V3-0…V3-9. Updated the V3-0 flow and integration addendum for reminders, attendance/readiness, exceptions, makeup lessons, new student/teacher onboarding, external groups/banners/drafts, staff shift attendance, accounting view, feedback, and shift handoff.
+- Important current-code finding: `server/src/jobs/sessionReminder.job.js` has 24h/1h/15m reminders but cron runs every 30 minutes using ±5m windows; it cannot reliably satisfy the newly requested 30m/5m alerts. Plan V3-3 to revise the existing reminder system and handle schedule changes without duplicate or stale alerts. No code was changed.
+- WhatsApp groups remain active for communication. Group descriptions, group creation, banner, welcome message, and manually received messages are external steps until an authorized integration exists; the platform must track their operational outcomes without falsely claiming automation. Makeup records should be closed, not physically deleted. Employee shift attendance is separate from session attendance; accounting access needs its own permissions.
+- V3-1 remains the first coding stage, not started. Owner explicitly required an OK before implementation; do not start it until that arrives. Remaining decisions relevant to later stages: approver for reschedule/compensation/substitute, what accounting sheet contains, destination for 30m/5m reminders, exact Banner/Draft meaning, report visibility/release policy, and academic assessment/ranking rules.
+
+---
+
+## Session Date
+2026-09-24 — V3 request audit and automation clarification
+
+## Status
+- Owner explicitly asked for a full requirements review and **no feature implementation until a further explicit OK**. No V3 product code was changed.
+- Reconciled all 11 academic-supervision headings from the supplied request against `PHASE_3_REQUESTED_CHANGES_AR.md` §7 and existing stage tasks. No heading was omitted. The separate administrative-supervision brief remains a one-line responsibility split; detailed approval/exception policies are not supplied.
+- Clarified that all existing WhatsApp teacher/academic/admin groups remain available for communication. The system should automatically route a supervisor's single submitted report to the relevant team, manager, and admin views, direct teacher-visible feedback to the teacher, flag missing/late reports, and derive shift/daily/weekly/monthly summaries from the same records. No duplicate report entry or mandatory WhatsApp reposting. Updated the Stage 0 model and V3 integration plan accordingly.
+- V3-1 is the first coding stage and remains `[ ]`, pending the owner's explicit OK. No blocking detail is needed to begin V3-1; administrative approval rules, teacher-visible report fields, test/ranking criteria, and proof of attendance are decisions for their respective later stages.
+
+---
+
+## Session Date
+2026-09-24 — Clarified the two supervision WhatsApp groups
+
+## Status
+- Owner clarified that the teacher group and academic-supervision group should have their work moved into the platform. Updated `PHASE_3_STAGE_0_OPERATING_MODEL_AR.md`, `PHASE_3_REQUESTED_CHANGES_AR.md`, and `PHASE_3_INTEGRATION_ADDENDUM_AR.md` to recommend a teacher follow-up inbox and a supervision report queue instead of recreating generic chat groups. Reports, comments, replies, responsibility, and shift handoff remain linked to sessions and visible to managers/admin by scope. Existing groups become transitional/emergency channels; student/parent groups are a separate future decision.
+- Documentation only; no V3 feature code was implemented. Next code stage remains V3-1.
+
+---
+
+## Session Date
+2026-09-24 — Version 3 stage V3-0 operating model
+
+## Status
+- Owner clarified the existing off-platform lesson flow: teacher/student use a meeting link, an academic supervisor may join to observe and report, supervisors close their shift with reports, each academic/administrative manager sees their team's data, and the central admin sees both teams. Owner asked for a recommendation and explicitly started the first planned stage.
+- Completed stage V3-0 as documentation: `PHASE_3_STAGE_0_OPERATING_MODEL_AR.md` defines platform-as-system-of-record, role access boundaries, flexible overlapping shifts, session observation vs actual meeting attendance, teacher report vs supervisor report, shift handoff, manager/admin aggregation, and a manual-first WhatsApp sharing path. The main V3 stage checklist now marks only V3-0 documentation items complete. No V3 feature code was implemented.
+- Current WhatsApp Business Platform has official API documentation and a distinct groups documentation path; access and compatibility with the academy's existing groups are unverified. Do not make group delivery a dependency of the supervision report. Future integration requires account-specific eligibility and group workflow verification.
+- Next requested implementation stage is V3-1 (staff identity, shift assignments, permission scope). Preserve the five unrelated pre-existing code edits in the working tree.
+
+---
+
+## Session Date
+2026-09-24 — Version 3 supervision planning (documentation only)
+
+## Status
+- Created `PHASE_2_COMPLETED_CHANGES_AR.md` as the closure register for the Phase 2 change-request package. It reconciles the original brief's stale top-level status labels with its later implementation addenda and records historical verification limits.
+- Created `PHASE_3_REQUESTED_CHANGES_AR.md` for the academy's academic-supervision request, the limited administrative-supervision description, separate academic/administrative managers shown in the supplied screenshots, flexible staffing and shifts, an eight-stage plan, and unresolved business questions.
+- Created `PHASE_3_INTEGRATION_ADDENDUM_AR.md` for inferred changes needed across current admin, teacher, student, scheduling, reporting, authorization, notification, and data flows. These inferred items are kept distinct from the academy's direct requests.
+- No Version 3 product code was changed or tested. Wait for the owner's answers about administrative duties, manager authority, group delivery, shift allocation, testing/ranking rules, and data visibility, and for their instruction to open a specific implementation stage. Existing unrelated working-tree code edits were left untouched.
+
+---
+
 ## Session Date
 2026-09-17 — Elderly-Friendly UI/UX Overhaul for Session Postponement & Quick Presets
 
@@ -1424,3 +1546,22 @@ DELETE /api/v1/website/contact-messages/:id   — delete
 - Email verification gate
 - PDF export for reports
 - Production deployment config (nginx, SSL, PM2)
+# 2026-09-28 — V3-1 foundation implemented
+
+- Owner explicitly authorized implementing V3-1. Four additional supervision workspaces are required beyond existing admin/teacher/student dashboards: academic supervisor, administrative supervisor, academic manager, administrative manager. V3-1 builds their shared identity, scoped access, shifts and dated assignments; role-specific operating/reporting content remains in V3-2…V3-8.
+- Added `User.supervisionTeam/supervisionPosition`, restricted role grants, two supervision permissions, shift/assignment/lock models, scoped supervision endpoints, account-creation selector, and an initial role-adaptive supervision page in the admin shell. Assignment history is retained when replacing a supervisor; shift overlap and multiple shift members are supported.
+- Targeted supervision/RBAC/migration tests: 26 passed; client tests: 97 passed; client production build passed. Full backend run: 54/55 suites and 602/606 tests passed; all four failures are in `enrollment.controller.test.js` around a pre-existing dirty enrollment controller, outside V3-1. Do not overwrite unrelated changes. No live-database acceptance run was performed; include this in V3-9.
+- V3-1 checklist is marked implemented. Historical report ownership and the two-hour report grace rule are explicitly deferred to V3-6 when the report itself exists. Four complete role-specific operating/reporting dashboards remain in V3-2…V3-8; do not represent the shared V3-1 foundation page as their completion.
+# 2026-09-28 — V3-2 team management and coverage
+
+- Added four role-specific supervision routes plus admin center. Managers and admins now have real-session coverage (primary/secondary assignments against active shifts), scoped activity, team policy settings, and searchable/paginated personnel controls. Admin can edit supervision team/position/categories/status; future work must be handed off first. The legacy user update/status endpoints enforce the same handoff guard.
+- Shift/assignment/settings/person changes notify configured recipients with role-specific links and dedupe keys. Supervision policy defaults to a two-hour R1 grace window; report lateness and escalation will consume the stored effective policy when R1 is implemented in V3-6. No report queue is fabricated before that source exists.
+- Targeted backend suites: 37 tests passed; client suite: 97 passed; production client build passed. Full backend run: 56/57 suites and 610/614 tests passed; the same four pre-existing failures remain in the unrelated enrollment controller suite. No live MongoDB acceptance run yet; preserve pre-existing dirty files.
+
+# 2026-09-29 — V3-9 integration progress and quick login
+
+- Added four development quick-login cards and exact demo identities for academic/administrative supervisors and managers. `npm run seed:supervision-demo` adds only missing accounts to local MongoDB, without deleting data; full seed also creates these accounts with hashed passwords. All four normal and quick sign-ins plus destination dashboards were verified in the browser. Development quick login is hidden in production and cannot choose arbitrary supervision accounts.
+- Live `npm run verify:v3` uses a unique disposable local MongoDB database and passed role/team isolation, concurrent shifts, shift handoff/report, dated assignments, 30/5 minute reminder recipients and deduplication after schedule change, R1/teacher reply, administrative case handoff, real aggregate metrics, and R4 recognition. The script waits for the notification index like server startup and drops its QA database. Removed a retained earlier QA database after verification.
+- Fixed the administrative-case owner query to include `supervisionTeam`, daily metrics period handling, and enrollment rollback to write a negative refund instead of a negative reversal. Fixed the mobile admin-shell navigation to filter links by permission and show the actual supervision role label.
+- Verification: server full suite 70/70 suites, 682/682 tests; client 97/97 tests and production build. Targeted exception/enrollment suites passed after the last backend fix. Browser verified the four new boards and existing admin/teacher/student login; all four supervision dashboards rendered RTL at 390px without horizontal overflow or forbidden mobile links. V3-9 remains open for observing the scheduled reminder runner through real time, selected V2 compatibility checks after authentic assignments, broader English/student/teacher mobile UI review, and the academy owner's operational acceptance.
+- Read-only compatibility check on the local pre-V3 dataset: 665 legacy sessions; the admin daily view returned six sessions for 2026-09-29 and the coverage view marked all six as unassigned. This is accurate because that dataset has no dated supervision assignments; team periodic metrics remain zero until managers assign teachers with valid dates. Do not autoassign historical sessions to arbitrary supervisors. Remaining V2 checks should use an agreed representative sample with real assignments.

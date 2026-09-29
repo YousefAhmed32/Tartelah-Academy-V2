@@ -8,6 +8,7 @@ import {
   FileText, SearchIcon, ImageIcon as ImageTab, CircleCheck, Rocket, Star, Pin, ExternalLink,
 } from 'lucide-react'
 import api from '../../utils/api.js'
+import DOMPurify from 'dompurify'
 import { getFileUrl } from '../../config/constants.js'
 
 // ── Rich Text Editor ───────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ function RichEditor({ value, onChange, placeholder = 'اكتب محتوى الم
         <div
           className="prose-article p-6 min-h-[400px]"
           dir="rtl"
-          dangerouslySetInnerHTML={{ __html: value || '<p class="text-gray-400">لا يوجد محتوى للمعاينة بعد</p>' }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value || '<p class="text-gray-400">لا يوجد محتوى للمعاينة بعد</p>', { ADD_ATTR: ['target'] }) }}
         />
       )}
 

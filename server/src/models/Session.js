@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const SessionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  supervisionOriginalTeacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
   seriesId: { type: mongoose.Schema.Types.ObjectId, ref: 'ScheduleRule' },
@@ -17,6 +18,15 @@ const SessionSchema = new mongoose.Schema({
   },
   meetingLink: { type: String, trim: true },
   meetingProvider: { type: String, enum: ['zoom', 'meet', 'teams', 'other', 'custom'], default: 'zoom' },
+  // Manual operational readiness is distinct from a link click or meeting
+  // attendance. Old sessions without this field simply remain "unknown".
+  administrativeReadiness: {
+    student: { type: String, enum: ['unknown', 'ready', 'issue'], default: 'unknown' },
+    teacher: { type: String, enum: ['unknown', 'ready', 'issue'], default: 'unknown' },
+    link: { type: String, enum: ['unknown', 'ready', 'issue'], default: 'unknown' },
+    updatedAt: { type: Date },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  },
   notes: { type: String },
   teacherNotes: { type: String },
   // Historical lessons imported during student onboarding are already
@@ -29,6 +39,7 @@ const SessionSchema = new mongoose.Schema({
   cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isException: { type: Boolean, default: false },
   isMakeup: { type: Boolean, default: false },
+  makeupForSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session' },
   rescheduledFrom: { type: Date },
   isPostponed: { type: Boolean, default: false },
   postponedAt: { type: Date },
@@ -150,8 +161,10 @@ const SessionSchema = new mongoose.Schema({
 
 SessionSchema.index({ studentId: 1, scheduledAt: -1 })
 SessionSchema.index({ teacherId: 1, scheduledAt: -1 })
+SessionSchema.index({ makeupForSessionId: 1 }, { unique: true, partialFilterExpression: { makeupForSessionId: { $exists: true }, status: { $in: ['scheduled', 'ongoing', 'completed', 'missed', 'no_show'] } }, name: 'uniq_active_makeup_for_session' })
 SessionSchema.index({ scheduledAt: 1, status: 1 })
 SessionSchema.index({ status: 1, createdAt: -1 })
+SessionSchema.index({ status: 1, completedAt: -1 })
 SessionSchema.index({ teacherId: 1, teacherAttendanceStatus: 1 })
 SessionSchema.index({ teacherId: 1, payrollStatus: 1 })
 SessionSchema.index({ payrollStatus: 1, scheduledAt: -1 })

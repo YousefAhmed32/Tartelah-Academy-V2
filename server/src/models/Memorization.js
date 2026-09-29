@@ -14,5 +14,7 @@ const MemorizationSchema = new mongoose.Schema({
 
 MemorizationSchema.index({ studentId: 1, surahNumber: 1 })
 MemorizationSchema.index({ teacherId: 1, recordedAt: -1 })
+MemorizationSchema.index({ studentId: 1, recordedAt: -1 })
+MemorizationSchema.index({ recordedAt: -1, teacherId: 1 })
 
 module.exports = mongoose.model('Memorization', MemorizationSchema)

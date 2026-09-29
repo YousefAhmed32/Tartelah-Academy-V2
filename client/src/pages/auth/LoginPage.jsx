@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { ShieldCheck, Users, GraduationCap, BookOpen, Mail, Lock, Eye, EyeOff, ChevronUp } from 'lucide-react'
+import { ShieldCheck, Users, GraduationCap, BookOpen, Mail, Lock, Eye, EyeOff, ChevronUp, ClipboardList, BookOpenCheck, UserRoundCog } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore.js'
 import { authService } from '../../services/auth.service.js'
 import { ROUTES } from '../../config/constants.js'
@@ -14,13 +14,17 @@ import {
 
 // ── Dev accounts ──────────────────────────────────────────────────────────────
 
-const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true'
+const IS_DEV = import.meta.env.DEV
 
 const DEV_ACCOUNTS = [
   { role: 'admin',          label: 'Admin',   Icon: ShieldCheck,  color: '#ef4444', bg: 'rgba(239,68,68,0.09)',  border: 'rgba(239,68,68,0.22)'  },
   { role: 'teacher',        label: 'Teacher', Icon: Users,        color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)' },
   { role: 'teacher_female', label: 'معلمة',   Icon: GraduationCap,color: '#8b5cf6', bg: 'rgba(139,92,246,0.09)', border: 'rgba(139,92,246,0.22)' },
   { role: 'student',        label: 'Student', Icon: BookOpen,     color: '#22c55e', bg: 'rgba(34,197,94,0.09)',  border: 'rgba(34,197,94,0.22)'  },
+  { role: 'academic_supervisor', label: 'مشرف أكاديمي', Icon: BookOpenCheck, color: '#c4b5fd', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.28)' },
+  { role: 'administrative_supervisor', label: 'مشرف إداري', Icon: ClipboardList, color: '#67e8f9', bg: 'rgba(103,232,249,0.10)', border: 'rgba(103,232,249,0.28)' },
+  { role: 'academic_manager', label: 'مدير أكاديمي', Icon: UserRoundCog, color: '#f0abfc', bg: 'rgba(240,171,252,0.10)', border: 'rgba(240,171,252,0.28)' },
+  { role: 'administrative_manager', label: 'مدير إداري', Icon: ShieldCheck, color: '#fdba74', bg: 'rgba(253,186,116,0.10)', border: 'rgba(253,186,116,0.28)' },
 ]
 
 // Helper to clean mobile keyboard spaces, autofill artifacts, and invisible unicode
@@ -229,7 +233,9 @@ export default function LoginPage() {
                   border:               '1px solid rgba(251,191,36,0.22)',
                   borderRadius:         '20px',
                   padding:              '16px',
-                  width:                '272px',
+                  width:                'min(300px, calc(100vw - 48px))',
+                  maxHeight:            'calc(100dvh - 90px)',
+                  overflowY:           'auto',
                   boxShadow:            '0 24px 56px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.35)',
                 }}
               >
@@ -249,6 +255,7 @@ export default function LoginPage() {
                       key={acc.role}
                       onClick={() => handleDevLogin(acc.role)}
                       disabled={devLoading !== null}
+                      dir="auto"
                       className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-[13px] text-center transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: acc.bg, border: `1px solid ${acc.border}`, color: acc.color }}
                     >

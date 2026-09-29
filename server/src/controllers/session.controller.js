@@ -363,6 +363,12 @@ exports.completeSession = async (req, res, next) => {
     // don't).
     await lessonDeduction.syncLessonConsumption(session, attendance.status, { performedByRole: req.user.role, performedBy: req.user._id })
     await session.save()
+    if (session.makeupForSessionId) {
+      await require('../models/SupervisionException').updateMany(
+        { makeupSessionId: session._id, status: 'open' },
+        { $set: { status: 'resolved', resolution: 'اكتملت الحصة التعويضية', resolvedAt: new Date(), resolvedBy: req.user._id } }
+      ).catch((error) => console.error('[supervision] makeup follow-up reconciliation failed:', error))
+    }
 
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.complete',
@@ -437,6 +443,7 @@ exports.finishSession = async (req, res, next) => {
       const previousDate = session.scheduledAt
       session.rescheduledFrom = previousDate
       session.scheduledAt = parsedDate
+      session.administrativeReadiness = { student: 'unknown', teacher: 'unknown', link: 'unknown' }
       session.status = 'scheduled'
       session.isPostponed = true
       session.postponedAt = now
@@ -528,6 +535,13 @@ exports.finishSession = async (req, res, next) => {
     // concrete receipt of the balance effect instead of a silent side effect.
     const consumptionResult = await lessonDeduction.syncLessonConsumption(session, attendanceStatus, { performedByRole: req.user.role, performedBy: req.user._id })
     await session.save()
+
+    if (session.makeupForSessionId) {
+      await require('../models/SupervisionException').updateMany(
+        { makeupSessionId: session._id, status: 'open' },
+        { $set: { status: 'resolved', resolution: 'اكتملت الحصة التعويضية', resolvedAt: new Date(), resolvedBy: req.user._id } }
+      ).catch((error) => console.error('[supervision] makeup follow-up reconciliation failed:', error))
+    }
 
     // 3) Optional evaluation.
     let createdEvaluation = null
@@ -645,6 +659,34 @@ exports.cancelSession = async (req, res, next) => {
     })
     await session.save()
 
+    if (session.isMakeup && session.makeupForSessionId && !walletImpact.deducted) {
+      try {
+      const source = await Session.findById(session.makeupForSessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
+      if (source) {
+        const SupervisionAssignment = require('../models/SupervisionAssignment')
+        const SupervisionException = require('../models/SupervisionException')
+        const assignment = await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId,
+          startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
+        const manager = assignment ? null : await User.findOne({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean()
+        const adminOwner = assignment || manager ? null : await User.findOne({ role: 'admin', isPrimaryAdmin: true, isActive: true }).select('_id').lean()
+        const ownerId = assignment?.supervisorId || manager?._id || adminOwner?._id
+        if (ownerId) {
+          const followUp = await SupervisionException.findOneAndUpdate({ autoKey: `makeup-cancelled:${session._id}` }, { $setOnInsert: {
+            autoKey: `makeup-cancelled:${session._id}`, sessionId: source._id, originalTeacherId: source.supervisionOriginalTeacherId || source.teacherId,
+            currentTeacherId: source.teacherId, sessionScheduledAt: source.scheduledAt, studentId: source.studentId,
+            type: 'compensation', reason: `أُلغيت الحصة التعويضية: ${reason}`, ownerId,
+            followUpAt: new Date(Date.now() + 86400000), createdBy: req.user._id,
+          } }, { upsert: true, new: true, setDefaultsOnInsert: true })
+          await createNotification({ userId: ownerId, type: 'assignment', titleAr: 'تعويض يحتاج موعدًا جديدًا',
+            bodyAr: `أُلغيت الحصة التعويضية "${session.titleAr}"؛ الرصيد الأصلي محفوظ ويحتاج موعدًا جديدًا`,
+            actionUrl: '/admin/supervision/administrative', metadata: { dedupeKey: `makeup-cancelled:${followUp._id}` } })
+        }
+      }
+      } catch (error) {
+        console.error('[supervision] cancelled makeup follow-up failed:', error)
+      }
+    }
+
     logAction({
       actorId: req.user._id, actorRole: req.user.role, action: 'session.cancel',
       entity: 'Session', entityId: session._id,
@@ -690,6 +732,7 @@ exports.rescheduleSession = async (req, res, next) => {
     const previousDate = session.scheduledAt
     session.rescheduledFrom = session.scheduledAt
     session.scheduledAt = parsedNewDate
+    session.administrativeReadiness = { student: 'unknown', teacher: 'unknown', link: 'unknown' }
     session.status = 'scheduled'
     session.isPostponed = true
     session.postponedAt = new Date()
@@ -775,6 +818,7 @@ exports.updateSessionMeetingLink = async (req, res, next) => {
 
     const previousLink = session.meetingLink
     session.meetingLink = meetingLink || ''
+    if (session.meetingLink !== previousLink) session.set('administrativeReadiness.link', 'unknown')
     if (meetingProvider) session.meetingProvider = meetingProvider
     await session.save()
 
@@ -791,6 +835,7 @@ exports.updateSessionMeetingLink = async (req, res, next) => {
         {
           $set: {
             meetingLink: meetingLink || '',
+            'administrativeReadiness.link': 'unknown',
             ...(meetingProvider ? { meetingProvider } : {}),
           },
         }
@@ -881,11 +926,19 @@ exports.adminUpdateSession = async (req, res, next) => {
 
     const scheduledAtChanged = updates.scheduledAt !== undefined
       && new Date(previousScheduledAt).getTime() !== updates.scheduledAt.getTime()
+    const participantsChanged = (updates.teacherId !== undefined && String(updates.teacherId) !== String(session.teacherId)) ||
+      (updates.studentId !== undefined && String(updates.studentId) !== String(session.studentId))
+    const restoredToScheduled = updates.status === 'scheduled' && session.status !== 'scheduled'
+    const linkChanged = updates.meetingLink !== undefined && updates.meetingLink !== session.meetingLink
     if (scheduledAtChanged) {
       session.rescheduledFrom = previousScheduledAt
       session.isException = true
     }
+    if (scheduledAtChanged || participantsChanged || restoredToScheduled) {
+      session.administrativeReadiness = { student: 'unknown', teacher: 'unknown', link: 'unknown' }
+    }
     Object.assign(session, updates)
+    if (!scheduledAtChanged && !participantsChanged && !restoredToScheduled && linkChanged) session.set('administrativeReadiness.link', 'unknown')
     await session.save()
     await session.populate('studentId teacherId', 'firstNameAr lastNameAr avatar email')
 

@@ -1,6 +1,8 @@
 const cron = require('node-cron')
 const Session = require('../models/Session')
 const User = require('../models/User')
+const SupervisionAssignment = require('../models/SupervisionAssignment')
+const SupervisionException = require('../models/SupervisionException')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { POLICY } = require('../config/attendancePolicy')
 const { computePayrollStatus } = require('../services/sessionIntelligence.service')
@@ -35,8 +37,9 @@ async function sweepStale() {
   // still in the future can never satisfy minutesPastEnd >= MISSED_AFTER_MINUTES
   // below, so excluding it here avoids scanning the whole forward-scheduled
   // calendar (the majority of the collection) every 10 minutes.
-  const stale = await Session.find({ status: 'scheduled', scheduledAt: { $lte: now } })
-    .select('_id teacherId studentId subscriptionId titleAr scheduledAt durationMinutes status teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq compensationGrantedTransactionId compensationRequired compensationReason')
+  const stale = await Session.find({ status: { $in: ['scheduled', 'missed'] }, scheduledAt: { $lte: now } })
+    .sort({ scheduledAt: 1 }).limit(500)
+    .select('_id teacherId studentId subscriptionId titleAr scheduledAt durationMinutes status isMakeup makeupForSessionId teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq compensationGrantedTransactionId compensationRequired compensationReason')
     .populate('teacherId', 'firstNameAr lastNameAr')
 
   for (const session of stale) {
@@ -81,6 +84,38 @@ async function sweepStale() {
     await handleTeacherNoShow(session, { reason: 'غياب المعلم — تم رصده تلقائياً' })
     await session.save()
     flaggedAbsent++
+
+    const source = session.isMakeup && session.makeupForSessionId
+      ? await Session.findById(session.makeupForSessionId).select('_id teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
+      : session
+
+    // Keep the owed replacement visible in the next shift instead of only
+    // crediting the wallet and leaving an unowned operational task.
+    const assignment = await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId._id,
+      startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).sort({ primary: -1, startsAt: -1 }).select('supervisorId').lean()
+    const fallback = assignment ? null : await User.findOne({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean()
+    const primaryAdmin = assignment || fallback ? null : await User.findOne({ isActive: true, role: 'admin', isPrimaryAdmin: true }).select('_id').lean()
+    const ownerId = assignment?.supervisorId || fallback?._id || primaryAdmin?._id
+    if (ownerId && source) {
+      const exception = await SupervisionException.findOneAndUpdate({ autoKey: `teacher-no-show:${session._id}` }, { $setOnInsert: {
+        autoKey: `teacher-no-show:${session._id}`, sessionId: source._id, originalTeacherId: source.supervisionOriginalTeacherId || source.teacherId._id || source.teacherId,
+        currentTeacherId: source.teacherId._id || source.teacherId, sessionScheduledAt: source.scheduledAt, studentId: source.studentId,
+        type: 'compensation', reason: 'غياب المعلم — حصة تعويضية تحتاج تحديد موعد', ownerId,
+        followUpAt: new Date(now.getTime() + 86400000), createdBy: ownerId,
+      } }, { upsert: true, new: true, setDefaultsOnInsert: true })
+      await createNotification({ userId: ownerId, titleAr: 'تعويض يحتاج متابعة', bodyAr: `حدد موعدًا لتعويض حصة "${session.titleAr}"`,
+        type: 'assignment', priority: 'high', actionUrl: '/admin/supervision/administrative',
+        metadata: { dedupeKey: `teacher-no-show-exception:${exception._id}` } })
+    }
+    const academicAssignments = await SupervisionAssignment.find({ team: 'academic', teacherId: session.teacherId._id,
+      startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
+    if (academicAssignments.length) {
+      await createNotifications(academicAssignments.map((row) => ({ userId: row.supervisorId,
+        titleAr: 'غياب معلم في حلقة مكلف بها', bodyAr: `تأكد من الأثر الأكاديمي لحصة "${session.titleAr}" والتعويض المطلوب`,
+        type: 'assignment', priority: 'high', actionUrl: '/admin/supervision/academic',
+        metadata: { dedupeKey: `teacher-no-show-academic:${session._id}` },
+      })))
+    }
 
     await createNotification({
       userId: session.teacherId._id,

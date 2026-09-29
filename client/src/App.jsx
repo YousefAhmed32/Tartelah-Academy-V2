@@ -54,6 +54,7 @@ const TeacherDashboardPage = lazy(() => import('./pages/teacher/TeacherDashboard
 const TeacherStudentsPage = lazy(() => import('./pages/teacher/TeacherStudentsPage.jsx'))
 const TeacherStudentDetailPage = lazy(() => import('./pages/teacher/TeacherStudentDetailPage.jsx'))
 const TeacherSessionsPage = lazy(() => import('./pages/teacher/TeacherSessionsPage.jsx'))
+const TeacherGuidancePage = lazy(() => import('./pages/teacher/TeacherGuidancePage.jsx'))
 const TeacherAttendancePage = lazy(() => import('./pages/teacher/TeacherAttendancePage.jsx'))
 const TeacherEvaluationsPage = lazy(() => import('./pages/teacher/TeacherEvaluationsPage.jsx'))
 const TeacherHomeworkPage = lazy(() => import('./pages/teacher/TeacherHomeworkPage.jsx'))
@@ -69,6 +70,8 @@ const TeacherAssignmentRequestsPage = lazy(() => import('./pages/teacher/Teacher
 
 // Admin
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage.jsx'))
+const AdminSupervisionPage = lazy(() => import('./pages/admin/AdminSupervisionPage.jsx'))
+const SupervisionWorkspacePage = lazy(() => import('./pages/admin/SupervisionWorkspacePage.jsx'))
 const AdminStudentsPage = lazy(() => import('./pages/admin/AdminStudentsPage.jsx'))
 const AdminStudentDetailPage = lazy(() => import('./pages/admin/AdminStudentDetailPage.jsx'))
 const AdminTeachersPage = lazy(() => import('./pages/admin/AdminTeachersPage.jsx'))
@@ -216,6 +219,7 @@ export default function App() {
           <Route path={ROUTES.TEACHER_STUDENTS} element={<TeacherStudentsPage />} />
           <Route path={ROUTES.TEACHER_STUDENT_DETAIL} element={<TeacherStudentDetailPage />} />
           <Route path={ROUTES.TEACHER_SESSIONS} element={<TeacherSessionsPage />} />
+          <Route path={ROUTES.TEACHER_GUIDANCE} element={<TeacherGuidancePage />} />
           <Route path={ROUTES.TEACHER_ATTENDANCE} element={<TeacherAttendancePage />} />
           <Route path={ROUTES.TEACHER_EVALUATIONS} element={<TeacherEvaluationsPage />} />
           <Route path={ROUTES.TEACHER_HOMEWORK} element={<TeacherHomeworkPage />} />
@@ -239,6 +243,11 @@ export default function App() {
             Sidebar/Route/Backend can never disagree. */}
         <Route element={<AdminLayout />}>
           <Route path={ROUTES.ADMIN_DASHBOARD} element={<RequirePermission permission="dashboard.view"><AdminDashboardPage /></RequirePermission>} />
+          <Route path={ROUTES.ADMIN_SUPERVISION} element={<RequirePermission permission="supervision.view"><AdminSupervisionPage /></RequirePermission>} />
+          <Route path={ROUTES.SUPERVISION_ACADEMIC} element={<RequirePermission permission="supervision.view"><SupervisionWorkspacePage team="academic" position="supervisor" /></RequirePermission>} />
+          <Route path={ROUTES.SUPERVISION_ADMINISTRATIVE} element={<RequirePermission permission="supervision.view"><SupervisionWorkspacePage team="administrative" position="supervisor" /></RequirePermission>} />
+          <Route path={ROUTES.SUPERVISION_ACADEMIC_MANAGER} element={<RequirePermission all={['supervision.view', 'supervision.manage']}><SupervisionWorkspacePage team="academic" position="manager" /></RequirePermission>} />
+          <Route path={ROUTES.SUPERVISION_ADMINISTRATIVE_MANAGER} element={<RequirePermission all={['supervision.view', 'supervision.manage']}><SupervisionWorkspacePage team="administrative" position="manager" /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_STUDENTS} element={<RequirePermission permission="students.view"><AdminStudentsPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_STUDENT_DETAIL} element={<RequirePermission permission="students.view"><AdminStudentDetailPage /></RequirePermission>} />
           <Route path={ROUTES.ADMIN_TEACHERS} element={<RequirePermission permission="teachers.view"><AdminTeachersPage /></RequirePermission>} />

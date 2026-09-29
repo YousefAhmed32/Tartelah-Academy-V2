@@ -34,6 +34,10 @@ const NAV_GROUPS = [
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
+        to: ROUTES.ADMIN_SUPERVISION, label: 'الإشراف', permission: 'supervision.view',
+        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.8"/><circle cx="5" cy="18" r="2" stroke="currentColor" strokeWidth="1.8"/><circle cx="19" cy="18" r="2" stroke="currentColor" strokeWidth="1.8"/><path d="M12 7v5M12 12l-7 4M12 12l7 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
         to: ROUTES.ADMIN_ENROLLMENTS, label: 'طلبات التسجيل', enrollment: true, permission: 'enrollments.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M14 2v6h6M9 13l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
@@ -169,7 +173,7 @@ const NAV_GROUPS = [
 const MOBILE_NAV = [
   NAV_GROUPS[0].items[0],  // Dashboard
   NAV_GROUPS[0].items[1],  // Operations Center
-  NAV_GROUPS[0].items[2],  // Enrollments
+  NAV_GROUPS[0].items[2],  // Supervision
   NAV_GROUPS[1].items[0],  // Students
   NAV_GROUPS[4].items[2],  // Notifications (شفت index بعد إضافة أداء المعلمين)
 ]
@@ -192,6 +196,18 @@ function navLinkClass({ isActive }) {
 // actually back.
 function isNavItemVisible(item, hasPermission) {
   return hasPermission(item.permission)
+}
+
+function supervisionPath(user) {
+  if (!user?.supervisionTeam || !user?.supervisionPosition) return ROUTES.ADMIN_SUPERVISION
+  if (user.supervisionTeam === 'academic') return user.supervisionPosition === 'manager' ? ROUTES.SUPERVISION_ACADEMIC_MANAGER : ROUTES.SUPERVISION_ACADEMIC
+  return user.supervisionPosition === 'manager' ? ROUTES.SUPERVISION_ADMINISTRATIVE_MANAGER : ROUTES.SUPERVISION_ADMINISTRATIVE
+}
+
+function sidebarRoleLabel(user) {
+  if (user?.supervisionTeam === 'academic') return user.supervisionPosition === 'manager' ? 'مدير الإشراف الأكاديمي' : 'مشرف أكاديمي'
+  if (user?.supervisionTeam === 'administrative') return user.supervisionPosition === 'manager' ? 'مدير الإشراف الإداري' : 'مشرف إداري'
+  return user?.jobTitle || user?.displayRoleName || 'أدمن'
 }
 
 // The header used to hardcode "مركز العمليات" (Operations Center) regardless
@@ -252,7 +268,7 @@ export default function AdminLayout() {
   // own data still 403s per-user if they lack users.view too, same as any
   // other page here).
   if (!hasPermission('dashboard.view') && location.pathname === ROUTES.ADMIN_DASHBOARD) {
-    return <Navigate to={ROUTES.ADMIN_ADMINS} replace />
+    return <Navigate to={hasPermission('supervision.view') ? supervisionPath(user) : ROUTES.ADMIN_ADMINS} replace />
   }
 
   function handleLogout() {
@@ -289,11 +305,11 @@ export default function AdminLayout() {
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="text-[11px] text-gray-500">مدير المنصة</span>
+              <span className="text-[11px] text-gray-500">{sidebarRoleLabel(user)}</span>
             </div>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
-            أدمن
+            {user?.supervisionTeam ? (user.supervisionPosition === 'manager' ? 'مدير' : 'مشرف') : (user?.displayRoleName || 'أدمن')}
           </span>
         </div>
       </div>
@@ -308,7 +324,7 @@ export default function AdminLayout() {
             {group.items.filter((item) => isNavItemVisible(item, hasPermission)).map((item) => (
               <NavLink
                 key={item.to}
-                to={item.to}
+                to={item.to === ROUTES.ADMIN_SUPERVISION ? supervisionPath(user) : item.to}
                 end={item.end}
                 onClick={() => setDrawerOpen(false)}
                 className={navLinkClass}
@@ -442,10 +458,10 @@ export default function AdminLayout() {
           className="lg:hidden fixed bottom-0 inset-x-0 z-20 flex bg-white border-t border-gray-200"
           style={{ direction: 'rtl' }}
         >
-          {MOBILE_NAV.map((item) => (
+          {MOBILE_NAV.filter((item) => isNavItemVisible(item, hasPermission)).map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to === ROUTES.ADMIN_SUPERVISION ? supervisionPath(user) : item.to}
               end={item.end}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-semibold transition-colors ${isActive ? 'text-violet-700' : 'text-gray-400'}`

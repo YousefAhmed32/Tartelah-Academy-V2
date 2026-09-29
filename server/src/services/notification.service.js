@@ -52,7 +52,11 @@ async function createNotification(input) {
   const [dupeIndex] = await findExistingDedupeKeys([input])
   if (dupeIndex === 0) return null
 
-  const notif = await Notification.create(withDefaults(input))
+  let notif
+  try { notif = await Notification.create(withDefaults(input)) } catch (error) {
+    if (error.code === 11000 && input.metadata?.reminderKey) return null
+    throw error
+  }
   socketService.emitToUser(notif.userId, 'notification:new', notif)
   return notif
 }

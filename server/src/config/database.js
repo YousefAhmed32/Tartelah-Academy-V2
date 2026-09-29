@@ -6,7 +6,7 @@ async function connectDB() {
   while (true) {
     try {
       const conn = await mongoose.connect(process.env.MONGO_URI, {
-        dbName: 'tartelah',
+        dbName: process.env.MONGO_DB_NAME || 'tartelah',
       })
       console.log(`✅ MongoDB connected: ${conn.connection.host}`)
       return conn

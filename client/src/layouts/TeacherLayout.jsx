@@ -55,6 +55,10 @@ const NAV_GROUPS = [
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16l-7-3-7 3V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 10l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },
       {
+        to: ROUTES.TEACHER_GUIDANCE, label: 'توجيهات الإشراف',
+        icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H9l-5 4V5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M8 9h8M8 12h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      },
+      {
         to: ROUTES.TEACHER_HOMEWORK, label: 'الواجبات',
         icon: <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M8 4h8l3 3v13H5V4h3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
       },

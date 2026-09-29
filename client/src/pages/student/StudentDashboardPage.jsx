@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../store/authStore.js'
 import Badge from '../../components/ui/Badge.jsx'
-import Spinner from '../../components/ui/Spinner.jsx'
 import LatestNotificationsWidget from '../../components/shared/LatestNotificationsWidget.jsx'
 import SessionTitleDisplay from '../../components/shared/SessionTitleDisplay.jsx'
-import { formatSessionTitle, extractSessionIndexInfo } from '../../utils/sessionTitle.js'
+import { formatSessionTitle } from '../../utils/sessionTitle.js'
 import { formatDateAr, formatTimeAr, isFuture } from '../../utils/date.js'
 import { SESSION_STATUS, ROUTES } from '../../config/constants.js'
 // greeting uses no emoji — wave removed
@@ -64,6 +64,27 @@ function useStudentStats() {
       memorization: { surahsCompleted: 0, ayahsTotal: 0 },
     },
   })
+}
+
+function FirstLessonFeedbackCard() {
+  const qc = useQueryClient()
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const feedback = useQuery({ queryKey: ['student', 'first-lesson-feedback'],
+    queryFn: () => api.get('/students/me/first-lesson-feedback').then((response) => response.data.data) })
+  const submit = useMutation({ mutationFn: () => api.post('/students/me/first-lesson-feedback', { rating, comment }),
+    onSuccess: () => { toast.success('شكرًا، وصلنا رأيك'); qc.invalidateQueries({ queryKey: ['student', 'first-lesson-feedback'] }) },
+    onError: (error) => toast.error(error.response?.data?.message || 'تعذّر إرسال رأيك، حاول مرة أخرى') })
+  if (feedback.isError) return <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر تحميل سؤال أول حلقة. <button type="button" onClick={() => feedback.refetch()} className="min-h-11 font-bold underline">إعادة المحاولة</button></p>
+  if (!feedback.data?.eligible) return null
+  return <section className="mb-5 rounded-2xl border border-violet-100 bg-white p-5 shadow-sm" aria-labelledby="first-lesson-title">
+    <h2 id="first-lesson-title" className="font-heading text-lg font-bold text-brand-textBody">كيف كانت أول حلقة لك؟</h2>
+    <p className="mt-1 text-sm text-gray-600">رأيك يساعدنا نتابع بدايتك بشكل أفضل. اختر تقييمًا، ولو تحب اكتب لنا ملاحظة.</p>
+    <div role="group" aria-label="تقييم أول حلقة" className="mt-4 flex flex-wrap gap-2">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" aria-pressed={rating === value} onClick={() => setRating(value)} className={`min-h-11 min-w-11 rounded-xl border px-3 text-sm font-bold ${rating === value ? 'border-violet-600 bg-violet-700 text-white' : 'border-gray-200 bg-white text-gray-700'}`}>{value}</button>)}</div>
+    <label className="mt-3 block text-sm font-semibold text-gray-700" htmlFor="first-lesson-comment">ملاحظة اختيارية</label>
+    <textarea id="first-lesson-comment" maxLength={1500} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className="mt-1 w-full min-h-11 rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-900 outline-none focus:border-violet-600" placeholder="لو فيه حاجة تحب نساعدك فيها، اكتبها هنا" />
+    <button type="button" disabled={!rating || submit.isPending} onClick={() => submit.mutate()} className="mt-3 min-h-11 rounded-xl bg-violet-700 px-5 text-sm font-bold text-white disabled:opacity-50">{submit.isPending ? 'جارٍ الإرسال...' : 'إرسال رأيي'}</button>
+  </section>
 }
 
 // ── Animation helpers ──────────────────────────────────────────────────────
@@ -134,6 +155,8 @@ export default function StudentDashboardPage() {
         </div>
       </motion.div>
 
+      <FirstLessonFeedbackCard />
+
       {/* ═══ NEXT SESSION CARD ═══ */}
       <motion.div {...fadeUp(0.05)} className="mb-5">
         {nextSess
@@ -195,7 +218,6 @@ export default function StudentDashboardPage() {
 // NEXT SESSION CARD
 // ══════════════════════════════════════════════════════════════════════════
 function NextSessionCard({ session, countdown }) {
-  const status = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled
   const pad = (n) => String(n).padStart(2, '0')
 
   return (

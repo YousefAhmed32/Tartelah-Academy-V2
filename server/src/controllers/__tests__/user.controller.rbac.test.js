@@ -94,6 +94,25 @@ describe('createUser — admins.create gate', () => {
 })
 
 describe('createUser — permission escalation prevention', () => {
+  test('supervision accounts receive only their scoped grants, not generic manager defaults', async () => {
+    User.findOne.mockResolvedValue(null)
+    User.create.mockResolvedValue({ _id: 'supervisor1', toPublic: () => ({ role: 'manager', supervisionTeam: 'academic' }) })
+    const req = { user: withPermission({ isPrimaryAdmin: true }), body: { role: 'manager', supervisionTeam: 'academic', supervisionPosition: 'manager', email: 'supervision@x.com', firstNameAr: 'أ', lastNameAr: 'ب' }, ip: '1.1.1.1' }
+    const res = mockRes()
+    await ctrl.createUser(req, res, jest.fn())
+    expect(User.create.mock.calls[0][0].permissions).toEqual(['supervision.view', 'supervision.manage'])
+    expect(res.status).toHaveBeenCalledWith(201)
+  })
+
+  test('a supervision account cannot receive academy-wide student permissions', async () => {
+    User.findOne.mockResolvedValue(null)
+    const req = { user: withPermission({ isPrimaryAdmin: true }), body: { role: 'staff', supervisionTeam: 'administrative', supervisionPosition: 'supervisor', permissions: ['supervision.view', 'students.view'], email: 'staff@x.com', firstNameAr: 'أ', lastNameAr: 'ب' }, ip: '1.1.1.1' }
+    const res = mockRes()
+    await ctrl.createUser(req, res, jest.fn())
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(User.create).not.toHaveBeenCalled()
+  })
+
   test('an actor cannot grant a permission they do not themselves hold', async () => {
     User.findOne.mockResolvedValue(null)
     const req = {

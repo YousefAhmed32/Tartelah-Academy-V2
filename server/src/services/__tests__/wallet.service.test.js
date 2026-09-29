@@ -61,6 +61,18 @@ describe('wallet.service.applyTransaction', () => {
     expect(incCall.$inc).toEqual({ remaining: 1, totalUsed: -1 })
   })
 
+  test('a failed purchase refund reduces remaining and totalPurchased without increasing totalUsed', async () => {
+    LessonWallet.findOneAndUpdate
+      .mockResolvedValueOnce({ _id: 'w1', remaining: 8, totalPurchased: 8 })
+      .mockResolvedValueOnce({ _id: 'w1', remaining: 0, totalPurchased: 0, totalUsed: 0 })
+    LessonTransaction.create.mockResolvedValueOnce({ _id: 'tx-refund' })
+
+    await walletService.applyTransaction({ studentId: 's1', type: 'refund', amount: -8,
+      idempotencyKey: 'enrollment:e1:purchase:rollback', correctsTransactionId: 'tx1' })
+
+    expect(LessonWallet.findOneAndUpdate.mock.calls[1][1].$inc).toEqual({ remaining: -8, totalPurchased: -8 })
+  })
+
   test('a negative manual_adjustment decrements remaining and increments deductedLessons only (without totalUsed)', async () => {
     LessonWallet.findOneAndUpdate
       .mockResolvedValueOnce({ _id: 'w1', remaining: 12 })

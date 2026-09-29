@@ -2,6 +2,7 @@ const router = require('express').Router()
 
 router.use('/auth', require('./auth.routes'))
 router.use('/users', require('./user.routes'))
+router.use('/supervision', require('./supervision.routes'))
 router.use('/students', require('./student.routes'))
 router.use('/teachers', require('./teacher.routes'))
 router.use('/sessions', require('./session.routes'))
