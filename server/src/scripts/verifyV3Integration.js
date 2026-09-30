@@ -14,6 +14,7 @@ const dbName = `tartelah_v3_qa_${crypto.randomBytes(6).toString('hex')}`
 process.env.JWT_ACCESS_SECRET = crypto.randomBytes(32).toString('hex')
 const User = require('../models/User')
 const Session = require('../models/Session')
+const ScheduleRule = require('../models/ScheduleRule')
 const Assignment = require('../models/SupervisionAssignment')
 const Observation = require('../models/AcademicObservationReport')
 const Notification = require('../models/Notification')
@@ -154,15 +155,17 @@ async function main() {
     await api(administrativeManager, 'POST', `/exceptions/${exception._id}/resolve`, { resolution: 'إغلاق مكرر' }, 409)
     checks.push('administrative exception: owner handoff, closure history and academic denial')
 
-    const cairoDate = formatInTimeZone(now, 'Africa/Cairo', 'yyyy-MM-dd')
+    const cairoDate = formatInTimeZone(lessonTime, 'Africa/Cairo', 'yyyy-MM-dd')
+    const expectedDailyTotal = [lesson, reminderLesson, fiveMinuteLesson, changedLesson]
+      .filter((row) => formatInTimeZone(row.scheduledAt, 'Africa/Cairo', 'yyyy-MM-dd') === cairoDate).length
     const monthlyStart = `${cairoDate.slice(0, 7)}-01`
     const metricsPath = `/periodic-metrics?team=academic&start=${cairoDate}`
     const metrics = await api(academicManager, 'GET', metricsPath)
-    assert.equal(metrics.data.counts.total, 4)
+    assert.equal(metrics.data.counts.total, expectedDailyTotal)
     assert.equal(metrics.data.counts.observed, 1)
     assert.deepEqual(metrics.data.observationCategories.map((row) => [row._id, row.reports]), [['lesson_quality', 1]])
     const administrativeMetrics = await api(administrativeManager, 'GET', `/periodic-metrics?team=administrative&start=${cairoDate}`)
-    assert.equal(administrativeMetrics.data.counts.total, 4)
+    assert.equal(administrativeMetrics.data.counts.total, expectedDailyTotal)
     assert.equal(administrativeMetrics.data.achievements, null)
     await api(academicSupervisor, 'GET', `/periodic-metrics?team=administrative&start=${cairoDate}`, undefined, 403)
     checks.push('real Mongo aggregates: distinct lesson, R1 category, and team-safe metrics')
@@ -178,9 +181,36 @@ async function main() {
     assert.equal(recognition.data.candidates.teachers.length, 1)
     checks.push('R4 approval and recognition sourced from an approved nomination')
 
+    await ScheduleRule.create({ teacherId: teacher._id, studentId: student._id, startDate: start, status: 'active' })
+    const cohortStudents = await Promise.all(Array.from({ length: 19 }, (_, i) => person('student', `cohort-${i}`)))
+    const cohort = (await api(academicManager, 'POST', '/cohorts', { team: 'academic', name: 'مجموعة اختبار التغطية', studentIds: [student._id, ...cohortStudents.map((row) => row._id)] }, 201)).data
+    assert.equal((await api(academicManager, 'GET', `/cohorts/${cohort._id}`)).data.total, 20)
+    await api(academicManager, 'POST', '/assignments', { team: 'academic', scopeType: 'cohort', cohortId: cohort._id,
+      supervisorId: academicPeer._id, startsAt: now, primary: true }, 201)
+    const assignedSession = `/daily-sessions?team=academic&from=${now.toISOString()}&to=${end.toISOString()}&sessionId=${reminderLesson._id}`
+    assert.equal((await api(academicPeer, 'GET', assignedSession)).data.length, 1)
+    assert.equal((await api(academicSupervisor, 'GET', assignedSession)).data.length, 0)
+    await api(academicManager, 'POST', '/assignments', { team: 'academic', scopeType: 'student', teacherId: teacher._id,
+      studentId: student._id, supervisorId: academicSupervisor._id, startsAt: now, primary: true }, 201)
+    assert.equal((await api(academicSupervisor, 'GET', assignedSession)).data.length, 1)
+    assert.equal((await api(academicPeer, 'GET', assignedSession)).data.length, 0)
+    const profile = await api(admin, 'GET', `/profiles/student/${student._id}`)
+    assert.equal(String(profile.data.owners.find((row) => row.team === 'academic')?.supervisorId?._id), String(academicSupervisor._id))
+    checks.push('V3-9.1: cohort ownership, student override, paginated access and admin student profile')
+    await api(academicManager, 'PATCH', `/cohorts/${cohort._id}`, { name: 'مجموعة معدلة', notes: 'مراجعة دورة المجموعة' })
+    await api(academicManager, 'PATCH', `/cohorts/${cohort._id}`, { isActive: false })
+    assert.equal((await api(academicManager, 'GET', `/cohorts/${cohort._id}`)).data.total, 0)
+    assert.equal((await api(academicManager, 'GET', `/cohorts/${cohort._id}?history=true`)).data.total, 20)
+    await api(academicManager, 'PATCH', `/cohorts/${cohort._id}`, { isActive: true })
+    const reopened = (await api(academicManager, 'GET', `/cohorts/${cohort._id}`)).data
+    assert.equal(reopened.isActive, true)
+    assert.equal(reopened.total, 0)
+    assert.equal(reopened.name, 'مجموعة معدلة')
+    checks.push('20-student cohort: rename, closure, retained history and safe reopening')
+
     const persisted = await Observation.findById(report._id).lean()
     assert.equal(persisted.teacherReplyStatus, 'acknowledged')
-    assert.equal(await Assignment.countDocuments({ team: 'academic', teacherId: teacher._id }), 2)
+    assert.equal(await Assignment.countDocuments({ team: 'academic', teacherId: teacher._id }), 3)
     console.log(JSON.stringify({ status: 'passed', database: dbName, ...(process.env.V3_QA_KEEP === '1' ? { accountSuffix: suffix } : {}), checks }, null, 2))
   } finally {
     await new Promise((resolve) => server.close(resolve))

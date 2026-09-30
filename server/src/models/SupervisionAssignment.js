@@ -1,11 +1,15 @@
 const mongoose = require('mongoose')
 const { SUPERVISION_TEAMS } = require('../config/permissions')
 
-// A dated teacher cohort. The students are resolved from the teacher's real
-// schedules/sessions, so a second student roster cannot drift out of sync.
+// Dated supervision responsibility. Legacy rows without scopeType are teacher
+// assignments. Student assignments apply to one teacher/student relationship;
+// cohort assignments use the separately dated cohort membership records.
 const SupervisionAssignmentSchema = new mongoose.Schema({
   team: { type: String, enum: SUPERVISION_TEAMS, required: true },
-  teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  scopeType: { type: String, enum: ['teacher', 'student', 'cohort'], default: 'teacher' },
+  teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  cohortId: { type: mongoose.Schema.Types.ObjectId, ref: 'SupervisionCohort' },
   supervisorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   startsAt: { type: Date, required: true },
   endsAt: { type: Date },
@@ -16,7 +20,17 @@ const SupervisionAssignmentSchema = new mongoose.Schema({
   replacedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'SupervisionAssignment' },
 }, { timestamps: true })
 
+SupervisionAssignmentSchema.pre('validate', function validateScope(next) {
+  const valid = this.scopeType === 'teacher' ? !!this.teacherId && !this.studentId && !this.cohortId
+    : this.scopeType === 'student' ? !!this.teacherId && !!this.studentId && !this.cohortId
+      : !!this.cohortId && !this.teacherId && !this.studentId
+  if (!valid) this.invalidate('scopeType', 'نطاق تكليف الإشراف غير صالح')
+  next()
+})
+
 SupervisionAssignmentSchema.index({ team: 1, teacherId: 1, primary: 1, startsAt: 1, endsAt: 1 })
+SupervisionAssignmentSchema.index({ team: 1, scopeType: 1, teacherId: 1, studentId: 1, startsAt: 1, endsAt: 1 })
+SupervisionAssignmentSchema.index({ team: 1, scopeType: 1, cohortId: 1, startsAt: 1, endsAt: 1 })
 SupervisionAssignmentSchema.index({ supervisorId: 1, startsAt: 1, endsAt: 1 })
 
 module.exports = mongoose.model('SupervisionAssignment', SupervisionAssignmentSchema)

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { CalendarRange, History, Settings2, AlertCircle } from 'lucide-react'
 import { supervisionService } from '../../services/supervision.service.js'
+import { academyDateKey, academyDayRange } from '../../utils/date.js'
 
 const input = 'min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100'
 const dateTime = (value) => value ? new Date(value).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -25,13 +26,11 @@ function Panel({ icon: Icon, title, detail, children }) {
 function Notice({ children }) { return <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{children}</p> }
 
 export function CoverageSection({ team, onAssignments }) {
-  const [day, setDay] = useState(() => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10) })
+  const [day, setDay] = useState(() => academyDateKey(new Date()))
   const [page, setPage] = useState(1)
   useEffect(() => { setPage(1) }, [team, day])
-  const from = new Date(`${day}T00:00:00`)
-  const to = new Date(from)
-  to.setDate(to.getDate() + 1)
-  const query = useQuery({ queryKey: ['supervision', 'coverage', team, day, page], queryFn: () => supervisionService.coverage({ team, from: from.toISOString(), to: to.toISOString(), page, limit: 20 }), enabled: !Number.isNaN(from.getTime()) })
+  const range = academyDayRange(day)
+  const query = useQuery({ queryKey: ['supervision', 'coverage', team, day, page], queryFn: () => supervisionService.coverage({ team, ...range, page, limit: 20 }), enabled: !!range })
   const rows = query.data?.data || []
   return <Panel icon={CalendarRange} title="تغطية الحلقات" detail="المسؤول عن كل حلقة من جدول المنصة، مع مطابقة شيفته عند موعدها">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="text-sm font-semibold text-gray-700">اليوم<input aria-label="يوم التغطية" type="date" value={day} onChange={(e) => setDay(e.target.value)} className={`mt-1 block ${input}`} /></label><p className="text-xs text-gray-500">فتح رابط الحلقة لا يثبت حضور المشرف داخل الاجتماع.</p></div>

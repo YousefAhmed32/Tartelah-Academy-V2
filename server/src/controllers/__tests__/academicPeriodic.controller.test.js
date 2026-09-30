@@ -97,13 +97,15 @@ test('monthly recognition warns when an approved R4 source has a newer version',
 
 test('teacher nomination checks that teacher sessions are in the academic scope', async () => {
   User.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ _id: other }) }) })
-  Assignment.distinct.mockResolvedValue([id])
-  Session.find.mockReturnValue({ select: () => ({ limit: () => ({ lean: async () => [] }) }) })
+  Session.aggregate.mockResolvedValue([])
   const response = res()
   await ctrl.save({ user: supervisor, body: { type: 'R4', start: '2026-04-01', analysis: {
     distinguishedTeachers: [{ personId: other, reason: 'متابعة ممتازة' }],
   } } }, response, jest.fn())
-  expect(Session.find.mock.calls[0][0].teacherId).toBe(other)
+  expect(String(Session.aggregate.mock.calls[0][0][0].$match.teacherId)).toBe(other)
+  expect(Session.aggregate.mock.calls[0][0]).toEqual(expect.arrayContaining([
+    expect.objectContaining({ $match: { 'effectiveOwner.0.supervisorId': expect.anything() } }),
+  ]))
   expect(response.status).toHaveBeenCalledWith(400)
   expect(Report.findOne).not.toHaveBeenCalled()
 })

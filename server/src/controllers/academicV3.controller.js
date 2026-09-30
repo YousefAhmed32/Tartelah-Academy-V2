@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const User = require('../models/User')
 const Assignment = require('../models/SupervisionAssignment')
+const CohortMember = require('../models/SupervisionCohortMember')
 const ScheduleRule = require('../models/ScheduleRule')
 const Subscription = require('../models/Subscription')
 const Course = require('../models/Course')
@@ -17,6 +18,7 @@ const Development = require('../models/AcademicDevelopmentCase')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 const { createNotifications } = require('../services/notification.service')
+const coverage = require('../services/supervisionCoverage.service')
 
 const oid = (value) => mongoose.isValidObjectId(value)
 const id = (value) => String(value?._id || value || '')
@@ -38,19 +40,36 @@ function safeUrl(value) {
 async function audit(req, action, entity, entityId, changes) {
   await logAction({ actorId: req.user._id, actorRole: req.user.role, action, entity, entityId, changes, ip: req.ip })
 }
-async function assignedTeacherIds(user) {
+async function academicTeacherIds(supervisorId = null) {
   const now = new Date()
-  return Assignment.distinct('teacherId', { team: 'academic', supervisorId: user._id,
+  const filter = { team: 'academic', ...(supervisorId ? { supervisorId } : {}),
+    startsAt: { $lte: now }, $or: [{ endsAt: null }, { endsAt: { $gt: now } }] }
+  const [direct, cohorts] = await Promise.all([
+    Assignment.distinct('teacherId', { ...filter, scopeType: { $ne: 'cohort' } }),
+    Assignment.distinct('cohortId', { ...filter, scopeType: 'cohort' }),
+  ])
+  if (!cohorts?.length) return (direct || []).filter(Boolean)
+  const students = await CohortMember.distinct('studentId', { team: 'academic', cohortId: { $in: cohorts },
     startsAt: { $lte: now }, $or: [{ endsAt: null }, { endsAt: { $gt: now } }] })
+  const teachers = students.length ? await ScheduleRule.distinct('teacherId', { studentId: { $in: students }, status: { $in: ['active', 'paused'] } }) : []
+  return [...new Map([...(direct || []), ...teachers].filter(Boolean).map((teacherId) => [id(teacherId), teacherId])).values()]
+}
+const assignedTeacherIds = (user) => academicTeacherIds(user._id)
+async function supervisedStudentTeacherIds(user, studentId) {
+  const rules = await ScheduleRule.find({ studentId, status: { $in: ['active', 'paused'] } }).select('teacherId').lean()
+  if (!rules.length) return []
+  const now = new Date()
+  const sessions = rules.map((row) => ({ studentId, teacherId: row.teacherId, scheduledAt: now }))
+  const { assignments, memberships } = await coverage.loadCoverage('academic', sessions)
+  return [...new Map(sessions
+    .filter((session) => id(coverage.resolveOwner(session, assignments, memberships)?.supervisorId) === id(user))
+    .map((session) => [id(session.teacherId), session.teacherId])).values()]
 }
 async function canAccessStudent(user, studentId) {
   if (leader(user) || user.role === 'student' && id(user) === id(studentId)) return true
   if (user.role === 'teacher') return !!(await ScheduleRule.exists({ studentId, teacherId: user._id, status: 'active' })
     || await Subscription.exists({ studentId, teacherId: user._id, status: 'active' }))
-  if (supervisor(user)) {
-    const teachers = await assignedTeacherIds(user)
-    return !!teachers.length && !!await ScheduleRule.exists({ studentId, teacherId: { $in: teachers }, status: { $in: ['active', 'paused'] } })
-  }
+  if (supervisor(user)) return (await supervisedStudentTeacherIds(user, studentId)).length > 0
   return false
 }
 function publicPlan(row, role) {
@@ -73,7 +92,16 @@ exports.findStudents = async (req, res, next) => {
     const candidates = await User.find({ role: 'student', isActive: true,
       $or: [{ firstNameAr: new RegExp(safe, 'i') }, { lastNameAr: new RegExp(safe, 'i') }, { email: new RegExp(safe, 'i') }] })
       .select(person).limit(30).lean()
-    const rows = supervisor(req.user) ? (await Promise.all(candidates.map(async (row) => await canAccessStudent(req.user, row._id) ? row : null))).filter(Boolean) : candidates
+    let rows = candidates
+    if (supervisor(req.user) && candidates.length) {
+      const rules = await ScheduleRule.find({ studentId: { $in: candidates.map((row) => row._id) }, status: { $in: ['active', 'paused'] } })
+        .select('studentId teacherId').lean()
+      const now = new Date()
+      const sessions = rules.map((row) => ({ studentId: row.studentId, teacherId: row.teacherId, scheduledAt: now }))
+      const { assignments, memberships } = await coverage.loadCoverage('academic', sessions)
+      const allowed = new Set(sessions.filter((session) => id(coverage.resolveOwner(session, assignments, memberships)?.supervisorId) === id(req.user)).map((row) => id(row.studentId)))
+      rows = candidates.filter((row) => allowed.has(id(row)))
+    }
     sendSuccess(res, rows.slice(0, 20))
   } catch (error) { next(error) }
 }
@@ -203,8 +231,11 @@ exports.updateMilestone = async (req, res, next) => {
 exports.studentOverview = async (req, res, next) => {
   try {
     const studentId = req.params.studentId === 'me' ? req.user._id : req.params.studentId
-    if (!oid(studentId) || !await canAccessStudent(req.user, studentId)) return sendError(res, 'غير مصرح للطالب', 403)
-    const teacherScope = req.user.role === 'teacher' ? { teacherId: req.user._id } : {}
+    if (!oid(studentId)) return sendError(res, 'غير مصرح للطالب', 403)
+    const supervisedTeachers = supervisor(req.user) ? await supervisedStudentTeacherIds(req.user, studentId) : null
+    if (supervisedTeachers ? !supervisedTeachers.length : !await canAccessStudent(req.user, studentId)) return sendError(res, 'غير مصرح للطالب', 403)
+    const teacherScope = req.user.role === 'teacher' ? { teacherId: req.user._id }
+      : supervisedTeachers ? { teacherId: { $in: supervisedTeachers } } : {}
     const [memorized, revised, evaluations, reports] = await Promise.all([
       Memorization.find({ studentId, ...teacherScope }).sort({ recordedAt: -1 }).limit(10).select('teacherId surahNumber fromAyah toAyah quality recordedAt').lean(),
       Revision.find({ studentId, ...teacherScope }).sort({ recordedAt: -1 }).limit(10).select('teacherId surahNumber fromAyah toAyah quality recordedAt').lean(),
@@ -222,8 +253,7 @@ exports.teacherOverview = async (req, res, next) => {
     if (!leader(req.user) && !supervisor(req.user)) return sendError(res, 'غير مصرح', 403)
     if (!oid(req.params.teacherId)) return sendError(res, 'المعلم غير صالح', 400)
     if (supervisor(req.user) && !(await assignedTeacherIds(req.user)).some((teacherId) => id(teacherId) === req.params.teacherId)) return sendError(res, 'المعلم خارج نطاقك', 403)
-    if (manager(req.user) && !await Assignment.exists({ team: 'academic', teacherId: req.params.teacherId,
-      startsAt: { $lte: new Date() }, $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })) return sendError(res, 'المعلم خارج تكليفات الفريق', 403)
+    if (manager(req.user) && !(await academicTeacherIds()).some((teacherId) => id(teacherId) === req.params.teacherId)) return sendError(res, 'المعلم خارج تكليفات الفريق', 403)
     const teacher = await User.findOne({ _id: req.params.teacherId, role: 'teacher' }).select('firstNameAr lastNameAr specializations audienceCategories bioAr').lean()
     if (!teacher) return sendError(res, 'المعلم غير موجود', 404)
     const reportFilter = { teacherId: teacher._id, ...(supervisor(req.user) ? { supervisorId: req.user._id } : {}), status: { $in: ['submitted', 'reviewed'] } }
@@ -272,8 +302,7 @@ exports.createDevelopment = async (req, res, next) => {
     const type = personRow?.role === 'teacher' ? 'teacher' : personRow?.supervisionTeam === 'academic' && personRow?.supervisionPosition === 'supervisor' ? 'supervisor' : null
     if (!type || !personRow.isActive) return sendError(res, 'الشخص خارج فريق المتابعة الأكاديمية', 400)
     if (type === 'teacher' && !admin(req.user)) {
-      const active = await Assignment.exists({ team: 'academic', teacherId: personId, startsAt: { $lte: new Date() },
-        $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })
+      const active = (await academicTeacherIds()).some((teacherId) => id(teacherId) === id(personId))
       if (!active) return sendError(res, 'المعلم خارج تكليفات الفريق', 403)
     }
     if (sourceObservationId) {
@@ -308,8 +337,7 @@ exports.updateDevelopment = async (req, res, next) => {
 }
 
 async function directiveRecipients(body) {
-  const assignments = await Assignment.distinct('teacherId', { team: 'academic', startsAt: { $lte: new Date() },
-    $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })
+  const assignments = await academicTeacherIds()
   if (body.targetType === 'person') {
     if (!oid(body.targetId)) return []
     return User.find({ _id: body.targetId, isActive: true,
@@ -330,8 +358,7 @@ exports.searchDirectiveRecipients = async (req, res, next) => {
     const search = String(req.query.search || '').trim().slice(0, 80)
     if (search.length < 2) return sendSuccess(res, [])
     const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const assignments = await Assignment.distinct('teacherId', { team: 'academic', startsAt: { $lte: new Date() },
-      $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })
+    const assignments = await academicTeacherIds()
     const rows = await User.find({ isActive: true, $and: [
       { $or: [{ _id: { $in: assignments }, role: 'teacher' }, { supervisionTeam: 'academic', supervisionPosition: 'supervisor' }] },
       { $or: [{ firstNameAr: new RegExp(safe, 'i') }, { lastNameAr: new RegExp(safe, 'i') }, { email: new RegExp(safe, 'i') }] },

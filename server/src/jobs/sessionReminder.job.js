@@ -1,6 +1,7 @@
 const cron = require('node-cron')
 const Session = require('../models/Session')
 const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const Shift = require('../models/SupervisionShift')
 const User = require('../models/User')
 const { createNotification } = require('../services/notification.service')
@@ -24,6 +25,28 @@ function reminderWindows(now) {
 }
 
 async function recipientsFor(sessions, from, to) {
+  const complex = await Assignment.exists({ scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] })
+  if (complex) {
+    const teams = await Promise.all(['academic', 'administrative'].map((team) => coverage.loadCoverage(team, sessions)))
+    const owners = sessions.flatMap((session) => teams.map(({ assignments, memberships }, index) => {
+      const row = coverage.resolveOwner(session, assignments, memberships)
+      return row ? { ...row, team: ['academic', 'administrative'][index] } : null
+    }).filter(Boolean))
+    const supervisors = [...new Set(owners.map((row) => id(row.supervisorId)))]
+    const [shifts, users] = await Promise.all([
+      supervisors.length ? Shift.find({ members: { $in: supervisors }, cancelledAt: null, startsAt: { $lt: to }, endsAt: { $gt: from } }).select('team members startsAt endsAt').lean() : [],
+      supervisors.length ? User.find({ _id: { $in: supervisors }, isActive: true, supervisionPosition: 'supervisor' }).select('_id supervisionTeam supervisionPosition').lean() : [],
+    ])
+    return (session) => teams.flatMap(({ assignments, memberships }, index) => {
+      const team = ['academic', 'administrative'][index]
+      const owner = coverage.resolveOwner(session, assignments, memberships)
+      if (!owner) return []
+      const user = users.find((row) => id(row) === id(owner.supervisorId) && row.supervisionTeam === team)
+      const at = session.scheduledAt
+      if (!user || !shifts.some((row) => row.team === team && row.startsAt <= at && row.endsAt > at && row.members.some((member) => id(member) === id(user)))) return []
+      return [{ userId: user._id, actionUrl: `/admin/supervision/${team}` }]
+    })
+  }
   const teacherIds = [...new Set(sessions.map((session) => id(session.teacherId)).filter(Boolean))]
   const assignments = teacherIds.length ? await Assignment.find({ teacherId: { $in: teacherIds }, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] }).select('team teacherId supervisorId startsAt endsAt').lean() : []
   const supervisors = [...new Set(assignments.map((row) => id(row.supervisorId)))]

@@ -32,7 +32,7 @@ const response = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn() })
 const staff = () => ({ _id: staffId, role: 'staff', supervisionTeam: 'administrative', supervisionPosition: 'supervisor' })
 const req = (user = staff()) => ({ user, params: { shiftId }, query: {}, body: {}, ip: '127.0.0.1' })
 
-beforeEach(() => { jest.clearAllMocks(); Settings.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ reportGraceMinutes: 120 }) }) }) })
+beforeEach(() => { jest.clearAllMocks(); Assignment.exists.mockResolvedValue(false); Settings.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ reportGraceMinutes: 120 }) }) }) })
 
 test('supervisor cannot read another member report even in the same shift', async () => {
   Shift.findById.mockReturnValue({ lean: async () => shift() })

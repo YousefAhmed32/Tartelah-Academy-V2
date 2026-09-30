@@ -12,6 +12,7 @@ import ErrorBoundary from '../components/shared/ErrorBoundary.jsx'
 import { useNotificationInit } from '../hooks/useNotificationInit.js'
 import api from '../utils/api.js'
 import { ROUTES, getFileUrl } from '../config/constants.js'
+import { BookOpenCheck, CalendarDays, ClipboardCheck, FileText, LayoutDashboard, ListTodo, Settings2, ShieldCheck, UsersRound } from 'lucide-react'
 
 function ContentFallback() {
   return (
@@ -34,9 +35,10 @@ const NAV_GROUPS = [
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
       {
-        to: ROUTES.ADMIN_SUPERVISION, label: 'الإشراف', permission: 'supervision.view',
+        to: ROUTES.SUPERVISION_ACADEMIC_MANAGER, label: 'الإشراف الأكاديمي', permission: 'supervision.manage',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.8"/><circle cx="5" cy="18" r="2" stroke="currentColor" strokeWidth="1.8"/><circle cx="19" cy="18" r="2" stroke="currentColor" strokeWidth="1.8"/><path d="M12 7v5M12 12l-7 4M12 12l7 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
       },
+      { to: ROUTES.SUPERVISION_ADMINISTRATIVE_MANAGER, label: 'الإشراف الإداري', permission: 'supervision.manage', icon: <ShieldCheck size={18} /> },
       {
         to: ROUTES.ADMIN_ENROLLMENTS, label: 'طلبات التسجيل', enrollment: true, permission: 'enrollments.view',
         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M14 2v6h6M9 13l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -214,7 +216,22 @@ function sidebarRoleLabel(user) {
 // of which admin page was actually open — this derives the real page title
 // from the matching nav item instead, falling back to the academy name for
 // routes with no nav entry (e.g. /admin/students/:id).
-function currentPageTitle(pathname) {
+function supervisionNav(user) {
+  const base = supervisionPath(user)
+  const academic = user.supervisionTeam === 'academic'
+  const manager = user.supervisionPosition === 'manager'
+  const item = (view, label, Icon) => ({ to: `${base}?view=${view}`, label, permission: 'supervision.view', icon: <Icon size={18} /> })
+  const work = academic ? [item('daily', 'حلقات اليوم', CalendarDays), item('academic-reports', 'تقارير المتابعة', ClipboardCheck), item('academic-learning', 'الطلاب والمناهج', BookOpenCheck), item('academic-directives', 'التوجيهات', FileText), item('exceptions', 'الحالات والتعويضات', ListTodo), item('handoff', 'تسليم الشيفت', ClipboardCheck)]
+    : [item('daily', 'حلقات اليوم', CalendarDays), item('exceptions', 'الحالات والتعويضات', ListTodo), item('new-students', 'الطلاب الجدد', UsersRound), item('handoff', 'تسليم الشيفت', ClipboardCheck)]
+  const reports = [item('periodic-metrics', 'الإحصاءات', ClipboardCheck), ...(academic ? [item('periodic-reports', 'التقارير الدورية', FileText), item('academic-search', 'البحث الأكاديمي', BookOpenCheck)] : [])]
+  const responsibilities = [item('assignments', manager ? 'التكليفات' : 'تكليفاتي', UsersRound), item('cohorts', 'مجموعات الطلاب', UsersRound), item('shifts', manager ? 'الشيفتات' : 'شيفتاتي', CalendarDays), item('people', 'الفريق', UsersRound)]
+  const management = manager ? [item('coverage', 'تغطية الحلقات', ShieldCheck), item('settings', 'السياسات', Settings2), item('activity', 'سجل التغييرات', FileText)] : []
+  return [{ label: 'مساحة العمل', items: [item('home', 'الرئيسية', LayoutDashboard), ...work] }, { label: 'التقارير', items: reports }, { label: manager ? 'إدارة الفريق' : 'مسؤولياتي', items: [...responsibilities, ...management] }]
+}
+
+function currentPageTitle(pathname, user) {
+  if (pathname.startsWith('/admin/supervision/academic')) return user?.supervisionPosition === 'supervisor' ? 'لوحة المشرف الأكاديمي' : 'الإشراف الأكاديمي'
+  if (pathname.startsWith('/admin/supervision/administrative')) return user?.supervisionPosition === 'supervisor' ? 'لوحة المشرف الإداري' : 'الإشراف الإداري'
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
       if (item.end ? pathname === item.to : pathname.startsWith(item.to)) return item.label
@@ -229,6 +246,12 @@ export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const workspaceMatch = location.pathname.match(/^\/admin\/supervision\/(academic|administrative)(-manager)?$/)
+  const adminWorkspace = workspaceMatch && (user?.isPrimaryAdmin || user?.role === 'admin')
+  const navigationUser = adminWorkspace ? { ...user, supervisionTeam: workspaceMatch[1], supervisionPosition: workspaceMatch[2] ? 'manager' : 'supervisor' } : user
+  const workspaceNav = navigationUser?.supervisionTeam ? supervisionNav(navigationUser) : null
+  const navGroups = workspaceNav ? [...(adminWorkspace ? [{ label: 'الإدارة العامة', items: [NAV_GROUPS[0].items[0], NAV_GROUPS[0].items[2], NAV_GROUPS[0].items[3]] }] : []), ...workspaceNav] : NAV_GROUPS
+  const mobileNav = workspaceNav ? workspaceNav[0].items.slice(0, 4) : MOBILE_NAV
   useNotificationInit()
 
   const { data: pendingEnrollments = 0 } = useQuery({
@@ -316,7 +339,7 @@ export default function AdminLayout() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 custom-scroll-light">
-        {NAV_GROUPS.map((group, gi) => (
+        {navGroups.map((group, gi) => (
           <div key={gi} className={gi > 0 ? 'pt-4' : ''}>
             <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               {group.label}
@@ -327,7 +350,7 @@ export default function AdminLayout() {
                 to={item.to === ROUTES.ADMIN_SUPERVISION ? supervisionPath(user) : item.to}
                 end={item.end}
                 onClick={() => setDrawerOpen(false)}
-                className={navLinkClass}
+                className={({ isActive }) => navLinkClass({ isActive: isActive && (!item.to.includes('?view=') || (new URLSearchParams(location.search).get('view') || 'home') === item.to.split('?view=')[1]) })}
               >
                 <span className="flex-none opacity-70">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
@@ -409,6 +432,7 @@ export default function AdminLayout() {
         {/* Top Header */}
         <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 h-16 bg-white border-b border-gray-200">
           <button
+            aria-label="فتح قائمة التنقل"
             onClick={() => setDrawerOpen(true)}
             className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
           >
@@ -418,7 +442,7 @@ export default function AdminLayout() {
           </button>
 
           <div className="font-heading font-bold text-base text-gray-900 hidden lg:block truncate">
-            {currentPageTitle(location.pathname)}
+            {currentPageTitle(location.pathname, user)}
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -458,13 +482,13 @@ export default function AdminLayout() {
           className="lg:hidden fixed bottom-0 inset-x-0 z-20 flex bg-white border-t border-gray-200"
           style={{ direction: 'rtl' }}
         >
-          {MOBILE_NAV.filter((item) => isNavItemVisible(item, hasPermission)).map((item) => (
+          {mobileNav.filter((item) => isNavItemVisible(item, hasPermission)).map((item) => (
             <NavLink
               key={item.to}
               to={item.to === ROUTES.ADMIN_SUPERVISION ? supervisionPath(user) : item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-semibold transition-colors ${isActive ? 'text-violet-700' : 'text-gray-400'}`
+                `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-semibold transition-colors ${isActive && (!item.to.includes('?view=') || (new URLSearchParams(location.search).get('view') || 'home') === item.to.split('?view=')[1]) ? 'text-violet-700' : 'text-gray-400'}`
               }
             >
               {item.icon}

@@ -5,12 +5,14 @@ jest.mock('../../models/SupervisionAssignment')
 jest.mock('../../models/StudentStartFollowup')
 jest.mock('../../services/notification.service')
 jest.mock('../../services/audit.service')
+jest.mock('../../services/supervisionCoverage.service')
 
 const Session = require('../../models/Session')
 const Rule = require('../../models/ScheduleRule')
 const Assignment = require('../../models/SupervisionAssignment')
 const Followup = require('../../models/StudentStartFollowup')
 const controller = require('../studentStartFollowup.controller')
+const coverage = require('../../services/supervisionCoverage.service')
 
 const studentId = '507f1f77bcf86cd799439011'
 const teacherId = '507f1f77bcf86cd799439012'
@@ -19,7 +21,7 @@ const staffId = '507f1f77bcf86cd799439014'
 const session = () => ({ _id: sessionId, studentId, teacherId, status: 'completed', scheduledAt: new Date(Date.now() - 86400000), completedAt: new Date(Date.now() - 86400000) })
 const response = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn() })
 
-beforeEach(() => jest.clearAllMocks())
+beforeEach(() => { jest.clearAllMocks(); coverage.ownerForSession.mockResolvedValue(null) })
 
 test('student feedback is offered only after an actual completed lesson', async () => {
   Session.findOne.mockReturnValue({ sort: () => ({ select: () => ({ lean: async () => null }) }) })

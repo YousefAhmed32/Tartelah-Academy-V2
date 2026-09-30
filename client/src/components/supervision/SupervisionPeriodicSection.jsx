@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Search, BarChart3, FileText, CheckCircle2, AlertCircle } from 'lucide-react'
 import { supervisionService } from '../../services/supervision.service.js'
+import { academyDateKey } from '../../utils/date.js'
 import AcademicRecognitionPanel from './AcademicRecognitionPanel.jsx'
 
 const input = 'min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-violet-500'
@@ -11,7 +12,7 @@ const button = 'min-h-11 rounded-xl bg-violet-600 px-4 text-sm font-bold text-wh
 const name = (person) => person ? `${person.firstNameAr || ''} ${person.lastNameAr || ''}`.trim() : '—'
 const date = (value) => value ? new Date(value).toLocaleString('ar-EG-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 const cairoDay = (value) => new Date(value).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })
-const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) }
+const today = () => academyDateKey(new Date())
 const startOf = (value, type) => { const d = new Date(`${value}T12:00:00Z`); if (type === 'R3') d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); if (type === 'R4') d.setUTCDate(1); return d.toISOString().slice(0, 10) }
 const analysisFields = [['achievements', 'إنجازات الإشراف'], ['challenges', 'المشكلات والتحديات'], ['actions', 'الإجراءات المتخذة'],
   ['recommendations', 'التوصيات والحلول'], ['generalNotes', 'ملاحظات عامة'], ['strength', 'أبرز نقطة قوة'], ['improvement', 'أهم نقطة تطوير'], ['nextGoal', 'هدف الفترة القادمة']]

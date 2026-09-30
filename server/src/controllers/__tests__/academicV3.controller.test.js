@@ -15,6 +15,7 @@ jest.mock('../../models/AcademicDirectiveReceipt')
 jest.mock('../../models/AcademicDevelopmentCase')
 jest.mock('../../services/audit.service')
 jest.mock('../../services/notification.service')
+jest.mock('../../services/supervisionCoverage.service')
 
 const Plan = require('../../models/StudentAcademicPlan')
 const Assignment = require('../../models/SupervisionAssignment')
@@ -28,6 +29,7 @@ const Subject = require('../../models/TeachingSubject')
 const Receipt = require('../../models/AcademicDirectiveReceipt')
 const Development = require('../../models/AcademicDevelopmentCase')
 const controller = require('../academicV3.controller')
+const coverage = require('../../services/supervisionCoverage.service')
 
 const studentId = '507f1f77bcf86cd799439011'
 const otherId = '507f1f77bcf86cd799439012'
@@ -78,6 +80,24 @@ test('student overview limits a teacher to their own memorization, revision and 
   expect(res.json.mock.calls[0][0].data.observations).toEqual([])
 })
 
+test('student overview limits an academic supervisor to teacher pairs they currently own', async () => {
+  const supervisor = { _id: managerId, role: 'staff', supervisionTeam: 'academic', supervisionPosition: 'supervisor', hasPermission: () => true }
+  ScheduleRule.find.mockReturnValue({ select: () => ({ lean: async () => [{ teacherId }, { teacherId: otherId }] }) })
+  coverage.loadCoverage.mockResolvedValue({ assignments: [], memberships: [] })
+  coverage.resolveOwner.mockImplementation((session) => ({ supervisorId: String(session.teacherId) === teacherId ? managerId : otherId }))
+  Memorization.find.mockReturnValue(historyChain([]))
+  Revision.find.mockReturnValue(historyChain([]))
+  Evaluation.find.mockReturnValue(historyChain([]))
+  const Observation = require('../../models/AcademicObservationReport')
+  Observation.find.mockReturnValue(historyChain([]))
+  const res = response()
+  await controller.studentOverview({ user: supervisor, params: { studentId } }, res, jest.fn())
+  for (const model of [Memorization, Revision, Evaluation]) {
+    expect(model.find).toHaveBeenCalledWith(expect.objectContaining({ studentId, teacherId: { $in: [teacherId] } }))
+  }
+  expect(res.json.mock.calls[0][0].success).toBe(true)
+})
+
 test('plan rejects an insecure material link before writing', async () => {
   const res = response()
   await controller.savePlan({ user: manager, body: { studentId, subjectKey: 'hifz', level: 'أول', goal: 'جزء',
@@ -87,7 +107,7 @@ test('plan rejects an insecure material link before writing', async () => {
 })
 
 test('individual directive excludes teachers outside active academic assignments', async () => {
-  Assignment.distinct.mockResolvedValue([teacherId])
+  Assignment.distinct.mockImplementation((field) => Promise.resolve(field === 'teacherId' ? [teacherId] : []))
   User.find.mockReturnValue({ select: () => ({ lean: async () => [] }) })
   const res = response()
   await controller.createDirective({ user: manager, body: { title: 'متابعة', body: 'يرجى مراجعة الحصة', targetType: 'person', targetId: otherId } }, res, jest.fn())
@@ -110,6 +130,7 @@ test('staff account without supervision permission cannot read academic directiv
 })
 
 test('manager cannot open a development case for an unassigned teacher', async () => {
+  Assignment.distinct.mockResolvedValue([])
   User.findById.mockReturnValue({ select: () => ({ lean: async () => ({ role: 'teacher', isActive: true }) }) })
   Assignment.exists.mockResolvedValue(false)
   const res = response()
@@ -127,8 +148,10 @@ test('improvement cannot be marked complete without a recorded outcome', async (
 
 test('supervisor proposal keeps the published student plan unchanged', async () => {
   const supervisor = { _id: managerId, role: 'staff', supervisionTeam: 'academic', supervisionPosition: 'supervisor', hasPermission: () => true }
-  Assignment.distinct.mockResolvedValue([teacherId])
-  ScheduleRule.exists.mockResolvedValue(true)
+  Assignment.distinct.mockImplementation((field) => Promise.resolve(field === 'teacherId' ? [teacherId] : []))
+  ScheduleRule.find.mockReturnValue({ select: () => ({ lean: async () => [{ teacherId }] }) })
+  coverage.loadCoverage.mockResolvedValue({ assignments: [], memberships: [] })
+  coverage.resolveOwner.mockReturnValue({ supervisorId: managerId })
   User.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ _id: studentId }) }) })
   Subject.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ key: 'hifz' }) }) })
   const row = { _id: otherId, status: 'published', goal: 'الهدف المنشور', milestones: [], save: jest.fn() }
@@ -153,8 +176,10 @@ test('manager approval applies pending revision and clears it', async () => {
 
 test('proposed plan revision retains a previously recorded external test', async () => {
   const supervisor = { _id: managerId, role: 'staff', supervisionTeam: 'academic', supervisionPosition: 'supervisor', hasPermission: () => true }
-  Assignment.distinct.mockResolvedValue([teacherId])
-  ScheduleRule.exists.mockResolvedValue(true)
+  Assignment.distinct.mockImplementation((field) => Promise.resolve(field === 'teacherId' ? [teacherId] : []))
+  ScheduleRule.find.mockReturnValue({ select: () => ({ lean: async () => [{ teacherId }] }) })
+  coverage.loadCoverage.mockResolvedValue({ assignments: [], memberships: [] })
+  coverage.resolveOwner.mockReturnValue({ supervisorId: managerId })
   User.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ _id: studentId }) }) })
   Subject.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ key: 'hifz' }) }) })
   const oldStep = { _id: otherId, title: 'الجزء الأول', externalTest: { result: 'ناجح' }, toObject() { return { _id: this._id, title: this.title, externalTest: this.externalTest } } }

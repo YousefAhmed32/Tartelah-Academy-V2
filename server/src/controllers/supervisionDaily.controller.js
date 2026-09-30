@@ -8,6 +8,7 @@ const Action = require('../models/SupervisionDailyAction')
 const Dispatch = require('../models/SupervisionDayDispatch')
 const AcademicReport = require('../models/AcademicObservationReport')
 const Settings = require('../models/SupervisionSettings')
+const coverage = require('../services/supervisionCoverage.service')
 const { sendSuccess, sendError, sendPaginated } = require('../utils/response')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { logAction } = require('../services/audit.service')
@@ -60,6 +61,11 @@ function sessionFilter(from, to, assignments, user) {
 async function canAccessSession(user, team, session) {
   if (isAdmin(user)) return true
   if (user.supervisionTeam !== team) return false
+  const complex = await Assignment.countDocuments({ team, scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] })
+  if (complex) {
+    const owner = await coverage.ownerForSession(team, session)
+    return !!owner && (isManager(user) || id(owner.supervisorId) === id(user))
+  }
   return !!await Assignment.exists({
     team, teacherId: { $in: [session.teacherId, session.supervisionOriginalTeacherId].filter(Boolean) }, ...(!isManager(user) ? { supervisorId: user._id } : {}),
     startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }],
@@ -72,22 +78,27 @@ exports.list = async (req, res, next) => {
     const range = period(req, res); if (!range) return
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1)
     const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 20))
-    const assignments = await assignmentsFor(team, range.from, range.to, req.user)
-    const filter = sessionFilter(range.from, range.to, assignments, req.user)
+    const lateStart = req.query.lateStart === 'true' && team === 'administrative'
+    const complex = await Assignment.countDocuments({ team, scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] })
+    const assignments = complex ? [] : await assignmentsFor(team, range.from, range.to, req.user)
+    const filter = complex ? null : sessionFilter(range.from, range.to, assignments, req.user)
+    if (filter && lateStart) { filter.status = { $in: ['scheduled', 'missed'] }; filter.teacherStartedAt = null }
     if (req.query.sessionId) {
       if (!mongoose.isValidObjectId(req.query.sessionId)) return sendError(res, 'الحصة غير صالحة', 400)
-      filter._id = req.query.sessionId
-      delete filter.status
+      if (filter) { filter._id = req.query.sessionId; delete filter.status }
     }
-    const [rows, total] = await Promise.all([
+    const legacyResult = complex ? null : await Promise.all([
       Session.find(filter).select('_id teacherId supervisionOriginalTeacherId studentId titleAr scheduledAt durationMinutes status meetingLink teacherStartedAt studentLinkOpenedAt teacherLinkOpenedAt actualStartAt completedAt quranReportRequired isMakeup administrativeReadiness')
         .sort({ scheduledAt: 1, _id: 1 }).skip((page - 1) * limit).limit(limit)
         .populate('teacherId', 'firstNameAr lastNameAr').populate('studentId', 'firstNameAr lastNameAr').lean(),
       Session.countDocuments(filter),
     ])
+    const resolvedResult = complex ? await coverage.listOwnedSessions({ team, ...range, userId: req.user._id, manager: isManager(req.user), admin: isAdmin(req.user), page, limit, lateStart, sessionId: req.query.sessionId ? new mongoose.Types.ObjectId(req.query.sessionId) : null }) : null
+    const rows = complex ? await Session.populate(resolvedResult.rows, [{ path: 'teacherId', select: 'firstNameAr lastNameAr' }, { path: 'studentId', select: 'firstNameAr lastNameAr' }]) : legacyResult[0]
+    const total = complex ? resolvedResult.total : legacyResult[1]
     const sessionIds = rows.map((row) => row._id)
     const teacherIds = [...new Set(rows.flatMap((row) => [id(row.teacherId), id(row.supervisionOriginalTeacherId)].filter(Boolean)))]
-    const relatedAssignments = isAdmin(req.user) && teacherIds.length ? await Assignment.find({ team, teacherId: { $in: teacherIds }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] }).select('teacherId supervisorId startsAt endsAt primary').lean() : assignments
+    const relatedAssignments = complex ? rows.flatMap((row) => row.effectiveOwner?.length ? [{ ...row.effectiveOwner[0], sessionId: row._id }] : []) : isAdmin(req.user) && teacherIds.length ? await Assignment.find({ team, teacherId: { $in: teacherIds }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] }).select('teacherId supervisorId startsAt endsAt primary').lean() : assignments
     const supervisorIds = [...new Set(relatedAssignments.map((row) => id(row.supervisorId)))]
     const [reports, actions, supervisors, shifts, dispatch, academicReports, academicSettings] = await Promise.all([
       sessionIds.length ? QuranSessionReport.find({ sessionId: { $in: sessionIds } }).select('sessionId status submittedAt').lean() : [],
@@ -106,7 +117,7 @@ exports.list = async (req, res, next) => {
     for (const report of academicReports) academicBySession.set(id(report.sessionId), [...(academicBySession.get(id(report.sessionId)) || []), report])
     const data = rows.map((row) => {
       const at = row.scheduledAt
-      const owners = relatedAssignments.filter((assignment) => [id(row.teacherId), id(row.supervisionOriginalTeacherId)].includes(id(assignment.teacherId)) && activeAt(assignment, at)).map((assignment) => {
+      const owners = relatedAssignments.filter((assignment) => complex ? id(assignment.sessionId) === id(row) : [id(row.teacherId), id(row.supervisionOriginalTeacherId)].includes(id(assignment.teacherId)) && activeAt(assignment, at)).map((assignment) => {
         const person = personById.get(id(assignment.supervisorId))
         return person ? { ...person, primary: assignment.primary, onShift: shifts.some((shift) => shift.startsAt <= at && shift.endsAt > at && shift.members.some((member) => id(member) === id(person))) } : null
       }).filter(Boolean)
@@ -134,23 +145,39 @@ exports.dispatch = async (req, res, next) => {
   try {
     const range = period(req, res); if (!range) return
     if (isAdmin(req.user) ? !req.user.hasPermission('supervision.manage') : req.user.supervisionTeam !== 'administrative') return sendError(res, 'التسليم من مسؤول الإشراف الإداري فقط', 403)
-    const adminAssignments = await assignmentsFor('administrative', range.from, range.to, req.user)
-    const filter = sessionFilter(range.from, range.to, adminAssignments, req.user)
-    const [sessionCount, currentTeacherIds, originalTeacherIds] = await Promise.all([
-      Session.countDocuments(filter), Session.distinct('teacherId', filter), Session.distinct('supervisionOriginalTeacherId', filter),
-    ])
-    const teacherIds = [...new Set([...currentTeacherIds, ...originalTeacherIds].filter(Boolean).map(id))]
-    if (!sessionCount) return sendError(res, 'لا توجد حلقات لتسليمها في هذه الفترة', 409)
-    const academicAssignments = teacherIds.length ? await Assignment.find({ team: 'academic', teacherId: { $in: teacherIds }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] }).select('teacherId supervisorId startsAt endsAt').lean() : []
-    const byTeacher = new Map()
-    for (const assignment of academicAssignments) byTeacher.set(id(assignment.teacherId), [...(byTeacher.get(id(assignment.teacherId)) || []), assignment])
+    const complex = await Assignment.exists({ scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] })
+    let sessionCount = 0
     const recipientIds = new Set()
-    const cursor = Session.find(filter).select('teacherId supervisionOriginalTeacherId scheduledAt').lean().cursor({ batchSize: 250 })
-    for await (const session of cursor) {
-      for (const teacherId of [id(session.teacherId), id(session.supervisionOriginalTeacherId)].filter(Boolean)) {
-        for (const row of byTeacher.get(teacherId) || []) if (activeAt(row, session.scheduledAt)) recipientIds.add(id(row.supervisorId))
+    if (complex) {
+      const pipeline = [
+        { $match: { scheduledAt: { $gte: range.from, $lt: range.to }, status: { $nin: ['cancelled', 'rescheduled'] } } },
+        ...coverage.ownershipStages('administrative'),
+        { $match: isAdmin(req.user) || isManager(req.user) ? { 'effectiveOwner.0': { $exists: true } } : { 'effectiveOwner.0.supervisorId': req.user._id } },
+        ...coverage.ownershipStages('academic'),
+        { $group: { _id: null, count: { $sum: 1 }, recipients: { $addToSet: { $arrayElemAt: ['$effectiveOwner.supervisorId', 0] } } } },
+      ]
+      const [summary] = await Session.aggregate(pipeline).allowDiskUse(true)
+      sessionCount = summary?.count || 0
+      for (const person of summary?.recipients || []) if (person) recipientIds.add(id(person))
+    } else {
+      const adminAssignments = await assignmentsFor('administrative', range.from, range.to, req.user)
+      const filter = sessionFilter(range.from, range.to, adminAssignments, req.user)
+      const [count, currentTeacherIds, originalTeacherIds] = await Promise.all([
+        Session.countDocuments(filter), Session.distinct('teacherId', filter), Session.distinct('supervisionOriginalTeacherId', filter),
+      ])
+      sessionCount = count
+      const teacherIds = [...new Set([...currentTeacherIds, ...originalTeacherIds].filter(Boolean).map(id))]
+      const academicAssignments = teacherIds.length ? await Assignment.find({ team: 'academic', teacherId: { $in: teacherIds }, startsAt: { $lt: range.to }, $or: [{ endsAt: null }, { endsAt: { $gt: range.from } }] }).select('teacherId supervisorId startsAt endsAt').lean() : []
+      const byTeacher = new Map()
+      for (const assignment of academicAssignments) byTeacher.set(id(assignment.teacherId), [...(byTeacher.get(id(assignment.teacherId)) || []), assignment])
+      const cursor = Session.find(filter).select('teacherId supervisionOriginalTeacherId scheduledAt').lean().cursor({ batchSize: 250 })
+      for await (const session of cursor) {
+        for (const teacherId of [id(session.teacherId), id(session.supervisionOriginalTeacherId)].filter(Boolean)) {
+          for (const row of byTeacher.get(teacherId) || []) if (activeAt(row, session.scheduledAt)) recipientIds.add(id(row.supervisorId))
+        }
       }
     }
+    if (!sessionCount) return sendError(res, 'لا توجد حلقات لتسليمها في هذه الفترة', 409)
     if (sessionCount && !recipientIds.size) return sendError(res, 'لا يوجد مشرف أكاديمي مكلف بهذه الحلقات', 409)
     const supervisors = recipientIds.size ? await User.find({ _id: { $in: [...recipientIds] }, isActive: true, supervisionTeam: 'academic', supervisionPosition: 'supervisor' }).select('_id supervisionPosition').lean() : []
     if (sessionCount && !supervisors.length) return sendError(res, 'المشرفون الأكاديميون المكلفون غير نشطين', 409)
@@ -172,7 +199,7 @@ exports.createAction = async (req, res, next) => {
     const team = teamFor(req, res); if (!team) return
     const { sessionId, category, description, ownerId } = req.body || {}
     if (!mongoose.isValidObjectId(sessionId) || !['readiness', 'entry', 'link', 'message', 'teacher_report'].includes(category) || typeof description !== 'string' || !description.trim() || description.length > 1000 || !mongoose.isValidObjectId(ownerId)) return sendError(res, 'بيانات المتابعة غير صالحة', 400)
-    const session = await Session.findById(sessionId).select('teacherId supervisionOriginalTeacherId scheduledAt status').lean()
+    const session = await Session.findById(sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt status').lean()
     if (!session || ['cancelled', 'rescheduled'].includes(session.status)) return sendError(res, 'الحصة غير متاحة', 404)
     if (!await canAccessSession(req.user, team, session)) return sendError(res, 'غير مصرح لهذه الحصة', 403)
     const owner = await User.findOne({ _id: ownerId, isActive: true, supervisionTeam: team }).select('_id supervisionTeam supervisionPosition').lean()
@@ -189,7 +216,7 @@ exports.updateReadiness = async (req, res, next) => {
   try {
     if (isAdmin(req.user) ? !req.user.hasPermission('supervision.manage') : req.user.supervisionTeam !== 'administrative') return sendError(res, 'الجاهزية يتابعها الإشراف الإداري', 403)
     if (!mongoose.isValidObjectId(req.params.sessionId) || !['student', 'teacher', 'link'].includes(req.body?.aspect) || !['unknown', 'ready', 'issue'].includes(req.body?.state)) return sendError(res, 'بيانات الجاهزية غير صالحة', 400)
-    const session = await Session.findById(req.params.sessionId).select('teacherId supervisionOriginalTeacherId scheduledAt status meetingLink').lean()
+    const session = await Session.findById(req.params.sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt status meetingLink').lean()
     if (!session || !['scheduled', 'ongoing'].includes(session.status)) return sendError(res, 'فحص الجاهزية متاح قبل الحصة وأثناءها فقط', 409)
     if (!await canAccessSession(req.user, 'administrative', session)) return sendError(res, 'غير مصرح لهذه الحصة', 403)
     if (req.body.aspect === 'link' && req.body.state === 'ready' && !session.meetingLink) return sendError(res, 'أضف رابط الحصة قبل تأكيد جاهزيته', 409)
@@ -220,7 +247,7 @@ exports.remindTeacherReport = async (req, res, next) => {
   try {
     const team = teamFor(req, res); if (!team) return
     if (!mongoose.isValidObjectId(req.params.sessionId)) return sendError(res, 'الحصة غير صالحة', 400)
-    const session = await Session.findById(req.params.sessionId).select('teacherId supervisionOriginalTeacherId scheduledAt status quranReportRequired').lean()
+    const session = await Session.findById(req.params.sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt status quranReportRequired').lean()
     if (!session || session.status !== 'completed' || session.quranReportRequired === false) return sendError(res, 'لا يوجد تقرير مستحق لهذه الحصة', 404)
     if (!await canAccessSession(req.user, team, session)) return sendError(res, 'غير مصرح لهذه الحصة', 403)
     const report = await QuranSessionReport.findOne({ sessionId: session._id }).select('status').lean()

@@ -31,6 +31,8 @@ const req = () => ({ user: manager(), query: { team: 'academic', from: '2026-10-
 
 beforeEach(() => {
   jest.clearAllMocks()
+  Assignment.exists.mockResolvedValue(false)
+  Assignment.countDocuments.mockResolvedValue(0)
   AcademicReport.find.mockReturnValue({ select: () => ({ lean: async () => [] }) })
   Settings.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ reportGraceMinutes: 120 }) }) })
 })

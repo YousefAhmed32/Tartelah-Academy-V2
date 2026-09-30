@@ -22,6 +22,7 @@ import DirectRenewalModal from '../../components/admin/DirectRenewalModal.jsx'
 import WalletOperationsModal from '../../components/admin/WalletOperationsModal.jsx'
 import QuranReportDetailModal from '../../components/admin/QuranReportDetailModal.jsx'
 import EditScheduleRuleModal from '../../components/admin/EditScheduleRuleModal.jsx'
+import SupervisionProfileCard from '../../components/supervision/SupervisionProfileCard.jsx'
 import { formatDateAr, formatDateTimeAr } from '../../utils/date.js'
 import { ROUTES, getFileUrl, DAYS_OF_WEEK } from '../../config/constants.js'
 import { quranReportService } from '../../services/quranReport.service.js'
@@ -70,6 +71,7 @@ const TOP_TABS = [
   { key: 'overview', label: 'نظرة عامة', Icon: LayoutGrid },
   { key: 'subscription', label: 'الاشتراك والمحفظة', Icon: Wallet },
   { key: 'academic', label: 'الأكاديمي', Icon: BookOpen },
+  { key: 'supervision', label: 'الإشراف والخطة', Icon: BookOpen, permission: 'supervision.view' },
   { key: 'transfers', label: 'النقل', Icon: ArrowLeftRight, permission: 'transfers.view' },
   { key: 'account', label: 'الحساب', Icon: User },
 ]
@@ -1181,7 +1183,8 @@ export default function AdminStudentDetailPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [transferOpen, setTransferOpen] = useState(false)
-  const { hasPermission } = useAuthStore()
+  const { hasPermission, user } = useAuthStore()
+  const canViewSupervision = (user?.isPrimaryAdmin || user?.role === 'admin') && hasPermission('supervision.view')
   const qc = useQueryClient()
 
   const { data: studentData, isLoading: loadStudent } = useQuery({
@@ -1264,7 +1267,7 @@ export default function AdminStudentDetailPage() {
         </div>
 
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
-          {TOP_TABS.filter((t) => !t.permission || hasPermission(t.permission)).map((t) => (
+          {TOP_TABS.filter((t) => (!t.permission || hasPermission(t.permission)) && (t.key !== 'supervision' || canViewSupervision)).map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-bold whitespace-nowrap transition-all ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
               <t.Icon size={14} /> {t.label}
@@ -1273,9 +1276,12 @@ export default function AdminStudentDetailPage() {
         </div>
       </div>
 
+      {canViewSupervision && tab !== 'supervision' && <SupervisionProfileCard kind="student" id={id} />}
+
       {tab === 'overview' && <OverviewTab student={student} assignedTeacher={assignedTeacher} subscription={sub} />}
       {tab === 'subscription' && <SubscriptionWalletTab studentId={id} student={student} subscription={sub} enrollmentRequests={enrollmentRequests} assignedTeacher={assignedTeacher} />}
       {tab === 'academic' && <AcademicTab studentId={id} recentSessions={recentSessions} academics={academics} academicsLoading={loadAcademics} />}
+      {tab === 'supervision' && canViewSupervision && <SupervisionProfileCard kind="student" id={id} full />}
       {tab === 'transfers' && hasPermission('transfers.view') && (
         <TransfersTab studentId={id} canTransfer={hasPermission('transfers.execute')} subscriptionActive={sub?.status === 'active'} onOpenTransfer={() => setTransferOpen(true)} />
       )}

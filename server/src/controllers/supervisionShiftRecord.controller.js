@@ -14,6 +14,7 @@ const AcademicReport = require('../models/AcademicObservationReport')
 const { sendError, sendSuccess } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 const { createNotifications } = require('../services/notification.service')
+const { ownershipStages } = require('../services/supervisionCoverage.service')
 
 const id = (value) => String(value?._id || value || '')
 const isAdmin = (user) => user.isPrimaryAdmin || user.role === 'admin' && user.hasPermission('supervision.view')
@@ -69,10 +70,26 @@ function exceptionFilter(shift, assignments, types) {
 }
 
 async function snapshot(shift, memberId, position) {
-  const assignments = await assignmentsFor(shift, memberId, position)
-  const filter = sessionFilter(shift, assignments)
-  const apologyFilter = exceptionFilter(shift, assignments, ['student_apology', 'teacher_apology'])
-  const absenceFilter = exceptionFilter(shift, assignments, ['student_absence', 'teacher_absence'])
+  const complex = await Assignment.exists({ team: shift.team, scopeType: { $in: ['student', 'cohort'] },
+    startsAt: { $lt: shift.endsAt }, $or: [{ endsAt: null }, { endsAt: { $gt: shift.startsAt } }] })
+  let filter, apologyFilter, absenceFilter
+  if (complex) {
+    const owner = position === 'manager' ? { 'effectiveOwner.0': { $exists: true } }
+      : { 'effectiveOwner.0.supervisorId': new mongoose.Types.ObjectId(memberId) }
+    const covered = await Session.aggregate([
+      { $match: { scheduledAt: { $gte: shift.startsAt, $lt: shift.endsAt } } },
+      ...ownershipStages(shift.team), { $match: owner }, { $project: { _id: 1 } },
+    ])
+    const sessionIds = covered.map((row) => row._id)
+    filter = { _id: { $in: sessionIds } }
+    apologyFilter = { sessionId: { $in: sessionIds }, type: { $in: ['student_apology', 'teacher_apology'] } }
+    absenceFilter = { sessionId: { $in: sessionIds }, type: { $in: ['student_absence', 'teacher_absence'] } }
+  } else {
+    const assignments = await assignmentsFor(shift, memberId, position)
+    filter = sessionFilter(shift, assignments)
+    apologyFilter = exceptionFilter(shift, assignments, ['student_apology', 'teacher_apology'])
+    absenceFilter = exceptionFilter(shift, assignments, ['student_absence', 'teacher_absence'])
+  }
   const [groups, lessons, apologyCount, absenceCount, apologies, absences, observedResult] = await Promise.all([
     Session.aggregate([{ $match: filter },
       { $lookup: { from: 'attendances', localField: '_id', foreignField: 'sessionId', as: 'attendance' } },

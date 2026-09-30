@@ -96,6 +96,31 @@ export function shiftDateKey(dateKey, days) {
   return new Date(Date.UTC(year, month - 1, day + Number(days || 0))).toISOString().slice(0, 10)
 }
 
+/** Half-open UTC interval for an academy calendar day, including DST changes. */
+export function academyDayRange(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey || '')) return null
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const midnightUtc = Date.UTC(year, month - 1, day)
+  if (new Date(midnightUtc).toISOString().slice(0, 10) !== dateKey) return null
+  const wallParts = (instant) => Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: academyTimezone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(instant).map((part) => [part.type, part.value]))
+  const boundary = (key) => {
+    const [y, m, d] = key.split('-').map(Number)
+    const target = Date.UTC(y, m - 1, d)
+    let result = target
+    for (let i = 0; i < 3; i += 1) {
+      const parts = wallParts(new Date(result))
+      const wall = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+        Number(parts.hour), Number(parts.minute), Number(parts.second))
+      result += target - wall
+    }
+    return new Date(result).toISOString()
+  }
+  return { from: boundary(dateKey), to: boundary(shiftDateKey(dateKey, 1)) }
+}
+
 export function academyMonthDateRange(date = new Date()) {
   const key = academyDateKey(date)
   if (!key) return { start: '', end: '' }

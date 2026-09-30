@@ -1,12 +1,12 @@
 const mongoose = require('mongoose')
 const Report = require('../models/AcademicPeriodicReport')
 const User = require('../models/User')
-const Assignment = require('../models/SupervisionAssignment')
 const Session = require('../models/Session')
 const ScheduleRule = require('../models/ScheduleRule')
 const Observation = require('../models/AcademicObservationReport')
 const Recognition = require('../models/AcademicRecognition')
 const { metrics, periodBounds } = require('../services/academicPeriodic.service')
+const { ownershipStages } = require('../services/supervisionCoverage.service')
 const { sendError, sendSuccess, sendPaginated } = require('../utils/response')
 const { logAction } = require('../services/audit.service')
 
@@ -34,7 +34,6 @@ function validPeriod(query) {
 async function validateAnalysis(value, supervisorId, from, to) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('التحليل غير صالح')
   const result = {}
-  let teacherScope
   for (const key of narrative) {
     if (value[key] !== undefined) {
       const cleaned = text(value[key], ['strength', 'improvement', 'nextGoal'].includes(key) ? 2000 : 4000)
@@ -57,18 +56,15 @@ async function validateAnalysis(value, supervisorId, from, to) {
       const isStudent = key.includes('Students')
       const person = await User.findOne({ _id: row.personId, role: isStudent ? 'student' : 'teacher' }).select('_id').lean()
       if (!person) throw new Error('المرشح غير موجود')
-      if (!teacherScope) teacherScope = await Assignment.distinct('teacherId', { team: 'academic', ...(supervisorId ? { supervisorId } : {}),
-        startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] })
-      const sessionFilter = { teacherId: isStudent ? { $in: teacherScope } : row.personId, scheduledAt: { $gte: from, $lt: to } }
-      if (isStudent) sessionFilter.studentId = row.personId
-      const sessions = await Session.find(sessionFilter).select('teacherId scheduledAt').limit(200).lean()
-      let inScope = false
-      for (const session of sessions) {
-        if (await Assignment.exists({ team: 'academic', teacherId: session.teacherId,
-          ...(supervisorId ? { supervisorId } : {}), startsAt: { $lte: session.scheduledAt },
-          $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] })) { inScope = true; break }
-      }
-      if (!inScope) throw new Error('المرشح خارج نطاق الفترة')
+      const scoped = await Session.aggregate([
+        { $match: { [isStudent ? 'studentId' : 'teacherId']: new mongoose.Types.ObjectId(row.personId),
+          scheduledAt: { $gte: from, $lt: to } } },
+        ...ownershipStages('academic'),
+        { $match: supervisorId ? { 'effectiveOwner.0.supervisorId': new mongoose.Types.ObjectId(supervisorId) }
+          : { 'effectiveOwner.0': { $exists: true } } },
+        { $limit: 1 }, { $project: { _id: 1 } },
+      ])
+      if (!scoped.length) throw new Error('المرشح خارج نطاق الفترة')
       rows.push({ personId: row.personId, reason: row.reason.trim(), evidence: (row.evidence || '').trim() })
     }
     result[key] = rows
@@ -209,22 +205,34 @@ exports.search = async (req, res, next) => {
     const regex = new RegExp(safe, 'i')
     const filter = { $or: [{ firstNameAr: regex }, { lastNameAr: regex }, { email: regex }] }
     const now = new Date()
-    const assigned = await Assignment.distinct('teacherId', { team: 'academic', ...(supervisor(req.user) ? { supervisorId: req.user._id,
-      startsAt: { $lte: now }, $or: [{ endsAt: null }, { endsAt: { $gt: now } }] } : {}) })
-    const teachers = await User.find({ ...filter, role: 'teacher', _id: { $in: assigned } }).select('firstNameAr lastNameAr').limit(5).lean()
+    const [matchedTeachers, matchedStudents] = await Promise.all([
+      User.find({ ...filter, role: 'teacher' }).select('firstNameAr lastNameAr').limit(30).lean(),
+      User.find({ ...filter, role: 'student' }).select('firstNameAr lastNameAr').limit(30).lean(),
+    ])
+    const teacherIds = matchedTeachers.map((p) => p._id)
+    const studentIds = matchedStudents.map((p) => p._id)
+    const pairMatch = [teacherIds.length && { teacherId: { $in: teacherIds } }, studentIds.length && { studentId: { $in: studentIds } }].filter(Boolean)
+    const ownedPairs = pairMatch.length ? await ScheduleRule.aggregate([
+      { $match: { status: { $in: ['active', 'paused'] }, $or: pairMatch } },
+      ...ownershipStages('academic', now),
+      { $match: supervisor(req.user) ? { 'effectiveOwner.0.supervisorId': req.user._id }
+        : { 'effectiveOwner.0': { $exists: true } } },
+      { $group: { _id: null, teachers: { $addToSet: '$teacherId' }, students: { $addToSet: '$studentId' } } },
+    ]) : []
+    const ownedTeachers = new Set((ownedPairs[0]?.teachers || []).map(id))
+    const ownedStudents = new Set((ownedPairs[0]?.students || []).map(id))
+    const teachers = matchedTeachers.filter((person) => ownedTeachers.has(id(person))).slice(0, 5)
     const supervisors = leader(req.user) ? await User.find({ ...filter, supervisionTeam: 'academic', supervisionPosition: 'supervisor' })
       .select('firstNameAr lastNameAr').limit(5).lean() : []
-    const matchedStudents = await User.find({ ...filter, role: 'student' }).select('firstNameAr lastNameAr').limit(30).lean()
-    const linkedStudents = matchedStudents.length ? await ScheduleRule.distinct('studentId', { studentId: { $in: matchedStudents.map((p) => p._id) },
-      teacherId: { $in: assigned }, status: { $in: ['active', 'paused'] } }) : []
-    const students = matchedStudents.filter((p) => linkedStudents.some((studentId) => id(studentId) === id(p))).slice(0, 5)
-    const dated = supervisor(req.user) ? await Assignment.find({ team: 'academic', supervisorId: req.user._id })
-      .select('teacherId startsAt endsAt').sort({ startsAt: -1 }).limit(500).lean() : []
-    const sessionScope = supervisor(req.user) ? { $or: dated.map((item) => ({ teacherId: item.teacherId,
-      scheduledAt: { $gte: item.startsAt, ...(item.endsAt ? { $lt: item.endsAt } : {}) } })) } : { teacherId: { $in: assigned } }
-    const sessions = dated.length || !supervisor(req.user) ? await Session.find({ ...sessionScope, titleAr: regex })
-      .select('titleAr scheduledAt teacherId studentId').sort({ scheduledAt: -1 }).limit(5).lean() : []
-    const reports = await Observation.find({ ...(supervisor(req.user) ? { supervisorId: req.user._id } : { teacherId: { $in: assigned } }),
+    const students = matchedStudents.filter((person) => ownedStudents.has(id(person))).slice(0, 5)
+    const sessions = await Session.aggregate([
+      { $match: { titleAr: regex } }, ...ownershipStages('academic'),
+      { $match: supervisor(req.user) ? { 'effectiveOwner.0.supervisorId': req.user._id }
+        : { 'effectiveOwner.0': { $exists: true } } },
+      { $sort: { scheduledAt: -1 } }, { $limit: 5 },
+      { $project: { titleAr: 1, scheduledAt: 1, teacherId: 1, studentId: 1 } },
+    ])
+    const reports = await Observation.find({ ...(supervisor(req.user) ? { supervisorId: req.user._id } : {}),
       $or: [{ observations: regex }, { strengths: regex }, { improvements: regex }] }).select('sessionId scheduledAt supervisorId').sort({ scheduledAt: -1 }).limit(5).lean()
     sendSuccess(res, { students, teachers, supervisors, sessions, reports })
   } catch (error) { next(error) }

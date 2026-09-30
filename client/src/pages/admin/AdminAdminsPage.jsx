@@ -297,8 +297,9 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
         <Input label="كلمة مرور مخصصة (اختياري — سيتم توليدها تلقائياً إن تُركت فارغة)" type="password" variant="light" value={form.password} onChange={(e) => set('password', e.target.value)} />
 
         {form.role && !form.supervisionTeam && (
-          <div>
-            <label className="text-sm font-semibold text-brand-textBody mb-1.5 block">الصلاحيات</label>
+          <details className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-textBody">تخصيص الصلاحيات المتقدمة (اختياري)</summary>
+            <p className="mt-2 text-xs text-gray-600">اختيار الدور يضبط الصلاحيات الافتراضية تلقائيًا. استخدم التخصيص فقط لحالة استثنائية.</p>
             <PermissionSelector
               allPermissions={allPermissions}
               actorPermissions={actor.permissions}
@@ -306,7 +307,7 @@ function CreateAccountModal({ open, onClose, roles, allPermissions, actor, onCre
               selected={form.permissions}
               onChange={(v) => set('permissions', v)}
             />
-          </div>
+          </details>
         )}
 
         <div>

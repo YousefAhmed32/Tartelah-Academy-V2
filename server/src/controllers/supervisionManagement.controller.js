@@ -3,6 +3,8 @@ const User = require('../models/User')
 const Session = require('../models/Session')
 const Shift = require('../models/SupervisionShift')
 const Assignment = require('../models/SupervisionAssignment')
+const CohortMember = require('../models/SupervisionCohortMember')
+const coverageService = require('../services/supervisionCoverage.service')
 const Settings = require('../models/SupervisionSettings')
 const TeachingSubject = require('../models/TeachingSubject')
 const AuditLog = require('../models/AuditLog')
@@ -49,23 +51,30 @@ exports.coverage = async (req, res, next) => {
     // supervision roster. The admin can audit academy-wide gaps, including
     // teachers who have no assignment in either team yet.
     if (!isAdmin(req.user)) {
-      const rosterTeacherIds = await Assignment.distinct('teacherId', { team, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] })
-      filter.teacherId = { $in: rosterTeacherIds }
+      const roster = await Assignment.find({ team, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] }).select('scopeType teacherId studentId cohortId').lean()
+      const teacherIds = roster.filter((row) => !row.scopeType || row.scopeType === 'teacher' || row.scopeType === 'student').map((row) => row.teacherId).filter(Boolean)
+      const studentIds = roster.filter((row) => row.scopeType === 'student').map((row) => row.studentId).filter(Boolean)
+      const cohortIds = roster.filter((row) => row.scopeType === 'cohort').map((row) => row.cohortId).filter(Boolean)
+      if (cohortIds.length) studentIds.push(...await CohortMember.distinct('studentId', { team, cohortId: { $in: cohortIds }, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] }))
+      filter.$or = [{ teacherId: { $in: teacherIds } }, { studentId: { $in: studentIds } }]
     }
     const [sessions, total] = await Promise.all([
       Session.find(filter).select('_id teacherId studentId scheduledAt status titleAr').sort({ scheduledAt: 1, _id: 1 }).skip(skip).limit(limit).populate('teacherId', 'firstNameAr lastNameAr').populate('studentId', 'firstNameAr lastNameAr').lean(),
       Session.countDocuments(filter),
     ])
-    const teacherIds = [...new Set(sessions.map((s) => identity(s.teacherId)).filter(Boolean))]
-    const assignments = teacherIds.length ? await Assignment.find({ team, teacherId: { $in: teacherIds }, startsAt: { $lt: to }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] }).select('teacherId supervisorId startsAt endsAt primary').populate('supervisorId', 'firstNameAr lastNameAr isActive').lean() : []
+    const { assignments, memberships } = await coverageService.loadCoverage(team, sessions)
     const supervisorIds = [...new Set(assignments.map((row) => identity(row.supervisorId)).filter(Boolean))]
-    const shifts = supervisorIds.length ? await Shift.find({ team, members: { $in: supervisorIds }, cancelledAt: null, startsAt: { $lt: to }, endsAt: { $gt: from } }).select('startsAt endsAt members').lean() : []
+    const [shifts, supervisorsById] = await Promise.all([
+      supervisorIds.length ? Shift.find({ team, members: { $in: supervisorIds }, cancelledAt: null, startsAt: { $lt: to }, endsAt: { $gt: from } }).select('startsAt endsAt members').lean() : [],
+      supervisorIds.length ? User.find({ _id: { $in: supervisorIds } }).select('firstNameAr lastNameAr isActive').lean() : [],
+    ])
+    const people = new Map(supervisorsById.map((person) => [identity(person), person]))
     const rows = sessions.map((session) => {
       const at = new Date(session.scheduledAt)
-      const current = assignments.filter((row) => identity(row.teacherId) === identity(session.teacherId) && row.startsAt <= at && (!row.endsAt || row.endsAt > at))
-      const supervisors = current.map((row) => ({ ...row.supervisorId, primary: row.primary, onShift: !!row.supervisorId?.isActive && shifts.some((shift) => shift.startsAt <= at && shift.endsAt > at && shift.members.some((member) => identity(member) === identity(row.supervisorId))) }))
+      const current = coverageService.resolveOwner(session, assignments, memberships)
+      const supervisors = current && people.has(identity(current.supervisorId)) ? [{ ...people.get(identity(current.supervisorId)), primary: true, onShift: !!people.get(identity(current.supervisorId)).isActive && shifts.some((shift) => shift.startsAt <= at && shift.endsAt > at && shift.members.some((member) => identity(member) === identity(current.supervisorId))) }] : []
       const primary = supervisors.find((row) => row.primary) || supervisors[0]
-      return { ...session, supervisor: primary || null, supervisors, coverage: !current.length ? 'unassigned' : supervisors.some((row) => row.onShift) ? 'covered' : supervisors.some((row) => row.isActive) ? 'off_shift' : 'inactive' }
+      return { ...session, supervisor: primary || null, supervisors, coverage: !current ? 'unassigned' : supervisors.some((row) => row.onShift) ? 'covered' : supervisors.some((row) => row.isActive) ? 'off_shift' : 'inactive' }
     })
     sendPaginated(res, rows, total, page, limit)
   } catch (err) { next(err) }

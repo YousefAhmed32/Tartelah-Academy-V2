@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Session = require('../models/Session')
 const User = require('../models/User')
 const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const Attendance = require('../models/Attendance')
 const Exception = require('../models/SupervisionException')
 const Adjustment = require('../models/SupervisionAdjustmentRequest')
@@ -27,9 +28,15 @@ const date = (value) => value && !Number.isNaN(new Date(value).getTime()) ? new 
 const types = ['student_apology', 'teacher_apology', 'student_absence', 'teacher_absence', 'delay', 'postpone', 'advance', 'reschedule', 'link_issue', 'substitute', 'compensation', 'other']
 const actions = ['reschedule', 'cancel', 'substitute', 'update_link', 'report_delay', 'grant_compensation', 'schedule_makeup']
 
-async function assigned(user, team, teacherId, at) {
+async function assigned(user, team, teacherId, at, studentId = null) {
   if (admin(user)) return true
   if (user.supervisionTeam !== team) return false
+  if (user.supervisionPosition === 'manager') return true
+  const complex = await Assignment.exists({ team, scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: at }, $or: [{ endsAt: null }, { endsAt: { $gt: at } }] })
+  if (complex && studentId) {
+    const owner = await coverage.ownerForSession(team, { teacherId: Array.isArray(teacherId) ? teacherId[0] : teacherId, supervisionOriginalTeacherId: Array.isArray(teacherId) ? teacherId[1] : null, studentId, scheduledAt: at })
+    return !!owner && (user.supervisionPosition === 'manager' || id(owner.supervisorId) === id(user))
+  }
   return !!await Assignment.exists({ team, teacherId: Array.isArray(teacherId) ? { $in: teacherId.filter(Boolean) } : teacherId,
     ...(!user.supervisionPosition || user.supervisionPosition !== 'manager' ? { supervisorId: user._id } : {}),
     startsAt: { $lte: at }, $or: [{ endsAt: null }, { endsAt: { $gt: at } }],
@@ -40,7 +47,24 @@ async function visibleFilter(user, team = 'administrative') {
   if (admin(user)) return {}
   if (user.supervisionTeam !== team) return { _id: { $in: [] } }
   if (user.supervisionPosition === 'supervisor' && team === 'administrative') return { ownerId: user._id }
+  if (team === 'administrative' && user.supervisionPosition === 'manager') {
+    const staffIds = await User.distinct('_id', { supervisionTeam: team, isActive: true })
+    return { ownerId: { $in: staffIds } }
+  }
+  const complex = await Assignment.exists({ team, scopeType: { $in: ['student', 'cohort'] } })
+  if (complex) {
+    const exceptionSessionIds = await Exception.distinct('sessionId')
+    if (!exceptionSessionIds.length) return { _id: { $in: [] } }
+    const covered = await Session.aggregate([
+      { $match: { _id: { $in: exceptionSessionIds } } }, ...coverage.ownershipStages(team),
+      { $match: user.supervisionPosition === 'manager' ? { 'effectiveOwner.0': { $exists: true } }
+        : { 'effectiveOwner.0.supervisorId': new mongoose.Types.ObjectId(user._id) } },
+      { $project: { _id: 1 } },
+    ])
+    return { sessionId: { $in: covered.map((row) => row._id) } }
+  }
   const rows = await Assignment.find({ team, ...(!user.supervisionPosition || user.supervisionPosition !== 'manager' ? { supervisorId: user._id } : {}) }).select('teacherId startsAt endsAt').lean()
+  if (!rows.length) return { _id: { $in: [] } }
   return { $or: rows.flatMap((row) => ['originalTeacherId', 'currentTeacherId'].map((field) => ({ [field]: row.teacherId, sessionScheduledAt: { $gte: row.startsAt, ...(row.endsAt ? { $lt: row.endsAt } : {}) } }))) }
 }
 
@@ -49,13 +73,15 @@ function audit(req, action, entity, entityId, changes) {
 }
 
 async function inform(caseRow, message) {
-  const session = await Session.findById(caseRow.sessionId).select('scheduledAt teacherId').lean()
+  const session = await Session.findById(caseRow.sessionId).select('scheduledAt teacherId studentId supervisionOriginalTeacherId').lean()
   const at = session?.scheduledAt || new Date()
-  const [managers, academics, admins] = await Promise.all([
+  const [managers, admins, complex] = await Promise.all([
     User.find({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean(),
-    Assignment.find({ team: 'academic', teacherId: { $in: [...new Set([id(caseRow.originalTeacherId), id(session?.teacherId)])] }, startsAt: { $lte: at }, $or: [{ endsAt: null }, { endsAt: { $gt: at } }] }).select('supervisorId').lean(),
     User.find({ isActive: true, role: 'admin', isPrimaryAdmin: true }).select('_id').lean(),
+    Assignment.exists({ team: 'academic', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: at }, $or: [{ endsAt: null }, { endsAt: { $gt: at } }] }),
   ])
+  const academics = complex && session ? [await coverage.ownerForSession('academic', session)].filter(Boolean)
+    : await Assignment.find({ team: 'academic', teacherId: { $in: [...new Set([id(caseRow.originalTeacherId), id(session?.teacherId)])] }, startsAt: { $lte: at }, $or: [{ endsAt: null }, { endsAt: { $gt: at } }] }).select('supervisorId').lean()
   const administrativeRecipients = [...new Set([id(caseRow.ownerId), ...managers.map(id), ...admins.map(id)])]
   const academicRecipients = [...new Set(academics.map((row) => id(row.supervisorId)))].filter((person) => !administrativeRecipients.includes(person))
   await createNotifications([
@@ -93,9 +119,9 @@ exports.create = async (req, res, next) => {
     const session = await Session.findById(sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
     const cohort = [session.teacherId, session.supervisionOriginalTeacherId].filter(Boolean)
-    if (!await assigned(req.user, 'administrative', cohort, session.scheduledAt)) return sendError(res, 'غير مكلف بهذه الحصة', 403)
+    if (!await assigned(req.user, 'administrative', cohort, session.scheduledAt, session.studentId)) return sendError(res, 'غير مكلف بهذه الحصة', 403)
     const owner = await User.findOne({ _id: ownerId, isActive: true, supervisionTeam: 'administrative', supervisionPosition: { $in: ['supervisor', 'manager'] } }).select('_id supervisionTeam supervisionPosition').lean()
-    if (!owner || owner.supervisionPosition === 'supervisor' && !await assigned(owner, 'administrative', cohort, session.scheduledAt)) return sendError(res, 'المسؤول غير مكلف بهذه الحصة', 400)
+    if (!owner || owner.supervisionPosition === 'supervisor' && !await assigned(owner, 'administrative', cohort, session.scheduledAt, session.studentId)) return sendError(res, 'المسؤول غير مكلف بهذه الحصة', 400)
     const row = await Exception.create({ sessionId, originalTeacherId: session.supervisionOriginalTeacherId || session.teacherId, currentTeacherId: session.teacherId, sessionScheduledAt: session.scheduledAt, studentId: session.studentId, type, reason, ownerId, followUpAt: due, createdBy: req.user._id })
     await audit(req, 'supervision_exception_create', 'SupervisionException', row._id, { sessionId, type, ownerId, followUpAt: due })
     await inform(row, `سُجلت حالة ${type} للحصة، والمسؤول عن المتابعة محدد حتى ${due.toISOString()}`).catch((error) => console.error('[supervision] exception notice:', error))
@@ -308,7 +334,7 @@ exports.requestAdjustment = async (req, res, next) => {
     if (!validId(sessionId) || !['teacher_payroll', 'student_lessons'].includes(accountType) || !reason || !Number.isFinite(amount) || amount <= 0 || amount > 100000 || accountType === 'student_lessons' && !Number.isInteger(amount) || accountType === 'teacher_payroll' && Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) return sendError(res, 'بيانات الخصم غير صالحة', 400)
     const session = await Session.findById(sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
     if (!session) return sendError(res, 'الحصة غير موجودة', 404)
-    if (!await assigned(req.user, 'administrative', [session.teacherId, session.supervisionOriginalTeacherId].filter(Boolean), session.scheduledAt)) return sendError(res, 'غير مكلف بهذه الحصة', 403)
+    if (!await assigned(req.user, 'administrative', [session.teacherId, session.supervisionOriginalTeacherId].filter(Boolean), session.scheduledAt, session.studentId)) return sendError(res, 'غير مكلف بهذه الحصة', 403)
     const row = await Adjustment.create({ sessionId, teacherId: session.teacherId, supervisionTeacherId: session.supervisionOriginalTeacherId || session.teacherId, sessionScheduledAt: session.scheduledAt, accountType, accountOwnerId: accountType === 'teacher_payroll' ? session.teacherId : session.studentId,
       unit: accountType === 'teacher_payroll' ? 'EGP' : 'lesson', requestedAmount: amount, reason, requestedBy: req.user._id })
     const managers = await User.find({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean()

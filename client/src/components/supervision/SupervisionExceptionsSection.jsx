@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { AlertTriangle, CalendarClock, CheckCircle2, CircleDollarSign } from 'lucide-react'
 import { supervisionService } from '../../services/supervision.service.js'
+import { academyDateKey, academyDayRange } from '../../utils/date.js'
 
 const input = 'min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100'
 const types = [['student_apology', 'اعتذار الطالب'], ['teacher_apology', 'اعتذار المعلم'], ['student_absence', 'غياب الطالب'], ['teacher_absence', 'غياب المعلم'], ['delay', 'تأخير'], ['postpone', 'تأجيل'], ['advance', 'تقديم الموعد'], ['reschedule', 'تغيير الموعد'], ['link_issue', 'مشكلة الرابط'], ['substitute', 'معلم بديل'], ['compensation', 'تعويض'], ['other', 'حالة أخرى']]
@@ -11,8 +12,8 @@ const fullName = (person) => [person?.firstNameAr, person?.lastNameAr].filter(Bo
 const localDateTime = (value) => new Date(value).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
 const localInput = (value) => { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) }
 const tomorrow = () => localInput(Date.now() + 86400000)
-const today = () => localInput(Date.now()).slice(0, 10)
-const dayRange = (day) => { const start = new Date(`${day}T00:00:00`); return { from: start.toISOString(), to: new Date(start.getTime() + 86400000).toISOString() } }
+const today = () => academyDateKey(new Date())
+const dayRange = academyDayRange
 
 function Field({ label, children }) { return <label className="block text-sm font-semibold text-gray-700">{label}{children}</label> }
 function Notice({ children }) { return <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{children}</p> }

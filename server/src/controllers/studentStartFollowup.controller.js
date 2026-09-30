@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 const User = require('../models/User')
 const Session = require('../models/Session')
 const ScheduleRule = require('../models/ScheduleRule')
-const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const Followup = require('../models/StudentStartFollowup')
 const { sendSuccess, sendError } = require('../utils/response')
 const { createNotifications } = require('../services/notification.service')
@@ -23,8 +23,8 @@ async function canAccess(user, session) {
   if (admin(user)) return true
   if (user.supervisionTeam !== 'administrative') return false
   if (user.supervisionPosition === 'manager') return true
-  return !!await Assignment.exists({ team: 'administrative', supervisorId: user._id, teacherId: session.teacherId,
-    startsAt: { $lte: new Date() }, $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })
+  const owner = await coverage.ownerForSession('administrative', session)
+  return id(owner?.supervisorId) === id(user)
 }
 
 exports.myFeedback = async (req, res, next) => {
@@ -58,7 +58,7 @@ exports.submitFeedback = async (req, res, next) => {
     if (rating <= 2) {
       const [managers, owners] = await Promise.all([
         User.find({ supervisionTeam: 'administrative', supervisionPosition: 'manager', isActive: true }).select('_id').lean(),
-        Assignment.find({ team: 'administrative', teacherId: session.teacherId, startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean(),
+        coverage.ownerForSession('administrative', session).then((row) => row ? [row] : []),
       ])
       const recipients = [...new Set([...managers.map(id), ...owners.map((item) => id(item.supervisorId))])]
       await createNotifications(recipients.map((userId) => ({ userId, type: 'assignment', titleAr: 'رأي الطالب بعد أول حلقة يحتاج متابعة',
@@ -78,13 +78,10 @@ exports.list = async (req, res, next) => {
     const since = recent()
     let students, total
     if (!admin(req.user) && req.user.supervisionPosition !== 'manager') {
-      const assignments = await Assignment.find({ team: 'administrative', supervisorId: req.user._id,
-        startsAt: { $lte: new Date() }, $or: [{ endsAt: null }, { endsAt: { $gt: new Date() } }] })
-        .select('teacherId startsAt endsAt').lean()
-      if (!assignments.length) return res.status(200).json({ success: true, data: [], total: 0, page, limit })
-      const periods = assignments.map((row) => ({ teacherId: row.teacherId, scheduledAt: { $gte: since } }))
       const result = await Session.aggregate([
-        { $match: { $or: periods } },
+        { $match: { scheduledAt: { $gte: since } } },
+        ...coverage.ownershipStages('administrative'),
+        { $match: { 'effectiveOwner.0.supervisorId': new mongoose.Types.ObjectId(req.user._id) } },
         { $group: { _id: '$studentId' } },
         { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'student' } },
         { $unwind: '$student' },

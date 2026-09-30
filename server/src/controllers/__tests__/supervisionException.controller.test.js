@@ -47,6 +47,18 @@ test('academic supervisor cannot create administrative exception', async () => {
   expect(Exception.create).not.toHaveBeenCalled()
 })
 
+test('academic supervisor without assignments sees no exceptions', async () => {
+  Assignment.exists.mockResolvedValue(false)
+  Assignment.find.mockReturnValue({ select: () => ({ lean: async () => [] }) })
+  const chain = { sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), lean: async () => [] }
+  Exception.find.mockReturnValue(chain)
+  Exception.countDocuments.mockResolvedValue(0)
+  const request = req({ _id: ids.staff, role: 'staff', supervisionTeam: 'academic', supervisionPosition: 'supervisor' })
+  await controller.list(request, response(), jest.fn())
+  expect(Exception.find).toHaveBeenCalledWith({ _id: { $in: [] } })
+  expect(Exception.countDocuments).toHaveBeenCalledWith({ _id: { $in: [] } })
+})
+
 test('new exception requires dated assignment and a responsible owner with follow-up time', async () => {
   const request = req()
   request.body = { sessionId: ids.session, ownerId: ids.staff, type: 'link_issue', reason: 'الرابط لا يعمل', followUpAt: new Date(Date.now() + 3600000).toISOString() }

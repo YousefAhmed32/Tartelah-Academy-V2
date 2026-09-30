@@ -2,6 +2,7 @@ const cron = require('node-cron')
 const Session = require('../models/Session')
 const User = require('../models/User')
 const SupervisionAssignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const SupervisionException = require('../models/SupervisionException')
 const { createNotification, createNotifications } = require('../services/notification.service')
 const { POLICY } = require('../config/attendancePolicy')
@@ -41,6 +42,9 @@ async function sweepStale() {
     .sort({ scheduledAt: 1 }).limit(500)
     .select('_id teacherId studentId subscriptionId titleAr scheduledAt durationMinutes status isMakeup makeupForSessionId teacherAttendanceStatus outcome payrollStatus payrollStatusSetBy subscriptionConsumed subscriptionConsumedAt lessonConsumedTransactionId lessonConsumptionSeq compensationGrantedTransactionId compensationRequired compensationReason')
     .populate('teacherId', 'firstNameAr lastNameAr')
+
+  const complex = stale.length && await SupervisionAssignment.exists({ scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: now }, $or: [{ endsAt: null }, { endsAt: { $gt: stale[0].scheduledAt } }] })
+  const scoped = complex ? await Promise.all(['academic', 'administrative'].map((team) => coverage.loadCoverage(team, stale))) : null
 
   for (const session of stale) {
     const end = new Date(new Date(session.scheduledAt).getTime() + (session.durationMinutes || 60) * 60000)
@@ -91,8 +95,9 @@ async function sweepStale() {
 
     // Keep the owed replacement visible in the next shift instead of only
     // crediting the wallet and leaving an unowned operational task.
-    const assignment = await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId._id,
-      startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).sort({ primary: -1, startsAt: -1 }).select('supervisorId').lean()
+    const assignment = scoped ? coverage.resolveOwner(session, scoped[1].assignments, scoped[1].memberships)
+      : await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId._id,
+        startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).sort({ primary: -1, startsAt: -1 }).select('supervisorId').lean()
     const fallback = assignment ? null : await User.findOne({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean()
     const primaryAdmin = assignment || fallback ? null : await User.findOne({ isActive: true, role: 'admin', isPrimaryAdmin: true }).select('_id').lean()
     const ownerId = assignment?.supervisorId || fallback?._id || primaryAdmin?._id
@@ -107,8 +112,9 @@ async function sweepStale() {
         type: 'assignment', priority: 'high', actionUrl: '/admin/supervision/administrative',
         metadata: { dedupeKey: `teacher-no-show-exception:${exception._id}` } })
     }
-    const academicAssignments = await SupervisionAssignment.find({ team: 'academic', teacherId: session.teacherId._id,
-      startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
+    const academicAssignments = scoped ? [coverage.resolveOwner(session, scoped[0].assignments, scoped[0].memberships)].filter(Boolean)
+      : await SupervisionAssignment.find({ team: 'academic', teacherId: session.teacherId._id,
+        startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
     if (academicAssignments.length) {
       await createNotifications(academicAssignments.map((row) => ({ userId: row.supervisorId,
         titleAr: 'غياب معلم في حلقة مكلف بها', bodyAr: `تأكد من الأثر الأكاديمي لحصة "${session.titleAr}" والتعويض المطلوب`,

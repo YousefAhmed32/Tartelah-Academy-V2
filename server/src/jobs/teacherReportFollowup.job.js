@@ -1,6 +1,7 @@
 const cron = require('node-cron')
 const Session = require('../models/Session')
 const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const QuranSessionReport = require('../models/QuranSessionReport')
 const User = require('../models/User')
 const { createNotification } = require('../services/notification.service')
@@ -14,7 +15,7 @@ async function sweepMissingReports(from, cutoff, initialCursor, maxBatches) {
   for (let batch = 0; batch < maxBatches; batch++) {
     const filter = { status: 'completed', quranReportRequired: { $ne: false }, completedAt: { $gte: from, $lte: cutoff } }
     if (cursor) filter._id = { $gt: cursor }
-    const sessions = await Session.find(filter).sort({ _id: 1 }).limit(100).select('_id teacherId scheduledAt completedAt titleAr').lean()
+    const sessions = await Session.find(filter).sort({ _id: 1 }).limit(100).select('_id teacherId studentId supervisionOriginalTeacherId scheduledAt completedAt titleAr').lean()
     if (!sessions.length) return null
     const sessionIds = sessions.map((row) => row._id)
     const reports = await QuranSessionReport.find({ sessionId: { $in: sessionIds }, status: { $in: ['submitted', 'approved'] } }).select('sessionId').lean()
@@ -24,8 +25,10 @@ async function sweepMissingReports(from, cutoff, initialCursor, maxBatches) {
       const teacherIds = [...new Set(missing.map((row) => id(row.teacherId)))]
       const earliest = new Date(Math.min(...missing.map((row) => row.scheduledAt.getTime())))
       const latest = new Date(Math.max(...missing.map((row) => row.scheduledAt.getTime())) + 1)
-      const assignments = await Assignment.find({ team: 'academic', teacherId: { $in: teacherIds }, startsAt: { $lt: latest }, $or: [{ endsAt: null }, { endsAt: { $gt: earliest } }] }).select('teacherId supervisorId startsAt endsAt').lean()
-      const supervisors = [...new Set(assignments.map((row) => id(row.supervisorId)))]
+      const complex = await Assignment.exists({ team: 'academic', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lt: latest }, $or: [{ endsAt: null }, { endsAt: { $gt: earliest } }] })
+      const scoped = complex ? await coverage.loadCoverage('academic', missing) : null
+      const assignments = scoped ? scoped.assignments : await Assignment.find({ team: 'academic', teacherId: { $in: teacherIds }, startsAt: { $lt: latest }, $or: [{ endsAt: null }, { endsAt: { $gt: earliest } }] }).select('teacherId supervisorId startsAt endsAt').lean()
+      const supervisors = [...new Set((scoped?.assignments || assignments).map((row) => id(row.supervisorId)))]
       const activeUsers = await User.find({ isActive: true, $or: [{ _id: { $in: supervisors }, supervisionTeam: 'academic', supervisionPosition: 'supervisor' }, { supervisionTeam: 'academic', supervisionPosition: 'manager' }] }).select('_id supervisionPosition').lean()
       const activeIds = new Set(activeUsers.map((user) => id(user)))
       const managerIds = activeUsers.filter((user) => user.supervisionPosition === 'manager').map((user) => user._id)
@@ -33,7 +36,8 @@ async function sweepMissingReports(from, cutoff, initialCursor, maxBatches) {
         const current = await Session.exists({ _id: session._id, status: 'completed', quranReportRequired: { $ne: false } })
         const report = await QuranSessionReport.exists({ sessionId: session._id, status: { $in: ['submitted', 'approved'] } })
         if (!current || report) continue
-        const assigned = assignments.filter((row) => id(row.teacherId) === id(session.teacherId) && row.startsAt <= session.scheduledAt && (!row.endsAt || row.endsAt > session.scheduledAt) && activeIds.has(id(row.supervisorId))).map((row) => row.supervisorId)
+        const assigned = scoped ? [coverage.resolveOwner(session, scoped.assignments, scoped.memberships)?.supervisorId].filter((owner) => owner && activeIds.has(id(owner)))
+          : assignments.filter((row) => id(row.teacherId) === id(session.teacherId) && row.startsAt <= session.scheduledAt && (!row.endsAt || row.endsAt > session.scheduledAt) && activeIds.has(id(row.supervisorId))).map((row) => row.supervisorId)
         const recipients = [
           { userId: session.teacherId, url: `/teacher/quran-reports/${session._id}`, title: 'تقرير حصتك لم يُرسل بعد' },
           ...[...new Set(assigned.map(id))].map((userId) => ({ userId, url: '/admin/supervision/academic', title: 'تقرير معلم يحتاج متابعة' })),

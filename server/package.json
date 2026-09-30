@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "seed": "node src/seed/seed.js",
     "seed:supervision-demo": "node src/scripts/ensureSupervisionDemoAccounts.js",
+    "seed:local-week": "node src/seed/localWeek.js",
     "verify:v3": "node src/scripts/verifyV3Integration.js",
     "seed:production": "node src/seeders/production/index.js",
     "seed:host": "node src/seeders/production/index.js",

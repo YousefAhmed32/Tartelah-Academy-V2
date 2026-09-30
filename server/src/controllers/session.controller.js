@@ -664,9 +664,12 @@ exports.cancelSession = async (req, res, next) => {
       const source = await Session.findById(session.makeupForSessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
       if (source) {
         const SupervisionAssignment = require('../models/SupervisionAssignment')
+        const supervisionCoverage = require('../services/supervisionCoverage.service')
         const SupervisionException = require('../models/SupervisionException')
-        const assignment = await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId,
-          startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
+        const complex = await SupervisionAssignment.exists({ team: 'administrative', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] })
+        const assignment = complex ? await supervisionCoverage.ownerForSession('administrative', session)
+          : await SupervisionAssignment.findOne({ team: 'administrative', teacherId: session.teacherId,
+            startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] }).select('supervisorId').lean()
         const manager = assignment ? null : await User.findOne({ isActive: true, supervisionTeam: 'administrative', supervisionPosition: 'manager' }).select('_id').lean()
         const adminOwner = assignment || manager ? null : await User.findOne({ role: 'admin', isPrimaryAdmin: true, isActive: true }).select('_id').lean()
         const ownerId = assignment?.supervisorId || manager?._id || adminOwner?._id

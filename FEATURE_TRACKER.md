@@ -2,6 +2,19 @@
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Not Started | ❌ Blocked
 
+## V3-9.1 — Supervision workspaces and flexible ownership — 2026-09-30
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Dated teacher, student-pair and cohort assignments | ✅ | Student > cohort > teacher; team isolation and one active cohort per student/team. |
+| Cohort management and direct assignment | ✅ | Create, rename/edit notes, add/remove members, close/reopen with retained history, and assign a supervisor from the creation form or replace later. |
+| Four supervision dashboards | ✅ | Role-specific navigation, live metrics, next lesson, academic R1 access and administrative late-start action. |
+| Admin and person profiles | ✅ | Separate academic/administrative navigation and scoped ownership, R1, and academic plans in relevant admin profiles. |
+| API and automated verification | ✅ | Isolated Mongo QA, 693/693 server tests in 72 suites, 100/100 client tests, production build and targeted ESLint. |
+| Navigation and account isolation | ✅ | Existing sections remain reachable from role/admin sidebars. No-assignment exception scope and cached data across logins are covered by regression tests. |
+| Interactive visual review | ✅ | Four role logins and admin access, desktop/mobile, right-side 460px drawer, Escape/keyboard focus and no horizontal overflow on reviewed mobile screens. |
+| Academy owner acceptance | ⏳ | Local implementation ready for operational review; owner acceptance and deployment are separate. |
+
 ## Inline Admin Session Editing & Postponement — 2026-09-17 (latest)
 
 Full detail in `SESSION_HANDOFF.md`'s matching entry.

@@ -19,6 +19,7 @@ import Badge from '../../components/ui/Badge.jsx'
 import BulkSyncLinksModal from '../../components/teacher/BulkSyncLinksModal.jsx'
 import TeacherAdjustmentModal from '../../components/admin/TeacherAdjustmentModal.jsx'
 import TeacherSessionsTab from '../../components/admin/TeacherSessionsTab.jsx'
+import SupervisionProfileCard from '../../components/supervision/SupervisionProfileCard.jsx'
 import ErrorState from '../../components/shared/ErrorState.jsx'
 import ConfirmDialog from '../../components/shared/ConfirmDialog.jsx'
 import WorkingHoursEditor from '../../components/ui/WorkingHoursEditor.jsx'
@@ -64,6 +65,7 @@ const TABS = [
   { key: 'sessions',    label: 'الحصص والجدول', Icon: CalendarClock },
   { key: 'students',    label: 'الطلاب',        Icon: Users },
   { key: 'performance', label: 'الأداء',        Icon: TrendingUp },
+  { key: 'supervision', label: 'الإشراف والمتابعة', Icon: ClipboardCheck, permission: 'supervision.view' },
   { key: 'payroll',     label: 'الرواتب',       Icon: Wallet, permission: 'payroll.view' },
   { key: 'account',     label: 'الحساب',        Icon: Settings },
 ]
@@ -1204,7 +1206,8 @@ export default function AdminTeacherProfilePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [showBulkSync, setShowBulkSync] = useState(false)
-  const { hasPermission } = useAuthStore()
+  const { hasPermission, user } = useAuthStore()
+  const canViewSupervision = (user?.isPrimaryAdmin || user?.role === 'admin') && hasPermission('supervision.view')
   const { data: subjects = [] } = useTeachingSubjects()
   const qc = useQueryClient()
 
@@ -1298,7 +1301,7 @@ export default function AdminTeacherProfilePage() {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
-          {TABS.filter((t) => !t.permission || hasPermission(t.permission)).map((t) => (
+          {TABS.filter((t) => (!t.permission || hasPermission(t.permission)) && (t.key !== 'supervision' || canViewSupervision)).map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-bold whitespace-nowrap transition-all ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
               <t.Icon size={14} /> {t.label}
@@ -1306,6 +1309,8 @@ export default function AdminTeacherProfilePage() {
           ))}
         </div>
       </div>
+
+      {canViewSupervision && tab !== 'supervision' && <SupervisionProfileCard kind="teacher" id={id} />}
 
       {/* Tab content */}
       {tab === 'overview' && (
@@ -1337,6 +1342,7 @@ export default function AdminTeacherProfilePage() {
         />
       )}
       {tab === 'performance' && <PerformanceTab teacherId={id} recentSessions={recentSessions} />}
+      {tab === 'supervision' && canViewSupervision && <SupervisionProfileCard kind="teacher" id={id} full />}
       {tab === 'payroll' && hasPermission('payroll.view') && (
         <PayrollTab
           teacherId={id}

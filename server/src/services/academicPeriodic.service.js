@@ -2,7 +2,7 @@ const crypto = require('crypto')
 const mongoose = require('mongoose')
 const { fromZonedTime } = require('date-fns-tz')
 const Session = require('../models/Session')
-const Assignment = require('../models/SupervisionAssignment')
+const { ownershipStages } = require('./supervisionCoverage.service')
 const Attendance = require('../models/Attendance')
 const Observation = require('../models/AcademicObservationReport')
 const Exception = require('../models/SupervisionException')
@@ -34,14 +34,10 @@ function percent(numerator, base) { return base ? Math.round(numerator / base * 
 
 async function academicAchievements({ start, end, supervisorId, category }) {
   async function count(model, field) {
-    const assignmentMatch = { $and: [{ $eq: ['$team', 'academic'] }, { $eq: ['$teacherId', '$$teacherId'] },
-      { $lte: ['$startsAt', '$$at'] }, { $or: [{ $eq: ['$endsAt', null] }, { $gt: ['$endsAt', '$$at'] }] },
-      ...(supervisorId ? [{ $eq: ['$supervisorId', objectId(supervisorId)] }] : [])] }
     const [result] = await model.aggregate([
       { $match: { [field]: { $gte: start, $lt: end } } },
-      { $lookup: { from: Assignment.collection.name, let: { teacherId: '$teacherId', at: `$${field}` },
-        pipeline: [{ $match: { $expr: assignmentMatch } }, { $limit: 1 }, { $project: { _id: 1 } }], as: 'assignment' } },
-      { $match: { 'assignment.0': { $exists: true } } },
+      ...ownershipStages('academic', `$${field}`),
+      { $match: supervisorId ? { 'effectiveOwner.0.supervisorId': objectId(supervisorId) } : { 'effectiveOwner.0': { $exists: true } } },
       ...(category ? [{ $lookup: { from: User.collection.name, localField: 'teacherId', foreignField: '_id', as: 'teacher' } },
         { $match: { 'teacher.specializations': category } }] : []),
       { $group: { _id: '$studentId', count: { $sum: 1 }, lastChangedAt: { $max: '$updatedAt' } } },
@@ -78,18 +74,10 @@ async function metrics({ team, from, to, supervisorId, shiftId, category, eviden
   const safeTeacherPage = Math.min(1000, Math.max(1, Number.parseInt(teacherPage, 10) || 1))
   if (!(start < end)) return { counts: empty, denominator: 0, percentages: null, days: [], teachers: [], samples: [], calculatedAt: new Date(),
     sourceFingerprint: crypto.createHash('sha256').update('empty').digest('hex'), shiftSnapshot }
-  const assignmentMatch = { $and: [
-    { $eq: ['$team', team] },
-    { $in: ['$teacherId', ['$$teacherId', '$$originalTeacherId']] },
-    { $lte: ['$startsAt', '$$scheduledAt'] },
-    { $or: [{ $eq: ['$endsAt', null] }, { $gt: ['$endsAt', '$$scheduledAt'] }] },
-    ...(supervisorId ? [{ $eq: ['$supervisorId', objectId(supervisorId)] }] : []),
-  ] }
   const pipeline = [
     { $match: { scheduledAt: { $gte: start, $lt: end } } },
-    { $lookup: { from: Assignment.collection.name, let: { teacherId: '$teacherId', originalTeacherId: '$supervisionOriginalTeacherId', scheduledAt: '$scheduledAt' },
-      pipeline: [{ $match: { $expr: assignmentMatch } }, { $limit: 1 }, { $project: { _id: 1 } }], as: 'assignment' } },
-    { $match: { 'assignment.0': { $exists: true } } },
+    ...ownershipStages(team),
+    { $match: supervisorId ? { 'effectiveOwner.0.supervisorId': objectId(supervisorId) } : { 'effectiveOwner.0': { $exists: true } } },
     ...(category ? [{ $lookup: { from: User.collection.name, localField: 'teacherId', foreignField: '_id', as: 'teacher' } },
       { $match: { 'teacher.specializations': category } }] : []),
     { $lookup: { from: Attendance.collection.name, let: { sessionId: '$_id' }, pipeline: [

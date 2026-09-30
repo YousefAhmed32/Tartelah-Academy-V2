@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Report = require('../models/AcademicObservationReport')
 const Session = require('../models/Session')
 const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const Shift = require('../models/SupervisionShift')
 const Settings = require('../models/SupervisionSettings')
 const User = require('../models/User')
@@ -27,6 +28,11 @@ function pageFor(req) {
 }
 
 async function assigned(session, user) {
+  const complex = await Assignment.countDocuments({ team: 'academic', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] })
+  if (complex) {
+    const owner = await coverage.ownerForSession('academic', session)
+    return !!owner && id(owner.supervisorId) === id(user)
+  }
   const teacherIds = [session.teacherId, session.supervisionOriginalTeacherId].filter(Boolean)
   return Assignment.exists({ team: 'academic', supervisorId: user._id, teacherId: { $in: teacherIds },
     startsAt: { $lte: session.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: session.scheduledAt } }] })
@@ -81,14 +87,15 @@ function complete(row) {
 async function nextSessionFor(row) {
   return Session.findOne({ studentId: row.studentId, teacherId: row.teacherId,
     scheduledAt: { $gt: row.scheduledAt }, _id: { $ne: row.sessionId },
-    status: { $nin: ['cancelled', 'rescheduled'] } }).sort({ scheduledAt: 1 }).select('_id scheduledAt teacherId supervisionOriginalTeacherId status').lean()
+    status: { $nin: ['cancelled', 'rescheduled'] } }).sort({ scheduledAt: 1 }).select('_id scheduledAt teacherId supervisionOriginalTeacherId studentId status').lean()
 }
 
 async function ensureFollowUpAction(row) {
   if (!row.followUpNeeded) return null
-  const nextSession = row.nextSessionId ? await Session.findById(row.nextSessionId).select('_id scheduledAt teacherId supervisionOriginalTeacherId status').lean() : await nextSessionFor(row)
+  const nextSession = row.nextSessionId ? await Session.findById(row.nextSessionId).select('_id scheduledAt teacherId supervisionOriginalTeacherId studentId status').lean() : await nextSessionFor(row)
   const target = nextSession && !['cancelled', 'rescheduled'].includes(nextSession.status) ? nextSession : null
-  const ownerAssignment = target ? await Assignment.findOne({ team: 'academic',
+  const complex = target ? await Assignment.countDocuments({ team: 'academic', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lte: target.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: target.scheduledAt } }] }) : 0
+  const ownerAssignment = target && complex ? await coverage.ownerForSession('academic', target) : target ? await Assignment.findOne({ team: 'academic',
     teacherId: { $in: [target.teacherId, target.supervisionOriginalTeacherId].filter(Boolean) },
     startsAt: { $lte: target.scheduledAt }, $or: [{ endsAt: null }, { endsAt: { $gt: target.scheduledAt } }] })
     .sort({ primary: -1, startsAt: -1 }).select('supervisorId').lean() : null
@@ -136,7 +143,7 @@ exports.list = async (req, res, next) => {
       if (!mongoose.isValidObjectId(req.query.sessionId)) return sendError(res, 'الحصة غير صالحة', 400)
       filter.sessionId = req.query.sessionId
       if (supervisor(req.user)) {
-        const session = await Session.findById(req.query.sessionId).select('teacherId supervisionOriginalTeacherId scheduledAt').lean()
+        const session = await Session.findById(req.query.sessionId).select('teacherId supervisionOriginalTeacherId studentId scheduledAt').lean()
         if (!session || !await assigned(session, req.user)) return sendError(res, 'غير مصرح لهذه الحصة', 403)
       }
     }

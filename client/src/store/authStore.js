@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { ROLES, ADMIN_FAMILY_ROLES, ROLE_DISPLAY_NAMES, ROUTES } from '../config/constants.js'
+import { queryClient } from '../config/queryClient.js'
 
 // RBAC + PBAC auth store. `user` (hydrated from GET /auth/me, see
 // hooks/useAuth.js) already carries `role` (the stable systemRole),
@@ -18,19 +19,25 @@ export const useAuthStore = create((set, get) => ({
   setUser: (user) => set({ user, isAuthenticated: !!user }),
   setAccessToken: (token) => set({ accessToken: token }),
 
-  setAuth: (user, token) => set({
-    user,
-    accessToken: token,
-    isAuthenticated: true,
-    isLoading: false,
-  }),
+  setAuth: (user, token) => {
+    if (get().user?._id !== user?._id) queryClient.clear()
+    set({
+      user,
+      accessToken: token,
+      isAuthenticated: true,
+      isLoading: false,
+    })
+  },
 
-  logout: () => set({
-    user: null,
-    accessToken: null,
-    isAuthenticated: false,
-    isLoading: false,
-  }),
+  logout: () => {
+    queryClient.clear()
+    set({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+    })
+  },
 
   setLoading: (isLoading) => set({ isLoading }),
 

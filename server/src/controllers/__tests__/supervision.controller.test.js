@@ -28,6 +28,13 @@ function request(body, user = actor()) { return { body, user, params: {}, query:
 beforeEach(() => { jest.clearAllMocks(); Lock.findOneAndUpdate.mockImplementation(async (_, update) => ({ token: update.$set.token })); Lock.deleteOne.mockResolvedValue({}) })
 
 describe('V3-1 supervision scope and schedules', () => {
+  test('an admin gets a validation error for an unknown assignment team', async () => {
+    const res = response()
+    await ctrl.createAssignment(request({ team: 'unknown', teacherId, supervisorId }, { role: 'admin', isPrimaryAdmin: true }), res, jest.fn())
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(User.findById).not.toHaveBeenCalled()
+  })
+
   test('an academic manager cannot read administrative assignments by team parameter', async () => {
     const req = request({}, actor('academic', 'manager'))
     req.query.team = 'administrative'

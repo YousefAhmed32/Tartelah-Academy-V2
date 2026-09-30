@@ -1,6 +1,7 @@
 const cron = require('node-cron')
 const Session = require('../models/Session')
 const Assignment = require('../models/SupervisionAssignment')
+const coverage = require('../services/supervisionCoverage.service')
 const Shift = require('../models/SupervisionShift')
 const Report = require('../models/AcademicObservationReport')
 const Settings = require('../models/SupervisionSettings')
@@ -27,11 +28,13 @@ async function runMissingAcademicReports(now = new Date()) {
       scheduledAt: { $gte: from, $lt: now } }
     if (cursor) filter._id = { $gt: cursor }
     const sessions = await Session.find(filter).sort({ _id: 1 }).limit(100)
-      .select('_id teacherId supervisionOriginalTeacherId scheduledAt titleAr').lean()
+      .select('_id teacherId studentId supervisionOriginalTeacherId scheduledAt titleAr').lean()
     if (!sessions.length) { resumeAfter = null; break }
     const teachers = [...new Set(sessions.flatMap((row) => [id(row.teacherId), id(row.supervisionOriginalTeacherId)].filter(Boolean)))]
+    const complex = await Assignment.exists({ team: 'academic', scopeType: { $in: ['student', 'cohort'] }, startsAt: { $lt: now }, $or: [{ endsAt: null }, { endsAt: { $gt: from } }] })
+    const scoped = complex ? await coverage.loadCoverage('academic', sessions) : null
     const [assignments, shifts, reports] = await Promise.all([
-      Assignment.find({ team: 'academic', teacherId: { $in: teachers }, startsAt: { $lt: now },
+      scoped ? scoped.assignments : Assignment.find({ team: 'academic', teacherId: { $in: teachers }, startsAt: { $lt: now },
         $or: [{ endsAt: null }, { endsAt: { $gt: from } }] }).select('teacherId supervisorId startsAt endsAt').lean(),
       Shift.find({ team: 'academic', cancelledAt: null, startsAt: { $lt: now }, endsAt: { $gt: from } })
         .select('members startsAt endsAt').lean(),
@@ -42,9 +45,10 @@ async function runMissingAcademicReports(now = new Date()) {
     const active = new Set(activeSupervisors.map(id))
     const reportByPair = new Map(reports.map((row) => [`${id(row.sessionId)}:${id(row.supervisorId)}`, row]))
     for (const session of sessions) {
-      const owners = [...new Set(assignments.filter((row) => [id(session.teacherId), id(session.supervisionOriginalTeacherId)].includes(id(row.teacherId))
-        && row.startsAt <= session.scheduledAt && (!row.endsAt || row.endsAt > session.scheduledAt))
-        .map((row) => id(row.supervisorId)))].filter((ownerId) => active.has(ownerId))
+      const owners = (scoped ? [id(coverage.resolveOwner(session, scoped.assignments, scoped.memberships)?.supervisorId)].filter(Boolean)
+        : [...new Set(assignments.filter((row) => [id(session.teacherId), id(session.supervisionOriginalTeacherId)].includes(id(row.teacherId))
+          && row.startsAt <= session.scheduledAt && (!row.endsAt || row.endsAt > session.scheduledAt))
+          .map((row) => id(row.supervisorId)))]).filter((ownerId) => active.has(ownerId))
       for (const ownerId of owners) {
         const shift = shifts.filter((row) => row.members.some((member) => id(member) === ownerId)
           && row.startsAt <= session.scheduledAt && row.endsAt > session.scheduledAt).sort((a, b) => a.endsAt - b.endsAt)[0]

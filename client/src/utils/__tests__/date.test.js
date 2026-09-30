@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import {
-  academyDateKey, academyMonthDateRange, formatDateAr, formatTimeAr, getDayNameAr,
+  academyDateKey, academyDayRange, academyMonthDateRange, formatDateAr, formatTimeAr, getDayNameAr,
   setAcademyTimezone, shiftDateKey, toAcademyDateTimeLocal,
 } from '../date.js'
 
@@ -30,5 +30,11 @@ describe('academy timezone date formatting', () => {
     expect(academyMonthDateRange('2026-09-17T06:00:00.000Z')).toEqual({
       start: '2026-09-01', end: '2026-09-30',
     })
+  })
+
+  test('uses exact academy midnight even when daylight saving changes the day length', () => {
+    expect(academyDayRange('2026-04-23')).toEqual({ from: '2026-04-22T22:00:00.000Z', to: '2026-04-23T21:00:00.000Z' })
+    expect(academyDayRange('2026-10-29')).toEqual({ from: '2026-10-28T21:00:00.000Z', to: '2026-10-29T22:00:00.000Z' })
+    expect(academyDayRange('2026-02-30')).toBeNull()
   })
 })
